@@ -1,7 +1,8 @@
 
 YACoin very-unofficial development tree
+---------------------------------------
+
 Maintained by bitcointalk.org user WindMaster
----------------------------------------------
 
 This is not the official YACoin client repository, but rather a fork I
 created to continue development and promotion of YACoin after the
