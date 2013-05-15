@@ -1,10 +1,30 @@
 
-NovaCoin official development tree
+YACoin very-unofficial development tree
+Maintained by bitcointalk.org user WindMaster
+---------------------------------------------
 
-NovaCoin - a hybrid scrypt PoW + PoS based cryptocurrency.
+This is not the official YACoin client repository, but rather a fork I
+created to continue development and promotion of YACoin after the
+original developer, GitHub user pocopoco, stopped participating in the
+community immediately after launch of the coin.  The official YACoin
+repository is located at:
 
-* 10 minute PoW block targets
-* 10 minute PoS block targets
+https://github.com/pocopoco/yacoin/
+
+
+YACoin - a hybrid scrypt PoW + PoS based cryptocurrency forked from NovaCoin
+by GitHub user pocopoco.
+
+
+NOTE: All of the information below is as cloned from pocopoco's
+repository.  Much of it is known to not be correct for YACoin, and
+is simply a copy of what NovaCoin's README file contained, as
+pocopoco didn't bother changing anything.  These will be corrected
+and updated as correct information is determined:
+
+
+* 1 minute PoW block targets
+* (?) minute PoS block targets
 * The PoW subsidy halves every x64 multiply of difficulty
 * Maximum PoW reward is 100 coins
 * ~ 2 billion total coins
