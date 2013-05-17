@@ -100,7 +100,7 @@ unsigned short GetListenPort()
 
 
 //
-// unsigned int GetMaxConnections( void )
+// int GetMaxConnections( void )
 //
 //    WM - Function to determine maximum allowed in+out connections.
 //
@@ -127,7 +127,7 @@ int GetMaxConnections()
 
 
 //
-// unsigned int GetMaxOutboundConnections( void )
+// int GetMaxOutboundConnections( void )
 //
 //    WM - Function to determine maximum allowed outbound connections.
 //
@@ -1900,7 +1900,7 @@ void StartNode(void* parg)
 
     if (semOutbound == NULL) {
         // initialize semaphore
-        int nMaxOutbound = min( /* WM - MAX_OUTBOUND_CONNECTIONS */ GetMaxOutboundConnections(), (int) GetArg( "-maxconnections", DEFAULT_MAX_CONNECTIONS ));
+        int nMaxOutbound = min( GetMaxOutboundConnections(), GetMaxConnections() );
         semOutbound = new CSemaphore(nMaxOutbound);
     }
 
@@ -1969,7 +1969,7 @@ bool StopNode()
     nTransactionsUpdated++;
     int64 nStart = GetTime();
     if (semOutbound)
-        for (int i=0; i< /* WM - MAX_OUTBOUND_CONNECTIONS */ GetMaxOutboundConnections(); i++)
+        for( int i = 0; i < GetMaxOutboundConnections(); i++ )
             semOutbound->post();
     do
     {
