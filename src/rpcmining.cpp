@@ -63,6 +63,9 @@ Value gethashespersec(const Array& params, bool fHelp)
 
 Value getmininginfo(const Array& params, bool fHelp)
 {
+    unsigned char Nfactor;
+    uint64_t N;
+
     if (fHelp || params.size() != 0)
         throw runtime_error(
             "getmininginfo\n"
@@ -79,6 +82,13 @@ Value getmininginfo(const Array& params, bool fHelp)
     obj.push_back(Pair("hashespersec",  gethashespersec(params, false)));
     obj.push_back(Pair("pooledtx",      (uint64_t)mempool.size()));
     obj.push_back(Pair("testnet",       fTestNet));
+
+    // WM - Tweaks to report current Nfactor and N.
+    Nfactor = GetNfactor( nBestHeightTime );
+    N = 1 << ( Nfactor + 1 );
+    
+    obj.push_back( Pair( "Nfactor", Nfactor ) );
+    obj.push_back( Pair( "N", N ) );
     return obj;
 }
 
