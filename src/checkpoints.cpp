@@ -26,6 +26,9 @@ namespace Checkpoints
         boost::assign::map_list_of
         (     0, hashGenesisBlockOfficial )
         ( 15000, uint256("0x00000082cab82d04354692fac3b83d19cbe3c3ab4b73610d0e73397545eb012e"))
+        ( 30000, uint256("0x0000000af2f6e71951d6e8befbd43a3dac36681b5095cb822b5c9c8de626e371"))
+        ( 45000, uint256("0x00000000591110a1411cf37739cde0c558c0c070aa38686d89b2e70fe39b654f"))
+        ( 60000, uint256("0x000000000c067c5df98a8285ff045c3ffee46eb64b248bc6622f6bdceb8558be"))
 //        ( 6000, uint256("0x000000000945e3c9d8e15df834e802521eb79f9ceb4191a27bdfadad4b777f4a"))
 //        ( 8700, uint256("0x00000000014270724837789c9a69859290f6bdee38556bc4561c21f17935a178"))
 //        ( 13560, uint256("0xa1591a0fcbf11f282d671581edb9f0aadcd06fee69761081e0a3245914c13729"))
@@ -359,12 +362,19 @@ namespace Checkpoints
     // Is the sync-checkpoint too old?
     bool IsSyncCheckpointTooOld(unsigned int nSeconds)
     {
+
+// WM - Defeat the "checkpoint too old" check, not needed now that YACoin is launched and stable.
+/*
         LOCK(cs_hashSyncCheckpoint);
         // sync-checkpoint should always be accepted block
         assert(mapBlockIndex.count(hashSyncCheckpoint));
         const CBlockIndex* pindexSync = mapBlockIndex[hashSyncCheckpoint];
         return (pindexSync->GetBlockTime() + nSeconds < GetAdjustedTime());
+*/
+
+        return false;
     }
+
 }
 
 // ppcoin: sync-checkpoint master key
