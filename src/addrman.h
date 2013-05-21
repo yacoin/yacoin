@@ -11,6 +11,7 @@
 
 
 #include <map>
+#include <math.h>       /* sqrt in addrman.cpp */
 #include <vector>
 
 #include <openssl/rand.h>
