@@ -91,9 +91,9 @@ Value gethashespersec(const Array& params, bool fHelp)
     if (fHelp || params.size() != 0)
         throw runtime_error(
             "gethashespersec\n"
-            "Returns a recent hashes per second performance measurement while generating.");
+            "Returns a recent hashes per second performance measurement averaged over 30 seconds while generating.");
 
-    if (GetTimeMillis() - nHPSTimerStart > 8000)
+    if (GetTimeMillis() - nHPSTimerStart > 30000)
         return (boost::int64_t)0;
     return (boost::int64_t)dHashesPerSec;
 }
