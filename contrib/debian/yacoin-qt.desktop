@@ -1,0 +1,12 @@
+[Desktop Entry]
+Encoding=UTF-8
+Name=YACoin
+Comment=NovaCoin P2P Cryptocurrency
+Comment[fr]=YACoin, monnaie virtuelle cryptographique pair à pair
+Comment[tr]=YACoin, eşten eşe kriptografik sanal para birimi
+Exec=/usr/bin/yacoin-qt
+Terminal=false
+Type=Application
+Icon=/usr/share/pixmaps/bitcoin80.xpm
+MimeType=x-scheme-handler/yacoin;
+Categories=Office;
