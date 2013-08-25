@@ -1,28 +1,9 @@
-
-YACoin very-unofficial development tree
+YACoin Official Development Tree.
 ---------------------------------------
+Many thanks to WindMaster for initially setting up this repository to continue development and promotion of YACoin after the original
+developer, GitHub user pocopoco, went paka paka. Due to community feedback and the need for an updated and stable client, this is now the official YACoin Development Tree. 
 
-Maintained by bitcointalk.org user WindMaster
-
-This is not the official YACoin client repository, but rather a fork I
-created to continue development and promotion of YACoin after the original
-developer, GitHub user pocopoco, stopped actively participating in the
-community immediately after launch of the coin.  The official YACoin
-repository is located at:
-
-https://github.com/pocopoco/yacoin/
-
-
-YACoin - a hybrid scrypt PoW + PoS based cryptocurrency forked from NovaCoin
-by GitHub user pocopoco.
-
-
-NOTE: All of the information below is as cloned from pocopoco's
-repository.  Much of it is known to not be correct for YACoin, and
-is simply a copy of what NovaCoin's README file contained, as
-pocopoco didn't bother changing anything.  These will be corrected
-and updated as correct information is determined:
-
+YACoin - a hybrid scrypt PoW + PoS based cryptocurrency forked from NovaCoin.
 
 * Uses the scrypt + chacha20/8 (N,1,1) hashing algorithm.
 * N increases over time to increase memory requirements.
