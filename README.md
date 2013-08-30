@@ -1,16 +1,9 @@
-YACoin Official Development Tree.
+YACoin Official Development Testing Tree.
 ---------------------------------------
-Many thanks to WindMaster for initially setting up this repository to continue development and promotion of YACoin after the original
-developer, GitHub user pocopoco, went paka paka. Due to community feedback and the need for an updated and stable client, this is now the official YACoin Development Tree. 
 
-YACoin - a hybrid scrypt PoW + PoS based cryptocurrency forked from NovaCoin.
+The testing distribution contains code and features that haven't yet been accepted into the stable release and is used for testing. This release should not be used for production as things will most likely break. 
 
-* Uses the scrypt + chacha20/8 (N,1,1) hashing algorithm.
-* N increases over time to increase memory requirements.
-* 1 minute PoW block targets.
-* (?) minute PoS block targets.
-* The PoW subsidy decreases as difficulty increases.
-* Maximum PoW reward is 100 coins.
+You should normally run YACoin testing in testnet and absolutely DO NOT use your main wallet in YACoin testing!
 
 Development process
 ===========================
@@ -25,8 +18,6 @@ The patch will be accepted if there is broad consensus that it is a
 good thing.  Developers should expect to rework and resubmit patches
 if they don't match the project's coding conventions (see coding.txt)
 or are controversial.
-
-The master branch (YACoin stable) is regularly built and tested, but is not guaranteed to be completely stable. 
 
 From time to time a pull request will become outdated. If this occurs, and
 the pull is no longer automatically mergeable; a comment on the pull will
