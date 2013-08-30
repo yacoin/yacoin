@@ -16,19 +16,17 @@ Development process
 ===========================
 
 Developers work in their own trees, then submit pull requests when
-they think their feature or bug fix is ready.
+they think their feature or bug fix is ready. For new features or
+enhancements to YACoin, please submit pull requests to YACoin testing. 
+Please refer to: https://help.github.com/articles/using-pull-requests
+if you need any help.
 
 The patch will be accepted if there is broad consensus that it is a
 good thing.  Developers should expect to rework and resubmit patches
 if they don't match the project's coding conventions (see coding.txt)
 or are controversial.
 
-The master branch is regularly built and tested, but is not guaranteed
-to be completely stable. Tags are regularly created to indicate new
-official, stable release versions of YACoin.
-
-Feature branches are created when there are major new features being
-worked on by several people.
+The master branch (YACoin stable) is regularly built and tested, but is not guaranteed to be completely stable. 
 
 From time to time a pull request will become outdated. If this occurs, and
 the pull is no longer automatically mergeable; a comment on the pull will
