@@ -25,6 +25,7 @@
 #include "notificator.h"
 #include "guiutil.h"
 #include "rpcconsole.h"
+#include "version.h"
 
 #ifdef Q_OS_MAC
 #include "macdockiconhandler.h"
@@ -69,7 +70,17 @@ BitcoinGUI::BitcoinGUI(QWidget *parent):
     rpcConsole(0)
 {
     resize(850, 550);
-    setWindowTitle(tr("YaCoin") + " - " + tr("Wallet"));
+
+    int y = (DISPLAY_VERSION_MINOR);
+    int a = (DISPLAY_VERSION_REVISION);
+    int c = (DISPLAY_VERSION_BUILD);
+
+    QString titVersion = QString::number(y)+ "." +
+                  QString::number(a) + "." +
+                  QString::number(c);
+
+    setWindowTitle(tr("YACoin ") + tr("Wallet ") + "v" + (titVersion));
+
 #ifndef Q_OS_MAC
     qApp->setWindowIcon(QIcon(":icons/bitcoin"));
     setWindowIcon(QIcon(":icons/bitcoin"));
@@ -199,7 +210,7 @@ void BitcoinGUI::createActions()
     tabGroup->addAction(overviewAction);
 
     sendCoinsAction = new QAction(QIcon(":/icons/send"), tr("&Send coins"), this);
-    sendCoinsAction->setToolTip(tr("Send coins to a YaCoin address"));
+    sendCoinsAction->setToolTip(tr("Send coins to a YACoin address"));
     sendCoinsAction->setCheckable(true);
     sendCoinsAction->setShortcut(QKeySequence(Qt::ALT + Qt::Key_2));
     tabGroup->addAction(sendCoinsAction);
@@ -237,14 +248,14 @@ void BitcoinGUI::createActions()
     quitAction->setToolTip(tr("Quit application"));
     quitAction->setShortcut(QKeySequence(Qt::CTRL + Qt::Key_Q));
     quitAction->setMenuRole(QAction::QuitRole);
-    aboutAction = new QAction(QIcon(":/icons/bitcoin"), tr("&About YaCoin"), this);
-    aboutAction->setToolTip(tr("Show information about YaCoin"));
+    aboutAction = new QAction(QIcon(":/icons/bitcoin"), tr("&About YACoin"), this);
+    aboutAction->setToolTip(tr("Show information about YACoin"));
     aboutAction->setMenuRole(QAction::AboutRole);
     aboutQtAction = new QAction(QIcon(":/trolltech/qmessagebox/images/qtlogo-64.png"), tr("About &Qt"), this);
     aboutQtAction->setToolTip(tr("Show information about Qt"));
     aboutQtAction->setMenuRole(QAction::AboutQtRole);
     optionsAction = new QAction(QIcon(":/icons/options"), tr("&Options..."), this);
-    optionsAction->setToolTip(tr("Modify configuration options for YaCoin"));
+    optionsAction->setToolTip(tr("Modify configuration options for YACoin"));
     optionsAction->setMenuRole(QAction::PreferencesRole);
     toggleHideAction = new QAction(QIcon(":/icons/bitcoin"), tr("&Show / Hide"), this);
     encryptWalletAction = new QAction(QIcon(":/icons/lock_closed"), tr("&Encrypt Wallet..."), this);
@@ -283,6 +294,9 @@ void BitcoinGUI::createMenuBar()
     // Get the main window's menu bar on other platforms
     appMenuBar = menuBar();
 #endif
+
+    // Colours - I am NOT a graffik artist as you can see - so FIXME.
+       qApp->setStyleSheet("* {color: #000000; background-color: #e7e7e7; selection-color: #2ec6f7; selection-background-color: #24537b;}");
 
     // Configure the menus
     QMenu *file = appMenuBar->addMenu(tr("&File"));
@@ -338,7 +352,7 @@ void BitcoinGUI::setClientModel(ClientModel *clientModel)
 #endif
             if(trayIcon)
             {
-                trayIcon->setToolTip(tr("YaCoin client") + QString(" ") + tr("[testnet]"));
+                trayIcon->setToolTip(tr("YACoin client") + QString(" ") + tr("[testnet]"));
                 trayIcon->setIcon(QIcon(":/icons/toolbar_testnet"));
                 toggleHideAction->setIcon(QIcon(":/icons/toolbar_testnet"));
             }
@@ -398,7 +412,7 @@ void BitcoinGUI::createTrayIcon()
     trayIcon = new QSystemTrayIcon(this);
     trayIconMenu = new QMenu(this);
     trayIcon->setContextMenu(trayIconMenu);
-    trayIcon->setToolTip(tr("YaCoin client"));
+    trayIcon->setToolTip(tr("YACoin client"));
     trayIcon->setIcon(QIcon(":/icons/toolbar"));
     connect(trayIcon, SIGNAL(activated(QSystemTrayIcon::ActivationReason)),
             this, SLOT(trayIconActivated(QSystemTrayIcon::ActivationReason)));
@@ -467,7 +481,7 @@ void BitcoinGUI::setNumConnections(int count)
     default: icon = ":/icons/connect_4"; break;
     }
     labelConnectionsIcon->setPixmap(QIcon(icon).pixmap(STATUSBAR_ICONSIZE,STATUSBAR_ICONSIZE));
-    labelConnectionsIcon->setToolTip(tr("%n active connection(s) to YaCoin network", "", count));
+    labelConnectionsIcon->setToolTip(tr("%n active connection(s) to YACoin network", "", count));
 }
 
 void BitcoinGUI::setNumBlocks(int count, int nTotalBlocks)
@@ -757,7 +771,7 @@ void BitcoinGUI::dropEvent(QDropEvent *event)
         if (nValidUrisFound)
             gotoSendCoinsPage();
         else
-            notificator->notify(Notificator::Warning, tr("URI handling"), tr("URI can not be parsed! This can be caused by an invalid YaCoin address or malformed URI parameters."));
+            notificator->notify(Notificator::Warning, tr("URI handling"), tr("URI can not be parsed! This can be caused by an invalid YACoin address or malformed URI parameters."));
     }
 
     event->acceptProposedAction();
@@ -772,7 +786,7 @@ void BitcoinGUI::handleURI(QString strURI)
         gotoSendCoinsPage();
     }
     else
-        notificator->notify(Notificator::Warning, tr("URI handling"), tr("URI can not be parsed! This can be caused by an invalid YaCoin address or malformed URI parameters."));
+        notificator->notify(Notificator::Warning, tr("URI handling"), tr("URI can not be parsed! This can be caused by an invalid YACoin address or malformed URI parameters."));
 }
 
 void BitcoinGUI::setEncryptionStatus(int status)

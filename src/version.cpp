@@ -13,7 +13,7 @@
 const std::string CLIENT_NAME("YACoin-WM");
 
 // Client version number
-#define CLIENT_VERSION_SUFFIX   "-yac-wm-alpha"
+#define CLIENT_VERSION_SUFFIX   "-yac-wm"
 
 
 // The following part of the code determines the CLIENT_BUILD variable.
