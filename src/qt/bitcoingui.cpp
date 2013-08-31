@@ -71,9 +71,9 @@ BitcoinGUI::BitcoinGUI(QWidget *parent):
 {
     resize(850, 550);
 
-    int y = (DISPLAY_VERSION_MINOR);
-    int a = (DISPLAY_VERSION_REVISION);
-    int c = (DISPLAY_VERSION_BUILD);
+    int y = (DISPLAY_VERSION_MAJOR);
+    int a = (DISPLAY_VERSION_MINOR);
+    int c = (DISPLAY_VERSION_REVISION);
 
     QString titVersion = QString::number(y)+ "." +
                   QString::number(a) + "." +
