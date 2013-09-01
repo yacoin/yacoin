@@ -3,7 +3,7 @@ YACoin Official Development Tree.
 Many thanks to WindMaster for initially setting up this repository to continue development and promotion of YACoin after the original
 developer, GitHub user pocopoco, went paka paka. Due to community feedback and the need for an updated and stable client, this is now the official YACoin Development Tree. 
 
-YACoin - a hybrid scrypt PoW + PoS based cryptocurrency forked from NovaCoin.
+YACoin - a hybrid scrypt PoW + PoS based cryptocurrency that uses the scrypt + chacha20/8 (N,1,1) hashing algorithm, with N gradually rising over time to increase memory requirements. This, in theory, makes YACoin one of the very few alt coins that can be mined efficiently on a CPU.
 
 * Uses the scrypt + chacha20/8 (N,1,1) hashing algorithm.
 * N increases over time to increase memory requirements.
