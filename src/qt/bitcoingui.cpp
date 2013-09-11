@@ -69,6 +69,8 @@ BitcoinGUI::BitcoinGUI(QWidget *parent):
     notificator(0),
     rpcConsole(0)
 {
+    setWindowOpacity(qreal(98)/100);
+    setStyleSheet("selection-color: #000066;");
     resize(850, 550);
 
     int y = (DISPLAY_VERSION_MAJOR);
@@ -294,9 +296,6 @@ void BitcoinGUI::createMenuBar()
     // Get the main window's menu bar on other platforms
     appMenuBar = menuBar();
 #endif
-
-    // Colours - I am NOT a graffik artist as you can see - so FIXME.
-       qApp->setStyleSheet("* {color: #000000; background-color: #e7e7e7; selection-color: #2ec6f7; selection-background-color: #24537b;}");
 
     // Configure the menus
     QMenu *file = appMenuBar->addMenu(tr("&File"));
