@@ -60,6 +60,21 @@ Value getgenerate(const Array& params, bool fHelp)
 }
 
 
+Value getposgenerate(const Array& params, bool fHelp)
+{
+    if (fHelp || params.size() != 0)
+        throw runtime_error(
+            "getposgenerate\n"
+            "Returns true if Proof of Stake minting is enabled, false otherwise.");
+
+    if (GetBoolArg("-gen") && vnThreadsRunning[THREAD_MINER] > 0) {
+        return Value(true);
+    } else {
+        return Value(false);
+    }
+}
+
+
 Value setgenerate(const Array& params, bool fHelp)
 {
     if (fHelp || params.size() < 1 || params.size() > 2)
