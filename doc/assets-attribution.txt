@@ -54,3 +54,8 @@ Designer: Crobbo (forum)
 Site: https://bitcointalk.org/index.php?topic=32273.0
 License: Public domain
 
+Image: All YACoin logos and images.
+Designer: Mjbmonetarymetals (forum)
+Site: https://bitcointalk.org/index.php?topic=281595.0
+License: Public domain
+
