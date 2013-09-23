@@ -97,6 +97,16 @@
         </widget>
        </item>
        <item>
+        <widget class="QCheckBox" name="cpuMining">
+         <property name="toolTip">
+          <string>Enable Proof-of-Work CPU mining (generating/minting) of YACoins (NOT to be confused with Proof-of-Stake!).</string>
+         </property>
+         <property name="text">
+          <string>&amp;Enable CPU mining</string>
+         </property>
+        </widget>
+       </item>
+       <item>
         <spacer name="verticalSpacer_Main">
          <property name="orientation">
           <enum>Qt::Vertical</enum>

@@ -29,6 +29,7 @@ public:
         DisplayUnit,       // BitcoinUnits::Unit
         DisplayAddresses,  // bool
         DetachDatabases,   // bool
+        CPUMining,         // bool
         Language,          // QString
         CoinControlFeatures, // bool
         OptionIDRowCount,
