@@ -1,7 +1,7 @@
 src/*.exe
-src/bitcoin
-src/bitcoind
-src/test_bitcoin
+src/yacoin
+src/yacoind
+src/test_yacoin
 src/build.h
 .*.swp
 *.*~*
@@ -10,11 +10,11 @@ src/build.h
 *.orig
 *.o
 *.patch
-.bitcoin
+.yacoin
 #compilation and Qt preprocessor part
 *.qm
 Makefile
-bitcoin-qt
+yacoin-qt
 #resources cpp
 qrc_*.cpp
 #qt creator
