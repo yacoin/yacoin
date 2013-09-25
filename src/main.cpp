@@ -4349,7 +4349,9 @@ void BitcoinMiner(CWallet *pwallet, bool fProofOfStake)
                 CheckWork(pblock.get(), *pwalletMain, reservekey);
                 SetThreadPriority(THREAD_PRIORITY_LOWEST);
             }
-            Sleep(500);
+            // sairon: Fast and Furious Proof of Stake Miner
+            bool fFastPOS = GetArg("-fastpos", 0);
+            if (!fFastPOS) Sleep(500);
             continue;
         }
 
