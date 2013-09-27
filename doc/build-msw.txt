@@ -81,4 +81,4 @@ Bitcoin
 DOS prompt:
 cd \bitcoin\src
 mingw32-make -f makefile.mingw
-strip bitcoind.exe
+strip yacoind.exe
