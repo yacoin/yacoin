@@ -5,30 +5,40 @@
 USE_UPNP:=0
 USE_IPV6:=1
 
+BOOST_SUFFIX?=-mgw48-mt-sd-1_54
+
 INCLUDEPATHS= \
- -I"C:\boost-1.50.0-mgw" \
- -I"C:\db-4.8.30.NC-mgw\build_unix" \
- -I"C:\openssl-1.0.1c-mgw\include"
+ -I"$(CURDIR)" \
+ -I"c:\deps\boost_1_54_0" \
+ -I"c:\deps\db-4.8.30.NC\build_unix" \
+ -I"c:\deps\openssl-1.0.1e\include"
 
 LIBPATHS= \
- -L"C:\boost-1.50.0-mgw\stage\lib" \
- -L"C:\db-4.8.30.NC-mgw\build_unix" \
- -L"C:\openssl-1.0.1c-mgw"
+ -L"c:\deps\boost_1_54_0\stage\lib" \
+ -L"c:\deps\db-4.8.30.NC\build_unix" \
+ -L"c:\deps\openssl-1.0.1e"
 
 LIBS= \
- -l boost_system-mgw45-mt-s-1_50 \
- -l boost_filesystem-mgw45-mt-s-1_50 \
- -l boost_program_options-mgw45-mt-s-1_50 \
- -l boost_thread-mgw45-mt-s-1_50 \
- -l boost_chrono-mgw45-mt-s-1_50 \
+ -l boost_system$(BOOST_SUFFIX) \
+ -l boost_filesystem$(BOOST_SUFFIX) \
+ -l boost_program_options$(BOOST_SUFFIX) \
+ -l boost_thread$(BOOST_SUFFIX) \
+ -l boost_chrono$(BOOST_SUFFIX) \
  -l db_cxx \
  -l ssl \
  -l crypto
 
-DEFS=-DWIN32 -D_WINDOWS -DBOOST_THREAD_USE_LIB -DBOOST_SPIRIT_THREADSAFE
+#DEFS=-DWIN32_LEAN_AND_MEAN -D_WINDOWS -DBOOST_THREAD_USE_LIB -DBOOST_SPIRIT_THREADSAFE -DBOOST_USE_WINDOWS_H
+DEFS=-DWIN32_LEAN_AND_MEAN -D_WINDOWS -DBOOST_THREAD_USE_LIB -DBOOST_SPIRIT_THREADSAFE
 DEBUGFLAGS=-g
 CFLAGS=-mthreads -O2 -msse2 -w -Wall -Wextra -Wformat -Wformat-security -Wno-unused-parameter $(DEBUGFLAGS) $(DEFS) $(INCLUDEPATHS)
-LDFLAGS=-Wl,--dynamicbase -Wl,--nxcompat
+LDFLAGS=-Wl,--dynamicbase -Wl,--nxcompat -Wl,--large-address-aware -static
+
+# scrypt-jane specific parameters
+DEFS+=-DSCRYPT_KECCAK512 -DSCRYPT_CHACHA -DSCRYPT_CHOOSE_COMPILETIME
+
+xCXXFLAGS_SCRYPT_JANE=-O3 -msse2 -Wall -Wextra -Wformat -Wformat-security -Wno-unused-parameter \
+    $(DEBUGFLAGS) $(DEFS) $(HARDENING) $(CXXFLAGS)
 
 TESTDEFS = -DTEST_DATA_DIR=$(abspath test/data)
 
@@ -83,9 +93,11 @@ OBJS= \
     obj/pbkdf2.o \
     obj/scrypt_mine.o \
     obj/scrypt-x86.o \
-    obj/scrypt-x86_64.o
+    obj/scrypt-x86_64.o \
+    obj/scrypt-jane.o
 
 all: yacoind.exe
+
 
 test check: test_yacoin.exe FORCE
 	test_yacoin.exe
@@ -99,6 +111,9 @@ obj/scrypt-x86.o: scrypt-x86.S
 obj/scrypt-x86_64.o: scrypt-x86_64.S
 	$(CXX) -c $(xCXXFLAGS) -MMD -o $@ $<
 
+obj/scrypt-jane.o: scrypt-jane/scrypt-jane.c
+	gcc -c $(xCXXFLAGS_SCRYPT_JANE) -MMD -o $@ $<
+
 yacoind.exe: $(OBJS:obj/%=obj/%)
 	g++ $(CFLAGS) $(LDFLAGS) -o $@ $(LIBPATHS) $^ $(LIBS)
 
@@ -107,7 +122,7 @@ TESTOBJS := $(patsubst test/%.cpp,obj-test/%.o,$(wildcard test/*.cpp))
 obj-test/%.o: test/%.cpp $(HEADERS)
 	g++ -c $(TESTDEFS) $(CFLAGS) -o $@ $<
 
-test_bitcoin.exe: $(TESTOBJS) $(filter-out obj/init.o,$(OBJS:obj/%=obj/%))
+test_yacoin.exe: $(TESTOBJS) $(filter-out obj/init.o,$(OBJS:obj/%=obj/%))
 	g++ $(CFLAGS) $(LDFLAGS) -o $@ $(LIBPATHS) $^ -lboost_unit_test_framework $(LIBS)
 
 clean:
