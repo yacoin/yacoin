@@ -16,6 +16,18 @@ CONFIG += thread
 #    BOOST_INCLUDE_PATH, BOOST_LIB_PATH, BDB_INCLUDE_PATH,
 #    BDB_LIB_PATH, OPENSSL_INCLUDE_PATH and OPENSSL_LIB_PATH respectively
 
+BOOST_LIB_SUFFIX=-mgw46-mt-s-1_54
+BOOST_INCLUDE_PATH=C:/deps/boost_1_54_0
+BOOST_LIB_PATH=C:/deps/boost_1_54_0/stage/lib
+BDB_INCLUDE_PATH=C:/deps/db-4.8.30.NC/build_unix
+BDB_LIB_PATH=C:/deps/db-4.8.30.NC/build_unix
+OPENSSL_INCLUDE_PATH=C:/deps/openssl-1.0.1e/include
+OPENSSL_LIB_PATH=C:/deps/openssl-1.0.1e
+MINIUPNPC_INCLUDE_PATH=C:/deps
+MINIUPNPC_LIB_PATH=C:/deps/miniupnpc/
+QRENCODE_INCLUDE_PATH=C:/deps/qrencode-3.4.3
+QRENCODE_LIB_PATH=C:/deps/qrencode-3.4.3/.libs
+
 OBJECTS_DIR = build
 MOC_DIR = build
 UI_DIR = build
@@ -44,9 +56,12 @@ win32:QMAKE_LFLAGS *= -Wl,--dynamicbase -Wl,--nxcompat
 # use: qmake "USE_QRCODE=1"
 # libqrencode (http://fukuchi.org/works/qrencode/index.en.html) must be installed for support
 contains(USE_QRCODE, 1) {
+    PTHREADS_LIB_PATH="C:/deps/pthreads/lib"
+    PTHREADS_INCLUDE_PATH="C:/deps/pthreads/include"
     message(Building with QRCode support)
     DEFINES += USE_QRCODE
-    LIBS += -lqrencode
+    INCLUDEPATH += $$PTHREADS_INCLUDE_PATH $$QRENCODE_INCLUDE_PATH
+    LIBS += $$join(PTHREADS_LIB_PATH,,-L,) -lpthread $$join(QRENCODE_LIB_PATH,,-L,) -lqrencode
 }
 
 # use: qmake "USE_UPNP=1" ( enabled by default; default)
@@ -312,7 +327,7 @@ OTHER_FILES += \
 # platform specific defaults, if not overridden on command line
 isEmpty(BOOST_LIB_SUFFIX) {
     macx:BOOST_LIB_SUFFIX = -mt
-    windows:BOOST_LIB_SUFFIX = -mgw44-mt-s-1_50
+    windows:BOOST_LIB_SUFFIX = -mgw46-mt-s-1_54
 }
 
 isEmpty(BOOST_THREAD_LIB_SUFFIX) {
