@@ -17,13 +17,11 @@ INCLUDEPATHS= \
  -I"c:/deps/openssl-1.0.1e"	
 
 LIBPATHS= \
- -L"$(CURDIR)/leveldb" \
  -L"c:/deps/boost_1_54_0/stage/lib" \
  -L"c:/deps/db-4.8.30.NC/build_unix" \
  -L"c:/deps/openssl-1.0.1e"
 
 LIBS= \
- -l leveldb \
  -l memenv \
  -l boost_system$(BOOST_SUFFIX) \
  -l boost_filesystem$(BOOST_SUFFIX) \
@@ -99,7 +97,6 @@ LIBS += \
 HEADERS = $(wildcard *.h)
 
 OBJS= \
-    leveldb/libleveldb.a \
     obj/addrman.o \
     obj/alert.o \
     obj/bitcoinrpc.o \
@@ -139,14 +136,7 @@ all: yacoind.exe
 test check: test_yacoin.exe FORCE
 	test_yacoin.exe
 
-DEFS += $(addprefix -I,$(CURDIR)/leveldb/include)
-DEFS += $(addprefix -I,$(CURDIR)/leveldb/helpers)
 DEFS += $(addprefix -I,c:/deps/openssl-1.0.1e/include)
-
-leveldb/libleveldb.a:
-	cd leveldb && \
-	$(MAKE) CC=$(CC) CXX=$(CXX) OPT="$(CFLAGS)" TARGET_OS=NATIVE_WINDOWS libleveldb.a libmemenv.a && \
-	cd ..
 
 obj/scrypt-jane.o: scrypt-jane/scrypt-jane.c 
 	g++ -c -frandom-seed=$@ $(CFLAGS) -MMD -o $@ $<
