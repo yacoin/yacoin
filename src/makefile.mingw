@@ -25,10 +25,32 @@ LIBS= \
  -l ssl \
  -l crypto
 
-DEFS=-DWIN32 -D_WINDOWS -DBOOST_THREAD_USE_LIB -DBOOST_SPIRIT_THREADSAFE
-DEBUGFLAGS=-g
-CFLAGS=-mthreads -O2 -msse2 -w -Wall -Wextra -Wformat -Wformat-security -Wno-unused-parameter $(DEBUGFLAGS) $(DEFS) $(INCLUDEPATHS)
-LDFLAGS=-Wl,--dynamicbase -Wl,--nxcompat
+DEFS= \
+	-DWIN32 \
+	-D_WINDOWS \
+	-DBOOST_THREAD_USE_LIB \
+	-DBOOST_SPIRIT_THREADSAFE \
+	-DSCRYPT_CHACHA \
+	-DSCRYPT_KECCAK512 \
+	-DSCRYPT_CHOOSE_COMPILETIME \
+	-DO2
+
+DEBUGFLAGS=#-g
+
+CFLAGS= \
+	-mthreads \
+	-O2 \
+	-msse2 \
+	-w -Wall -Wextra -Wformat -Wformat-security -Wno-unused-parameter \
+	$(DEBUGFLAGS) \
+	$(DEFS) \
+	$(INCLUDEPATHS)
+
+LDFLAGS= \
+	-Wl,--dynamicbase \
+	-Wl,--nxcompat \
+	-Wl,--large-address-aware \
+	-static
 
 TESTDEFS = -DTEST_DATA_DIR=$(abspath test/data)
 

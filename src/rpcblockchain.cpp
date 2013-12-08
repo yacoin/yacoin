@@ -161,7 +161,7 @@ Value getblockhash(const Array& params, bool fHelp)
         throw runtime_error("Block number out of range.");
 
     CBlockIndex* pblockindex = FindBlockByHeight(nHeight);
-    return pblockindex->phashBlock->GetHex();
+    return pblockindex->GetHash().GetHex();
 }
 
 Value getblock(const Array& params, bool fHelp)
@@ -202,7 +202,7 @@ Value getblockbynumber(const Array& params, bool fHelp)
     while (pblockindex->nHeight > nHeight)
         pblockindex = pblockindex->pprev;
 
-    uint256 hash = *pblockindex->phashBlock;
+    uint256 hash = pblockindex->GetHash();
 
     pblockindex = mapBlockIndex[hash];
     block.ReadFromDisk(pblockindex, true);
