@@ -6,6 +6,12 @@
 
 #include <string.h>
 
+#if defined( _WINDOWS )
+#if !defined( QT_GUI )
+extern "C" {
+#endif
+#endif
+
 #include "scrypt-jane.h"
 #include "code/scrypt-jane-portable.h"
 #include "code/scrypt-jane-hash.h"
@@ -180,3 +186,8 @@ scrypt(const uint8_t *password, size_t password_len, const uint8_t *salt, size_t
 	scrypt_free(&V);
 	scrypt_free(&YX);
 }
+#if defined( _WINDOWS )
+#if !defined( QT_GUI )
+}
+#endif
+#endif
