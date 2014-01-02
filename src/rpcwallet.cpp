@@ -9,6 +9,16 @@
 #include "init.h"
 #include "base58.h"
 
+#ifdef _MSC_VER
+    #pragma warning( push )
+    #pragma warning( disable: 4244 )
+    #pragma warning( disable: 4267 )
+    #pragma warning( disable: 4334 )
+    #pragma warning( disable: 4390 )
+    #pragma warning( disable: 4800 )
+    #pragma warning( disable: 4996 )
+#endif
+
 using namespace json_spirit;
 using namespace std;
 
@@ -1739,3 +1749,12 @@ Value makekeypair(const Array& params, bool fHelp)
     result.push_back(Pair("PublicKey", HexStr(key.GetPubKey().Raw())));
     return result;
 }
+#ifdef _MSC_VER
+    #pragma warning( pop )
+    //#pragma warning( disable: 4244 )
+    //#pragma warning( disable: 4267 )
+    //#pragma warning( disable: 4334 )
+    //#pragma warning( disable: 4390 )
+    //#pragma warning( disable: 4800 )
+    //#pragma warning( disable: 4996 )
+#endif

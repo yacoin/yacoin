@@ -21,6 +21,15 @@
 #include "key.h"
 #include "script.h"
 
+#ifdef _MSC_VER
+    #pragma warning( push )
+    #pragma warning( disable: 4996 )
+    #pragma warning( disable: 4267 )
+    #pragma warning( disable: 4244 )
+    #pragma warning( disable: 4345 )
+    #pragma warning( disable: 4800 )
+#endif
+
 static const char* pszBase58 = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
 
 // Encode a byte sequence as a base58-encoded string
@@ -456,5 +465,12 @@ public:
     {
     }
 };
-
+#ifdef _MSC_VER
+    #pragma warning( pop )
+    //#pragma warning( disable: 4996 )
+    //#pragma warning( disable: 4267 )
+    //#pragma warning( disable: 4244 )
+    //#pragma warning( disable: 4345 )
+    //#pragma warning( disable: 4800 )
+#endif
 #endif

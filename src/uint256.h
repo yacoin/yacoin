@@ -11,6 +11,16 @@
 #include <string>
 #include <vector>
 
+#ifdef _MSC_VER
+    #pragma warning( push )
+    #pragma warning( disable: 4244 )
+    #pragma warning( disable: 4267 )
+    #pragma warning( disable: 4334 )
+    #pragma warning( disable: 4390 )
+    #pragma warning( disable: 4800 )
+    #pragma warning( disable: 4996 )
+#endif
+
 typedef long long  int64;
 typedef unsigned long long  uint64;
 
@@ -759,5 +769,13 @@ inline int Testuint256AdHoc(std::vector<std::string> vArg)
 }
 
 #endif
-
+#ifdef _MSC_VER
+    #pragma warning( pop )
+    //#pragma warning( disable: 4244 )
+    //#pragma warning( disable: 4267 )
+    //#pragma warning( disable: 4334 )
+    //#pragma warning( disable: 4390 )
+    //#pragma warning( disable: 4800 )
+    //#pragma warning( disable: 4996 )
+#endif
 #endif

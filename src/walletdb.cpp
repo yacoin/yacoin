@@ -7,6 +7,16 @@
 #include "wallet.h"
 #include <boost/filesystem.hpp>
 
+#ifdef _MSC_VER
+    #pragma warning( push )
+    #pragma warning( disable: 4244 )
+    #pragma warning( disable: 4267 )
+    #pragma warning( disable: 4334 )
+    #pragma warning( disable: 4390 )
+    #pragma warning( disable: 4800 )
+    #pragma warning( disable: 4996 )
+#endif
+
 using namespace std;
 using namespace boost;
 
@@ -485,14 +495,14 @@ DBErrors CWalletDB::LoadWallet(CWallet* pwallet)
 void ThreadFlushWalletDB(void* parg)
 {
     // Make this thread recognisable as the wallet flushing thread
-    RenameThread("bitcoin-wallet");
+    RenameThread("bitcoin-wallet");    // tbd
 
     const string& strFile = ((const string*)parg)[0];
-    static bool fOneThread;
+    static bool fOneThread;         // presumed initialized to false, I trust?
     if (fOneThread)
         return;
     fOneThread = true;
-    if (!GetBoolArg("-flushwallet", true))
+    if (!GetBoolArg("-flushwallet", true))   // implying what of yacoin.conf?
         return;
 
     unsigned int nLastSeen = nWalletDBUpdated;
@@ -500,7 +510,8 @@ void ThreadFlushWalletDB(void* parg)
     int64 nLastWalletUpdate = GetTime();
     while (!fShutdown)
     {
-        Sleep(500);
+        //Sleep(500);       // original value
+        Sleep(1500);     // test
 
         if (nLastSeen != nWalletDBUpdated)
         {
@@ -521,7 +532,7 @@ void ThreadFlushWalletDB(void* parg)
                     nRefCount += (*mi).second;
                     mi++;
                 }
-
+                // to get here isn't ...begin() == bitdb.mapFileUseCount.end()
                 if (nRefCount == 0 && !fShutdown)
                 {
                     map<string, int>::iterator mi = bitdb.mapFileUseCount.find(strFile);
@@ -538,6 +549,14 @@ void ThreadFlushWalletDB(void* parg)
                         bitdb.mapFileUseCount.erase(mi++);
                         printf("Flushed wallet.dat %"PRI64d"ms\n", GetTimeMillis() - nStart);
                     }
+                    else        // what does it mean?
+                    {
+                    printf("Flushing wallet.dat files are busy?\n");
+                    }
+                }
+                else    // I presume that DBs are in use. Which, wallet or blockchain? Both?
+                {       // peers.dat?
+                    printf("Flushing wallet.dat postponed\n");
                 }
             }
         }
@@ -674,3 +693,12 @@ bool CWalletDB::Recover(CDBEnv& dbenv, std::string filename)
 {
     return CWalletDB::Recover(dbenv, filename, false);
 }
+#ifdef _MSC_VER
+    #pragma warning( pop )
+    //#pragma warning( disable: 4244 )
+    //#pragma warning( disable: 4267 )
+    //#pragma warning( disable: 4334 )
+    //#pragma warning( disable: 4390 )
+    //#pragma warning( disable: 4800 )
+    //#pragma warning( disable: 4996 )
+#endif

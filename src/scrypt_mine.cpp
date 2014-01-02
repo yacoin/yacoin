@@ -34,6 +34,10 @@
 extern "C" {
 #include "scrypt-jane/scrypt-jane.h"
 }
+#ifdef _MSC_VER
+    // it seems I need this? I don't know how to make it find the CPU type?
+    #define __i386__
+#endif
 
 #include "scrypt_mine.h"
 #include "pbkdf2.h"

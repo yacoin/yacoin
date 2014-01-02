@@ -8,26 +8,55 @@
 #include "uint256.h"
 
 #ifndef WIN32
-#include <sys/types.h>
-#include <sys/time.h>
-#include <sys/resource.h>
+    #include <sys/types.h>
+    #include <sys/time.h>
+    #include <sys/resource.h>
 #else
-typedef int pid_t; /* define for Windows compatibility */
+    typedef int pid_t; /* define for Windows compatibility */
 #endif
-#include <map>
-#include <vector>
-#include <string>
 
-#include <boost/thread.hpp>
-#include <boost/filesystem.hpp>
-#include <boost/filesystem/path.hpp>
-#include <boost/date_time/gregorian/gregorian_types.hpp>
-#include <boost/date_time/posix_time/posix_time_types.hpp>
+#ifdef _MSC_VER
+    //#include <map>
+    //#include <list>
+    #include <utility>
+    //#include <vector>
+    //#include <string>
 
-#include <openssl/sha.h>
-#include <openssl/ripemd.h>
+    #include <boost/version.hpp>
+    #include <boost/thread.hpp>
+    #include <boost/filesystem.hpp>
+    #include <boost/filesystem/path.hpp>
+    #include <boost/date_time/gregorian/gregorian_types.hpp>
+    #include <boost/date_time/posix_time/posix_time_types.hpp>
 
-#include "netbase.h" // for AddTimeData
+    #include <openssl/sha.h>
+    #include <openssl/ripemd.h>
+
+    #include "netbase.h" // for AddTimeData
+#else
+    #include <map>
+    #include <vector>
+    #include <string>
+
+    #include <boost/thread.hpp>
+    #include <boost/filesystem.hpp>
+    #include <boost/filesystem/path.hpp>
+    #include <boost/date_time/gregorian/gregorian_types.hpp>
+    #include <boost/date_time/posix_time/posix_time_types.hpp>
+
+    #include <openssl/sha.h>
+    #include <openssl/ripemd.h>
+
+    #include "netbase.h" // for AddTimeData
+#endif
+
+#ifdef _MSC_VER
+    #pragma warning( push )
+    #pragma warning( disable: 4996 )
+    #pragma warning( disable: 4267 )
+    #pragma warning( disable: 4244 )
+    #pragma warning( disable: 4800 )
+#endif
 
 typedef long long  int64;
 typedef unsigned long long  uint64;
@@ -162,6 +191,9 @@ void RandAddSeed();
 void RandAddSeedPerfmon();
 int ATTR_WARN_PRINTF(1,2) OutputDebugStringF(const char* pszFormat, ...);
 
+#ifdef _MSC_VER
+    extern int64 nFrequency;
+#endif
 /*
   Rationale for the real_strprintf / strprintf construction:
     It is not allowed to use va_start with a pass-by-reference argument.
@@ -328,7 +360,33 @@ inline int64 GetPerformanceCounter()
 {
     int64 nCounter = 0;
 #ifdef WIN32
-    QueryPerformanceCounter((LARGE_INTEGER*)&nCounter);
+    #ifdef _MSC_VER
+        static bool
+            fGotFrequency = false;
+
+        switch( fGotFrequency )
+            {
+            case false:
+                fGotFrequency = true;
+                if( QueryPerformanceFrequency((LARGE_INTEGER*)&nFrequency) )
+                    {
+                    }
+                else    // counter isn't working!?
+                    {
+                    nFrequency = -1;    // so make the numbers come out weird
+                    }   
+                break;
+            case true:
+                break;
+            }
+        if( QueryPerformanceCounter((LARGE_INTEGER*)&nCounter) )
+            return nCounter;
+        else    // error, so let's do something different
+            return -1;
+    #else
+        QueryPerformanceCounter((LARGE_INTEGER*)&nCounter);
+        return nCounter;
+    #endif
 #else
     timeval t;
     gettimeofday(&t, NULL);
@@ -625,6 +683,12 @@ inline uint32_t ByteReverse(uint32_t value)
     value = ((value & 0xFF00FF00) >> 8) | ((value & 0x00FF00FF) << 8);
     return (value<<16) | (value>>16);
 }
-
+#ifdef _MSC_VER
+    #pragma warning( pop )
+    //#pragma warning( disable: 4996 )
+    //#pragma warning( disable: 4267 )
+    //#pragma warning( disable: 4244 )
+    //#pragma warning( disable: 4800 )
+#endif
 #endif
 

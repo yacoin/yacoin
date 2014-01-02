@@ -8,6 +8,15 @@
 #include "strlcpy.h"
 #include "base58.h"
 
+#ifdef _MSC_VER
+    #pragma warning( push )
+    #pragma warning( disable: 4244 )
+    #pragma warning( disable: 4267 )
+    #pragma warning( disable: 4390 )
+    #pragma warning( disable: 4800 )
+    #pragma warning( disable: 4996 )
+#endif
+
 using namespace std;
 using namespace boost;
 
@@ -335,7 +344,16 @@ void ThreadIRCSeed2(void* parg)
                 // index 7 is limited to 16 characters
                 // could get full length name at index 10, but would be different from join messages
                 strlcpy(pszName, vWords[7].c_str(), sizeof(pszName));
+#ifdef _MSC_VER
+                (void)printf( 
+                            "IRC got who"
+                            "\r"
+                            "           "
+                            "\r"
+                            );
+#else
                 printf("IRC got who\n");
+#endif
             }
 
             if (vWords[1] == "JOIN" && vWords[0].size() > 1)
@@ -402,4 +420,12 @@ int main(int argc, char *argv[])
     WSACleanup();
     return 0;
 }
+#endif
+#ifdef _MSC_VER
+    #pragma warning( pop )
+    //#pragma warning( disable: 4244 )
+    //#pragma warning( disable: 4267 )
+    //#pragma warning( disable: 4390 )
+    //#pragma warning( disable: 4800 )
+    //#pragma warning( disable: 4996 )
 #endif

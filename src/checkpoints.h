@@ -5,8 +5,13 @@
 #define  BITCOIN_CHECKPOINT_H
 
 #include <map>
-#include "net.h"
-#include "util.h"
+#include "net.h"                    // for CNode
+
+#ifdef _MSC_VER
+    #include "sync.h"
+#else
+    #include "util.h"
+#endif
 
 #define CHECKPOINT_MAX_SPAN (60 * 60 * 4) // max 4 hours before latest block
 

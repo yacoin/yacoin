@@ -13,7 +13,11 @@
 const std::string CLIENT_NAME("YACoin-WM");
 
 // Client version number
-#define CLIENT_VERSION_SUFFIX   "-yac-wm-alpha"
+#ifdef _MSC_VER
+    #define CLIENT_VERSION_SUFFIX   "-yac-wm on MSVC++"
+#else
+    #define CLIENT_VERSION_SUFFIX   "-yac-wm"
+#endif
 
 
 // The following part of the code determines the CLIENT_BUILD variable.
@@ -35,11 +39,19 @@ const std::string CLIENT_NAME("YACoin-WM");
 #    include "build.h"
 #endif
 
+#ifdef _MSC_VER
+#else
 // git will put "#define GIT_ARCHIVE 1" on the next line inside archives. 
 #define GIT_ARCHIVE 1
+#endif
+
 #ifdef GIT_ARCHIVE
 #    define GIT_COMMIT_ID "32a928e"
+    #ifdef _MSC_VER
+#    define GIT_COMMIT_DATE "$Format:%cD$"
+    #else
 #    define GIT_COMMIT_DATE "$Format:%cD"
+    #endif
 #endif
 
 #define BUILD_DESC_FROM_COMMIT(maj,min,rev,build,commit) \

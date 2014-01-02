@@ -2,19 +2,48 @@
 // Copyright (c) 2009-2012 The Bitcoin developers
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
-#include <boost/foreach.hpp>
-#include <boost/tuple/tuple.hpp>
 
-using namespace std;
-using namespace boost;
+#ifdef _MSC_VER
+    #include <stdint.h>
+    
+    #include "script.h"
+    //#include "keystore.h"
+    //#include "bignum.h"
+    //#include "key.h"
+    #include "main.h"
+    //#include "sync.h"
+    //#include "util.h"
 
-#include "script.h"
-#include "keystore.h"
-#include "bignum.h"
-#include "key.h"
-#include "main.h"
-#include "sync.h"
-#include "util.h"
+    #include <boost/foreach.hpp>
+    #include <boost/tuple/tuple.hpp>
+
+    using namespace std;
+    using namespace boost;
+#else
+    #include <boost/foreach.hpp>
+    #include <boost/tuple/tuple.hpp>
+
+    using namespace std;
+    using namespace boost;
+
+    #include "script.h"
+    #include "keystore.h"
+    #include "bignum.h"
+    #include "key.h"
+    #include "main.h"
+    #include "sync.h"
+    #include "util.h"
+#endif
+
+#ifdef _MSC_VER
+    #pragma warning( push )
+    #pragma warning( disable: 4244 )
+    #pragma warning( disable: 4267 )
+    #pragma warning( disable: 4334 )
+    #pragma warning( disable: 4390 )
+    #pragma warning( disable: 4800 )
+    #pragma warning( disable: 4996 )
+#endif
 
 bool CheckSig(vector<unsigned char> vchSig, vector<unsigned char> vchPubKey, CScript scriptCode, const CTransaction& txTo, unsigned int nIn, int nHashType);
 
@@ -1883,3 +1912,12 @@ void CScript::SetMultisig(int nRequired, const std::vector<CKey>& keys)
         *this << key.GetPubKey();
     *this << EncodeOP_N(keys.size()) << OP_CHECKMULTISIG;
 }
+#ifdef _MSC_VER
+    #pragma warning( pop )
+    //#pragma warning( disable: 4244 )
+    //#pragma warning( disable: 4267 )
+    //#pragma warning( disable: 4334 )
+    //#pragma warning( disable: 4390 )
+    //#pragma warning( disable: 4800 )
+    //#pragma warning( disable: 4996 )
+#endif

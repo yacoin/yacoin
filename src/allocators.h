@@ -5,31 +5,61 @@
 #ifndef BITCOIN_ALLOCATORS_H
 #define BITCOIN_ALLOCATORS_H
 
-#include <string.h>
+#ifdef _MSC_VER
+    #include <stdint.h>
+    // apparantly, string.h is unneccessary?
+#else
+    #include <string.h>
+#endif
+
 #include <string>
 #include <boost/thread/mutex.hpp>
 #include <map>
 
 #ifdef WIN32
-#ifdef _WIN32_WINNT
-#undef _WIN32_WINNT
-#endif
-#define _WIN32_WINNT 0x0501
-#define WIN32_LEAN_AND_MEAN 1
-#ifndef NOMINMAX
-#define NOMINMAX
-#endif
-#include <windows.h>
+    #ifdef _MSC_VER
+        #include <basetsd.h>    // for ULONG_PTR
+
+        #ifdef _WIN32_WINNT
+            #undef _WIN32_WINNT
+        #endif
+        #define _WIN32_WINNT 0x0501
+        #define WIN32_LEAN_AND_MEAN 1
+        #ifndef NOMINMAX
+            #define NOMINMAX
+        #endif
+
+        #include "winsock2.h"
+        #include "WS2tcpip.h"
+        #include <windows.h>
+    #else
+        #ifdef _WIN32_WINNT
+            #undef _WIN32_WINNT
+        #endif
+        #define _WIN32_WINNT 0x0501
+        #define WIN32_LEAN_AND_MEAN 1
+        #ifndef NOMINMAX
+            #define NOMINMAX
+        #endif
+        #include <windows.h>
+    #endif
 // This is used to attempt to keep keying material out of swap
 // Note that VirtualLock does not provide this as a guarantee on Windows,
 // but, in practice, memory that has been VirtualLock'd almost never gets written to
 // the pagefile except in rare circumstances where memory is extremely low.
 #else
-#include <sys/mman.h>
-#include <limits.h> // for PAGESIZE
-#include <unistd.h> // for sysconf
+    #include <sys/mman.h>
+    #include <limits.h> // for PAGESIZE
+    #include <unistd.h> // for sysconf
 #endif
 
+#ifdef _MSC_VER
+    #pragma warning( push )
+    #pragma warning( disable: 4996 )
+    #pragma warning( disable: 4267 )
+    #pragma warning( disable: 4244 )
+    #pragma warning( disable: 4800 )
+#endif
 /**
  * Thread-safe class to keep track of locked (ie, non-swappable) memory pages.
  *
@@ -253,5 +283,11 @@ struct zero_after_free_allocator : public std::allocator<T>
 
 // This is exactly like std::string, but with a custom allocator.
 typedef std::basic_string<char, std::char_traits<char>, secure_allocator<char> > SecureString;
-
+#ifdef _MSC_VER
+    #pragma warning( pop )
+    //#pragma warning( disable: 4996 )
+    //#pragma warning( disable: 4267 )
+    //#pragma warning( disable: 4244 )
+    //#pragma warning( disable: 4800 )
+#endif
 #endif

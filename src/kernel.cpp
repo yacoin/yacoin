@@ -7,10 +7,24 @@
 #include "kernel.h"
 #include "db.h"
 
+#ifdef _MSC_VER
+    #pragma warning( push )
+    #pragma warning( disable: 4267 )
+    #pragma warning( disable: 4244 )
+    #pragma warning( disable: 4390 )
+    #pragma warning( disable: 4800 )
+    #pragma warning( disable: 4996 )
+#endif
+
 using namespace std;
 
-extern int nStakeMaxAge;
-extern int nStakeTargetSpacing;
+#ifdef _MSC_VER
+    extern unsigned int nStakeMaxAge;
+    extern unsigned int nStakeTargetSpacing;
+#else
+    extern int nStakeMaxAge;
+    extern int nStakeTargetSpacing;
+#endif
 
 // Modifier interval: time to elapse before new modifier is computed
 // Set to 6-hour for production network and 20-minute for test network
@@ -66,24 +80,40 @@ static bool SelectBlockFromCandidates(
     *pindexSelected = (const CBlockIndex*) 0;
     BOOST_FOREACH(const PAIRTYPE(int64, uint256)& item, vSortedByTimestamp)
     {
-        if (!mapBlockIndex.count(item.second))
-            return error("SelectBlockFromCandidates: failed to find block index for candidate block %s", item.second.ToString().c_str());
-        const CBlockIndex* pindex = mapBlockIndex[item.second];
+        if (!mapBlockIndex.count(item.second))  // this takes the most time
+            return error(
+                        "SelectBlockFromCandidates: failed to find block index for candidate block %s", 
+                        item.second.ToString().c_str()
+                        );
+
+        const CBlockIndex
+            * pindex = mapBlockIndex[item.second];
+
         if (fSelected && pindex->GetBlockTime() > nSelectionIntervalStop)
             break;
+
         if (mapSelectedBlocks.count(pindex->GetBlockHash()) > 0)
             continue;
+
         // compute the selection hash by hashing its proof-hash and the
         // previous proof-of-stake modifier
-        uint256 hashProof = pindex->IsProofOfStake()? pindex->hashProofOfStake : pindex->GetBlockHash();
-        CDataStream ss(SER_GETHASH, 0);
+        uint256 
+            hashProof = pindex->IsProofOfStake()? pindex->hashProofOfStake : pindex->GetBlockHash();
+
+        CDataStream 
+            ss(SER_GETHASH, 0);
+
         ss << hashProof << nStakeModifierPrev;
-        uint256 hashSelection = Hash(ss.begin(), ss.end());
+
+        uint256 
+            hashSelection = Hash(ss.begin(), ss.end());
+
         // the selection hash is divided by 2**32 so that proof-of-stake block
         // is always favored over proof-of-work block. this is to preserve
         // the energy efficiency property
         if (pindex->IsProofOfStake())
             hashSelection >>= 32;
+
         if (fSelected && hashSelection < hashBest)
         {
             hashBest = hashSelection;
@@ -384,3 +414,11 @@ bool CheckStakeModifierCheckpoints(int nHeight, unsigned int nStakeModifierCheck
         return nStakeModifierChecksum == mapStakeModifierCheckpoints[nHeight];
     return true;
 }
+#ifdef _MSC_VER
+    #pragma warning( pop )
+    //#pragma warning( disable: 4267 )
+    //#pragma warning( disable: 4244 )
+    //#pragma warning( disable: 4390 )
+    //#pragma warning( disable: 4800 )
+    //#pragma warning( disable: 4996 )
+#endif

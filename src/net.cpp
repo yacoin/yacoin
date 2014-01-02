@@ -23,6 +23,15 @@
 #include <miniupnpc/upnperrors.h>
 #endif
 
+#ifdef _MSC_VER
+    #pragma warning( push )
+    #pragma warning( disable: 4244 )
+    #pragma warning( disable: 4267 )
+    #pragma warning( disable: 4390 )
+    #pragma warning( disable: 4800 )
+    #pragma warning( disable: 4996 )
+#endif
+
 using namespace std;
 using namespace boost;
 
@@ -67,7 +76,7 @@ static bool vfLimited[NET_MAX] = {};
 static CNode* pnodeLocalHost = NULL;
 CAddress addrSeenByPeer(CService("0.0.0.0", 0), nLocalServices);
 uint64 nLocalHostNonce = 0;
-array<int, THREAD_MAX> vnThreadsRunning;
+boost::array<int, THREAD_MAX> vnThreadsRunning;
 static std::vector<SOCKET> vhListenSocket;
 CAddrMan addrman;
 
@@ -1217,9 +1226,17 @@ void MapPort()
 // Each pair gives a source name and a seed name.
 // The first name is used as information source for addrman.
 // The second name should resolve to a list of seed addresses.
+#ifdef _MSC_VER
+    static const char 
+        *strDNSSeed[][2] = {
+                            //{"yacoin.org", "seed.novacoin.su"},
+                            { NULL, NULL }
+                           };
+#else
 static const char *strDNSSeed[][2] = {
     //{"yacoin.org", "seed.novacoin.su"},    // WM - Umm...  FIXME
 };
+#endif
 
 void ThreadDNSAddressSeed(void* parg)
 {
@@ -2010,6 +2027,17 @@ public:
     }
     ~CNetCleanup()
     {
+#ifdef _MSC_VER
+    bool
+        did_this_already = false;
+
+    if( !did_this_already )
+        {
+        did_this_already = true;
+    (void)printf(
+                "~CNetCleanup() started..."
+                );
+#endif
         // Close sockets
         BOOST_FOREACH(CNode* pnode, vNodes)
             if (pnode->hSocket != INVALID_SOCKET)
@@ -2023,6 +2051,28 @@ public:
         // Shutdown Windows Sockets
         WSACleanup();
 #endif
+#ifdef _MSC_VER
+    (void)printf(
+                " done\n"
+                );
+        }
+#endif
     }
 }
 instance_of_cnetcleanup;
+
+#ifdef _MSC_VER
+void kill_CNetCleanup_now( void )
+{
+instance_of_cnetcleanup.~CNetCleanup();
+}
+#endif
+
+#ifdef _MSC_VER
+    #pragma warning( pop )
+    //#pragma warning( disable: 4244 )
+    //#pragma warning( disable: 4267 )
+    //#pragma warning( disable: 4390 )
+    //#pragma warning( disable: 4800 )
+    //#pragma warning( disable: 4996 )
+#endif
