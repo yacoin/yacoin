@@ -1,9 +1,5 @@
 ===============================================================================
 ===============================================================================
-One gets to these sites by googling! Isn't that how everyone programs these days!?
-No more printed books.
-
-===============================================================================
 For BerkeleyDB 4.8.30 for Windows:
 
 See all the older versions at:
