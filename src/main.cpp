@@ -18,6 +18,10 @@
 using namespace std;
 using namespace boost;
 
+// saironiq: block height where "no consecutive PoS blocks" rule activates
+// (around January 28 2014)
+int nConsecutiveStakeSwitchHeight = 400000;
+
 //
 // Global state
 //
@@ -2125,6 +2129,10 @@ bool CBlock::AcceptBlock()
         return DoS(10, error("AcceptBlock() : prev block not found"));
     CBlockIndex* pindexPrev = (*mi).second;
     int nHeight = pindexPrev->nHeight+1;
+
+    // saironiq: enforce "no consecutive PoS blocks" rule (from end of Jan 2014)
+    if (nHeight >= nConsecutiveStakeSwitchHeight && IsProofOfStake() && pindexPrev->IsProofOfStake())
+        return DoS(100, error("AcceptBlock() : two consecutive PoS blocks"));
 
     // Check proof-of-work or proof-of-stake
     if (nBits != GetNextTargetRequired(pindexPrev, IsProofOfStake()))

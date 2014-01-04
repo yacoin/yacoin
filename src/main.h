@@ -1267,7 +1267,8 @@ public:
         bnTarget.SetCompact(nBits);
         if (bnTarget <= 0)
             return 0;
-        return (IsProofOfStake()? (CBigNum(1)<<256) / (bnTarget+1) : 1);
+        //return (IsProofOfStake()? (CBigNum(1)<<256) / (bnTarget+1) : 1);
+        return 1; // saironiq: PoW and PoS both have the same trust
     }
 
     bool IsInMainChain() const
