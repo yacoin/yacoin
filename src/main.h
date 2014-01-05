@@ -25,6 +25,10 @@ class CInv;
 class CRequestTracker;
 class CNode;
 
+// saironiq: block height where "no consecutive PoS blocks" rule activates
+// (around January 28 2014)
+static const unsigned int nConsecutiveStakeSwitchHeight = 400000;
+
 static const unsigned int MAX_BLOCK_SIZE = 1000000;
 static const unsigned int MAX_BLOCK_SIZE_GEN = MAX_BLOCK_SIZE/2;
 static const unsigned int MAX_BLOCK_SIGOPS = MAX_BLOCK_SIZE/50;
@@ -1263,12 +1267,17 @@ public:
 
     CBigNum GetBlockTrust() const
     {
+        if (nHeight >= nConsecutiveStakeSwitchHeight) {
+            // new rules
+            return 1; // saironiq: PoW and PoS both have the same trust
+        }
+
+        // old rules
         CBigNum bnTarget;
         bnTarget.SetCompact(nBits);
         if (bnTarget <= 0)
             return 0;
-        //return (IsProofOfStake()? (CBigNum(1)<<256) / (bnTarget+1) : 1);
-        return 1; // saironiq: PoW and PoS both have the same trust
+        return (IsProofOfStake()? (CBigNum(1)<<256) / (bnTarget+1) : 1);
     }
 
     bool IsInMainChain() const

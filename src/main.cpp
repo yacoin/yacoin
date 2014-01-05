@@ -18,10 +18,6 @@
 using namespace std;
 using namespace boost;
 
-// saironiq: block height where "no consecutive PoS blocks" rule activates
-// (around January 28 2014)
-int nConsecutiveStakeSwitchHeight = 400000;
-
 //
 // Global state
 //
