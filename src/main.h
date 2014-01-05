@@ -27,7 +27,7 @@ class CNode;
 
 // saironiq: block height where "no consecutive PoS blocks" rule activates
 // (around January 28 2014)
-static const unsigned int nConsecutiveStakeSwitchHeight = 400000;
+static const int nConsecutiveStakeSwitchHeight = 400000;
 
 static const unsigned int MAX_BLOCK_SIZE = 1000000;
 static const unsigned int MAX_BLOCK_SIZE_GEN = MAX_BLOCK_SIZE/2;
