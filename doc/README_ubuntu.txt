@@ -97,15 +97,16 @@ Section B - Updating Ubuntu Server 12.04.3
 
       6 - Start the virtual machine back up by clicking the green "Start" button.
 
-Section C - Loggin in to your virtual machine using SSH
+Section C - Login to your virtual machine using SSH
 
-The VirtualBOX window running yor virtual machine is small and clunky. We want to use the Putty
-SSH client to login to the virtual machine because it is fast and beautiful. Download Putty from
-http://www.putty.org. Get the putty.exe file for "Windows on Intel x86". It's just an executable
-file. There is no need to install it. We need to find out the IP address of the virtual machine, so
-login using the VirtualBOX window.
+The VirtualBOX window running yor virtual machine is small and clunky. We want to use the Putty SSH
+client to login to the virtual machine because it is fast, beautiful, and the window can be resized.
+Download Putty from http://www.putty.org. Get the putty.exe file for "Windows on Intel x86". It's
+just an executable file. There is no need to install it. We need to find out the IP address of the
+virtual machine, so login using the VirtualBOX window.
 
-      1 - type " ifconfig ". In "eth0" is "inet addr:". That's your IP address.
+      1 - type " ifconfig ". In "eth0" is "inet addr:". That's the IP address of your virtual
+      machine.
 
       2 - On your Windows host, start "putty.exe". Type your IP address into the "Host Name" box.
       Type a name like "yacbuild" into the "Saved Sessions" box and click "Save". Click "Open" to
