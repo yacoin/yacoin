@@ -100,7 +100,7 @@ Section B - Updating Ubuntu Server 12.04.3
 Section C - Loggin in to your virtual machine using SSH
 
 The VirtualBOX window running yor virtual machine is small and clunky. We want to use the Putty
-SSH client to login tothe virtual machine because it is fast and beautiful. Download Putty from
+SSH client to login to the virtual machine because it is fast and beautiful. Download Putty from
 http://www.putty.org. Get the putty.exe file for "Windows on Intel x86". It's just an executable
 file. There is no need to install it. We need to find out the IP address of the virtual machine, so
 login using the VirtualBOX window.
@@ -129,7 +129,7 @@ Section E - Build the OpenSSL Lbrary
       2 - type " wget http://www.openssl.org/source/openssl-1.0.1e.tar.gz " to get the exact version
       of openssl we need from the internet.
 
-      3 - type " md5sum md5sum openssl-1.0.1e.tar.gz " and make sure you get
+      3 - type " md5sum openssl-1.0.1e.tar.gz " and make sure you get
       66bf6f10f060d561929de96f9dfe5b8c
 
       4 - type " tar xvzf openssl-1.0.1e.tar.gz " to extract the source files.
@@ -208,7 +208,7 @@ Section J - Build YACoin (yacoind)
 
       4 - type " make "
 
-Section J - Getting the yacoind executable file out of VirtualBOX and running on a production
+Section K - Get the yacoind executable file out of VirtualBOX and running on a production
 server.
 
       1 - Login to your server that you will use to run yacoind.
@@ -242,7 +242,7 @@ server.
 
       14 - type " ./yacoind stop " when you need to stop the daemon.
 
-Section L - Testing YACoin (yacoind)
+Section L - Test YACoin (yacoind)
 
 Many of the tests havn't been maintained and either don't compile or don't work properly. Remove the
 tests that don't compile for now.
