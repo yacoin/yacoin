@@ -122,7 +122,7 @@ Section D - Install required packages
 
       3 - type " sudo -k " to revoke your sudo password. You will not need sudo any more. Yay!
 
-Section E - Building the OpenSSL Lbrary
+Section E - Build the OpenSSL Lbrary
 
       1 - type " cd " to get to the home directory
 
@@ -140,7 +140,7 @@ Section E - Building the OpenSSL Lbrary
 
       7 - type " make "
 
-Section F - Build Berkely DB
+Section F - Build the Berkely DB library
 
       1 - type " cd " to get to the home directory
 
@@ -156,7 +156,7 @@ Section F - Build Berkely DB
 
       7 - type " make "
 
-Section G - Building Boost library
+Section G - Build the Boost library
 
       1 - type " cd " to get to the home directory
 
@@ -179,7 +179,7 @@ Section H - Get the latest production YACoin source
 
       2 - type " git clone https://github.com/yacoin/yacoin " to get the YACoin source code.
 
-Section I - Building miniupnpc library
+Section I - Build the miniupnpc library
 
       1 - type " cd " to get to the home directory
 
@@ -198,7 +198,7 @@ Section I - Building miniupnpc library
 
       8 - type " make "
 
-Section J - Building YACoin (yacoind)
+Section J - Build YACoin (yacoind)
 
       1 - type " cd " to get to the home directory
 
