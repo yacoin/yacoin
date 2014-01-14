@@ -2,7 +2,7 @@
 # Distributed under the MIT/X11 software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-# See file UBUNTU_BUILD_INSTRUCTIONS.txt for instructions
+# See file doc/README_ubuntu.txt for instructions
 
 USE_UPNP:=1
 USE_IPV6:=1
