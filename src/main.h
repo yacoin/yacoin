@@ -1252,7 +1252,12 @@ public:
         bnTarget.SetCompact(nBits);
         if (bnTarget <= 0)
             return 0;
-        return (IsProofOfStake()? (CBigNum(1)<<256) / (bnTarget+1) : 1);
+        if (nHeight < 400000) {
+            return (IsProofOfStake()? (CBigNum(1)<<256) / (bnTarget+1) : 1);
+        }
+        else {
+            return 1;
+        }
     }
 
     bool IsInMainChain() const
