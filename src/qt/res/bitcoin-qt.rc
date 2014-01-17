@@ -1,4 +1,4 @@
-IDI_ICON1 ICON DISCARDABLE "icons/novacoin.ico"
+IDI_ICON1 ICON DISCARDABLE "icons/yacoin.ico"
 
 #include <windows.h>             // needed for VERSIONINFO
 #include "../../clientversion.h" // holds the needed client version information
@@ -18,14 +18,14 @@ BEGIN
     BEGIN
         BLOCK "040904E4" // U.S. English - multilingual (hex)
         BEGIN
-            VALUE "CompanyName",        "YaCoin"
-            VALUE "FileDescription",    "YaCoin-Qt (OSS GUI client for YaCoin)"
+            VALUE "CompanyName",        "YACoin"
+            VALUE "FileDescription",    "YACoin-Qt (OSS GUI client for YACoin)"
             VALUE "FileVersion",        VER_FILEVERSION_STR
             VALUE "InternalName",       "yacoin-qt"
-            VALUE "LegalCopyright",     "2009-2012 The Bitcoin developers, 2012-2013 The NovaCoin & PPCoin developers, 2013 The YaCoin developers."
+            VALUE "LegalCopyright",     "2009-2012 The Bitcoin developers, 2012-2013 The NovaCoin & PPCoin developers, 2013 The YACoin developers."
             VALUE "LegalTrademarks1",   "Distributed under the MIT/X11 software license, see the accompanying file COPYING or http://www.opensource.org/licenses/mit-license.php."
             VALUE "OriginalFilename",   "yacoin-qt.exe"
-            VALUE "ProductName",        "YaCoin-Qt"
+            VALUE "ProductName",        "YACoin-Qt"
             VALUE "ProductVersion",     VER_PRODUCTVERSION_STR
         END
     END

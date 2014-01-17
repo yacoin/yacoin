@@ -1009,13 +1009,13 @@ void PrintExceptionContinue(std::exception* pex, const char* pszThread)
 boost::filesystem::path GetDefaultDataDir()
 {
     namespace fs = boost::filesystem;
-    // Windows < Vista: C:\Documents and Settings\Username\Application Data\YaCoin
-    // Windows >= Vista: C:\Users\Username\AppData\Roaming\YaCoin
-    // Mac: ~/Library/Application Support/YaCoin
+    // Windows < Vista: C:\Documents and Settings\Username\Application Data\YACoin
+    // Windows >= Vista: C:\Users\Username\AppData\Roaming\YACoin
+    // Mac: ~/Library/Application Support/YACoin
     // Unix: ~/.yacoin
 #ifdef WIN32
     // Windows
-    return GetSpecialFolderPath(CSIDL_APPDATA) / "YaCoin";
+    return GetSpecialFolderPath(CSIDL_APPDATA) / "YACoin";
 #else
     fs::path pathRet;
     char* pszHome = getenv("HOME");
@@ -1027,7 +1027,7 @@ boost::filesystem::path GetDefaultDataDir()
     // Mac
     pathRet /= "Library/Application Support";
     fs::create_directory(pathRet);
-    return pathRet / "YaCoin";
+    return pathRet / "YACoin";
 #else
     // Unix
     return pathRet / ".yacoin";
