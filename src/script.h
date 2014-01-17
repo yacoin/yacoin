@@ -14,6 +14,14 @@
 #include "keystore.h"
 #include "bignum.h"
 
+#ifdef _MSC_VER
+    #pragma warning( push )
+    #pragma warning( disable: 4996 )
+    #pragma warning( disable: 4267 )
+    #pragma warning( disable: 4244 )
+    #pragma warning( disable: 4800 )
+#endif
+
 typedef std::vector<unsigned char> valtype;
 
 class CTransaction;
@@ -603,4 +611,11 @@ bool VerifySignature(const CTransaction& txFrom, const CTransaction& txTo, unsig
 // combine them intelligently and return the result.
 CScript CombineSignatures(CScript scriptPubKey, const CTransaction& txTo, unsigned int nIn, const CScript& scriptSig1, const CScript& scriptSig2);
 
+#ifdef _MSC_VER
+    #pragma warning( pop )
+    //#pragma warning( disable: 4996 )
+    //#pragma warning( disable: 4267 )
+    //#pragma warning( disable: 4244 )
+    //#pragma warning( disable: 4800 )
+#endif
 #endif

@@ -3,6 +3,10 @@
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#ifdef _MSC_VER
+    #include <stdint.h>
+#endif
+
 #include "util.h"
 #include "sync.h"
 #include "strlcpy.h"
@@ -31,34 +35,38 @@ namespace boost {
 #include <stdarg.h>
 
 #ifdef WIN32
-#ifdef _MSC_VER
-#pragma warning(disable:4786)
-#pragma warning(disable:4804)
-#pragma warning(disable:4805)
-#pragma warning(disable:4717)
-#endif
-#ifdef _WIN32_WINNT
-#undef _WIN32_WINNT
-#endif
-#define _WIN32_WINNT 0x0501
-#ifdef _WIN32_IE
-#undef _WIN32_IE
-#endif
-#define _WIN32_IE 0x0501
-#define WIN32_LEAN_AND_MEAN 1
-#ifndef NOMINMAX
-#define NOMINMAX
-#endif
-#include <io.h> /* for _commit */
-#include "shlobj.h"
+    #ifdef _WIN32_WINNT
+        #undef _WIN32_WINNT
+    #endif
+    #define _WIN32_WINNT 0x0501
+    #ifdef _WIN32_IE
+        #undef _WIN32_IE
+    #endif
+    #define _WIN32_IE 0x0501
+    #define WIN32_LEAN_AND_MEAN 1
+    #ifndef NOMINMAX
+        #define NOMINMAX
+    #endif
+    #include <io.h> /* for _commit */
+    #include "shlobj.h"
 #elif defined(__linux__)
-# include <sys/prctl.h>
+    # include <sys/prctl.h>
 #endif
 
 #ifndef WIN32
-#include <execinfo.h>
+    #include <execinfo.h>
 #endif
 
+#ifdef _MSC_VER
+    #pragma warning( push )
+    #pragma warning( disable: 4146 )
+    #pragma warning( disable: 4244 )
+    #pragma warning( disable: 4267 )
+    #pragma warning( disable: 4334 )
+    #pragma warning( disable: 4390 )
+    #pragma warning( disable: 4800 )
+    #pragma warning( disable: 4996 )
+#endif
 
 using namespace std;
 
@@ -80,6 +88,9 @@ bool fLogTimestamps = false;
 CMedianFilter<int64> vTimeOffsets(200,0);
 bool fReopenDebugLog = false;
 
+#ifdef _MSC_VER
+    int64 nFrequency;
+#endif
 // Init OpenSSL library multithreading support
 static CCriticalSection** ppmutexOpenSSL;
 void locking_callback(int mode, int i, const char* file, int line)
@@ -1009,13 +1020,13 @@ void PrintExceptionContinue(std::exception* pex, const char* pszThread)
 boost::filesystem::path GetDefaultDataDir()
 {
     namespace fs = boost::filesystem;
-    // Windows < Vista: C:\Documents and Settings\Username\Application Data\YaCoin
-    // Windows >= Vista: C:\Users\Username\AppData\Roaming\YaCoin
-    // Mac: ~/Library/Application Support/YaCoin
+    // Windows < Vista: C:\Documents and Settings\Username\Application Data\YACoin
+    // Windows >= Vista: C:\Users\Username\AppData\Roaming\YACoin
+    // Mac: ~/Library/Application Support/YACoin
     // Unix: ~/.yacoin
 #ifdef WIN32
     // Windows
-    return GetSpecialFolderPath(CSIDL_APPDATA) / "YaCoin";
+    return GetSpecialFolderPath(CSIDL_APPDATA) / "YACoin";
 #else
     fs::path pathRet;
     char* pszHome = getenv("HOME");
@@ -1027,7 +1038,7 @@ boost::filesystem::path GetDefaultDataDir()
     // Mac
     pathRet /= "Library/Application Support";
     fs::create_directory(pathRet);
-    return pathRet / "YaCoin";
+    return pathRet / "YACoin";
 #else
     // Unix
     return pathRet / ".yacoin";
@@ -1347,3 +1358,13 @@ bool NewThread(void(*pfn)(void*), void* parg)
     }
     return true;
 }
+#ifdef _MSC_VER
+    #pragma warning( pop )
+    //#pragma warning( disable: 4146 )
+    //#pragma warning( disable: 4244 )
+    //#pragma warning( disable: 4267 )
+    //#pragma warning( disable: 4334 )
+    //#pragma warning( disable: 4390 )
+    //#pragma warning( disable: 4800 )
+    //#pragma warning( disable: 4996 )
+#endif

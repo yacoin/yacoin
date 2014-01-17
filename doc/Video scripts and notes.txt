@@ -1,0 +1,182 @@
+===============================================================================
+===============================================================================
+For BerkeleyDB 4.8.30 for Windows:
+
+See all the older versions at:
+http://www.oracle.com/technetwork/database/database-technologies/berkeleydb/downloads/index-082944.html 
+pick 
+http://download.oracle.com/berkeley-db/db-4.8.30.NC.zip
+and for good luck
+http://download.oracle.com/berkeley-db/db-4.8.30.zip
+too!
+
+Building one's BerkeleyDb libraries here:
+http://docs.oracle.com/cd/E17275_01/html/programmer_reference/build_win.html#id1631798
+
+Compile time help at 
+http://docs.oracle.com/cd/E17275_01/html/programmer_reference/build_win_faq.html
+
+What I did was, though one can use other techniques, is:
+
+//Open the .dsw workspace for C6 in MSVC++ 8.0 (aka 2005). 
+//But change all the projects from +r (read only) to -r first!
+// scratch that, the following seemed easier for me!
+
+Open the Berkeley DB VC++6.0 workspace,
+Berkeley_DB.dsw in MSC++ 6.0
+
+Select Project=>Dependencies...
+Select project to modify=>db_dll =>OK
+
+Select Project=>Settings 
+Preprocessor definitions:
+remove UNICODE and _UNICODE
+
+Build=>Set Active Configuration...
+choose db_dll - Win32 Release x86 =>OK
+
+shift - F8 which is 
+Build=>build libdb48.dll
+
+Build=>Set Active Configuration...
+choose db_dll - Win32 Debug x86 =>OK
+
+shift - F8 which is 
+Build=>build libdb48d.dll
+
+The .dlls for run time and .libs for linking are now in 
+your directory\db-4.8.30.NC\build_windows\Win32\Debug
+your directory\db-4.8.30.NC\build_windows\Win32\Release
+
+===============================================================================
+For Boost 1.53 this link: 
+
+http://sourceforge.net/projects/boost/files/boost-binaries/ 
+will get you version 1.53 or higher
+Now choosing 1.53 lands one at 
+http://sourceforge.net/projects/boost/files/boost-binaries/1.53.0/ 
+Note: pick your MSVC++ version here. Mine happens to be 32 bit MSVC++ 2005 Express, 
+so my pick must be 
+http://sourceforge.net/projects/boost/files/boost-binaries/1.53.0/boost_1_53_0-msvc-8.0-32.exe/download
+
+I just installed it and "pointed my IDE to it (explained later) I didn't have to do anything, Nice!
+
+===============================================================================
+For OpenSSL 1.0.e
+and the red [LATEST} line is 
+http://www.openssl.org/source/openssl-1.0.1e.tar.gz
+
+some same sources at 
+http://slproweb.com/products/Win32OpenSSL.html
+
+http://www.openssl.org/source/
+
+I used
+http://slproweb.com/download/Win32OpenSSL-1_0_1e.exe
+when run, it produces the .lib and .dll files I used
+
+===============================================================================
+===============================================================================
+MSVC++ 2005
+Tools=>Options=>Projects and Solutions=>
+    Show Directories for: (choose)
+    Include files
+
+    ...your boost 1.53 root directory, e.g. 
+    X:\libs\boost_1_53_0
+
+    ... your OpenSSL include directory, e.g
+    X:\libs\openssl\OpenSSL-Win32\include
+    
+    ... your BerkeleyDB Windows base directory, e.g
+    X:\libs\db-4.8.30\build_windows
+
+Tools=>Options=>Projects and Solutions=>
+    Show Directories for: (choose)
+    Library files
+
+    ...your boost 1.53 MSVC root library directory, e.g. 
+    X:\libs\boost_1_53_0\lib32-msvc-8.0
+
+    ... your OpenSSL library directory, e.g
+    X:\libs\OpenSSL\OpenSSL-Win32\lib
+
+    ... your BerkeleyDB Windows library directories, e.g
+    X:\libs\db-4.8.30\build_windows\Win32\Debug
+    X:\libs\db-4.8.30\build_windows\Win32\Release
+
+MSVC++ 2005 uses these preprocessor defines
+
+for debug mode:
+
+WIN32
+_DEBUG
+_CONSOLE
+SCRYPT_CHACHA
+SCRYPT_KECCAK512
+SCRYPT_CHOOSE_COMPILETIME
+
+code generation => runtime library:
+Multi-threaded Debug DLL (/MD)
+
+Linker properties
+Additional Dependencies:
+
+libeay32.lib
+ssleay32.lib
+libdb48d.lib
+shell32.lib
+shlwapi.lib
+
+Linker=> system=> SubSystem
+Console (/SUBSYSTEM:CONSOLE)
+================================
+
+for release mode:
+
+WIN32
+NDEBUG
+_CONSOLE
+SCRYPT_CHACHA
+SCRYPT_KECCAK512
+SCRYPT_CHOOSE_COMPILETIME
+
+code generation => runtime library:
+Multi-threaded DLL (/MD)
+
+Linker=> input properties
+Additional Dependencies:
+
+libeay32.lib
+ssleay32.lib
+libdb48.lib
+shell32.lib
+shlwapi.lib
+
+Linker=> system=> SubSystem
+Console (/SUBSYSTEM:CONSOLE)
+
+Copy 
+libdb48.dll
+libeay32.dll
+ssleay32.dll
+
+to the Release directory or whereever you want to run yacoind.exe from
+
+Copy 
+libdb48d.dll
+libeay32.dll
+ssleay32.dll
+
+to the Debug directory or whereever you want to run yacoind.exe from
+
+one can (ought to be able to) run yacoid.exe with those 3 .dlls in any directory 
+on any Windows system.
+
+Ron Winter
+
+old c coder
+BTC: 1DPvP6WoZzaNQ9Nxzd64hjYad1kyQzTTbx
+YAC: YHyyrjp5W43o7K7zPutddZh8ks2GDz8hAs
+
+===============================================================================

@@ -3,9 +3,18 @@
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-#include "netbase.h"
-#include "util.h"
-#include "sync.h"
+#ifdef _MSC_VER
+    #include <stdint.h>
+
+    #include "netbase.h"
+    //#include "util.h"
+    //#include "sync.h"
+    #include "db.h"     // for ssize_t
+#else
+    #include "netbase.h"
+    #include "util.h"
+    #include "sync.h"
+#endif
 
 #ifndef WIN32
 #include <sys/fcntl.h>
@@ -13,6 +22,15 @@
 
 #include "strlcpy.h"
 #include <boost/algorithm/string/case_conv.hpp> // for to_lower()
+
+#ifdef _MSC_VER
+    #pragma warning( push )
+    #pragma warning( disable: 4244 )
+    #pragma warning( disable: 4267 )
+    #pragma warning( disable: 4390 )
+    #pragma warning( disable: 4800 )
+    #pragma warning( disable: 4996 )
+#endif
 
 using namespace std;
 
@@ -1178,3 +1196,11 @@ void CService::SetPort(unsigned short portIn)
 {
     port = portIn;
 }
+#ifdef _MSC_VER
+    #pragma warning( pop )
+    //#pragma warning( disable: 4244 )
+    //#pragma warning( disable: 4267 )
+    //#pragma warning( disable: 4390 )
+    //#pragma warning( disable: 4800 )
+    //#pragma warning( disable: 4996 )
+#endif

@@ -9,6 +9,14 @@
 
 #include "key.h"
 
+#ifdef _MSC_VER
+    #pragma warning( push )
+    #pragma warning( disable: 4267 )
+    #pragma warning( disable: 4244 )
+    #pragma warning( disable: 4390 )
+    #pragma warning( disable: 4800 )
+    #pragma warning( disable: 4996 )
+#endif
 // Generate a private key from just the secret parameter
 int EC_KEY_regenerate_key(EC_KEY *eckey, BIGNUM *priv_key)
 {
@@ -404,3 +412,11 @@ bool CKey::IsValid()
     key2.SetSecret(secret, fCompr);
     return GetPubKey() == key2.GetPubKey();
 }
+#ifdef _MSC_VER
+    #pragma warning( pop )
+    //#pragma warning( disable: 4267 )
+    //#pragma warning( disable: 4244 )
+    //#pragma warning( disable: 4390 )
+    //#pragma warning( disable: 4800 )
+    //#pragma warning( disable: 4996 )
+#endif

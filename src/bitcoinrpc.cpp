@@ -3,6 +3,10 @@
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#if defined( _MSC_VER )
+    #include <stdint.h>
+#endif
+
 #include "init.h"
 #include "util.h"
 #include "sync.h"
@@ -12,21 +16,55 @@
 #include "db.h"
 
 #undef printf
-#include <boost/asio.hpp>
-#include <boost/asio/ip/v6_only.hpp>
-#include <boost/bind.hpp>
-#include <boost/filesystem.hpp>
-#include <boost/foreach.hpp>
-#include <boost/iostreams/concepts.hpp>
-#include <boost/iostreams/stream.hpp>
-#include <boost/algorithm/string.hpp>
-#include <boost/lexical_cast.hpp>
-#include <boost/asio/ssl.hpp>
-#include <boost/filesystem/fstream.hpp>
-#include <boost/shared_ptr.hpp>
+
+#if defined( _MSC_VER )
+    #pragma warning( push )
+    #pragma warning( disable: 4267 )
+    #pragma warning( disable: 4288 )
+    #pragma warning( disable: 4996 )
+    #include <boost/asio.hpp>
+     //#include <boost/asio/ip/v6_only.hpp>
+    #include <boost/asio/ssl.hpp>
+     //#include <boost/bind.hpp>
+     //#include <boost/filesystem.hpp>
+     //#include <boost/foreach.hpp>
+     //#include <boost/iostreams/concepts.hpp>
+    #include <boost/iostreams/stream.hpp>
+    #include <boost/algorithm/string.hpp>
+     //#include <boost/lexical_cast.hpp>
+     //#include <boost/asio/ssl.hpp>
+     //#include <boost/filesystem/fstream.hpp>
+     //#include <boost/shared_ptr.hpp>
+    #pragma warning( pop )
+    //#pragma warning( disable: 4267 )
+    //#pragma warning( disable: 4288 )
+    //#pragma warning( disable: 4996 )
+#else
+    #include <boost/asio.hpp>
+    #include <boost/asio/ip/v6_only.hpp>
+    #include <boost/bind.hpp>
+    #include <boost/filesystem.hpp>
+    #include <boost/foreach.hpp>
+    #include <boost/iostreams/concepts.hpp>
+    #include <boost/iostreams/stream.hpp>
+    #include <boost/algorithm/string.hpp>
+    #include <boost/lexical_cast.hpp>
+    #include <boost/asio/ssl.hpp>
+    #include <boost/filesystem/fstream.hpp>
+    #include <boost/shared_ptr.hpp>
+#endif
+
 #include <list>
 
 #define printf OutputDebugStringF
+
+#ifdef _MSC_VER
+    #pragma warning( push )
+    #pragma warning( disable: 4996 )
+    #pragma warning( disable: 4267 )
+    #pragma warning( disable: 4244 )
+    #pragma warning( disable: 4800 )
+#endif
 
 using namespace std;
 using namespace boost;
@@ -113,10 +151,18 @@ Value ValueFromAmount(int64 amount)
 std::string HexBits(unsigned int nBits)
 {
     union {
+#if defined( _MSC_VER )
+        ::int32_t nBits;
+#else
         int32_t nBits;
+#endif
         char cBits[4];
     } uBits;
+#if defined( _MSC_VER )
+    uBits.nBits = htonl((::int32_t)nBits);
+#else
     uBits.nBits = htonl((int32_t)nBits);
+#endif
     return HexStr(BEGIN(uBits.cBits), END(uBits.cBits));
 }
 
@@ -627,6 +673,27 @@ private:
     iostreams::stream< SSLIOStreamDevice<Protocol> > _stream;
 };
 
+void StopRPCThreads()
+    {
+    //delete pMiningKey;
+    //pMiningKey = NULL;
+
+    //if( rpc_io_service == NULL ) 
+    //    return;
+
+    //rpc_io_service->stop();
+
+    //rpc_worker_group->join_all();
+    //delete rpc_worker_group;
+    //rpc_worker_group = NULL;
+
+    //delete rpc_ssl_context;
+    //rpc_ssl_context = NULL;
+
+    //delete rpc_io_service;
+    //rpc_io_service = NULL;
+    }
+
 void ThreadRPCServer(void* parg)
 {
     // Make this thread recognisable as the RPC listener
@@ -733,7 +800,7 @@ void ThreadRPCServer2(void* parg)
     {
         unsigned char rand_pwd[32];
         RAND_bytes(rand_pwd, 32);
-        string strWhatAmI = "To use yacoind";
+        string strWhatAmI = "To use bitcoind";
         if (mapArgs.count("-server"))
             strWhatAmI = strprintf(_("To use the %s option"), "\"-server\"");
         else if (mapArgs.count("-daemon"))
@@ -755,9 +822,11 @@ void ThreadRPCServer2(void* parg)
 
     const bool fUseSSL = GetBoolArg("-rpcssl");
 
-    asio::io_service io_service;
+    asio::io_service 
+        io_service;
 
-    ssl::context context(io_service, ssl::context::sslv23);
+    ssl::context 
+        context(io_service, ssl::context::sslv23);
     if (fUseSSL)
     {
         context.set_options(ssl::context::no_sslv2);
@@ -777,16 +846,25 @@ void ThreadRPCServer2(void* parg)
     }
 
     // Try a dual IPv6/IPv4 socket, falling back to separate IPv4 and IPv6 sockets
-    const bool loopback = !mapArgs.count("-rpcallowip");
-    asio::ip::address bindAddress = loopback ? asio::ip::address_v6::loopback() : asio::ip::address_v6::any();
-    ip::tcp::endpoint endpoint(bindAddress, GetArg("-rpcport", GetDefaultRPCPort()));
+    const bool 
+        loopback = !mapArgs.count("-rpcallowip");
+
+    asio::ip::address 
+        bindAddress = loopback ? asio::ip::address_v6::loopback() : asio::ip::address_v6::any();
+
+    ip::tcp::endpoint 
+        endpoint(bindAddress, GetArg("-rpcport", GetDefaultRPCPort()));
+
     boost::system::error_code v6_only_error;
     boost::shared_ptr<ip::tcp::acceptor> acceptor(new ip::tcp::acceptor(io_service));
 
     boost::signals2::signal<void ()> StopRequests;
 
-    bool fListening = false;
-    std::string strerr;
+    bool 
+        fListening = false;
+
+    std::string 
+        strerr;
     try
     {
         acceptor->open(endpoint.protocol());
@@ -846,7 +924,7 @@ void ThreadRPCServer2(void* parg)
 
     vnThreadsRunning[THREAD_RPCLISTENER]--;
     while (!fShutdown)
-        io_service.run_one();
+        io_service.run_one();   // do we loop here until shutdown?
     vnThreadsRunning[THREAD_RPCLISTENER]++;
     StopRequests();
 }
@@ -1289,3 +1367,10 @@ int main(int argc, char *argv[])
 #endif
 
 const CRPCTable tableRPC;
+#ifdef _MSC_VER
+    #pragma warning( pop )
+    //#pragma warning( disable: 4996 )
+    //#pragma warning( disable: 4267 )
+    //#pragma warning( disable: 4244 )
+    //#pragma warning( disable: 4800 )
+#endif

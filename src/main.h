@@ -5,13 +5,38 @@
 #ifndef BITCOIN_MAIN_H
 #define BITCOIN_MAIN_H
 
-#include "bignum.h"
-#include "sync.h"
-#include "net.h"
-#include "script.h"
-#include "scrypt_mine.h"
+#ifdef _MSC_VER
+    #include <stdint.h>
+    #define __PRETTY_FUNCTION__ __FUNCTION__
+    //#define __PRETTY_FUNCTION__ __FUNCSIG__
 
-#include <list>
+    #include "net.h"
+    #ifdef H_BITCOIN_SCRIPT
+    #else
+        #include "script.h"
+    #endif
+    #include "scrypt_mine.h"
+
+    #include <set>
+    #include <map>
+
+    #include <limits>
+
+    #pragma warning( push )
+    #pragma warning( disable: 4101 )
+    #pragma warning( disable: 4267 )
+    #pragma warning( disable: 4244 )
+    #pragma warning( disable: 4800 )
+    #pragma warning( disable: 4996 )
+#else
+    #include "bignum.h"
+    #include "sync.h"
+    #include "net.h"
+    #include "script.h"
+    #include "scrypt_mine.h"
+
+    #include <list>
+#endif
 
 class CWallet;
 class CBlock;
@@ -593,7 +618,7 @@ public:
         return dPriority > COIN * 144 / 250;
     }
 
-    int64 GetMinFee(unsigned int nBlockSize=1, bool fAllowFree=false, enum GetMinFee_mode mode=GMF_BLOCK) const;
+    int64 GetMinFee(unsigned int nBlockSize=1, bool fAllowFree=true, enum GetMinFee_mode mode=GMF_BLOCK, unsigned int nBytes=0) const;
 
     bool ReadFromDisk(CDiskTxPos pos, FILE** pfileRet=NULL)
     {
@@ -820,7 +845,78 @@ public:
 };
 
 
+class CBlockHeader
+{
+public:
+    static const int CURRENT_VERSION=3;
+    int nVersion;
+    uint256 hashPrevBlock;
+    uint256 hashMerkleRoot;
+    unsigned int nTime;
+    unsigned int nBits;
+    unsigned int nNonce;
 
+    // memory only
+    mutable bool fHashed;
+    mutable uint256 hashCached;
+
+    CBlockHeader()
+    {
+        fHashed = false;
+        SetNull();
+    }
+
+    IMPLEMENT_SERIALIZE
+    (
+        READWRITE(this->nVersion);
+        nVersion = this->nVersion;
+        READWRITE(hashPrevBlock);
+        READWRITE(hashMerkleRoot);
+        READWRITE(nTime);
+        READWRITE(nBits);
+        READWRITE(nNonce);
+    )
+
+    void SetNull()
+    {
+        fHashed = false;
+        nVersion = CURRENT_VERSION;
+        hashPrevBlock = 0;
+        hashMerkleRoot = 0;
+        nTime = 0;
+        nBits = 0;
+        nNonce = 0;
+        fHashed = false;
+    }
+
+    void SetHash(uint256 h) const
+    {
+        if (!fHashed) {
+            hashCached = h;
+            fHashed = true;
+        }
+    }
+
+    uint256 GetHash() const
+    {
+        if (!fHashed) {
+            scrypt_hash(CVOIDBEGIN(nVersion), sizeof(block_header), UINTBEGIN(hashCached), GetNfactor(nTime));
+            fHashed = true;
+        }
+
+        return hashCached;
+    }
+
+    int64 GetBlockTime() const
+    {
+        return (int64)nTime;
+    }
+
+    bool IsNull() const
+    {
+        return (nBits == 0);
+    }
+};
 
 
 /** Nodes collect new transactions into a block, hash them into a hash tree,
@@ -833,17 +929,9 @@ public:
  * Blocks are appended to blk0001.dat files on disk.  Their location on disk
  * is indexed by CBlockIndex objects in memory.
  */
-class CBlock
+class CBlock : public CBlockHeader
 {
 public:
-    // header
-    static const int CURRENT_VERSION=3;
-    int nVersion;
-    uint256 hashPrevBlock;
-    uint256 hashMerkleRoot;
-    unsigned int nTime;
-    unsigned int nBits;
-    unsigned int nNonce;
 
     // network and disk
     std::vector<CTransaction> vtx;
@@ -860,6 +948,14 @@ public:
 
     CBlock()
     {
+        fHashed = false;
+        SetNull();
+    }
+
+    CBlock(const CBlockHeader &blockHeader)
+        : CBlockHeader(blockHeader)
+    {
+        fHashed = false;
         SetNull();
     }
 
@@ -888,38 +984,13 @@ public:
 
     void SetNull()
     {
-        nVersion = CBlock::CURRENT_VERSION;
-        hashPrevBlock = 0;
-        hashMerkleRoot = 0;
-        nTime = 0;
-        nBits = 0;
-        nNonce = 0;
+        fHashed = false;
+        CBlockHeader::SetNull();
+
         vtx.clear();
         vchBlockSig.clear();
         vMerkleTree.clear();
         nDoS = 0;
-    }
-
-    bool IsNull() const
-    {
-        return (nBits == 0);
-    }
-
-    uint256 GetHash() const
-    {
-        uint256 thash;
-        //void * scratchbuff = scrypt_buffer_alloc();
-
-        scrypt_hash(CVOIDBEGIN(nVersion), sizeof(block_header), UINTBEGIN(thash), GetNfactor(nTime));
-
-        //scrypt_buffer_free(scratchbuff);
-
-        return thash;
-    }
-
-    int64 GetBlockTime() const
-    {
-        return (int64)nTime;
     }
 
     void UpdateTime(const CBlockIndex* pindexPrev);
@@ -931,7 +1002,11 @@ public:
 //        if (nHeight >= 9689)
         {
             // Take last bit of block hash as entropy bit
+#ifdef _MSC_VER
+            unsigned int nEntropyBit = ((GetHash().Get64()) & 1);
+#else           
             unsigned int nEntropyBit = ((GetHash().Get64()) & 1llu);
+#endif
             if (fDebug && GetBoolArg("-printstakemodifier"))
                 printf("GetStakeEntropyBit: nHeight=%u hashBlock=%s nEntropyBit=%u\n", nHeight, GetHash().ToString().c_str(), nEntropyBit);
             return nEntropyBit;
@@ -1127,10 +1202,9 @@ private:
  * to it, but pnext will only point forward to the longest branch, or will
  * be null if the block is not part of the longest chain.
  */
-class CBlockIndex
+class CBlockIndex : public CBlockHeader
 {
 public:
-    const uint256* phashBlock;
     CBlockIndex* pprev;
     CBlockIndex* pnext;
     unsigned int nFile;
@@ -1157,16 +1231,11 @@ public:
     unsigned int nStakeTime;
     uint256 hashProofOfStake;
 
-    // block header
-    int nVersion;
-    uint256 hashMerkleRoot;
-    unsigned int nTime;
-    unsigned int nBits;
-    unsigned int nNonce;
-
     CBlockIndex()
     {
-        phashBlock = NULL;
+        fHashed = false;
+        CBlockHeader::SetNull();
+
         pprev = NULL;
         pnext = NULL;
         nFile = 0;
@@ -1181,17 +1250,11 @@ public:
         hashProofOfStake = 0;
         prevoutStake.SetNull();
         nStakeTime = 0;
-
-        nVersion       = 0;
-        hashMerkleRoot = 0;
-        nTime          = 0;
-        nBits          = 0;
-        nNonce         = 0;
     }
 
     CBlockIndex(unsigned int nFileIn, unsigned int nBlockPosIn, CBlock& block)
+        : CBlockHeader(block)
     {
-        phashBlock = NULL;
         pprev = NULL;
         pnext = NULL;
         nFile = nFileIn;
@@ -1215,35 +1278,16 @@ public:
             prevoutStake.SetNull();
             nStakeTime = 0;
         }
-
-        nVersion       = block.nVersion;
-        hashMerkleRoot = block.hashMerkleRoot;
-        nTime          = block.nTime;
-        nBits          = block.nBits;
-        nNonce         = block.nNonce;
     }
 
-    CBlock GetBlockHeader() const
+    const CBlockHeader & GetBlockHeader() const
     {
-        CBlock block;
-        block.nVersion       = nVersion;
-        if (pprev)
-            block.hashPrevBlock = pprev->GetBlockHash();
-        block.hashMerkleRoot = hashMerkleRoot;
-        block.nTime          = nTime;
-        block.nBits          = nBits;
-        block.nNonce         = nNonce;
-        return block;
+        return *this;
     }
 
     uint256 GetBlockHash() const
     {
-        return *phashBlock;
-    }
-
-    int64 GetBlockTime() const
-    {
-        return (int64)nTime;
+        return GetHash();
     }
 
     CBigNum GetBlockTrust() const
@@ -1371,6 +1415,7 @@ public:
 
     CDiskBlockIndex()
     {
+        fHashed = false;
         hashPrev = 0;
         hashNext = 0;
     }
@@ -1385,6 +1430,9 @@ public:
     (
         if (!(nType & SER_GETHASH))
             READWRITE(nVersion);
+
+        READWRITE(hashCached);
+        SetHash(hashCached); // sets the hash if reading from disk; does nothing if writing
 
         READWRITE(hashNext);
         READWRITE(nFile);
@@ -1418,14 +1466,7 @@ public:
 
     uint256 GetBlockHash() const
     {
-        CBlock block;
-        block.nVersion        = nVersion;
-        block.hashPrevBlock   = hashPrev;
-        block.hashMerkleRoot  = hashMerkleRoot;
-        block.nTime           = nTime;
-        block.nBits           = nBits;
-        block.nNonce          = nNonce;
-        return block.GetHash();
+        return GetHash();
     }
 
 
@@ -1619,5 +1660,12 @@ public:
 };
 
 extern CTxMemPool mempool;
-
+#ifdef _MSC_VER
+    #pragma warning( pop )
+    //#pragma warning( disable: 4101 )
+    //#pragma warning( disable: 4267 )
+    //#pragma warning( disable: 4244 )
+    //#pragma warning( disable: 4800 )
+    //#pragma warning( disable: 4996 )
+#endif
 #endif

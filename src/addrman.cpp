@@ -2,7 +2,23 @@
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#ifdef _MSC_VER
+    #include <stdint.h>                 // this gets rid of the 
+    //microsoft visual studio 8\vc\include\stdint.h(244) : warning C4005: 'INTMAX_C' : macro redefinition
+    //boost_1_53_0\boost\cstdint.hpp(423) : see previous definition of 'INTMAX_C'
+    //microsoft visual studio 8\vc\include\stdint.h(245) : warning C4005: 'UINTMAX_C' : macro redefinition
+    //boost_1_53_0\boost\cstdint.hpp(424) : see previous definition of 'UINTMAX_C'
+#endif
+
 #include "addrman.h"
+
+#ifdef _MSC_VER
+    #pragma warning( push )
+    #pragma warning( disable: 4996 )
+    #pragma warning( disable: 4267 )
+    #pragma warning( disable: 4244 )
+    #pragma warning( disable: 4800 )
+#endif
 
 using namespace std;
 
@@ -390,9 +406,13 @@ CAddress CAddrMan::Select_(int nUnkBias)
 {
     if (size() == 0)
         return CAddress();
-
+#ifdef _MSC_VER
+    double nCorTried = sqrt(double(nTried)) * (100.0 - nUnkBias);
+    double nCorNew = sqrt(double(nNew)) * nUnkBias;
+#else
     double nCorTried = sqrt(nTried) * (100.0 - nUnkBias);
     double nCorNew = sqrt(nNew) * nUnkBias;
+#endif
     if ((nCorTried + nCorNew)*GetRandInt(1<<30)/(1<<30) < nCorTried)
     {
         // use a tried node
@@ -525,3 +545,10 @@ void CAddrMan::Connected_(const CService &addr, int64 nTime)
     if (nTime - info.nTime > nUpdateInterval)
         info.nTime = nTime;
 }
+#ifdef _MSC_VER
+    #pragma warning( pop )
+    //#pragma warning( disable: 4996 )
+    //#pragma warning( disable: 4267 )
+    //#pragma warning( disable: 4244 )
+    //#pragma warning( disable: 4800 )
+#endif

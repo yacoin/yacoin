@@ -25,6 +25,15 @@
 #endif
 
 #if defined(COMPILER_MSVC)
+    #ifndef _MSC_VER
+        // this is MSVC++ 2005
+        #define _MSC_VER 1400
+        // put your defines here
+        // e.g.
+        // MSVC++ 2008 is 1500, etc.
+    #else
+        // it should be defined already?
+    #endif
 	#define X86_INTRINSIC
 	#if defined(CPU_X86_64) || defined(X86ASM_SSE)
 		#define X86_INTRINSIC_SSE
@@ -78,7 +87,12 @@
 	#endif
 	#if defined(X86_INTRINSIC_SSSE3)
 		#define X86_INTRINSIC_SSSE3
-		#include <tmmintrin.h>
+        #ifdef _MSC_VER     
+            // MSVC++ Epress 2005 doesn't have tmmintrin.h
+            // IIRC it didn't come into existence until MSVC 2008?
+        #else
+	        #include <tmmintrin.h>
+        #endif
 	#endif
 #endif
 

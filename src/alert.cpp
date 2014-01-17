@@ -2,6 +2,14 @@
 // Alert system
 //
 
+#ifdef _MSC_VER
+    #include <stdint.h>                 // this gets rid of the 
+    //microsoft visual studio 8\vc\include\stdint.h(244) : warning C4005: 'INTMAX_C' : macro redefinition
+    //boost_1_53_0\boost_1_53_0\boost\cstdint.hpp(423) : see previous definition of 'INTMAX_C'
+    //microsoft visual studio 8\vc\include\stdint.h(245) : warning C4005: 'UINTMAX_C' : macro redefinition
+    //boost_1_53_0\boost_1_53_0\boost\cstdint.hpp(424) : see previous definition of 'UINTMAX_C'
+#endif
+
 #include <boost/foreach.hpp>
 #include <map>
 

@@ -3,7 +3,11 @@
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-#include <boost/assign/list_of.hpp>
+#ifdef _MSC_VER
+    #include <stdint.h>
+#else
+    #include <boost/assign/list_of.hpp>
+#endif
 
 #include "base58.h"
 #include "bitcoinrpc.h"
@@ -12,6 +16,19 @@
 #include "main.h"
 #include "net.h"
 #include "wallet.h"
+
+#ifdef _MSC_VER
+    #include <boost/assign/list_of.hpp>
+#endif
+
+#ifdef _MSC_VER
+    #pragma warning( push )
+    #pragma warning( disable: 4101 )
+    #pragma warning( disable: 4267 )
+    #pragma warning( disable: 4244 )
+    #pragma warning( disable: 4800 )
+    #pragma warning( disable: 4996 )
+#endif
 
 using namespace std;
 using namespace boost;
@@ -530,3 +547,13 @@ Value sendrawtransaction(const Array& params, bool fHelp)
 
     return hashTx.GetHex();
 }
+#ifdef _MSC_VER
+    #pragma warning( pop )
+
+    //#pragma warning( disable: 4101 )
+    //#pragma warning( disable: 4267 )
+    //#pragma warning( disable: 4244 )
+    //#pragma warning( disable: 4345 )
+    //#pragma warning( disable: 4800 )
+    //#pragma warning( disable: 4996 )
+#endif

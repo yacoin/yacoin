@@ -11,6 +11,15 @@
 # include <arpa/inet.h>
 #endif
 
+#ifdef _MSC_VER
+    #pragma warning( push )
+    #pragma warning( disable: 4101 )
+    #pragma warning( disable: 4267 )
+    #pragma warning( disable: 4244 )
+    #pragma warning( disable: 4800 )
+    #pragma warning( disable: 4996 )
+#endif
+
 static const char* ppszTypeName[] =
 {
     "ERROR",
@@ -147,4 +156,10 @@ void CInv::print() const
 {
     printf("CInv(%s)\n", ToString().c_str());
 }
-
+#ifdef _MSC_VER
+    #pragma warning( pop )
+    //#pragma warning( disable: 4996 )
+    //#pragma warning( disable: 4267 )
+    //#pragma warning( disable: 4244 )
+    //#pragma warning( disable: 4800 )
+#endif

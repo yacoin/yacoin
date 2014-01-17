@@ -2,12 +2,29 @@
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#ifdef _MSC_VER
+    #include <stdint.h>
+#endif
+
 #include <openssl/aes.h>
 #include <openssl/evp.h>
 #include <vector>
 #include <string>
+
+#ifdef _MSC_VER
+    #pragma warning( push )
+    #pragma warning( disable: 4996 )
+    #pragma warning( disable: 4267 )
+    #pragma warning( disable: 4244 )
+    #pragma warning( disable: 4800 )
+#endif
+
 #ifdef WIN32
-#include <windows.h>
+    #ifdef _MSC_VER
+        #include "sync.h"
+    #else
+        #include <windows.h>    // for MinGW
+    #endif
 #endif
 
 #include "crypter.h"
@@ -119,3 +136,11 @@ bool DecryptSecret(const CKeyingMaterial& vMasterKey, const std::vector<unsigned
         return false;
     return cKeyCrypter.Decrypt(vchCiphertext, *((CKeyingMaterial*)&vchPlaintext));
 }
+#ifdef _MSC_VER
+    #pragma warning( pop )
+    //#pragma warning( disable: 4996 )
+    //#pragma warning( disable: 4267 )
+    //#pragma warning( disable: 4244 )
+    //#pragma warning( disable: 4800 )
+#endif
+
