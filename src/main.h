@@ -1267,16 +1267,33 @@ public:
 
     CBigNum GetBlockTrust() const
     {
-        if (nHeight >= nConsecutiveStakeSwitchHeight) {
-            // new rules
-            return 1; // saironiq: PoW and PoS both have the same trust
-        }
-
-        // old rules
         CBigNum bnTarget;
         bnTarget.SetCompact(nBits);
         if (bnTarget <= 0)
             return 0;
+
+        // new rules (requires no-consecutive-pos)
+        if (nHeight >= nConsecutiveStakeSwitchHeight) {
+            // PoS trust = previous PoW block trust
+            // tries to prevent orphaning of PoS
+            // more likely to be orphaned if PoW diff is increasing
+            if (IsProofOfStake())
+                return pprev->GetBlockTrust() + 1;
+
+            // default trust multiplier
+            unsigned int trustMult = 1;
+
+            // PoW after PoS -> more trust (trying to prevent orphaning of PoS blocks)
+            if (IsProofOfWork() && pprev->IsProofOfStake())
+                trustMult = 2;
+
+            // PoW trust based on difficulty
+            // max target vs current target ratio (truncated to int)
+            // double trust for PoW after PoS
+            return CBigNum(trustMult) * (bnTargetLimit / bnTarget);
+        }
+
+        // old rules - PoS trust over 9000, PoW trust = 1
         return (IsProofOfStake()? (CBigNum(1)<<256) / (bnTarget+1) : 1);
     }
 
