@@ -2190,8 +2190,8 @@ CBigNum CBlockIndex::GetBlockTrust() const
     if (bnTarget <= 0)
         return 0;
 
-    // saironiq: new trust rules
-    if (nHeight >= nConsecutiveStakeSwitchHeight) {
+    // saironiq: new trust rules (since specific block on mainnet and always on testnet)
+    if (nHeight >= nConsecutiveStakeSwitchHeight || fTestNet) {
         // first block trust - for future compatibility (i.e., forks :P)
         if (pprev == NULL)
             return 1;
