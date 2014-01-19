@@ -26,8 +26,8 @@ class CRequestTracker;
 class CNode;
 
 // saironiq: block height where "no consecutive PoS blocks" rule activates
-// (around January 28 2014)
-static const int nConsecutiveStakeSwitchHeight = 400000;
+// (around February 11 2014)
+static const int nConsecutiveStakeSwitchHeight = 420000;
 
 static const unsigned int MAX_BLOCK_SIZE = 1000000;
 static const unsigned int MAX_BLOCK_SIZE_GEN = MAX_BLOCK_SIZE/2;
@@ -52,7 +52,7 @@ static const int fHaveUPnP = false;
 static const uint256 hashGenesisBlockOfficial("0x0000060fc90618113cde415ead019a1052a9abc43afcccff38608ff8751353e5");
 static const uint256 hashGenesisBlockTestNet("0xfe20c2c2fc02b36d2473e1f51dba1fb455d41ff42966e2a4edabb98fdd7107e6");
 
-static const int64 nMaxClockDrift = 15 * 60;        // 15 minutes
+static const int64 nMaxClockDrift = 2 * 60 * 60;        // two hours
 
 extern CScript COINBASE_FLAGS;
 
@@ -1265,20 +1265,7 @@ public:
         return GetHash();
     }
 
-    CBigNum GetBlockTrust() const
-    {
-        if (nHeight >= nConsecutiveStakeSwitchHeight) {
-            // new rules
-            return 1; // saironiq: PoW and PoS both have the same trust
-        }
-
-        // old rules
-        CBigNum bnTarget;
-        bnTarget.SetCompact(nBits);
-        if (bnTarget <= 0)
-            return 0;
-        return (IsProofOfStake()? (CBigNum(1)<<256) / (bnTarget+1) : 1);
-    }
+    CBigNum GetBlockTrust() const;
 
     bool IsInMainChain() const
     {

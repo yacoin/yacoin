@@ -7,7 +7,7 @@ YACoin - a hybrid scrypt PoW + PoS based cryptocurrency that uses the scrypt + c
 Uses the scrypt + chacha20/8 (N,1,1) hashing algorithm.
 N increases over time to increase memory requirements.
 1 minute PoW block targets.
-(?) minute PoS block targets.
+10 minute PoS block targets.
 The PoW subsidy decreases as difficulty increases.
 Maximum PoW reward is 100 coins.
 Development process
