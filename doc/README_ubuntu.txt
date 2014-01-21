@@ -171,14 +171,19 @@ Section G - Build the Boost library
 
       6 - Type " ./bootstrap.sh "
 
-      7 - Type " ./b2 --with-chrono --with-filesystem --with-program_options --with-thread
+      7 - Type " ./b2 --with-chrono --with-filesystem --with-program_options --with-thread \
       --with-test stage "
 
-Section H - Get the latest production YACoin source
+Section H - Get the latest stable branch of the YACoin source
 
       1 - Type " cd " to get to the home directory
 
       2 - Type " git clone https://github.com/yacoin/yacoin " to get the YACoin source code.
+
+      3 - Type " git tag -l " to see a list of stable branches.
+
+      4 - Type " git checkout -b tags/stable_0.4.2 " to set your source files to the most recent
+      stable branch.
 
 Section I - Build the miniupnpc library
 
