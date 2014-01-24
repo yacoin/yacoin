@@ -69,11 +69,17 @@ cd C:\deps\boost_1_54_0\
 bootstrap.bat mingw
 b2 --build-type=complete --with-chrono --with-filesystem --with-program_options --with-system --with-thread toolset=gcc stage
 
-14) Download latest snapshot of yacoin, extract it to C:\ (so you have C:\yacoin-cc-master)
-https://github.com/saironiq/yacoin-cc/archive/master.zip
+14) Use GIT to get a copy of the yacoin source.
+Download and install git from http://git-scm.com/download/win
+Open "Git->Git Bash" from the Windows start menu and type:
+cd /c/
+git clone https://github.com/yacoin/yacoin
+cd yacoin
+git tag -l   # list of stable branches
+git checkout -b tags/stable_0.4.2  # set your source files to the most recent stable branch.
 
 15) Back in the MinGW shell, type:
-cd /c/yacoin-cc-master/src
+cd /c/yacoin/src
 mingw32-make -f makefile.mingw
 strip yacoind.exe
 
@@ -116,7 +122,16 @@ LIBS="-lpthread" LDFLAGS="-L/c/MinGW/lib" png_CFLAGS="-L../libpng-1.2.37/lib -I.
 make
 
 26) Open the newly installed Qt command prompt and type:
-cd C:\yacoin-cc-master\
+cd C:\yacoin\
 qmake "USE_UPNP=1" yacoin-qt.pro
 mingw32-make -f Makefile.Release
+
+27) Back up your wallet.dat file
+copy %HOMEPATH%\AppData\Roaming\YaCoin\wallet.dat %HOMEPATH%\AppData\Roaming\YaCoin\walletSave.dat 
+
+28) Copy DLLs into release directory
+copy C:\Qt\4.8.5\bin\QtCore4.dll release
+copy C:\Qt\4.8.5\bin\QtGui4.dll release
+
+29) Use windows to navigate to the release directory and double click on yacoin-qt.exe
 
