@@ -1,3 +1,5 @@
+NOTE: These instructions are out of date and are here for reference only.
+
 yacoin-qt: Qt4 GUI for Bitcoin
 ===============================
 
