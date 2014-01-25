@@ -141,8 +141,11 @@ qmake "USE_UPNP=1" yacoin-qt.pro
 mingw32-make -f Makefile.Release
 
 27) Copy DLLs into release directory
-copy C:\Qt\4.8.5\bin\QtCore4.dll release
-copy C:\Qt\4.8.5\bin\QtGui4.dll release
+copy "C:\Qt\4.8.5\bin\QtCore4.dll" release
+copy "C:\Qt\4.8.5\bin\QtGui4.dll" release
+copy "C:\MinGW462\bin\libgcc_s_dw2-1.dll" release
+copy "C:\MinGW462\bin\libstdc++-6.dll" release
+copy "C:\MinGW462\bin\mingwm10.dll" release
 
 28) Before running yacoin-qt.exe be sure to back up your wallet.dat file
 copy %HOMEPATH%\AppData\Roaming\YaCoin\wallet.dat %HOMEPATH%\AppData\Roaming\YaCoin\walletSave2.dat 
