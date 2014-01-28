@@ -629,12 +629,21 @@ void CWalletTx::GetAmounts(int64& nGeneratedImmature, int64& nGeneratedMature, l
     listSent.clear();
     strSentAccount = strFromAccount;
 
-    if (IsCoinBase() || IsCoinStake())
+    if (IsCoinBase())
     {
         if (GetBlocksToMaturity() > 0)
             nGeneratedImmature = pwallet->GetCredit(*this);
         else
             nGeneratedMature = GetCredit();
+        return;
+    }
+
+    if (IsCoinStake())
+    {
+        if (GetBlocksToMaturity() > 0) 
+            nGeneratedImmature = pwallet->GetCredit(*this) - pwallet->GetDebit(*this);
+        else 
+            nGeneratedMature = GetCredit() - GetDebit();
         return;
     }
 
