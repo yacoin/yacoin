@@ -22,6 +22,7 @@ License: ISC
 Files: debian/*
 Copyright: 2010-2011, Jonas Smedegaard <dr@jones.dk>
            2011, Matt Corallo <matt@bluematt.me>
+           2013-2014, Sampo Harjula <sahtor@sahtor.net>
 License: GPL-2+
 
 Files: debian/manpages/*
