@@ -9,8 +9,8 @@
 	dh $@
 
 override_dh_auto_build:
-	cd src; $(MAKE) -f makefile.unix -j4 yacoind
-	$(MAKE) -j4
+	cd src; $(MAKE) -f makefile.unix yacoind
+	$(MAKE)
 
 override_dh_auto_clean:
 	if [ -f Makefile ]; then $(MAKE) clean; else rm -rf build/; rm -f yacoin-qt; fi

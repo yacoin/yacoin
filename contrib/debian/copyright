@@ -7,6 +7,7 @@ Source: http://sourceforge.net/projects/bitcoin/files/
 
 Files: *
 Copyright: 2009-2012, Bitcoin Developers
+           2013-2014, Yacoin Developers
 License: Expat
 Comment: The Bitcoin Developers encompasses the current developers listed on bitcoin.org,
          as well as the numerous contributors to the project.
