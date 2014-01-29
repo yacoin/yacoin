@@ -1,6 +1,0 @@
-yacoin-qt usr/bin
-src/qt/res/icons/yacoin-32.png usr/share/pixmaps
-src/qt/res/icons/yacoin-16.png usr/share/pixmaps
-src/qt/res/icons/yacoin-128.png usr/share/pixmaps
-debian/yacoin-qt.desktop usr/share/applications
-debian/yacoin-qt.protocol usr/share/kde4/services/
