@@ -64,6 +64,10 @@ QString TransactionDesc::toHTML(CWallet *wallet, CWalletTx &wtx)
         {
             strHTML += "<b>" + tr("Source") + ":</b> " + tr("Generated") + "<br>";
         }
+        else if (wtx.IsCoinStake())
+        {
+            strHTML += "<b>" + tr("Source") + ":</b> " + tr("Stake Interest") + "<br>";
+        }
         else if (wtx.mapValue.count("from") && !wtx.mapValue["from"].empty())
         {
             // Online transaction
@@ -117,7 +121,7 @@ QString TransactionDesc::toHTML(CWallet *wallet, CWalletTx &wtx)
         //
         // Amount
         //
-        if (wtx.IsCoinBase() && nCredit == 0)
+        if (wtx.IsCoinBase() && !wtx.IsMature())
         {
             //
             // Coinbase

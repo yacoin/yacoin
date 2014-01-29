@@ -205,8 +205,7 @@ void TransactionRecord::updateStatus(const CWalletTx &wtx)
     if(type == TransactionRecord::Generated ||
        type == TransactionRecord::StakeInterest)
     {
-        int64 nCredit = wtx.GetCredit(true);
-        if (nCredit == 0)
+        if (!wtx.IsMature())
         {
             status.maturity = TransactionStatus::Immature;
 
