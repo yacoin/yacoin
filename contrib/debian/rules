@@ -5,15 +5,12 @@
 #build/yacoind::
 #	$(if $(filter nocheck,$(DEB_BUILD_OPTIONS)),,src/test_yacoin)
 
-DEB_INSTALL_EXAMPLES_yacoind += debian/examples/*
-DEB_INSTALL_MANPAGES_yacoind += debian/manpages/*
-
 %:
-	dh --with bash-completion $@
+	dh $@
 
 override_dh_auto_build:
-	cd src; $(MAKE) -f makefile.unix yacoind
-	$(MAKE)
+	cd src; $(MAKE) -f makefile.unix -j4 yacoind
+	$(MAKE) -j4
 
 override_dh_auto_clean:
 	if [ -f Makefile ]; then $(MAKE) clean; else rm -rf build/; rm -f yacoin-qt; fi
@@ -23,8 +20,8 @@ override_dh_auto_configure:
 	qmake yacoin-qt.pro USE_QRCODE=1
 
 override_dh_auto_test:
-	cd src; $(MAKE) -f makefile.unix test_yacoin
-	src/test_yacoin
+#	cd src; $(MAKE) -f makefile.unix test_yacoin
+#	src/test_yacoin
 
 # Ensure wrapper is set executable
 binary-post-install/yacoind:
