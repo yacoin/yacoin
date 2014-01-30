@@ -1097,8 +1097,10 @@ int64 CWallet::GetNewMint() const
     for (map<uint256, CWalletTx>::const_iterator it = mapWallet.begin(); it != mapWallet.end(); ++it)
     {
         const CWalletTx* pcoin = &(*it).second;
-        if (pcoin->IsCoinBase() && pcoin->GetBlocksToMaturity() > 0 && pcoin->GetDepthInMainChain() > 0)
+        if (pcoin->IsCoinBase() && !pcoin->IsMature() && pcoin->GetDepthInMainChain() > 0)
             nTotal += CWallet::GetCredit(*pcoin);
+        if (pcoin->IsCoinStake() && !pcoin->IsMature() && pcoin->GetDepthInMainChain() > 0)
+            nTotal += CWallet::GetCredit(*pcoin) - CWallet::GetDebit(*pcoin);
     }
     return nTotal;
 }
