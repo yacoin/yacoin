@@ -1,12 +1,12 @@
-.TH Yacoin.CONF "8" "April 2013" "yacoin.conf 3.19"
+.TH YACOIN.CONF "5" "January 2011" "yacoin.conf 3.19"
 .SH NAME
 yacoin.conf \- yacoin configuration file
 .SH SYNOPSIS
-All command-line options (except for '-datadir' and '-conf') may be specified in a configuration file, and all configuration file options may also be specified on the command line. Command-line options override values set in the configuration file.
+All command-line options (except for '\-datadir' and '\-conf') may be specified in a configuration file, and all configuration file options may also be specified on the command line. Command-line options override values set in the configuration file.
 .TP
 The configuration file is a list of 'setting=value' pairs, one per line, with optional comments starting with the '#' character.
 .TP
-The configuration file is not automatically created; you can create it using your favorite plain-text editor. By default, yacoind(1) will look for a file named yacoin.conf(5) in the yacoin data directory, but both the data directory and the configuration file path may be changed using the '-datadir' and '-conf' command-line arguments.
+The configuration file is not automatically created; you can create it using your favorite plain-text editor. By default, yacoind(1) will look for a file named yacoin.conf(5) in the yacoin data directory, but both the data directory and the configuration file path may be changed using the '\-datadir' and '\-conf' command-line arguments.
 .SH LOCATION
 yacoin.conf should be located in $HOME/.yacoin
 .SH NETWORK-RELATED SETTINGS
@@ -18,14 +18,11 @@ Enable or disable run on the test network instead of the real *yacoin* network.
 \fBproxy=\fR\fI'127.0.0.1:9050'\fR
 Connect via a socks4 proxy.
 .TP
-\fBaddnode=\fR\fI'10.0.0.2:7688'\fR
+\fBaddnode=\fR\fI'10.0.0.2:8333'\fR
 Use as many *addnode=* settings as you like to connect to specific peers.
 .TP
-\fBconnect=\fR\fI'10.0.0.1:7688'\fR
+\fBconnect=\fR\fI'10.0.0.1:8333'\fR
 Use as many *connect=* settings as you like to connect ONLY to specific peers.
-.TP
-\fBnoirc=\fR[\fI'1'\fR|\fI'0'\fR]
-Use or Do not use Internet Relay Chat (irc.lfnet.org #yacoin channel) to find other peers.
 .TP
 \fRmaxconnections=\fR\fI'value'\fR
 Maximum number of inbound+outbound connections.
@@ -53,9 +50,10 @@ Listen for RPC connections on this TCP port.
 You can use *yacoin* or *yacoind(1)* to send commands to *yacoin*/*yacoind(1)* running on another host using this option.
 .TP
 \fBrpcssl=\fR\fI'1'\fR
-Use Secure Sockets Layer (also known as TLS or HTTPS) to communicate with *yacoin* '-server' or *yacoind(1)*. Example of OpenSSL settings used when *rpcssl*='1':
+Use Secure Sockets Layer (also known as TLS or HTTPS) to communicate with *yacoin* '\-server' or *yacoind(1)*. Example of OpenSSL settings used when *rpcssl*='1':
 .TP
-\fBrpcsslciphers=\fR\fI'TLSv1+HIGH:!SSLv2:!aNULL:!eNULL:!AH:!3DES:@STRENGTH'\fR
+\fB\-rpcsslciphers=\fR<ciphers>
+Acceptable ciphers (default: TLSv1+HIGH:\:!SSLv2:\:!aNULL:\:!eNULL:\:!AH:\:!3DES:\:@STRENGTH)
 .TP
 \fBrpcsslcertificatechainfile=\fR\fI'server.cert'\fR
 .TP
@@ -65,6 +63,9 @@ Use Secure Sockets Layer (also known as TLS or HTTPS) to communicate with *yacoi
 .TP
 \fBgen=\fR[\fI'0'\fR|\fI'1'\fR]
 Enable or disable attempt to generate yacoins.
+.TP
+\fB4way=\fR[\fI'0'\fR|\fI'1'\fR]
+Enable or disable use SSE instructions to try to generate yacoins faster.
 .TP
 \fBkeypool=\fR\fI'100'\fR
 Pre-generate this many public/private key pairs, so wallet backups will be valid for both prior transactions and several dozen future transactions.
