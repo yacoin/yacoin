@@ -16,6 +16,18 @@ CONFIG += thread
 #    BOOST_INCLUDE_PATH, BOOST_LIB_PATH, BDB_INCLUDE_PATH,
 #    BDB_LIB_PATH, OPENSSL_INCLUDE_PATH and OPENSSL_LIB_PATH respectively
 
+win32:BOOST_LIB_SUFFIX=-mgw46-mt-s-1_54
+win32:BOOST_INCLUDE_PATH=C:/deps/boost_1_54_0
+win32:BOOST_LIB_PATH=C:/deps/boost_1_54_0/stage/lib
+win32:BDB_INCLUDE_PATH=C:/deps/db-4.8.30.NC/build_unix
+win32:BDB_LIB_PATH=C:/deps/db-4.8.30.NC/build_unix
+win32:OPENSSL_INCLUDE_PATH=C:/deps/openssl-1.0.1e/include
+win32:OPENSSL_LIB_PATH=C:/deps/openssl-1.0.1e
+win32:MINIUPNPC_INCLUDE_PATH=C:/deps
+win32:MINIUPNPC_LIB_PATH=C:/deps/miniupnpc/
+win32:QRENCODE_INCLUDE_PATH=C:/deps/qrencode-3.4.3
+win32:QRENCODE_LIB_PATH=C:/deps/qrencode-3.4.3/.libs
+
 OBJECTS_DIR = build
 MOC_DIR = build
 UI_DIR = build
@@ -46,7 +58,8 @@ win32:QMAKE_LFLAGS *= -Wl,--dynamicbase -Wl,--nxcompat
 contains(USE_QRCODE, 1) {
     message(Building with QRCode support)
     DEFINES += USE_QRCODE
-    LIBS += -lqrencode
+    INCLUDEPATH += $$QRENCODE_INCLUDE_PATH
+    LIBS += $$join(QRENCODE_LIB_PATH,,-L,) -lqrencode
 }
 
 # use: qmake "USE_UPNP=1" ( enabled by default; default)
@@ -312,7 +325,7 @@ OTHER_FILES += \
 # platform specific defaults, if not overridden on command line
 isEmpty(BOOST_LIB_SUFFIX) {
     macx:BOOST_LIB_SUFFIX = -mt
-    windows:BOOST_LIB_SUFFIX = -mgw44-mt-s-1_50
+    windows:BOOST_LIB_SUFFIX = -mgw46-mt-s-1_54
 }
 
 isEmpty(BOOST_THREAD_LIB_SUFFIX) {
