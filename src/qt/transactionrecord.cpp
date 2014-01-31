@@ -65,7 +65,7 @@ QList<TransactionRecord> TransactionRecord::decomposeTransaction(const CWallet *
                         sub.type = TransactionRecord::RecvFromOther;
                         sub.address = mapValue["from"];
                     }
-                    if (wtx.IsCoinBase() || wtx.IsCoinStake())
+                    if (wtx.IsCoinBase())
                     {
                         // Generated
                         sub.type = TransactionRecord::Generated;
