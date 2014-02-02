@@ -984,7 +984,7 @@ int64 CWallet::GetUnconfirmedBalance() const
         for (map<uint256, CWalletTx>::const_iterator it = mapWallet.begin(); it != mapWallet.end(); ++it)
         {
             const CWalletTx* pcoin = &(*it).second;
-            if (!pcoin->IsFinal() || !pcoin->IsConfirmed())
+            if ((!pcoin->IsFinal() || !pcoin->IsConfirmed()) && !pcoin->IsCoinBase() && !pcoin->IsCoinStake())
                 nTotal += pcoin->GetAvailableCredit();
         }
     }
