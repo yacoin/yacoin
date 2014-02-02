@@ -182,7 +182,7 @@ Section H - Get the latest stable branch of the YACoin source
 
       3 - Type " git tag -l " to see a list of stable branches.
 
-      4 - Type " git checkout -b tags/stable_0.4.2 " to set your source files to the most recent
+      4 - Type " git checkout tags/stable_0.4.2 " to set your source files to the most recent
       stable branch.
 
 Section I - Build the miniupnpc library
