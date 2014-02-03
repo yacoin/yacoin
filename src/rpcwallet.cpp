@@ -980,7 +980,7 @@ void ListTransactions(const CWalletTx& wtx, const string& strAccount, int nMinDe
         }
         else
         {
-            entry.push_back(Pair("category", "generate"));
+            entry.push_back(Pair("category", wtx.IsCoinStake() ? "interest" : "generate"));
             entry.push_back(Pair("amount", ValueFromAmount(nGeneratedMature)));
         }
         if (fLong)
