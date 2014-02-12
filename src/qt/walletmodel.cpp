@@ -48,7 +48,7 @@ qint64 WalletModel::getUnconfirmedBalance() const
 
 qint64 WalletModel::getStake() const
 {
-    return wallet->GetStake();
+    return wallet->GetStakedCoin();
 }
 
 qint64 WalletModel::getImmatureBalance() const

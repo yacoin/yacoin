@@ -1077,7 +1077,7 @@ static void ApproximateBestSubset(vector<pair<int64, pair<const CWalletTx*,unsig
 }
 
 // ppcoin: total coins staked (non-spendable until maturity)
-int64 CWallet::GetStake() const
+int64 CWallet::GetStakedCoin() const
 {
     int64 nTotal = 0;
     LOCK(cs_wallet);
@@ -1085,7 +1085,7 @@ int64 CWallet::GetStake() const
     {
         const CWalletTx* pcoin = &(*it).second;
         if (pcoin->IsCoinStake() && pcoin->GetBlocksToMaturity() > 0 && pcoin->GetDepthInMainChain() > 0)
-            nTotal += CWallet::GetCredit(*pcoin);
+            nTotal += CWallet::GetDebit(*pcoin);
     }
     return nTotal;
 }
