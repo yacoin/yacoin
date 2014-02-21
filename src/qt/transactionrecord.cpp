@@ -5,9 +5,9 @@
 
 /* Return positive answer if transaction should be shown in list.
  */
-bool TransactionRecord::showTransaction(const CWalletTx &wtx)
+bool TransactionRecord::showTransaction(const CWalletTx &wtx, bool testStake)
 {
-    if (wtx.IsCoinBase() || wtx.IsCoinStake())
+    if (wtx.IsCoinBase() || (testStake && wtx.IsCoinStake()))
     {
         // Ensures we show generated coins / mined transactions at depth 1
         if (!wtx.IsInMainChain())
