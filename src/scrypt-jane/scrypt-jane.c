@@ -6,12 +6,6 @@
 
 #include <string.h>
 
-#if defined( _WINDOWS )
-#if !defined( QT_GUI )
-extern "C" {
-#endif
-#endif
-
 #include "scrypt-jane.h"
 #include "code/scrypt-jane-portable.h"
 #include "code/scrypt-jane-hash.h"
@@ -19,7 +13,7 @@ extern "C" {
 #include "code/scrypt-jane-test-vectors.h"
 
 
-#define scrypt_maxN 30  /* (1 << (30 + 1)) = ~2 billion */
+#define scrypt_maxNfactor 30  /* (1 << (30 + 1)) = ~2 billion */
 #if (SCRYPT_BLOCK_BYTES == 64)
 #define scrypt_r_32kb 8 /* (1 << 8) = 256 * 2 blocks in a chunk * 64 bytes = Max of 32kb in a chunk */
 #elif (SCRYPT_BLOCK_BYTES == 128)
@@ -29,13 +23,13 @@ extern "C" {
 #elif (SCRYPT_BLOCK_BYTES == 512)
 #define scrypt_r_32kb 5 /* (1 << 5) = 32 * 2 blocks in a chunk * 512 bytes = Max of 32kb in a chunk */
 #endif
-#define scrypt_maxr scrypt_r_32kb /* 32kb */
-#define scrypt_maxp 25  /* (1 << 25) = ~33 million */
+#define scrypt_maxrfactor scrypt_r_32kb /* 32kb */
+#define scrypt_maxpfactor 25  /* (1 << 25) = ~33 million */
 
 #include <stdio.h>
-#include <malloc.h>
+//#include <malloc.h>
 
-static void
+static void NORETURN
 scrypt_fatal_error_default(const char *msg) {
 	fprintf(stderr, "%s\n", msg);
 	exit(1);
@@ -44,12 +38,12 @@ scrypt_fatal_error_default(const char *msg) {
 static scrypt_fatal_errorfn scrypt_fatal_error = scrypt_fatal_error_default;
 
 void
-scrypt_set_fatal_error_default(scrypt_fatal_errorfn fn) {
+scrypt_set_fatal_error(scrypt_fatal_errorfn fn) {
 	scrypt_fatal_error = fn;
 }
 
 static int
-scrypt_power_on_self_test() {
+scrypt_power_on_self_test(void) {
 	const scrypt_test_setting *t;
 	uint8_t test_digest[64];
 	uint32_t i;
@@ -154,11 +148,11 @@ scrypt(const uint8_t *password, size_t password_len, const uint8_t *salt, size_t
 	}
 #endif
 
-	if (Nfactor > scrypt_maxN)
+	if (Nfactor > scrypt_maxNfactor)
 		scrypt_fatal_error("scrypt: N out of range");
-	if (rfactor > scrypt_maxr)
+	if (rfactor > scrypt_maxrfactor)
 		scrypt_fatal_error("scrypt: r out of range");
-	if (pfactor > scrypt_maxp)
+	if (pfactor > scrypt_maxpfactor)
 		scrypt_fatal_error("scrypt: p out of range");
 
 	N = (1 << (Nfactor + 1));
@@ -186,8 +180,3 @@ scrypt(const uint8_t *password, size_t password_len, const uint8_t *salt, size_t
 	scrypt_free(&V);
 	scrypt_free(&YX);
 }
-#if defined( _WINDOWS )
-#if !defined( QT_GUI )
-}
-#endif
-#endif

@@ -11,10 +11,20 @@ typedef uint32_t scrypt_mix_word_t;
 /* must have these here in case block bytes is ever != 64 */
 #include "scrypt-jane-romix-basic.h"
 
+#include "scrypt-jane-mix_chacha-xop.h"
 #include "scrypt-jane-mix_chacha-avx.h"
 #include "scrypt-jane-mix_chacha-ssse3.h"
 #include "scrypt-jane-mix_chacha-sse2.h"
 #include "scrypt-jane-mix_chacha.h"
+
+#if defined(SCRYPT_CHACHA_XOP)
+	#define SCRYPT_CHUNKMIX_FN scrypt_ChunkMix_xop
+	#define SCRYPT_ROMIX_FN scrypt_ROMix_xop
+	#define SCRYPT_MIX_FN chacha_core_xop
+	#define SCRYPT_ROMIX_TANGLE_FN scrypt_romix_nop
+	#define SCRYPT_ROMIX_UNTANGLE_FN scrypt_romix_nop
+	#include "scrypt-jane-romix-template.h"
+#endif
 
 #if defined(SCRYPT_CHACHA_AVX)
 	#define SCRYPT_CHUNKMIX_FN scrypt_ChunkMix_avx
@@ -52,8 +62,14 @@ typedef uint32_t scrypt_mix_word_t;
 
 #if !defined(SCRYPT_CHOOSE_COMPILETIME)
 static scrypt_ROMixfn
-scrypt_getROMix() {
+scrypt_getROMix(void) {
 	size_t cpuflags = detect_cpu();
+
+#if defined(SCRYPT_CHACHA_XOP)
+	if (cpuflags & cpu_xop)
+		return scrypt_ROMix_xop;
+	else
+#endif
 
 #if defined(SCRYPT_CHACHA_AVX)
 	if (cpuflags & cpu_avx)
@@ -80,9 +96,14 @@ scrypt_getROMix() {
 
 #if defined(SCRYPT_TEST_SPEED)
 static size_t
-available_implementations() {
+available_implementations(void) {
 	size_t cpuflags = detect_cpu();
 	size_t flags = 0;
+
+#if defined(SCRYPT_CHACHA_XOP)
+	if (cpuflags & cpu_xop)
+		flags |= cpu_xop;
+#endif
 
 #if defined(SCRYPT_CHACHA_AVX)
 	if (cpuflags & cpu_avx)
@@ -104,13 +125,18 @@ available_implementations() {
 #endif
 
 static int
-scrypt_test_mix() {
+scrypt_test_mix(void) {
 	static const uint8_t expected[16] = {
 		0x48,0x2b,0x2d,0xb8,0xa1,0x33,0x22,0x73,0xcd,0x16,0xc4,0xb4,0xb0,0x7f,0xb1,0x8a,
 	};
 
 	int ret = 1;
 	size_t cpuflags = detect_cpu();
+
+#if defined(SCRYPT_CHACHA_XOP)
+	if (cpuflags & cpu_xop)
+		ret &= scrypt_test_mix_instance(scrypt_ChunkMix_xop, scrypt_romix_nop, scrypt_romix_nop, expected);
+#endif
 
 #if defined(SCRYPT_CHACHA_AVX)
 	if (cpuflags & cpu_avx)
