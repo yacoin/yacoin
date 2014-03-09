@@ -104,7 +104,7 @@ public:
             bool inModel = (lower != upper);
 
             // Determine whether to show transaction or not
-            bool showTransaction = (inWallet && TransactionRecord::showTransaction(mi->second));
+            bool showTransaction = (inWallet && TransactionRecord::showTransaction(mi->second, false));
 
             if(status == CT_UPDATED)
             {
