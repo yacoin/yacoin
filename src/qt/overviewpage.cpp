@@ -236,8 +236,4 @@ void OverviewPage::on_checkBox_stateChanged(int ckState)
 
      }
 
-//      if ((ckState == Qt::Checked) && (AskPassphraseDialog.reject()))
-//           {
-//          ui->checkBox->setCheckState(Qt::Unchecked);
-//           }
 }
