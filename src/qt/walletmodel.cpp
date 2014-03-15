@@ -397,6 +397,32 @@ void WalletModel::UnlockContext::CopyFrom(const UnlockContext& rhs)
     rhs.relock = false;
 }
 
+// WalletModel::UnlockContextStake implementation - Used for Qt POS Minting
+WalletModel::UnlockContextStake WalletModel::requestUnlockStake()
+{
+    bool was_locked = getEncryptionStatus() == Locked;
+    if(was_locked)
+    {
+        // Request UI to unlock wallet
+        emit requireUnlock();
+    }
+    // If wallet is still locked, unlock was failed or cancelled, mark context as invalid
+    bool valid = getEncryptionStatus() != Locked;
+
+    return UnlockContextStake(this, valid, was_locked);
+}
+
+WalletModel::UnlockContextStake::UnlockContextStake(WalletModel *wallet, bool valid, bool foo):
+        wallet(wallet),
+        valid(valid),
+        foo(foo)
+{
+}
+
+WalletModel::UnlockContextStake::~UnlockContextStake()
+{
+}
+
 bool WalletModel::getPubKey(const CKeyID &address, CPubKey& vchPubKeyOut) const
 {
     return wallet->GetPubKey(address, vchPubKeyOut);   
