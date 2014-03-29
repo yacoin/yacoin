@@ -1380,6 +1380,8 @@ bool CWallet::CreateCoinStake(const CKeyStore& keystore, unsigned int nBits, int
     // Should not be adjusted if you don't understand the consequences
     static unsigned int nStakeSplitAge = (60 * 60 * 24 * 90);
     int64 nCombineThreshold = GetProofOfWorkReward(GetLastBlockIndex(pindexBest, false)->nBits) / 3;
+    // Keep a table of block header hashes to speed things up
+    static map<uint256, uint256> mapBlockHeaderHash;
 
     CBigNum bnTargetPerCoinDay;
     bnTargetPerCoinDay.SetCompact(nBits);
@@ -1411,7 +1413,8 @@ bool CWallet::CreateCoinStake(const CKeyStore& keystore, unsigned int nBits, int
     {
         CTxDB txdb("r");
         CTxIndex txindex;
-        if (!txdb.ReadTxIndex(pcoin.first->GetHash(), txindex))
+        uint256 txHash = pcoin.first->GetHash();
+        if (!txdb.ReadTxIndex(txHash, txindex))
             continue;
 
         // Read block header
@@ -1421,6 +1424,18 @@ bool CWallet::CreateCoinStake(const CKeyStore& keystore, unsigned int nBits, int
         static int nMaxStakeSearchInterval = 60;
         if (block.GetBlockTime() + nStakeMinAge > txNew.nTime - nMaxStakeSearchInterval)
             continue; // only count coins meeting min age requirement
+
+        // Groko's POS miner performance fix:
+        if (mapBlockHeaderHash.count(txHash)) {
+            // re-use the transaction's saved block header hash
+            block.SetHash(mapBlockHeaderHash[txHash]);
+        }
+        else {
+            // This takes a bit longer then it used to now that N >= 14
+            uint256 hashBlockFrom = block.GetHash();
+            // Save it for faster POS mining.
+            mapBlockHeaderHash.insert(make_pair(txHash, hashBlockFrom));
+        }
 
         bool fKernelFound = false;
         for (unsigned int n=0; n<min(nSearchInterval,(int64)nMaxStakeSearchInterval) && !fKernelFound && !fShutdown; n++)
