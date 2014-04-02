@@ -1380,8 +1380,8 @@ bool CWallet::CreateCoinStake(const CKeyStore& keystore, unsigned int nBits, int
     // Should not be adjusted if you don't understand the consequences
     static unsigned int nStakeSplitAge = (60 * 60 * 24 * 90);
     int64 nCombineThreshold = GetProofOfWorkReward(GetLastBlockIndex(pindexBest, false)->nBits) / 3;
-    // Keep a table of block header hashes to speed things up
-    static map<uint256, uint256> mapBlockHeaderHash;
+    // Keep a table of stuff to speed up POS mining
+    static map<uint256, PosMiningStuff *> mapMiningStuff;
 
     CBigNum bnTargetPerCoinDay;
     bnTargetPerCoinDay.SetCompact(nBits);
@@ -1426,15 +1426,32 @@ bool CWallet::CreateCoinStake(const CKeyStore& keystore, unsigned int nBits, int
             continue; // only count coins meeting min age requirement
 
         // Groko's POS miner performance fix:
-        if (mapBlockHeaderHash.count(txHash)) {
-            // re-use the transaction's saved block header hash
-            block.SetHash(mapBlockHeaderHash[txHash]);
+        PosMiningStuff *miningStuff = NULL;
+        if (mapMiningStuff.count(txHash)) {
+            // re-use the block header hash and the kernel stake modifiers
+            miningStuff = mapMiningStuff[txHash];
+            block.SetHash(miningStuff->hashBlockFrom);
         }
         else {
-            // This takes a bit longer then it used to now that N >= 14
-            uint256 hashBlockFrom = block.GetHash();
-            // Save it for faster POS mining.
-            mapBlockHeaderHash.insert(make_pair(txHash, hashBlockFrom));
+            // All this takes quite a long time, and only needs to be done once for each input.
+            uint64 nStakeModifier = 0;
+            int nStakeModifierHeight = 0;
+            int64 nStakeModifierTime = 0;
+            uint256 hashBlockFrom;
+            // Calculate the block header hash
+            hashBlockFrom = block.GetHash();
+            // Calculate the kernel stake modifiers
+            if (GetKernelStakeModifier(hashBlockFrom, nStakeModifier, nStakeModifierHeight, nStakeModifierTime)) {
+                miningStuff = (PosMiningStuff *)malloc(sizeof(PosMiningStuff));
+    
+                miningStuff->hashBlockFrom = hashBlockFrom;
+                miningStuff->nStakeModifier = nStakeModifier;
+                miningStuff->nStakeModifierHeight = nStakeModifierHeight;
+                miningStuff->nStakeModifierTime = nStakeModifierTime;
+    
+                // Save it all for faster POS mining.
+                mapMiningStuff.insert(make_pair(txHash, miningStuff));
+            }
         }
 
         bool fKernelFound = false;
@@ -1444,7 +1461,7 @@ bool CWallet::CreateCoinStake(const CKeyStore& keystore, unsigned int nBits, int
             // Search nSearchInterval seconds back up to nMaxStakeSearchInterval
             uint256 hashProofOfStake = 0;
             COutPoint prevoutStake = COutPoint(pcoin.first->GetHash(), pcoin.second);
-            if (CheckStakeKernelHash(nBits, block, txindex.pos.nTxPos - txindex.pos.nBlockPos, *pcoin.first, prevoutStake, txNew.nTime - n, hashProofOfStake))
+            if (CheckStakeKernelHash(nBits, block, txindex.pos.nTxPos - txindex.pos.nBlockPos, *pcoin.first, prevoutStake, txNew.nTime - n, hashProofOfStake, false, miningStuff))
             {
                 // Found a kernel
                 if (fDebug && GetBoolArg("-printcoinstake"))
