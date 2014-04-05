@@ -3,9 +3,20 @@
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#ifdef _MSC_VER
+    #include <stdint.h>
+
+    #include "msvc_warnings.push.h"
+
+    #include "netbase.h"
+    //#include "util.h"
+    //#include "sync.h"
+    #include "db.h"     // for ssize_t
+#else    
 #include "netbase.h"
 #include "util.h"
 #include "sync.h"
+#endif
 
 #ifndef WIN32
 #include <sys/fcntl.h>
@@ -1178,3 +1189,6 @@ void CService::SetPort(unsigned short portIn)
 {
     port = portIn;
 }
+#ifdef _MSC_VER
+    #include "msvc_warnings.pop.h"
+#endif

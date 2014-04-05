@@ -25,7 +25,9 @@ class CWallet;
 class CWalletTx;
 
 extern unsigned int nWalletDBUpdated;
-
+#ifdef _MSC_VER
+    extern void kill_CNetCleanup_now( void );
+#endif    
 void ThreadFlushWalletDB(void* parg);
 bool BackupWallet(const CWallet& wallet, const std::string& strDest);
 

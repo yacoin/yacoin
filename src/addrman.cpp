@@ -2,6 +2,12 @@
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#ifdef _MSC_VER
+    #include <stdint.h>
+
+    #include "msvc_warnings.push.h"
+#endif
+
 #include "addrman.h"
 
 using namespace std;
@@ -391,8 +397,14 @@ CAddress CAddrMan::Select_(int nUnkBias)
     if (size() == 0)
         return CAddress();
 
+#ifdef _MSC_VER
+    double 
+        nCorTried = sqrt( double(nTried) ) * (100.0 - nUnkBias),
+        nCorNew = sqrt( double(nNew) )* nUnkBias;
+#else
     double nCorTried = sqrt(nTried) * (100.0 - nUnkBias);
     double nCorNew = sqrt(nNew) * nUnkBias;
+#endif
     if ((nCorTried + nCorNew)*GetRandInt(1<<30)/(1<<30) < nCorTried)
     {
         // use a tried node
@@ -525,3 +537,6 @@ void CAddrMan::Connected_(const CService &addr, int64 nTime)
     if (nTime - info.nTime > nUpdateInterval)
         info.nTime = nTime;
 }
+#ifdef _MSC_VER
+    #include "msvc_warnings.pop.h"
+#endif

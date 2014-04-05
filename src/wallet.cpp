@@ -3,6 +3,12 @@
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#ifdef _MSC_VER
+    #include <stdint.h>
+
+    #include "msvc_warnings.push.h"
+#endif
+
 #include "wallet.h"
 #include "walletdb.h"
 #include "crypter.h"
@@ -12,7 +18,10 @@
 #include "kernel.h"
 
 using namespace std;
+#ifdef _MSC_VER
+#else
 extern int nStakeMaxAge;
+#endif
 
 
 //////////////////////////////////////////////////////////////////////////////
@@ -787,16 +796,28 @@ bool CWalletTx::WriteToDisk()
 // Scan the block chain (starting in pindexStart) for transactions
 // from or to us. If fUpdate is true, found transactions that already
 // exist in the wallet will be updated.
+#ifdef _MSC_VER
+int CWallet::ScanForWalletTransactions(CBlockIndex* pindexStart, bool fUpdate, int nTotalToScan)
+#else
 int CWallet::ScanForWalletTransactions(CBlockIndex* pindexStart, bool fUpdate)
+#endif
 {
     int ret = 0;
 
-    CBlockIndex* pindex = pindexStart;
+    CBlockIndex
+        * pindex = pindexStart;
     {
         LOCK(cs_wallet);
+
+#ifdef _MSC_VER
+        int
+            nCount = 0;
+#endif        
         while (pindex)
         {
-            CBlock block;
+            CBlock 
+                block;
+
             block.ReadFromDisk(pindex, true);
             BOOST_FOREACH(CTransaction& tx, block.vtx)
             {
@@ -804,7 +825,42 @@ int CWallet::ScanForWalletTransactions(CBlockIndex* pindexStart, bool fUpdate)
                     ret++;
             }
             pindex = pindex->pnext;
+#ifdef _MSC_VER
+            ++nCount;
+            if (fPrintToConsole)
+            {
+                if(
+                    (0 == (nCount % 10) )   // every 10th time
+                  )
+                {
+                    if( 0 == nTotalToScan )
+                    {
+                        (void)printf(
+                                "%6d "
+                                "\r"
+                                ""
+                                , nCount
+                                    );
+                    }
+                    else
+                    {
+                        (void)printf(
+                                "%6d "
+                                "%2.2f%%"
+                                "\r"
+                                ""
+                                , nCount
+                                , floorf( float(nCount * 10000.0 / nTotalToScan) ) / 100
+                                    );
+                    }
+                }
+            }
         }
+        if (fPrintToConsole)     // this could be a progress bar, % meter etc.
+            (void)printf( "\n" );
+#else    
+        }
+#endif        
     }
     return ret;
 }
@@ -2184,3 +2240,6 @@ void CWallet::UpdatedTransaction(const uint256 &hashTx)
             NotifyTransactionChanged(this, hashTx, CT_UPDATED);
     }
 }
+#ifdef _MSC_VER
+    #include "msvc_warnings.pop.h"
+#endif

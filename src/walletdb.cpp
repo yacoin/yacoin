@@ -3,6 +3,12 @@
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#ifdef _MSC_VER
+    #include <stdint.h>
+
+    #include "msvc_warnings.push.h"
+#endif
+
 #include "walletdb.h"
 #include "wallet.h"
 #include <boost/filesystem.hpp>
@@ -674,3 +680,6 @@ bool CWalletDB::Recover(CDBEnv& dbenv, std::string filename)
 {
     return CWalletDB::Recover(dbenv, filename, false);
 }
+#ifdef _MSC_VER
+    #include "msvc_warnings.pop.h"
+#endif

@@ -2,6 +2,13 @@
 // Copyright (c) 2009-2012 The Bitcoin developers
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
+
+#ifdef _MSC_VER
+    #include <stdint.h>
+
+    #include "msvc_warnings.push.h"
+#endif
+
 #include <boost/foreach.hpp>
 #include <boost/tuple/tuple.hpp>
 
@@ -1265,6 +1272,10 @@ bool Solver(const CScript& scriptPubKey, txnouttype& typeRet, vector<vector<unsi
                 typeRet = tplate.first;
                 if (typeRet == TX_MULTISIG)
                 {
+#ifdef _MSC_VER
+                    if( vSolutionsRet.empty() ) // trouble!
+                        return false;
+#endif                    
                     // Additional checks for TX_MULTISIG:
                     unsigned char m = vSolutionsRet.front()[0];
                     unsigned char n = vSolutionsRet.back()[0];
@@ -1345,14 +1356,35 @@ bool Sign1(const CKeyID& address, const CKeyStore& keystore, uint256 hash, int n
     return true;
 }
 
-bool SignN(const vector<valtype>& multisigdata, const CKeyStore& keystore, uint256 hash, int nHashType, CScript& scriptSigRet)
+bool SignN(const vector<valtype>& multisigdata, 
+           const CKeyStore& keystore, 
+           uint256 hash, 
+           int nHashType, 
+           CScript& scriptSigRet
+          )
 {
-    int nSigned = 0;
-    int nRequired = multisigdata.front()[0];
+    int 
+        nSigned = 0;
+#ifdef _MSC_VER
+    bool
+        fTest = false;
+    if( multisigdata.empty() )  //trouble
+        {
+        fTest = true;   // need a fix here!!!
+        return false;   //???
+        }
+#endif
+    int 
+        nRequired = multisigdata.front()[0];
+
     for (unsigned int i = 1; i < multisigdata.size()-1 && nSigned < nRequired; i++)
     {
-        const valtype& pubkey = multisigdata[i];
-        CKeyID keyID = CPubKey(pubkey).GetID();
+        const valtype
+            & pubkey = multisigdata[i];
+
+        CKeyID 
+            keyID = CPubKey(pubkey).GetID();
+
         if (Sign1(keyID, keystore, hash, nHashType, scriptSigRet))
             ++nSigned;
     }
@@ -1370,11 +1402,25 @@ bool Solver(const CKeyStore& keystore, const CScript& scriptPubKey, uint256 hash
 {
     scriptSigRet.clear();
 
-    vector<valtype> vSolutions;
+    vector<valtype> 
+        vSolutions;
+
     if (!Solver(scriptPubKey, whichTypeRet, vSolutions))
         return false;
 
-    CKeyID keyID;
+    CKeyID 
+        keyID;
+
+#ifdef _MSC_VER
+    bool
+        fTest = false;
+    if( vSolutions.empty() )
+        {       // one can't technically access vSolutions[ 0 ]
+        fTest = true;
+        return false;
+        }
+#endif
+
     switch (whichTypeRet)
     {
     case TX_NONSTANDARD:
@@ -1414,9 +1460,12 @@ int ScriptSigArgsExpected(txnouttype t, const std::vector<std::vector<unsigned c
     case TX_PUBKEYHASH:
         return 2;
     case TX_MULTISIG:
-        if (vSolutions.size() < 1 || vSolutions[0].size() < 1)
+        if (
+            vSolutions.size() < 1 || 
+            vSolutions[0].size() < 1
+           )
             return -1;
-        return vSolutions[0][0] + 1;
+        return vSolutions[0][0] + 1;  // returning, at least -1, 1, 2, & something else? All undocumented!
     case TX_SCRIPTHASH:
         return 1; // doesn't include args needed by the script
     }
@@ -1425,13 +1474,23 @@ int ScriptSigArgsExpected(txnouttype t, const std::vector<std::vector<unsigned c
 
 bool IsStandard(const CScript& scriptPubKey)
 {
-    vector<valtype> vSolutions;
-    txnouttype whichType;
+    vector<valtype> 
+        vSolutions;
+
+    txnouttype 
+        whichType;
+
     if (!Solver(scriptPubKey, whichType, vSolutions))
         return false;
 
     if (whichType == TX_MULTISIG)
     {
+#ifdef _MSC_VER
+        if( vSolutions.empty() )
+            {       // one can't technically access vSolutions[ 0 ]
+            return false;
+            }
+#endif
         unsigned char m = vSolutions.front()[0];
         unsigned char n = vSolutions.back()[0];
         // Support up to x-of-3 multisig txns as standard
@@ -1476,12 +1535,27 @@ bool IsMine(const CKeyStore &keystore, const CTxDestination &dest)
 
 bool IsMine(const CKeyStore &keystore, const CScript& scriptPubKey)
 {
-    vector<valtype> vSolutions;
-    txnouttype whichType;
+    vector<valtype> 
+        vSolutions;
+
+    txnouttype 
+        whichType;
+
     if (!Solver(scriptPubKey, whichType, vSolutions))
         return false;
 
-    CKeyID keyID;
+#ifdef _MSC_VER
+    bool
+        fTest = false;
+    if( vSolutions.empty() )
+        {       // one can't technically access vSolutions[ 0 ]
+        fTest = true;     // just to debug test
+        return false;
+        }
+#endif
+    CKeyID 
+        keyID;
+
     switch (whichType)
     {
     case TX_NONSTANDARD:
@@ -1515,11 +1589,20 @@ bool IsMine(const CKeyStore &keystore, const CScript& scriptPubKey)
 
 bool ExtractDestination(const CScript& scriptPubKey, CTxDestination& addressRet)
 {
-    vector<valtype> vSolutions;
-    txnouttype whichType;
+    vector<valtype> 
+        vSolutions;
+
+    txnouttype 
+        whichType;
+
     if (!Solver(scriptPubKey, whichType, vSolutions))
         return false;
-
+#ifdef _MSC_VER
+    if( vSolutions.empty()  )
+        {       // one can't technically access vSolutions[ 0 ]
+        return false;
+        }
+#endif
     if (whichType == TX_PUBKEY)
     {
         addressRet = CPubKey(vSolutions[0]).GetID();
@@ -1715,6 +1798,16 @@ static CScript CombineMultisig(CScript scriptPubKey, const CTransaction& txTo, u
     CScript result; result << OP_0; // pop-one-too-many workaround
     for (unsigned int i = 0; i < nPubKeys && nSigsHave < nSigsRequired; i++)
     {
+#ifdef _MSC_VER
+        bool
+            fTest = false;
+        if( (i + 2) > vSolutions.size() )    // trouble !!???
+            {
+            fTest = true;
+            // but what do you return, if anything???
+            }
+#endif
+
         if (sigs.count(vSolutions[i+1]))
         {
             result << sigs[vSolutions[i+1]];
@@ -1758,7 +1851,7 @@ static CScript CombineSignatures(CScript scriptPubKey, const CTransaction& txTo,
 
             txnouttype txType2;
             vector<vector<unsigned char> > vSolutions2;
-            Solver(pubKey2, txType2, vSolutions2);
+            Solver(pubKey2, txType2, vSolutions2);  // Shouldn't we care what it returns???
             sigs1.pop_back();
             sigs2.pop_back();
             CScript result = CombineSignatures(pubKey2, txTo, nIn, txType2, vSolutions2, sigs1, sigs2);
@@ -1777,7 +1870,7 @@ CScript CombineSignatures(CScript scriptPubKey, const CTransaction& txTo, unsign
 {
     txnouttype txType;
     vector<vector<unsigned char> > vSolutions;
-    Solver(scriptPubKey, txType, vSolutions);
+    Solver(scriptPubKey, txType, vSolutions);   // Doesn't it matter whether it fails or not???
 
     vector<valtype> stack1;
     EvalScript(stack1, scriptSig1, CTransaction(), 0, 0);
@@ -1883,3 +1976,6 @@ void CScript::SetMultisig(int nRequired, const std::vector<CKey>& keys)
         *this << key.GetPubKey();
     *this << EncodeOP_N(keys.size()) << OP_CHECKMULTISIG;
 }
+#ifdef _MSC_VER
+    #include "msvc_warnings.pop.h"
+#endif

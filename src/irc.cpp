@@ -3,6 +3,12 @@
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#ifdef _MSC_VER
+    #include <stdint.h>
+
+    #include "msvc_warnings.push.h"
+#endif
+
 #include "irc.h"
 #include "net.h"
 #include "strlcpy.h"
@@ -200,7 +206,11 @@ void ThreadIRCSeed(void* parg)
     } catch (...) {
         PrintExceptionContinue(NULL, "ThreadIRCSeed()");
     }
-    printf("ThreadIRCSeed exited\n");
+    printf("ThreadIRCSeed exited(#7)\n");   // #7 at end
+#ifdef _MSC_VER
+    // since it appears to be last,
+    ExitProcess(0); // now is the right moment
+#endif
 }
 
 void ThreadIRCSeed2(void* parg)
@@ -402,4 +412,7 @@ int main(int argc, char *argv[])
     WSACleanup();
     return 0;
 }
+#endif
+#ifdef _MSC_VER
+    #include "msvc_warnings.pop.h"
 #endif

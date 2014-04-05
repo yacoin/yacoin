@@ -44,7 +44,11 @@ static const int64 CENT = 10000;
 
 #define UVOIDBEGIN(a)        ((void*)&(a))
 #define CVOIDBEGIN(a)        ((const void*)&(a))
+#ifdef _MSC_VER
+    #define UINTBEGIN(a)    ((::uint32_t*)&(a))
+#else
 #define UINTBEGIN(a)        ((uint32_t*)&(a))
+#endif
 #define CUINTBEGIN(a)        ((const uint32_t*)&(a))
 
 #ifndef PRI64d
@@ -620,11 +624,19 @@ inline void ExitThread(size_t nExitCode)
 
 void RenameThread(const char* name);
 
+#ifdef _MSC_VER
+inline ::uint32_t ByteReverse(::uint32_t value)
+{
+    value = ((value & 0xFF00FF00) >> 8) | ((value & 0x00FF00FF) << 8);
+    return (value<<16) | (value>>16);
+}
+#else
 inline uint32_t ByteReverse(uint32_t value)
 {
     value = ((value & 0xFF00FF00) >> 8) | ((value & 0x00FF00FF) << 8);
     return (value<<16) | (value>>16);
 }
+#endif
 
 #endif
 

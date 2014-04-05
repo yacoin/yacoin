@@ -3,6 +3,12 @@
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#ifdef _MSC_VER
+    #include <stdint.h>
+
+    #include "msvc_warnings.push.h"        
+#endif
+
 #include "alert.h"
 #include "checkpoints.h"
 #include "db.h"
@@ -3877,6 +3883,16 @@ void SHA256Transform(void* pstate, void* pinput, const void* pinit)
 
     SHA256_Init(&ctx);
 
+#ifdef _MSC_VER
+    for (int i = 0; i < 16; i++)
+        ((::uint32_t*)data)[i] = ByteReverse(((::uint32_t*)pinput)[i]);
+
+    for (int i = 0; i < 8; i++)
+        ctx.h[i] = ((::uint32_t*)pinit)[i];
+    SHA256_Update(&ctx, data, sizeof(data));
+    for (int i = 0; i < 8; i++)
+        ((::uint32_t*)pstate)[i] = ctx.h[i];        
+#else
     for (int i = 0; i < 16; i++)
         ((uint32_t*)data)[i] = ByteReverse(((uint32_t*)pinput)[i]);
 
@@ -3886,6 +3902,7 @@ void SHA256Transform(void* pstate, void* pinput, const void* pinit)
     SHA256_Update(&ctx, data, sizeof(data));
     for (int i = 0; i < 8; i++)
         ((uint32_t*)pstate)[i] = ctx.h[i];
+#endif
 }
 
 // Some explaining would be appreciated
@@ -4579,3 +4596,6 @@ void GenerateBitcoins(bool fGenerate, CWallet* pwallet)
         }
     }
 }
+#ifdef _MSC_VER
+    #include "msvc_warnings.pop.h"        
+#endif

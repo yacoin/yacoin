@@ -6,12 +6,38 @@
 #define BITCOIN_NET_H
 
 #include <deque>
+#ifdef _MSC_VER
+#else
 #include <boost/array.hpp>
 #include <boost/foreach.hpp>
 #include <openssl/rand.h>
+#endif
 
 #ifndef WIN32
 #include <arpa/inet.h>
+#else
+    #ifdef _MSC_VER
+        #ifdef H_BITCOIN_SCRIPT
+            #include "mruset.h"
+            //#include "netbase.h"
+            //#include "protocol.h"
+            #include "addrman.h"
+        #else
+            #include "mruset.h"
+            #include "netbase.h"
+            #include "protocol.h"
+            #include "addrman.h"
+        #endif
+
+        #include <boost/array.hpp>
+        #include <boost/foreach.hpp>
+        //#include <openssl/rand.h>
+    #else
+        #include "mruset.h"
+        #include "netbase.h"
+        #include "protocol.h"
+        #include "addrman.h"
+    #endif
 #endif
 
 #include "mruset.h"
