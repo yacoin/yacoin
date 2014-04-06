@@ -85,7 +85,7 @@ void Shutdown(void* parg)
         fShutdown = true;
         nTransactionsUpdated++;
         bitdb.Flush(false);
-        StopNode();
+        StopNode();             // this should stop everything worth stopping
         bitdb.Flush(true);
         boost::filesystem::remove(GetPidFile());
         UnregisterWallet(pwalletMain);
@@ -96,8 +96,9 @@ void Shutdown(void* parg)
         fExit = true;
 #ifndef QT_GUI
     #ifdef _MSC_VER
-        while( true )   // just wait
-            Sleep( 1000 );  
+        ExitProcess(0);
+        //while( true )   // just wait
+        //    Sleep( 1000 );  
     #else
         // ensure non-UI client gets exited here, but let yacoin-qt reach 'return 0;' in bitcoin.cpp
         exit(0);
@@ -214,7 +215,8 @@ bool AppInit(int argc, char* argv[])
         {
             int ret = CommandLineRPC(argc, argv);
 #ifdef _MSC_VER
-            Shutdown(NULL);
+            ExitProcess(0);
+            //Shutdown(NULL);
             //return false;
 #else
             exit(ret);

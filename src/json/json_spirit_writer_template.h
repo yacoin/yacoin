@@ -11,12 +11,25 @@
 #include <cassert>
 #include <sstream>
 #include <iomanip>
-
+#ifdef _MSC_VER
+    #include "../justincase.h"       // for releaseModeAssertionfailure()
+#endif
 namespace json_spirit
 {
     inline char to_hex_char( unsigned int c )
     {
+#ifdef _MSC_VER
+        bool
+            fTest = ( c <= 0xF );
+    #ifdef _DEBUG
+        assert(fTest);
+    #else
+        if( !fTest )
+            releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
+    #endif
+#else
         assert( c <= 0xF );
+#endif
 
         const char ch = static_cast< char >( c );
 
@@ -130,7 +143,19 @@ namespace json_spirit
                                      << value.get_real();     break;
 
                 case null_type:  os_ << "null";               break;
-                default: assert( false );
+                default: 
+#ifdef _MSC_VER
+                    bool
+                        fTest = ( false );
+    #ifdef _DEBUG
+                    assert(fTest);
+    #else
+                    if( !fTest )
+                        releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
+    #endif
+#else
+                    assert( false );
+#endif
             }
         }
 

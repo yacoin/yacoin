@@ -1276,8 +1276,22 @@ bool CTransaction::FetchInputs(CTxDB& txdb, const map<uint256, CTxIndex>& mapTes
     // Make sure all prevout.n indexes are valid:
     for (unsigned int i = 0; i < vin.size(); i++)
     {
-        const COutPoint prevout = vin[i].prevout;
+        const COutPoint 
+            prevout = vin[i].prevout;
+
+#ifdef _MSC_VER
+    #ifdef NDEBUG
+        bool
+            fTest = (0 != inputsRet.count(prevout.hash));
+
+        if( !fTest )
+            releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
+    #else
         assert(inputsRet.count(prevout.hash) != 0);
+    #endif
+#else
+        assert(inputsRet.count(prevout.hash) != 0);
+#endif
         const CTxIndex& txindex = inputsRet[prevout.hash].first;
         const CTransaction& txPrev = inputsRet[prevout.hash].second;
         if (prevout.n >= txPrev.vout.size() || prevout.n >= txindex.vSpent.size())
@@ -1348,8 +1362,20 @@ bool CTransaction::ConnectInputs(CTxDB& txdb, MapPrevTx inputs,
         int64 nFees = 0;
         for (unsigned int i = 0; i < vin.size(); i++)
         {
-            COutPoint prevout = vin[i].prevout;
+            COutPoint 
+                prevout = vin[i].prevout;
+
+#ifdef _MSC_VER
+    #ifdef NDEBUG
+            bool
+                fTest = (inputs.count(prevout.hash) > 0);
+            assert(fTest);
+    #else
             assert(inputs.count(prevout.hash) > 0);
+    #endif
+#else
+            assert(inputs.count(prevout.hash) > 0);
+#endif
             CTxIndex& txindex = inputs[prevout.hash].first;
             CTransaction& txPrev = inputs[prevout.hash].second;
 
@@ -1377,8 +1403,21 @@ bool CTransaction::ConnectInputs(CTxDB& txdb, MapPrevTx inputs,
         // Helps prevent CPU exhaustion attacks.
         for (unsigned int i = 0; i < vin.size(); i++)
         {
-            COutPoint prevout = vin[i].prevout;
+            COutPoint 
+                prevout = vin[i].prevout;
+
+#ifdef _MSC_VER
+            bool
+                fTest = (inputs.count(prevout.hash) > 0);
+    #ifdef _DEBUG
+            assert(fTest);
+    #else
+            if( !fTest )
+                releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
+    #endif
+#else
             assert(inputs.count(prevout.hash) > 0);
+#endif
             CTxIndex& txindex = inputs[prevout.hash].first;
             CTransaction& txPrev = inputs[prevout.hash].second;
 
@@ -2597,11 +2636,43 @@ bool LoadBlockIndex(bool fAllowNew)
         //// debug print
         printf("block.GetHash() == %s\n", block.GetHash().ToString().c_str());
         printf("block.hashMerkleRoot == %s\n", block.hashMerkleRoot.ToString().c_str());
+#ifdef _MSC_VER
+        bool
+            fTest = (block.hashMerkleRoot == uint256("0x678b76419ff06676a591d3fa9d57d7f7b26d8021b7cc69dde925f39d4cf2244f"));
+    #ifdef _DEBUG
+        assert(fTest);
+    #else
+        if( !fTest )
+            releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
+    #endif
+#else
         assert(block.hashMerkleRoot == uint256("0x678b76419ff06676a591d3fa9d57d7f7b26d8021b7cc69dde925f39d4cf2244f"));
+#endif
         block.print();
 
+#ifdef _MSC_VER
+        fTest = (block.GetHash() == hashGenesisBlock);
+    #ifdef _DEBUG
+        assert(fTest);
+    #else
+        if( !fTest )
+            releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
+    #endif
+#else
         assert(block.GetHash() == hashGenesisBlock);
+#endif
+
+#ifdef _MSC_VER
+        fTest = (block.CheckBlock());
+    #ifdef _DEBUG
+        assert(fTest);
+    #else
+        if( !fTest )
+            releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
+    #endif
+#else
         assert(block.CheckBlock());
+#endif
 
         // Start new block file
         unsigned int nFile;
@@ -2851,7 +2922,18 @@ string GetWarnings(string strFor)
         return strStatusBar;
     else if (strFor == "rpc")
         return strRPC;
+#ifdef _MSC_VER
+    bool
+        fTest = (!"GetWarnings() : invalid parameter");
+    #ifdef _DEBUG
+    assert(fTest);
+    #else
+    if( !fTest )
+        releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
+    #endif
+#else
     assert(!"GetWarnings() : invalid parameter");
+#endif
     return "error";
 }
 
@@ -4070,7 +4152,24 @@ CBlock* CreateNewBlock(CWallet* pwallet, bool fProofOfStake)
                     if (!mempool.mapTx.count(txin.prevout.hash))
                     {
                         printf("ERROR: mempool transaction missing input\n");
-                        if (fDebug) assert("mempool transaction missing input" == 0);
+                        if (fDebug) 
+#ifdef _MSC_VER
+                        {
+                            bool
+                                fTest = (0 == "mempool transaction missing input");
+    #ifdef _DEBUG
+                            assert(fTest);
+    #else
+                            if( !fTest )
+                                releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
+    #endif
+                        }
+#else
+                            assert("mempool transaction missing input" == 0);
+                            // doesn't the next line become part of the if () above
+                            // in (gcc or MS) release mode?? Is it important?
+                            // Is it intended?
+#endif
                         fMissingInputs = true;
                         if (porphan)
                             vOrphan.pop_back();
@@ -4255,7 +4354,19 @@ void IncrementExtraNonce(CBlock* pblock, CBlockIndex* pindexPrev, unsigned int& 
     ++nExtraNonce;
     unsigned int nHeight = pindexPrev->nHeight+1; // Height first in coinbase required for block.version=2
     pblock->vtx[0].vin[0].scriptSig = (CScript() << nHeight << CBigNum(nExtraNonce)) + COINBASE_FLAGS;
+#ifdef _MSC_VER
+    #ifdef NDEBUG
+    bool
+        fTest = (pblock->vtx[0].vin[0].scriptSig.size() <= 100);
+
+    if( !fTest )
+        releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
+    #else
     assert(pblock->vtx[0].vin[0].scriptSig.size() <= 100);
+    #endif
+#else
+    assert(pblock->vtx[0].vin[0].scriptSig.size() <= 100);
+#endif
 
     pblock->hashMerkleRoot = pblock->BuildMerkleTree();
 }
@@ -4471,7 +4582,19 @@ void BitcoinMiner(CWallet *pwallet, bool fProofOfStake)
                 {
                     // Found a solution
                     pblock->nNonce = nNonceFound;
+#ifdef _MSC_VER
+    #ifdef NDEBUG
+                    bool
+                        fTest = (result == pblock->GetHash());
+
+                    if( !fTest )
+                        releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
+    #else
                     assert(result == pblock->GetHash());
+    #endif
+#else
+                    assert(result == pblock->GetHash());
+#endif
                     if (!pblock->SignBlock(*pwalletMain))
                     {
 //                        strMintWarning = strMintMessage;
@@ -4597,5 +4720,22 @@ void GenerateBitcoins(bool fGenerate, CWallet* pwallet)
     }
 }
 #ifdef _MSC_VER
+void releaseModeAssertionfailure( const char* pFileName, const int nL, const std::string strFunctionName )
+{
+    (void)printf( 
+                 "\n"
+                 "file:%s, line#%d, function %s()"
+                 "\n"
+                 "release mode assertion failure!?"
+                 "\n"
+                 "\n"
+                 ""
+                 , pFileName                //__FILE__
+                 , nL                       //__LINE__
+                 , strFunctionName.c_str()  // __PRETTY_FUNCTION__
+                );
+    StartShutdown();    // maybe there are other ways??
+}
+
     #include "msvc_warnings.pop.h"        
 #endif

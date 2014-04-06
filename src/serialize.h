@@ -14,6 +14,10 @@
 #include <cstring>
 #include <cstdio>
 
+#ifdef _MSC_VER
+    #include "justincase.h"       // for releaseModeAssertionfailure()
+#endif
+
 #include <boost/type_traits/is_fundamental.hpp>
 #include <boost/tuple/tuple.hpp>
 #include <boost/tuple/tuple_comparison.hpp>
@@ -882,7 +886,18 @@ public:
 
     void insert(iterator it, const_iterator first, const_iterator last)
     {
+#ifdef _MSC_VER
+        bool
+            fTest = ((last - first) >= 0);
+    #ifdef _DEBUG
+        assert(fTest);
+    #else
+        if( !fTest )
+            releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
+    #endif
+#else
         assert(last - first >= 0);
+#endif
         if (it == vch.begin() + nReadPos && (unsigned int)(last - first) <= nReadPos)
         {
             // special case for inserting at the front when there's room
@@ -895,7 +910,18 @@ public:
 
     void insert(iterator it, std::vector<char>::const_iterator first, std::vector<char>::const_iterator last)
     {
+#ifdef _MSC_VER
+        bool
+            fTest = ((last - first) >= 0);
+    #ifdef _DEBUG
+        assert(fTest);
+    #else
+        if( !fTest )
+            releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
+    #endif
+#else
         assert(last - first >= 0);
+#endif
         if (it == vch.begin() + nReadPos && (unsigned int)(last - first) <= nReadPos)
         {
             // special case for inserting at the front when there's room
@@ -909,7 +935,18 @@ public:
 #if !defined(_MSC_VER) || _MSC_VER >= 1300
     void insert(iterator it, const char* first, const char* last)
     {
+#ifdef _MSC_VER
+        bool
+            fTest = ((last - first) >= 0);
+    #ifdef _DEBUG
+        assert(fTest);
+    #else
+        if( !fTest )
+            releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
+    #endif
+#else
         assert(last - first >= 0);
+#endif
         if (it == vch.begin() + nReadPos && (unsigned int)(last - first) <= nReadPos)
         {
             // special case for inserting at the front when there's room
@@ -1003,7 +1040,18 @@ public:
     CDataStream& read(char* pch, int nSize)
     {
         // Read from the beginning of the buffer
+#ifdef _MSC_VER
+        bool
+            fTest = (nSize >= 0);
+    #ifdef _DEBUG
+        assert(fTest);
+    #else
+        if( !fTest )
+            releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
+    #endif
+#else
         assert(nSize >= 0);
+#endif
         unsigned int nReadPosNext = nReadPos + nSize;
         if (nReadPosNext >= vch.size())
         {
@@ -1026,7 +1074,18 @@ public:
     CDataStream& ignore(int nSize)
     {
         // Ignore from the beginning of the buffer
+#ifdef _MSC_VER
+        bool
+            fTest = (nSize >= 0);
+    #ifdef _DEBUG
+        assert(fTest);
+    #else
+        if( !fTest )
+            releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
+    #endif
+#else
         assert(nSize >= 0);
+#endif
         unsigned int nReadPosNext = nReadPos + nSize;
         if (nReadPosNext >= vch.size())
         {
@@ -1046,7 +1105,18 @@ public:
     CDataStream& write(const char* pch, int nSize)
     {
         // Write to the end of the buffer
+#ifdef _MSC_VER
+        bool
+            fTest = (nSize >= 0);
+    #ifdef _DEBUG
+        assert(fTest);
+    #else
+        if( !fTest )
+            releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
+    #endif
+#else
         assert(nSize >= 0);
+#endif
         vch.insert(vch.end(), pch, pch + nSize);
         return (*this);
     }

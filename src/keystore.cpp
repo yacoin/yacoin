@@ -7,6 +7,7 @@
     #include <stdint.h>
 
     #include "msvc_warnings.push.h"        
+    #include "justincase.h"       // for releaseModeAssertionfailure()
 #endif
 
 #include "keystore.h"

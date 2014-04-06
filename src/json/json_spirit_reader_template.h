@@ -9,6 +9,10 @@
 #include "json_spirit_value.h"
 #include "json_spirit_error_position.h"
 
+#ifdef _MSC_VER
+    #include "../justincase.h"       // for releaseModeAssertionfailure()
+#endif
+
 //#define BOOST_SPIRIT_THREADSAFE  // uncomment for multithreaded use, requires linking to boost.thread
 
 #include <boost/bind.hpp>
@@ -159,7 +163,18 @@ namespace json_spirit
     String_type get_str_( typename String_type::const_iterator begin, 
                        typename String_type::const_iterator end )
     {
+#ifdef _MSC_VER
+        bool
+            fTest = ( end - begin >= 2 );
+    #ifdef _DEBUG
+        assert(fTest);
+    #else
+        if( !fTest )
+            releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
+    #endif
+#else
         assert( end - begin >= 2 );
+#endif
 
         typedef typename String_type::const_iterator Iter_type;
 
@@ -211,35 +226,90 @@ namespace json_spirit
 
         void begin_obj( Char_type c )
         {
+#ifdef _MSC_VER
+            bool
+                fTest = ( c == '{' );
+    #ifdef _DEBUG
+            assert(fTest);
+    #else
+            if( !fTest )
+                releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
+    #endif
+#else
             assert( c == '{' );
+#endif
 
             begin_compound< Object_type >();
         }
 
         void end_obj( Char_type c )
         {
+#ifdef _MSC_VER
+            bool
+                fTest = ( c == '}' );
+    #ifdef _DEBUG
+            assert(fTest);
+    #else
+            if( !fTest )
+                releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
+    #endif
+#else
             assert( c == '}' );
+#endif
 
             end_compound();
         }
 
         void begin_array( Char_type c )
         {
+#ifdef _MSC_VER
+            bool
+                fTest = ( c == '[' );
+    #ifdef _DEBUG
+            assert(fTest);
+    #else
+            if( !fTest )
+                releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
+    #endif
+#else
             assert( c == '[' );
+#endif
      
             begin_compound< Array_type >();
         }
 
         void end_array( Char_type c )
         {
+#ifdef _MSC_VER
+            bool
+                fTest = ( c == ']' );
+    #ifdef _DEBUG
+            assert(fTest);
+    #else
+            if( !fTest )
+                releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
+    #endif
+#else
             assert( c == ']' );
+#endif
 
             end_compound();
         }
 
         void new_name( Iter_type begin, Iter_type end )
         {
+#ifdef _MSC_VER
+            bool
+                fTest = ( current_p_->type() == obj_type );
+    #ifdef _DEBUG
+            assert(fTest);
+    #else
+            if( !fTest )
+                releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
+    #endif
+#else
             assert( current_p_->type() == obj_type );
+#endif
 
             name_ = get_str< String_type >( begin, end );
         }
@@ -251,21 +321,54 @@ namespace json_spirit
 
         void new_true( Iter_type begin, Iter_type end )
         {
+#ifdef _MSC_VER
+            bool
+                fTest = ( is_eq( begin, end, "true" ) );
+    #ifdef _DEBUG
+            assert(fTest);
+    #else
+            if( !fTest )
+                releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
+    #endif
+#else
             assert( is_eq( begin, end, "true" ) );
+#endif
 
             add_to_current( true );
         }
 
         void new_false( Iter_type begin, Iter_type end )
         {
+#ifdef _MSC_VER
+            bool
+                fTest = ( is_eq( begin, end, "false" ) );
+    #ifdef _DEBUG
+            assert(fTest);
+    #else
+            if( !fTest )
+                releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
+    #endif
+#else
             assert( is_eq( begin, end, "false" ) );
+#endif
 
             add_to_current( false );
         }
 
         void new_null( Iter_type begin, Iter_type end )
         {
+#ifdef _MSC_VER
+            bool
+                fTest = ( is_eq( begin, end, "null" ) );
+    #ifdef _DEBUG
+            assert(fTest);
+    #else
+            if( !fTest )
+                releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
+    #endif
+#else
             assert( is_eq( begin, end, "null" ) );
+#endif
 
             add_to_current( Value_type() );
         }
@@ -292,7 +395,18 @@ namespace json_spirit
 
         Value_type* add_first( const Value_type& value )
         {
+#ifdef _MSC_VER
+            bool
+                fTest = ( 0 == current_p_ );
+    #ifdef _DEBUG
+            assert(fTest);
+    #else
+            if( !fTest )
+                releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
+    #endif
+#else
             assert( current_p_ == 0 );
+#endif
 
             value_ = value;
             current_p_ = &value_;
@@ -339,7 +453,18 @@ namespace json_spirit
                 return &current_p_->get_array().back(); 
             }
             
+#ifdef _MSC_VER
+            bool
+                fTest = ( current_p_->type() == obj_type );
+    #ifdef _DEBUG
+            assert(fTest);
+    #else
+            if( !fTest )
+                releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
+    #endif
+#else
             assert( current_p_->type() == obj_type );
+#endif
 
             return &Config_type::add( current_p_->get_obj(), name_, value );
         }
@@ -526,7 +651,18 @@ namespace json_spirit
 
         if( !info.hit )
         {
+#ifdef _MSC_VER
+            bool
+                fTest = ( false ); // in theory exception should already have been thrown
+    #ifdef _DEBUG
+            assert(fTest);
+    #else
+            if( !fTest )
+                releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
+    #endif
+#else
             assert( false ); // in theory exception should already have been thrown
+#endif
             throw_error( info.stop, "error" );
         }
 

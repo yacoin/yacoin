@@ -8,12 +8,23 @@
     #include "msvc_warnings.push.h"
 #endif
 
+#ifdef _MSC_VER
+    //#include "net.h"
+    #include "bitcoinrpc.h"
+    #include "alert.h"
+    #include "wallet.h"
+    //#include "db.h"
+    //#include "walletdb.h"
+
+    #include "justincase.h"       // for releaseModeAssertionfailure()
+#else
 #include "net.h"
 #include "bitcoinrpc.h"
 #include "alert.h"
 #include "wallet.h"
 #include "db.h"
 #include "walletdb.h"
+#endif
 
 using namespace json_spirit;
 using namespace std;

@@ -569,7 +569,18 @@ public:
     T median() const
     {
         int size = vSorted.size();
+#ifdef _MSC_VER
+        bool
+            fTest = (size>0);
+    #ifdef _DEBUG
+        assert(fTest);
+    #else
+        if( !fTest )
+            releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
+    #endif
+#else
         assert(size>0);
+#endif
         if(size & 1) // Odd number of elements
         {
             return vSorted[size/2];

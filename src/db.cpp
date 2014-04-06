@@ -176,17 +176,35 @@ void CDBEnv::MakeMock()
 CDBEnv::VerifyResult CDBEnv::Verify(std::string strFile, bool (*recoverFunc)(CDBEnv& dbenv, std::string strFile))
 {
     LOCK(cs_db);
-    assert(mapFileUseCount.count(strFile) == 0);
 
-    Db db(&dbenv, 0);
-    int result = db.verify(strFile.c_str(), NULL, NULL, 0);
+#ifdef _MSC_VER
+    bool
+        fTest = (0 == mapFileUseCount.count(strFile));  // just in case there are side effects in there???
+    #ifdef _DEBUG
+    assert(fTest);
+    #else
+    if( !fTest )
+        releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
+    #endif
+#else
+    assert(mapFileUseCount.count(strFile) == 0);
+#endif
+
+    Db 
+        db(&dbenv, 0);
+
+    int 
+        result = db.verify(strFile.c_str(), NULL, NULL, 0);
+
     if (result == 0)
         return VERIFY_OK;
     else if (recoverFunc == NULL)
         return RECOVER_FAIL;
 
     // Try to recover:
-    bool fRecovered = (*recoverFunc)(*this, strFile);
+    bool 
+        fRecovered = (*recoverFunc)(*this, strFile);
+
     return (fRecovered ? RECOVER_OK : RECOVER_FAIL);
 }
 
@@ -194,7 +212,19 @@ bool CDBEnv::Salvage(std::string strFile, bool fAggressive,
                      std::vector<CDBEnv::KeyValPair >& vResult)
 {
     LOCK(cs_db);
+
+#ifdef _MSC_VER
+    bool
+        fTest = (0 == mapFileUseCount.count(strFile));  // just in case there are side effects in there???
+    #ifdef _DEBUG
+    assert(fTest);
+    #else
+    if( !fTest )
+        releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
+    #endif
+#else
     assert(mapFileUseCount.count(strFile) == 0);
+#endif
 
     u_int32_t flags = DB_SALVAGE;
     if (fAggressive) flags |= DB_AGGRESSIVE;
@@ -517,20 +547,53 @@ void CDBEnv::Flush(bool fShutdown)
 
 bool CTxDB::ReadTxIndex(uint256 hash, CTxIndex& txindex)
 {
+#ifdef _MSC_VER
+    bool
+        fTest = (!fClient);
+    #ifdef _DEBUG
+    assert(fTest);
+    #else
+    if( !fTest )
+        releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
+    #endif
+#else
     assert(!fClient);
+#endif
     txindex.SetNull();
     return Read(make_pair(string("tx"), hash), txindex);
 }
 
 bool CTxDB::UpdateTxIndex(uint256 hash, const CTxIndex& txindex)
 {
+#ifdef _MSC_VER
+    bool
+        fTest = (!fClient);
+    #ifdef _DEBUG
+    assert(fTest);
+    #else
+    if( !fTest )
+        releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
+    #endif
+#else
     assert(!fClient);
+#endif
     return Write(make_pair(string("tx"), hash), txindex);
 }
 
 bool CTxDB::AddTxIndex(const CTransaction& tx, const CDiskTxPos& pos, int nHeight)
 {
+#ifdef _MSC_VER
+    bool
+        fTest = (!fClient);
+    #ifdef _DEBUG
+    assert(fTest);
+    #else
+    if( !fTest )
+        releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
+    #endif
+#else
     assert(!fClient);
+#endif
 
     // Add to tx index
     uint256 hash = tx.GetHash();
@@ -540,7 +603,18 @@ bool CTxDB::AddTxIndex(const CTransaction& tx, const CDiskTxPos& pos, int nHeigh
 
 bool CTxDB::EraseTxIndex(const CTransaction& tx)
 {
+#ifdef _MSC_VER
+    bool
+        fTest = (!fClient);
+    #ifdef _DEBUG
+    assert(fTest);
+    #else
+    if( !fTest )
+        releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
+    #endif
+#else
     assert(!fClient);
+#endif
     uint256 hash = tx.GetHash();
 
     return Erase(make_pair(string("tx"), hash));
@@ -548,13 +622,35 @@ bool CTxDB::EraseTxIndex(const CTransaction& tx)
 
 bool CTxDB::ContainsTx(uint256 hash)
 {
+#ifdef _MSC_VER
+    bool
+        fTest = (!fClient);
+    #ifdef _DEBUG
+    assert(fTest);
+    #else
+    if( !fTest )
+        releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
+    #endif
+#else
     assert(!fClient);
+#endif
     return Exists(make_pair(string("tx"), hash));
 }
 
 bool CTxDB::ReadDiskTx(uint256 hash, CTransaction& tx, CTxIndex& txindex)
 {
+#ifdef _MSC_VER
+    bool
+        fTest = (!fClient);
+    #ifdef _DEBUG
+    assert(fTest);
+    #else
+    if( !fTest )
+        releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
+    #endif
+#else
     assert(!fClient);
+#endif
     tx.SetNull();
     if (!ReadTxIndex(hash, txindex))
         return false;

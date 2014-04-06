@@ -1904,7 +1904,18 @@ void CWallet::ReserveKeyFromKeyPool(int64& nIndex, CKeyPool& keypool)
             throw runtime_error("ReserveKeyFromKeyPool() : read failed");
         if (!HaveKey(keypool.vchPubKey.GetID()))
             throw runtime_error("ReserveKeyFromKeyPool() : unknown key in key pool");
+#ifdef _MSC_VER
+        bool
+            fTest = (keypool.vchPubKey.IsValid());
+    #ifdef _DEBUG
+        assert(fTest);
+    #else
+        if( !fTest )
+            releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
+    #endif
+#else
         assert(keypool.vchPubKey.IsValid());
+#endif
         if (fDebug && GetBoolArg("-printkeypool"))
             printf("keypool reserve %"PRI64d"\n", nIndex);
     }
@@ -2190,7 +2201,18 @@ CPubKey CReserveKey::GetReservedKey()
             vchPubKey = pwallet->vchDefaultKey;
         }
     }
+#ifdef _MSC_VER
+    bool
+        fTest = (vchPubKey.IsValid());
+    #ifdef _DEBUG
+    assert(fTest);
+    #else
+    if( !fTest )
+        releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
+    #endif
+#else
     assert(vchPubKey.IsValid());
+#endif
     return vchPubKey;
 }
 
@@ -2222,7 +2244,18 @@ void CWallet::GetAllReserveKeys(set<CKeyID>& setAddress)
         CKeyPool keypool;
         if (!walletdb.ReadPool(id, keypool))
             throw runtime_error("GetAllReserveKeyHashes() : read failed");
+#ifdef _MSC_VER
+        bool
+            fTest = (keypool.vchPubKey.IsValid());
+    #ifdef _DEBUG
+        assert(fTest);
+    #else
+        if( !fTest )
+            releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
+    #endif
+#else
         assert(keypool.vchPubKey.IsValid());
+#endif
         CKeyID keyID = keypool.vchPubKey.GetID();
         if (!HaveKey(keyID))
             throw runtime_error("GetAllReserveKeyHashes() : unknown key in key pool");

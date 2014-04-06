@@ -15,7 +15,7 @@
 
 #ifdef WIN32
     #ifdef _MSC_VER
-       //#include "sync.h"
+        #include "justincase.h"       // for releaseModeAssertionfailure()
     #else
         #include <windows.h>    // for MinGW
     #endif

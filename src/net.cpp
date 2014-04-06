@@ -2026,35 +2026,52 @@ bool StopNode()
 {
     printf("StopNode()\n");
     fShutdown = true;
-    nTransactionsUpdated++;
-    int64 nStart = GetTime();
+    nTransactionsUpdated++;       // why?
+
+    int64 
+        nStart = GetTime();
+
     if (semOutbound)
         for( int i = 0; i < GetMaxOutboundConnections(); i++ )
             semOutbound->post();
     do
     {
-        int nThreadsRunning = 0;
-        for (int n = 0; n < THREAD_MAX; n++)
+        int 
+            nThreadsRunning = 0;
+
+        for (int n = 0; n < THREAD_MAX; n++)        // why is it 11?
             nThreadsRunning += vnThreadsRunning[n];
         if (nThreadsRunning == 0)
             break;
-        if (GetTime() - nStart > 20)
+        if (GetTime() - nStart > 20)   //ms ?
             break;
         Sleep(20);
-    } while(true);
-    if (vnThreadsRunning[THREAD_SOCKETHANDLER] > 0) printf("ThreadSocketHandler still running\n");
-    if (vnThreadsRunning[THREAD_OPENCONNECTIONS] > 0) printf("ThreadOpenConnections still running\n");
-    if (vnThreadsRunning[THREAD_MESSAGEHANDLER] > 0) printf("ThreadMessageHandler still running\n");
-    if (vnThreadsRunning[THREAD_MINER] > 0) printf("ThreadBitcoinMiner still running\n");
-    if (vnThreadsRunning[THREAD_RPCLISTENER] > 0) printf("ThreadRPCListener still running\n");
-    if (vnThreadsRunning[THREAD_RPCHANDLER] > 0) printf("ThreadsRPCServer still running\n");
+    } 
+    while(true);
+    if (vnThreadsRunning[THREAD_SOCKETHANDLER] > 0) 
+        printf("ThreadSocketHandler still running\n");
+    if (vnThreadsRunning[THREAD_OPENCONNECTIONS] > 0) 
+        printf("ThreadOpenConnections still running\n");
+    if (vnThreadsRunning[THREAD_MESSAGEHANDLER] > 0) 
+        printf("ThreadMessageHandler still running\n");
+    if (vnThreadsRunning[THREAD_MINER] > 0) 
+        printf("ThreadBitcoinMiner still running\n");
+    if (vnThreadsRunning[THREAD_RPCLISTENER] > 0) 
+        printf("ThreadRPCListener still running\n");
+    if (vnThreadsRunning[THREAD_RPCHANDLER] > 0) 
+        printf("ThreadsRPCServer still running\n");
 #ifdef USE_UPNP
-    if (vnThreadsRunning[THREAD_UPNP] > 0) printf("ThreadMapPort still running\n");
+    if (vnThreadsRunning[THREAD_UPNP] > 0) 
+        printf("ThreadMapPort still running\n");
 #endif
-    if (vnThreadsRunning[THREAD_DNSSEED] > 0) printf("ThreadDNSAddressSeed still running\n");
-    if (vnThreadsRunning[THREAD_ADDEDCONNECTIONS] > 0) printf("ThreadOpenAddedConnections still running\n");
-    if (vnThreadsRunning[THREAD_DUMPADDRESS] > 0) printf("ThreadDumpAddresses still running\n");
-    if (vnThreadsRunning[THREAD_MINTER] > 0) printf("ThreadStakeMinter still running\n");
+    if (vnThreadsRunning[THREAD_DNSSEED] > 0) 
+        printf("ThreadDNSAddressSeed still running\n");
+    if (vnThreadsRunning[THREAD_ADDEDCONNECTIONS] > 0) 
+        printf("ThreadOpenAddedConnections still running\n");
+    if (vnThreadsRunning[THREAD_DUMPADDRESS] > 0) 
+        printf("ThreadDumpAddresses still running\n");
+    if (vnThreadsRunning[THREAD_MINTER] > 0) 
+        printf("ThreadStakeMinter still running\n");
     while (vnThreadsRunning[THREAD_MESSAGEHANDLER] > 0 || vnThreadsRunning[THREAD_RPCHANDLER] > 0)
         Sleep(20);
     Sleep(50);

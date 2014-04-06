@@ -15,6 +15,18 @@
 using namespace std;
 using namespace boost;
 
+#ifdef _MSC_VER
+    #include "justincase.h"       // for releaseModeAssertionfailure()
+
+    #include "script.h"
+    //#include "keystore.h"
+    //#include "bignum.h"
+    //#include "key.h"
+    #include "main.h"
+    //#include "sync.h"
+    //#include "util.h"
+
+#else
 #include "script.h"
 #include "keystore.h"
 #include "bignum.h"
@@ -22,6 +34,7 @@ using namespace boost;
 #include "main.h"
 #include "sync.h"
 #include "util.h"
+#endif
 
 bool CheckSig(vector<unsigned char> vchSig, vector<unsigned char> vchPubKey, CScript scriptCode, const CTransaction& txTo, unsigned int nIn, int nHashType);
 
@@ -773,7 +786,20 @@ bool EvalScript(vector<vector<unsigned char> >& stack, const CScript& script, co
                     case OP_ABS:        if (bn < bnZero) bn = -bn; break;
                     case OP_NOT:        bn = (bn == bnZero); break;
                     case OP_0NOTEQUAL:  bn = (bn != bnZero); break;
-                    default:            assert(!"invalid opcode"); break;
+                    default:
+#ifdef _MSC_VER
+                        bool
+                            fTest = (!"invalid opcode");
+    #ifdef _DEBUG
+                        assert(fTest);
+    #else
+                        if( !fTest )
+                            releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
+    #endif
+#else
+                        assert(!"invalid opcode"); 
+#endif
+                        break;
                     }
                     popstack(stack);
                     stack.push_back(bn.getvch());
@@ -853,7 +879,20 @@ bool EvalScript(vector<vector<unsigned char> >& stack, const CScript& script, co
                     case OP_GREATERTHANOREQUAL:  bn = (bn1 >= bn2); break;
                     case OP_MIN:                 bn = (bn1 < bn2 ? bn1 : bn2); break;
                     case OP_MAX:                 bn = (bn1 > bn2 ? bn1 : bn2); break;
-                    default:                     assert(!"invalid opcode"); break;
+                    default:
+#ifdef _MSC_VER
+                        bool
+                            fTest = (!"invalid opcode");
+    #ifdef _DEBUG
+                        assert(fTest);
+    #else
+                        if( !fTest )
+                            releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
+    #endif
+#else
+                        assert(!"invalid opcode"); 
+#endif
+                        break;
                     }
                     popstack(stack);
                     popstack(stack);
@@ -1690,7 +1729,18 @@ bool VerifyScript(const CScript& scriptSig, const CScript& scriptPubKey, const C
 
 bool SignSignature(const CKeyStore &keystore, const CScript& fromPubKey, CTransaction& txTo, unsigned int nIn, int nHashType)
 {
+#ifdef _MSC_VER
+    bool
+        fTest = (nIn < txTo.vin.size());
+    #ifdef _DEBUG
+    assert(fTest);
+    #else
+    if( !fTest )
+        releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
+    #endif
+#else
     assert(nIn < txTo.vin.size());
+#endif
     CTxIn& txin = txTo.vin[nIn];
 
     // Leave out the signature from the hash, since a signature can't sign itself.
@@ -1725,10 +1775,42 @@ bool SignSignature(const CKeyStore &keystore, const CScript& fromPubKey, CTransa
 
 bool SignSignature(const CKeyStore &keystore, const CTransaction& txFrom, CTransaction& txTo, unsigned int nIn, int nHashType)
 {
+#ifdef _MSC_VER
+    bool
+        fTest = (nIn < txTo.vin.size());
+    #ifdef _DEBUG
+    assert(fTest);
+    #else
+    if( !fTest )
+        releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
+    #endif
+#else
     assert(nIn < txTo.vin.size());
+#endif
     CTxIn& txin = txTo.vin[nIn];
+#ifdef _MSC_VER
+    fTest = (txin.prevout.n < txFrom.vout.size());
+    #ifdef _DEBUG
+    assert(fTest);
+    #else
+    if( !fTest )
+        releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
+    #endif
+#else
     assert(txin.prevout.n < txFrom.vout.size());
+#endif
+
+#ifdef _MSC_VER
+    fTest = (txin.prevout.hash == txFrom.GetHash());
+    #ifdef _DEBUG
+    assert(fTest);
+    #else
+    if( !fTest )
+        releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
+    #endif
+#else
     assert(txin.prevout.hash == txFrom.GetHash());
+#endif
     const CTxOut& txout = txFrom.vout[txin.prevout.n];
 
     return SignSignature(keystore, txout.scriptPubKey, txTo, nIn, nHashType);
@@ -1736,7 +1818,18 @@ bool SignSignature(const CKeyStore &keystore, const CTransaction& txFrom, CTrans
 
 bool VerifySignature(const CTransaction& txFrom, const CTransaction& txTo, unsigned int nIn, bool fValidatePayToScriptHash, int nHashType)
 {
+#ifdef _MSC_VER
+    bool
+        fTest = (nIn < txTo.vin.size());
+    #ifdef _DEBUG
+    assert(fTest);
+    #else
+    if( !fTest )
+        releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
+    #endif
+#else
     assert(nIn < txTo.vin.size());
+#endif
     const CTxIn& txin = txTo.vin[nIn];
     if (txin.prevout.n >= txFrom.vout.size())
         return false;
@@ -1774,7 +1867,18 @@ static CScript CombineMultisig(CScript scriptPubKey, const CTransaction& txTo, u
     }
 
     // Build a map of pubkey -> signature by matching sigs to pubkeys:
+#ifdef _MSC_VER
+    bool
+        fTest = (vSolutions.size() > 1);
+    #ifdef _DEBUG
+    assert(fTest);
+    #else
+    if( !fTest )
+        releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
+    #endif
+#else
     assert(vSolutions.size() > 1);
+#endif
     unsigned int nSigsRequired = vSolutions.front()[0];
     unsigned int nPubKeys = vSolutions.size()-2;
     map<valtype, valtype> sigs;

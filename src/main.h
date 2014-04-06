@@ -7,8 +7,9 @@
 
 #ifdef _MSC_VER
     #include <stdint.h>
-    #define __PRETTY_FUNCTION__ __FUNCTION__
+//    #define __PRETTY_FUNCTION__ __FUNCTION__
     //#define __PRETTY_FUNCTION__ __FUNCSIG__
+    #include "justincase.h"       // for releaseModeAssertionfailure()
 #endif
 
 #include "bignum.h"
@@ -16,6 +17,10 @@
 #include "net.h"
 #include "script.h"
 #include "scrypt_mine.h"
+
+#ifdef _MSC_VER
+  //  #include "justincase.h"       // for releaseModeAssertionfailure()
+#endif
 
 #include <list>
 
