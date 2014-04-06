@@ -196,7 +196,41 @@ HEADERS += src/qt/bitcoingui.h \
     src/qt/rpcconsole.h \
     src/version.h \
     src/netbase.h \
-    src/clientversion.h
+    src/clientversion.h \
+    src/scrypt-jane/scrypt-jane.h \
+    src/scrypt-jane/code/scrypt-jane-test-vectors.h \
+    src/scrypt-jane/code/scrypt-jane-salsa64.h \
+    src/scrypt-jane/code/scrypt-jane-salsa.h \
+    src/scrypt-jane/code/scrypt-jane-romix-template.h \
+    src/scrypt-jane/code/scrypt-jane-romix-basic.h \
+    src/scrypt-jane/code/scrypt-jane-romix.h \
+    src/scrypt-jane/code/scrypt-jane-portable-x86.h \
+    src/scrypt-jane/code/scrypt-jane-portable.h \
+    src/scrypt-jane/code/scrypt-jane-pbkdf2.h \
+    src/scrypt-jane/code/scrypt-jane-mix_salsa-xop.h \
+    src/scrypt-jane/code/scrypt-jane-mix_salsa-sse2.h \
+    src/scrypt-jane/code/scrypt-jane-mix_salsa-avx.h \
+    src/scrypt-jane/code/scrypt-jane-mix_salsa64-xop.h \
+    src/scrypt-jane/code/scrypt-jane-mix_salsa64-ssse3.h \
+    src/scrypt-jane/code/scrypt-jane-mix_salsa64-sse2.h \
+    src/scrypt-jane/code/scrypt-jane-mix_salsa64-avx2.h \
+    src/scrypt-jane/code/scrypt-jane-mix_salsa64-avx.h \
+    src/scrypt-jane/code/scrypt-jane-mix_salsa64.h \
+    src/scrypt-jane/code/scrypt-jane-mix_salsa.h \
+    src/scrypt-jane/code/scrypt-jane-mix_chacha-xop.h \
+    src/scrypt-jane/code/scrypt-jane-mix_chacha-ssse3.h \
+    src/scrypt-jane/code/scrypt-jane-mix_chacha-sse2.h \
+    src/scrypt-jane/code/scrypt-jane-mix_chacha-avx.h \
+    src/scrypt-jane/code/scrypt-jane-mix_chacha.h \
+    src/scrypt-jane/code/scrypt-jane-hash_skein512.h \
+    src/scrypt-jane/code/scrypt-jane-hash_sha512.h \
+    src/scrypt-jane/code/scrypt-jane-hash_sha256.h \
+    src/scrypt-jane/code/scrypt-jane-hash_keccak.h \
+    src/scrypt-jane/code/scrypt-jane-hash_blake512.h \
+    src/scrypt-jane/code/scrypt-jane-hash_blake256.h \
+    src/scrypt-jane/code/scrypt-jane-hash.h \
+    src/scrypt-jane/code/scrypt-jane-chacha.h \
+    src/scrypt-jane/code/scrypt-conf.h
 
 SOURCES += src/qt/bitcoin.cpp src/qt/bitcoingui.cpp \
     src/qt/transactiontablemodel.cpp \
