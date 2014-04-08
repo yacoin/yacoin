@@ -4,6 +4,12 @@
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#ifdef _MSC_VER
+    #include <stdint.h>
+
+    #include "msvc_warnings.push.h"
+#endif
+
 #include "main.h"
 #include "db.h"
 #include "init.h"
@@ -124,7 +130,11 @@ Value getmininginfo(const Array& params, bool fHelp)
 
     // WM - Tweaks to report current Nfactor and N.
     Nfactor = GetNfactor( nBestHeightTime );
+#ifdef _MSC_VER
+    N = uint64_t(1) << ( Nfactor + 1 );    
+#else    
     N = 1 << ( Nfactor + 1 );
+#endif    
     
     obj.push_back( Pair( "Nfactor", Nfactor ) );
     obj.push_back( Pair( "N", N ) );
@@ -580,3 +590,6 @@ Value submitblock(const Array& params, bool fHelp)
     return Value::null;
 }
 
+#ifdef _MSC_VER
+    #include "msvc_warnings.pop.h"
+#endif

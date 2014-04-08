@@ -2,6 +2,12 @@
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#ifdef _MSC_VER
+    #include <stdint.h>
+
+    #include "msvc_warnings.push.h"
+#endif
+
 #include "addrman.h"
 
 using namespace std;
@@ -107,13 +113,45 @@ void CAddrMan::SwapRandom(unsigned int nRndPos1, unsigned int nRndPos2)
     if (nRndPos1 == nRndPos2)
         return;
 
+#ifdef _MSC_VER
+    bool
+        fTest = ((nRndPos1 < vRandom.size()) && (nRndPos2 < vRandom.size()));
+    #ifdef _DEBUG
+    assert(fTest);
+    #else
+    if( !fTest )
+        releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
+    #endif
+#else
     assert(nRndPos1 < vRandom.size() && nRndPos2 < vRandom.size());
+#endif
 
     int nId1 = vRandom[nRndPos1];
     int nId2 = vRandom[nRndPos2];
 
+#ifdef _MSC_VER
+    fTest = (mapInfo.count(nId1) == 1);
+    #ifdef _DEBUG
+    assert(fTest);
+    #else
+    if( !fTest )
+        releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
+    #endif
+#else
     assert(mapInfo.count(nId1) == 1);
+#endif
+
+#ifdef _MSC_VER
+    fTest = (mapInfo.count(nId2) == 1);
+    #ifdef _DEBUG
+    assert(fTest);
+    #else
+    if( !fTest )
+        releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
+    #endif
+#else
     assert(mapInfo.count(nId2) == 1);
+#endif
 
     mapInfo[nId1].nRandomPos = nRndPos2;
     mapInfo[nId2].nRandomPos = nRndPos1;
@@ -136,7 +174,18 @@ int CAddrMan::SelectTried(int nKBucket)
         int nTemp = vTried[nPos];
         vTried[nPos] = vTried[i];
         vTried[i] = nTemp;
+#ifdef _MSC_VER
+        bool
+            fTest = ((nOldest == -1) || (mapInfo.count(nTemp) == 1));
+    #ifdef _DEBUG
+        assert(fTest);
+    #else
+        if( !fTest )
+            releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
+    #endif
+#else
         assert(nOldest == -1 || mapInfo.count(nTemp) == 1);
+#endif
         if (nOldest == -1 || mapInfo[nTemp].nLastSuccess < mapInfo[nOldest].nLastSuccess) {
            nOldest = nTemp;
            nOldestPos = nPos;
@@ -148,13 +197,34 @@ int CAddrMan::SelectTried(int nKBucket)
 
 int CAddrMan::ShrinkNew(int nUBucket)
 {
+#ifdef _MSC_VER
+    bool
+        fTest = ((nUBucket >= 0) && ((unsigned int)nUBucket < vvNew.size()));
+    #ifdef _DEBUG
+    assert(fTest);
+    #else
+    if( !fTest )
+        releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
+    #endif
+#else
     assert(nUBucket >= 0 && (unsigned int)nUBucket < vvNew.size());
+#endif
     std::set<int> &vNew = vvNew[nUBucket];
 
     // first look for deletable items
     for (std::set<int>::iterator it = vNew.begin(); it != vNew.end(); it++)
     {
+#ifdef _MSC_VER
+        fTest = (mapInfo.count(*it));
+    #ifdef _DEBUG
+        assert(fTest);
+    #else
+        if( !fTest )
+            releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
+    #endif
+#else
         assert(mapInfo.count(*it));
+#endif
         CAddrInfo &info = mapInfo[*it];
         if (info.IsTerrible())
         {
@@ -179,13 +249,33 @@ int CAddrMan::ShrinkNew(int nUBucket)
     {
         if (nI == n[0] || nI == n[1] || nI == n[2] || nI == n[3])
         {
+#ifdef _MSC_VER
+            fTest = ((nOldest == -1) || (1 == mapInfo.count(*it)));
+    #ifdef _DEBUG
+            assert(fTest);
+    #else
+            if( !fTest )
+                releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
+    #endif
+#else
             assert(nOldest == -1 || mapInfo.count(*it) == 1);
+#endif
             if (nOldest == -1 || mapInfo[*it].nTime < mapInfo[nOldest].nTime)
                 nOldest = *it;
         }
         nI++;
     }
+#ifdef _MSC_VER
+    fTest = (1 == mapInfo.count(nOldest));
+    #ifdef _DEBUG
+    assert(fTest);
+    #else
+    if( !fTest )
+        releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
+    #endif
+#else
     assert(mapInfo.count(nOldest) == 1);
+#endif
     CAddrInfo &info = mapInfo[nOldest];
     if (--info.nRefCount == 0)
     {
@@ -202,7 +292,18 @@ int CAddrMan::ShrinkNew(int nUBucket)
 
 void CAddrMan::MakeTried(CAddrInfo& info, int nId, int nOrigin)
 {
+#ifdef _MSC_VER
+    bool
+        fTest = (1 == vvNew[nOrigin].count(nId));
+    #ifdef _DEBUG
+    assert(fTest);
+    #else
+    if( !fTest )
+        releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
+    #endif
+#else
     assert(vvNew[nOrigin].count(nId) == 1);
+#endif
 
     // remove the entry from all new buckets
     for (std::vector<std::set<int> >::iterator it = vvNew.begin(); it != vvNew.end(); it++)
@@ -212,7 +313,17 @@ void CAddrMan::MakeTried(CAddrInfo& info, int nId, int nOrigin)
     }
     nNew--;
 
+#ifdef _MSC_VER
+    fTest = (0 == info.nRefCount);
+    #ifdef _DEBUG
+    assert(fTest);
+    #else
+    if( !fTest )
+        releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
+    #endif
+#else
     assert(info.nRefCount == 0);
+#endif
 
     // what tried bucket to move the entry to
     int nKBucket = info.GetTriedBucket(nKey);
@@ -231,7 +342,17 @@ void CAddrMan::MakeTried(CAddrInfo& info, int nId, int nOrigin)
     int nPos = SelectTried(nKBucket);
 
     // find which new bucket it belongs to
+#ifdef _MSC_VER
+    fTest = (1 == mapInfo.count(vTried[nPos]));
+    #ifdef _DEBUG
+    assert(fTest);
+    #else
+    if( !fTest )
+        releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
+    #endif
+#else
     assert(mapInfo.count(vTried[nPos]) == 1);
+#endif
     int nUBucket = mapInfo[vTried[nPos]].GetNewBucket(nKey);
     std::set<int> &vNew = vvNew[nUBucket];
 
@@ -391,38 +512,91 @@ CAddress CAddrMan::Select_(int nUnkBias)
     if (size() == 0)
         return CAddress();
 
+#ifdef _MSC_VER
+    double 
+        nCorTried = sqrt( double(nTried) ) * (100.0 - nUnkBias),
+        nCorNew = sqrt( double(nNew) )* nUnkBias;
+#else
     double nCorTried = sqrt(nTried) * (100.0 - nUnkBias);
     double nCorNew = sqrt(nNew) * nUnkBias;
+#endif
     if ((nCorTried + nCorNew)*GetRandInt(1<<30)/(1<<30) < nCorTried)
     {
         // use a tried node
         double fChanceFactor = 1.0;
-        while(1)
+        while(1)        // ah, forever
         {
-            int nKBucket = GetRandInt(vvTried.size());
-            std::vector<int> &vTried = vvTried[nKBucket];
-            if (vTried.size() == 0) continue;
-            int nPos = GetRandInt(vTried.size());
+            int 
+                nKBucket = GetRandInt(vvTried.size());
+
+            std::vector<int> 
+                &vTried = vvTried[nKBucket];
+
+            if (vTried.size() == 0) 
+                continue;
+
+            int 
+                nPos = GetRandInt(vTried.size());
+
+#ifdef _MSC_VER
+            bool
+                fTest = (1 == mapInfo.count(vTried[nPos]));
+    #ifdef _DEBUG
+            assert(fTest);
+    #else
+            if( !fTest )
+                releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
+    #endif
+#else
             assert(mapInfo.count(vTried[nPos]) == 1);
-            CAddrInfo &info = mapInfo[vTried[nPos]];
+#endif
+
+            CAddrInfo 
+                &info = mapInfo[vTried[nPos]];
+
             if (GetRandInt(1<<30) < fChanceFactor*info.GetChance()*(1<<30))
                 return info;
             fChanceFactor *= 1.2;
         }
-    } else {
+    } 
+    else 
+    {
         // use a new node
         double fChanceFactor = 1.0;
-        while(1)
+        while(1)    // forever
         {
-            int nUBucket = GetRandInt(vvNew.size());
-            std::set<int> &vNew = vvNew[nUBucket];
-            if (vNew.size() == 0) continue;
-            int nPos = GetRandInt(vNew.size());
-            std::set<int>::iterator it = vNew.begin();
+            int 
+                nUBucket = GetRandInt(vvNew.size());
+
+            std::set<int> 
+                &vNew = vvNew[nUBucket];
+
+            if (vNew.size() == 0) 
+                continue;
+
+            int 
+                nPos = GetRandInt(vNew.size());
+
+            std::set<int>::iterator 
+                it = vNew.begin();
+
             while (nPos--)
                 it++;
+#ifdef _MSC_VER
+            bool
+                fTest = (1 == mapInfo.count(*it));
+    #ifdef _DEBUG
+            assert(fTest);
+    #else
+            if( !fTest )
+                releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
+    #endif
+#else
             assert(mapInfo.count(*it) == 1);
-            CAddrInfo &info = mapInfo[*it];
+#endif
+            CAddrInfo 
+                &info = mapInfo[*it];
+
             if (GetRandInt(1<<30) < fChanceFactor*info.GetChance()*(1<<30))
                 return info;
             fChanceFactor *= 1.2;
@@ -501,7 +675,18 @@ void CAddrMan::GetAddr_(std::vector<CAddress> &vAddr)
     {
         int nRndPos = GetRandInt(vRandom.size() - n) + n;
         SwapRandom(n, nRndPos);
+#ifdef _MSC_VER
+        bool
+            fTest = (1 == mapInfo.count(vRandom[n]));
+    #ifdef _DEBUG
+        assert(fTest);
+    #else
+        if( !fTest )
+            releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
+    #endif
+#else
         assert(mapInfo.count(vRandom[n]) == 1);
+#endif
         vAddr.push_back(mapInfo[vRandom[n]]);
     }
 }
@@ -525,3 +710,6 @@ void CAddrMan::Connected_(const CService &addr, int64 nTime)
     if (nTime - info.nTime > nUpdateInterval)
         info.nTime = nTime;
 }
+#ifdef _MSC_VER
+    #include "msvc_warnings.pop.h"
+#endif

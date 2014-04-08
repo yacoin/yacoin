@@ -4,6 +4,10 @@
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#ifdef _MSC_VER
+    #include "msvc_warnings.push.h"
+#endif
+
 #include "irc.h"
 #include "db.h"
 #include "net.h"
@@ -723,7 +727,7 @@ void ThreadSocketHandler(void* parg)
         vnThreadsRunning[THREAD_SOCKETHANDLER]--;
         throw; // support pthread_cancel()
     }
-    printf("ThreadSocketHandler exited\n");
+    printf("ThreadSocketHandler exited(#3)\n"); // 3rd at end of program
 }
 
 void ThreadSocketHandler2(void* parg)
@@ -1218,7 +1222,11 @@ void MapPort()
 // The first name is used as information source for addrman.
 // The second name should resolve to a list of seed addresses.
 static const char *strDNSSeed[][2] = {
+#ifdef _MSC_VER
+    NULL, NULL
+#else
     //{"yacoin.org", "seed.novacoin.su"},    // WM - Umm...  FIXME
+#endif
 };
 
 void ThreadDNSAddressSeed(void* parg)
@@ -1330,7 +1338,7 @@ void ThreadDumpAddress(void* parg)
     catch (std::exception& e) {
         PrintException(&e, "ThreadDumpAddress()");
     }
-    printf("ThreadDumpAddress exited\n");
+    printf("ThreadDumpAddress exited(#6)\n");      // 6th at end of program
 }
 
 void ThreadOpenConnections(void* parg)
@@ -1351,7 +1359,7 @@ void ThreadOpenConnections(void* parg)
         vnThreadsRunning[THREAD_OPENCONNECTIONS]--;
         PrintException(NULL, "ThreadOpenConnections()");
     }
-    printf("ThreadOpenConnections exited\n");
+    printf("ThreadOpenConnections exited(#4)\n");    //     // 4th at end of program
 }
 
 void static ProcessOneShot()
@@ -1390,7 +1398,9 @@ void static ThreadStakeMinter(void* parg)
         vnThreadsRunning[THREAD_MINTER]--;
         PrintException(NULL, "ThreadStakeMinter()");
     }
-    printf("ThreadStakeMinter exiting, %d threads remaining\n", vnThreadsRunning[THREAD_MINTER]);
+    printf("ThreadStakeMinter exiting(#2), %d threads remaining\n",     // #2nd at end of program
+            vnThreadsRunning[THREAD_MINTER]
+          );
 }
 
 void ThreadOpenConnections2(void* parg)
@@ -1533,7 +1543,7 @@ void ThreadOpenAddedConnections(void* parg)
         vnThreadsRunning[THREAD_ADDEDCONNECTIONS]--;
         PrintException(NULL, "ThreadOpenAddedConnections()");
     }
-    printf("ThreadOpenAddedConnections exited\n");
+    printf("ThreadOpenAddedConnections exited(#5)\n");      // 5th at end of program
 }
 
 void ThreadOpenAddedConnections2(void* parg)
@@ -1543,11 +1553,18 @@ void ThreadOpenAddedConnections2(void* parg)
     if (mapArgs.count("-addnode") == 0)
         return;
 
-    if (HaveNameProxy()) {
-        while(!fShutdown) {
-            BOOST_FOREACH(string& strAddNode, mapMultiArgs["-addnode"]) {
-                CAddress addr;
-                CSemaphoreGrant grant(*semOutbound);
+    if (HaveNameProxy()) 
+    {
+        while(!fShutdown) 
+        {
+            BOOST_FOREACH(string& strAddNode, mapMultiArgs["-addnode"]) 
+            {
+                CAddress 
+                    addr;
+
+                CSemaphoreGrant 
+                    grant(*semOutbound);
+
                 OpenNetworkConnection(addr, &grant, strAddNode.c_str());
                 Sleep(500);
             }
@@ -1558,15 +1575,20 @@ void ThreadOpenAddedConnections2(void* parg)
         return;
     }
 
-    vector<vector<CService> > vservAddressesToAdd(0);
+    vector<vector<CService> > 
+        vservAddressesToAdd(0);
+
     BOOST_FOREACH(string& strAddNode, mapMultiArgs["-addnode"])
     {
-        vector<CService> vservNode(0);
+        vector<CService> 
+            vservNode(0);
+
         if(Lookup(strAddNode.c_str(), vservNode, GetDefaultPort(), fNameLookup, 0))
         {
             vservAddressesToAdd.push_back(vservNode);
             {
                 LOCK(cs_setservAddNodeAddresses);
+
                 BOOST_FOREACH(CService& serv, vservNode)
                     setservAddNodeAddresses.insert(serv);
             }
@@ -1574,20 +1596,54 @@ void ThreadOpenAddedConnections2(void* parg)
     }
     loop
     {
-        vector<vector<CService> > vservConnectAddresses = vservAddressesToAdd;
+        vector<vector<CService> > 
+            vservConnectAddresses = vservAddressesToAdd;
         // Attempt to connect to each IP for each addnode entry until at least one is successful per addnode entry
         // (keeping in mind that addnode entries can have many IPs if fNameLookup)
         {
             LOCK(cs_vNodes);
+
             BOOST_FOREACH(CNode* pnode, vNodes)
-                for (vector<vector<CService> >::iterator it = vservConnectAddresses.begin(); it != vservConnectAddresses.end(); it++)
+            {
+                for (vector<vector<CService> >::iterator it = vservConnectAddresses.begin(); 
+                     it != vservConnectAddresses.end(); 
+                     ++it   // isn't ++it always better?
+                    )
+                {
                     BOOST_FOREACH(CService& addrNode, *(it))
+#ifndef _MSC_VER
+                    {
                         if (pnode->addr == addrNode)
                         {
                             it = vservConnectAddresses.erase(it);
                             it--;
                             break;
                         }
+                    }
+#else
+                    {
+                        if (pnode->addr == addrNode)
+                        {
+                            it = vservConnectAddresses.erase(it);
+
+                            // now it get tricky!
+                            if( vservConnectAddresses.empty() )
+                                break;          // can't legally --it, nor ++it
+                            // else it's not empty, so
+                            if (it == vservConnectAddresses.begin()) // can't --it
+                                break;
+                            --it;               // finally, a legal place!!    
+                            break;
+                        }
+                        // else we stay in the inner BOOST_FOREACH() loop
+                    }
+                    if( vservConnectAddresses.empty() )
+                        break;      // can't do a ++it
+                    if (it == vservConnectAddresses.end())
+                        break;      // can't do a ++it
+#endif
+                }
+            }
         }
         BOOST_FOREACH(vector<CService>& vserv, vservConnectAddresses)
         {
@@ -1664,7 +1720,7 @@ void ThreadMessageHandler(void* parg)
         vnThreadsRunning[THREAD_MESSAGEHANDLER]--;
         PrintException(NULL, "ThreadMessageHandler()");
     }
-    printf("ThreadMessageHandler exited\n");
+    printf("ThreadMessageHandler exited(#1)\n");        // #1
 }
 
 void ThreadMessageHandler2(void* parg)
@@ -1970,35 +2026,52 @@ bool StopNode()
 {
     printf("StopNode()\n");
     fShutdown = true;
-    nTransactionsUpdated++;
-    int64 nStart = GetTime();
+    nTransactionsUpdated++;       // why?
+
+    int64 
+        nStart = GetTime();
+
     if (semOutbound)
         for( int i = 0; i < GetMaxOutboundConnections(); i++ )
             semOutbound->post();
     do
     {
-        int nThreadsRunning = 0;
-        for (int n = 0; n < THREAD_MAX; n++)
+        int 
+            nThreadsRunning = 0;
+
+        for (int n = 0; n < THREAD_MAX; n++)        // why is it 11?
             nThreadsRunning += vnThreadsRunning[n];
         if (nThreadsRunning == 0)
             break;
-        if (GetTime() - nStart > 20)
+        if (GetTime() - nStart > 20)   //ms ?
             break;
         Sleep(20);
-    } while(true);
-    if (vnThreadsRunning[THREAD_SOCKETHANDLER] > 0) printf("ThreadSocketHandler still running\n");
-    if (vnThreadsRunning[THREAD_OPENCONNECTIONS] > 0) printf("ThreadOpenConnections still running\n");
-    if (vnThreadsRunning[THREAD_MESSAGEHANDLER] > 0) printf("ThreadMessageHandler still running\n");
-    if (vnThreadsRunning[THREAD_MINER] > 0) printf("ThreadBitcoinMiner still running\n");
-    if (vnThreadsRunning[THREAD_RPCLISTENER] > 0) printf("ThreadRPCListener still running\n");
-    if (vnThreadsRunning[THREAD_RPCHANDLER] > 0) printf("ThreadsRPCServer still running\n");
+    } 
+    while(true);
+    if (vnThreadsRunning[THREAD_SOCKETHANDLER] > 0) 
+        printf("ThreadSocketHandler still running\n");
+    if (vnThreadsRunning[THREAD_OPENCONNECTIONS] > 0) 
+        printf("ThreadOpenConnections still running\n");
+    if (vnThreadsRunning[THREAD_MESSAGEHANDLER] > 0) 
+        printf("ThreadMessageHandler still running\n");
+    if (vnThreadsRunning[THREAD_MINER] > 0) 
+        printf("ThreadBitcoinMiner still running\n");
+    if (vnThreadsRunning[THREAD_RPCLISTENER] > 0) 
+        printf("ThreadRPCListener still running\n");
+    if (vnThreadsRunning[THREAD_RPCHANDLER] > 0) 
+        printf("ThreadsRPCServer still running\n");
 #ifdef USE_UPNP
-    if (vnThreadsRunning[THREAD_UPNP] > 0) printf("ThreadMapPort still running\n");
+    if (vnThreadsRunning[THREAD_UPNP] > 0) 
+        printf("ThreadMapPort still running\n");
 #endif
-    if (vnThreadsRunning[THREAD_DNSSEED] > 0) printf("ThreadDNSAddressSeed still running\n");
-    if (vnThreadsRunning[THREAD_ADDEDCONNECTIONS] > 0) printf("ThreadOpenAddedConnections still running\n");
-    if (vnThreadsRunning[THREAD_DUMPADDRESS] > 0) printf("ThreadDumpAddresses still running\n");
-    if (vnThreadsRunning[THREAD_MINTER] > 0) printf("ThreadStakeMinter still running\n");
+    if (vnThreadsRunning[THREAD_DNSSEED] > 0) 
+        printf("ThreadDNSAddressSeed still running\n");
+    if (vnThreadsRunning[THREAD_ADDEDCONNECTIONS] > 0) 
+        printf("ThreadOpenAddedConnections still running\n");
+    if (vnThreadsRunning[THREAD_DUMPADDRESS] > 0) 
+        printf("ThreadDumpAddresses still running\n");
+    if (vnThreadsRunning[THREAD_MINTER] > 0) 
+        printf("ThreadStakeMinter still running\n");
     while (vnThreadsRunning[THREAD_MESSAGEHANDLER] > 0 || vnThreadsRunning[THREAD_RPCHANDLER] > 0)
         Sleep(20);
     Sleep(50);
@@ -2014,19 +2087,45 @@ public:
     }
     ~CNetCleanup()
     {
-        // Close sockets
-        BOOST_FOREACH(CNode* pnode, vNodes)
-            if (pnode->hSocket != INVALID_SOCKET)
-                closesocket(pnode->hSocket);
-        BOOST_FOREACH(SOCKET hListenSocket, vhListenSocket)
-            if (hListenSocket != INVALID_SOCKET)
-                if (closesocket(hListenSocket) == SOCKET_ERROR)
-                    printf("closesocket(hListenSocket) failed with error %d\n", WSAGetLastError());
+#ifdef _MSC_VER
+        bool
+            fDidThisAlready = false;
+
+        if( !fDidThisAlready )
+        {
+            fDidThisAlready = true;
+            (void)printf(
+                        "~CNetCleanup() destructor called..."
+                        );
+#endif
+            // Close sockets
+            BOOST_FOREACH(CNode* pnode, vNodes)
+                if (pnode->hSocket != INVALID_SOCKET)
+                    closesocket(pnode->hSocket);
+            BOOST_FOREACH(SOCKET hListenSocket, vhListenSocket)
+                if (hListenSocket != INVALID_SOCKET)
+                    if (closesocket(hListenSocket) == SOCKET_ERROR)
+                        printf("closesocket(hListenSocket) failed with error %d\n", WSAGetLastError());
 
 #ifdef WIN32
-        // Shutdown Windows Sockets
-        WSACleanup();
+            // Shutdown Windows Sockets
+            WSACleanup();
+#endif
+#ifdef _MSC_VER
+            (void)printf( " done\n" );
+        }
 #endif
     }
 }
 instance_of_cnetcleanup;
+
+#ifdef _MSC_VER
+void kill_CNetCleanup_now( void )
+{
+    instance_of_cnetcleanup.~CNetCleanup();
+}
+#endif
+
+#ifdef _MSC_VER
+    #include "msvc_warnings.pop.h"
+#endif

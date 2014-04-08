@@ -404,7 +404,18 @@ class CBitcoinSecret : public CBase58Data
 public:
     void SetSecret(const CSecret& vchSecret, bool fCompressed)
     {
+#ifdef _MSC_VER
+        bool
+            fTest = (32 == vchSecret.size());
+    #ifdef _DEBUG
+        assert(fTest);
+    #else
+        if( !fTest )
+            releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
+    #endif
+#else
         assert(vchSecret.size() == 32);
+#endif
         SetData(128 + (fTestNet ? CBitcoinAddress::PUBKEY_ADDRESS_TEST : CBitcoinAddress::PUBKEY_ADDRESS), &vchSecret[0], vchSecret.size());
         if (fCompressed)
             vchData.push_back(1);

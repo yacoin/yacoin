@@ -14,6 +14,10 @@
 #include <cstring>
 #include <cstdio>
 
+#ifdef _MSC_VER
+    #include "justincase.h"       // for releaseModeAssertionfailure()
+#endif
+
 #include <boost/type_traits/is_fundamental.hpp>
 #include <boost/tuple/tuple.hpp>
 #include <boost/tuple/tuple_comparison.hpp>
@@ -56,6 +60,49 @@ enum
     SER_BLOCKHEADERONLY = (1 << 17),
 };
 
+#ifdef _MSC_VER
+#define IMPLEMENT_SERIALIZE(statements)    \
+    unsigned int GetSerializeSize(int nType, int nVersion) const  \
+    {                                           \
+        CSerActionGetSerializeSize ser_action;  \
+        const bool fGetSize = true;             \
+        const bool fWrite = false;              \
+        const bool fRead = false;               \
+        unsigned int nSerSize = 0;              \
+        ser_streamplaceholder s;                \
+        assert(fGetSize||fWrite||fRead); /* suppress warning */ \
+        s.nType = nType;                        \
+        s.nVersion = nVersion;                  \
+    std::map<int, int> mapUnkIds;          \
+        {statements}                            \
+        return nSerSize;                        \
+    }                                           \
+    template<typename Stream>                   \
+    void Serialize(Stream& s, int nType, int nVersion) const  \
+    {                                           \
+        CSerActionSerialize ser_action;         \
+        const bool fGetSize = false;            \
+        const bool fWrite = true;               \
+        const bool fRead = false;               \
+        unsigned int nSerSize = 0;              \
+    std::map<int, int> mapUnkIds;          \
+        assert(fGetSize||fWrite||fRead); /* suppress warning */ \
+        {statements}                            \
+    }                                           \
+    template<typename Stream>                   \
+    void Unserialize(Stream& s, int nType, int nVersion)  \
+    {                                           \
+        CSerActionUnserialize ser_action;       \
+        const bool fGetSize = false;            \
+        const bool fWrite = false;              \
+        const bool fRead = true;                \
+        unsigned int nSerSize = 0;              \
+    std::map<int, int> mapUnkIds;          \
+        assert(fGetSize||fWrite||fRead); /* suppress warning */ \
+        {statements}                            \
+    }
+
+#else
 #define IMPLEMENT_SERIALIZE(statements)    \
     unsigned int GetSerializeSize(int nType, int nVersion) const  \
     {                                           \
@@ -93,6 +140,7 @@ enum
         assert(fGetSize||fWrite||fRead); /* suppress warning */ \
         {statements}                            \
     }
+#endif
 
 #define READWRITE(obj)      (nSerSize += ::SerReadWrite(s, (obj), nType, nVersion, ser_action))
 
@@ -172,10 +220,27 @@ void LogStackTrace();
 //
 inline unsigned int GetSizeOfCompactSize(uint64 nSize)
 {
+#ifdef _MSC_VER
+    if (nSize < 253)             
+        return sizeof(unsigned char);
+    else if (
+             nSize <= 
+             uint64( std::numeric_limits<unsigned short>::max() )
+            ) 
+        return sizeof(unsigned char) + sizeof(unsigned short);
+    else if (
+             nSize <= 
+             uint64( std::numeric_limits<unsigned int>::max() )
+            )  
+        return sizeof(unsigned char) + sizeof(unsigned int);
+    else                         
+        return sizeof(unsigned char) + sizeof(uint64);
+#else
     if (nSize < 253)             return sizeof(unsigned char);
     else if (nSize <= std::numeric_limits<unsigned short>::max()) return sizeof(unsigned char) + sizeof(unsigned short);
     else if (nSize <= std::numeric_limits<unsigned int>::max())  return sizeof(unsigned char) + sizeof(unsigned int);
     else                         return sizeof(unsigned char) + sizeof(uint64);
+#endif    
 }
 
 template<typename Stream>
@@ -761,7 +826,15 @@ public:
         Init(nTypeIn, nVersionIn);
     }
 
+#ifdef _MSC_VER
+    CDataStream(const std::vector<unsigned char>& vchIn, 
+                int nTypeIn, 
+                int nVersionIn
+               ) 
+        : vch(vchIn.begin(), vchIn.end())
+#else    
     CDataStream(const std::vector<unsigned char>& vchIn, int nTypeIn, int nVersionIn) : vch((char*)&vchIn.begin()[0], (char*)&vchIn.end()[0])
+#endif    
     {
         Init(nTypeIn, nVersionIn);
     }
@@ -813,7 +886,18 @@ public:
 
     void insert(iterator it, const_iterator first, const_iterator last)
     {
+#ifdef _MSC_VER
+        bool
+            fTest = ((last - first) >= 0);
+    #ifdef _DEBUG
+        assert(fTest);
+    #else
+        if( !fTest )
+            releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
+    #endif
+#else
         assert(last - first >= 0);
+#endif
         if (it == vch.begin() + nReadPos && (unsigned int)(last - first) <= nReadPos)
         {
             // special case for inserting at the front when there's room
@@ -826,7 +910,18 @@ public:
 
     void insert(iterator it, std::vector<char>::const_iterator first, std::vector<char>::const_iterator last)
     {
+#ifdef _MSC_VER
+        bool
+            fTest = ((last - first) >= 0);
+    #ifdef _DEBUG
+        assert(fTest);
+    #else
+        if( !fTest )
+            releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
+    #endif
+#else
         assert(last - first >= 0);
+#endif
         if (it == vch.begin() + nReadPos && (unsigned int)(last - first) <= nReadPos)
         {
             // special case for inserting at the front when there's room
@@ -840,7 +935,18 @@ public:
 #if !defined(_MSC_VER) || _MSC_VER >= 1300
     void insert(iterator it, const char* first, const char* last)
     {
+#ifdef _MSC_VER
+        bool
+            fTest = ((last - first) >= 0);
+    #ifdef _DEBUG
+        assert(fTest);
+    #else
+        if( !fTest )
+            releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
+    #endif
+#else
         assert(last - first >= 0);
+#endif
         if (it == vch.begin() + nReadPos && (unsigned int)(last - first) <= nReadPos)
         {
             // special case for inserting at the front when there's room
@@ -934,7 +1040,18 @@ public:
     CDataStream& read(char* pch, int nSize)
     {
         // Read from the beginning of the buffer
+#ifdef _MSC_VER
+        bool
+            fTest = (nSize >= 0);
+    #ifdef _DEBUG
+        assert(fTest);
+    #else
+        if( !fTest )
+            releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
+    #endif
+#else
         assert(nSize >= 0);
+#endif
         unsigned int nReadPosNext = nReadPos + nSize;
         if (nReadPosNext >= vch.size())
         {
@@ -957,7 +1074,18 @@ public:
     CDataStream& ignore(int nSize)
     {
         // Ignore from the beginning of the buffer
+#ifdef _MSC_VER
+        bool
+            fTest = (nSize >= 0);
+    #ifdef _DEBUG
+        assert(fTest);
+    #else
+        if( !fTest )
+            releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
+    #endif
+#else
         assert(nSize >= 0);
+#endif
         unsigned int nReadPosNext = nReadPos + nSize;
         if (nReadPosNext >= vch.size())
         {
@@ -977,7 +1105,18 @@ public:
     CDataStream& write(const char* pch, int nSize)
     {
         // Write to the end of the buffer
+#ifdef _MSC_VER
+        bool
+            fTest = (nSize >= 0);
+    #ifdef _DEBUG
+        assert(fTest);
+    #else
+        if( !fTest )
+            releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
+    #endif
+#else
         assert(nSize >= 0);
+#endif
         vch.insert(vch.end(), pch, pch + nSize);
         return (*this);
     }

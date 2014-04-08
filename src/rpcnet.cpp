@@ -2,12 +2,29 @@
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#ifdef _MSC_VER
+    #include <stdint.h>
+
+    #include "msvc_warnings.push.h"
+#endif
+
+#ifdef _MSC_VER
+    //#include "net.h"
+    #include "bitcoinrpc.h"
+    #include "alert.h"
+    #include "wallet.h"
+    //#include "db.h"
+    //#include "walletdb.h"
+
+    #include "justincase.h"       // for releaseModeAssertionfailure()
+#else
 #include "net.h"
 #include "bitcoinrpc.h"
 #include "alert.h"
 #include "wallet.h"
 #include "db.h"
 #include "walletdb.h"
+#endif
 
 using namespace json_spirit;
 using namespace std;
@@ -134,3 +151,6 @@ Value sendalert(const Array& params, bool fHelp)
         result.push_back(Pair("nCancel", alert.nCancel));
     return result;
 }
+#ifdef _MSC_VER
+    #include "msvc_warnings.pop.h"
+#endif

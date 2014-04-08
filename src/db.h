@@ -25,7 +25,9 @@ class CWallet;
 class CWalletTx;
 
 extern unsigned int nWalletDBUpdated;
-
+#ifdef _MSC_VER
+    extern void kill_CNetCleanup_now( void );
+#endif    
 void ThreadFlushWalletDB(void* parg);
 bool BackupWallet(const CWallet& wallet, const std::string& strDest);
 
@@ -152,7 +154,23 @@ protected:
         if (!pdb)
             return false;
         if (fReadOnly)
+#ifdef _MSC_VER
+        {
+            bool
+                fTest = (!"Write called on database in read-only mode");
+    #ifdef _DEBUG
+            assert(fTest);
+    #else
+            if( !fTest )
+                releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
+    #endif
+        }
+#else
             assert(!"Write called on database in read-only mode");
+            // doesn't the if() above execute the next statement in release mode???
+            // gcc or MS.  Is this wrong?? Intended?? 
+            // What does it say about *coin-qt.exe in release mode? 
+#endif
 
         // Key
         CDataStream ssKey(SER_DISK, CLIENT_VERSION);
@@ -181,7 +199,23 @@ protected:
         if (!pdb)
             return false;
         if (fReadOnly)
+#ifdef _MSC_VER
+        {
+            bool
+                fTest = (!"Erase called on database in read-only mode");
+    #ifdef _DEBUG
+            assert(fTest);
+    #else
+            if( !fTest )
+                releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
+    #endif
+        }
+#else
             assert(!"Erase called on database in read-only mode");
+            // doesn't the if() above execute the next statement in release mode???
+            // gcc or MS.  Is this wrong?? Intended?? 
+            // What does it say about *coin-qt.exe in release mode? 
+#endif
 
         // Key
         CDataStream ssKey(SER_DISK, CLIENT_VERSION);

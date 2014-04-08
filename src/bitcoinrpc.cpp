@@ -3,6 +3,12 @@
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#ifdef _MSC_VER
+    #include <stdint.h>
+
+    #include "msvc_warnings.push.h"
+#endif
+
 #include "init.h"
 #include "util.h"
 #include "sync.h"
@@ -112,11 +118,20 @@ Value ValueFromAmount(int64 amount)
 
 std::string HexBits(unsigned int nBits)
 {
+#if defined( _MSC_VER )
+    union 
+    {
+        ::int32_t nBits;
+        char cBits[4];
+    } uBits;
+    uBits.nBits = htonl(::int32_t(nBits));
+#else
     union {
         int32_t nBits;
         char cBits[4];
     } uBits;
     uBits.nBits = htonl((int32_t)nBits);
+#endif
     return HexStr(BEGIN(uBits.cBits), END(uBits.cBits));
 }
 
@@ -204,6 +219,9 @@ static const CRPCCommand vRPCCommands[] =
     { "help",                   &help,                   true,   true },
     { "stop",                   &stop,                   true,   true },
     { "getblockcount",          &getblockcount,          true,   false },
+#ifdef _MSC_VER
+    { "getblockcountt",         &getcurrentblockandtime, true,   false },
+#endif
     { "getconnectioncount",     &getconnectioncount,     true,   false },
     { "getpeerinfo",            &getpeerinfo,            true,   false },
     { "getdifficulty",          &getdifficulty,          true,   false },
@@ -645,7 +663,7 @@ void ThreadRPCServer(void* parg)
         vnThreadsRunning[THREAD_RPCLISTENER]--;
         PrintException(NULL, "ThreadRPCServer()");
     }
-    printf("ThreadRPCServer exited\n");
+    printf("ThreadRPCServer exited(#0)\n");    // first at end
 }
 
 // Forward declaration required for RPCListen
@@ -1289,3 +1307,6 @@ int main(int argc, char *argv[])
 #endif
 
 const CRPCTable tableRPC;
+#ifdef _MSC_VER
+    #include "msvc_warnings.pop.h"
+#endif
