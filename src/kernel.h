@@ -10,6 +10,14 @@
 static const unsigned int MODIFIER_INTERVAL = 6 * 60 * 60;
 extern unsigned int nModifierInterval;
 
+// A structure to hold stuff for faster POS mining
+struct PosMiningStuff {
+    uint256 hashBlockFrom;
+    uint64 nStakeModifier;
+    int nStakeModifierHeight;
+    int64 nStakeModifierTime;
+};
+
 // MODIFIER_INTERVAL_RATIO:
 // ratio of group interval length between the last group and the first group
 static const int MODIFIER_INTERVAL_RATIO = 3;
@@ -19,7 +27,11 @@ bool ComputeNextStakeModifier(const CBlockIndex* pindexPrev, uint64& nStakeModif
 
 // Check whether stake kernel meets hash target
 // Sets hashProofOfStake on success return
-bool CheckStakeKernelHash(unsigned int nBits, const CBlock& blockFrom, unsigned int nTxPrevOffset, const CTransaction& txPrev, const COutPoint& prevout, unsigned int nTimeTx, uint256& hashProofOfStake, bool fPrintProofOfStake=false);
+bool CheckStakeKernelHash(unsigned int nBits, const CBlock& blockFrom, unsigned int nTxPrevOffset, const CTransaction& txPrev, const COutPoint& prevout, unsigned int nTimeTx, uint256& hashProofOfStake, bool fPrintProofOfStake=false, PosMiningStuff *miningStuff=NULL);
+
+// The stake modifier used to hash for a stake kernel is chosen as the stake
+// modifier about a selection interval later than the coin generating the kernel
+bool GetKernelStakeModifier(uint256 hashBlockFrom, uint64& nStakeModifier, int& nStakeModifierHeight, int64& nStakeModifierTime, bool fPrintProofOfStake=false);
 
 // Check kernel hash target and coinstake signature
 // Sets hashProofOfStake on success return

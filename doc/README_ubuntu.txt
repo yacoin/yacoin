@@ -276,3 +276,35 @@ tests that don't compile for now.
 
       11 - Type " git checkout test/wallet_tests.cpp " to restore deleted test file.
 
+Section QT - Make a QT GUI version of YACoin
+  
+If you do all the above steps on Ubuntu 12.04 Desktop (instead of Server), you can also build the QT GUI 
+version of YACoin.
+
+      1 - Type " sudo apt-get install qt4-qmake libqt4-dev " to install QT development
+
+      2 - Type " cd " to get to the home directory
+
+      3 - Type " cd yacoin " 
+
+      4 - Edit the file called yacoin-qt.pro and add the folowing lines near the top:
+
+          BDB_INCLUDE_PATH=../db-4.8.30.NC/build_unix
+          BDB_LIB_PATH=../db-4.8.30.NC/build_unix
+          BOOST_INCLUDE_PATH=../boost_1_54_0
+          BOOST_LIB_PATH=../boost_1_54_0/stage/lib
+          OPENSSL_INCLUDE_PATH=../openssl-1.0.1e/include
+          OPENSSL_LIB_PATH=../openssl-1.0.1e
+          MINIUPNPC_INCLUDE_PATH=src
+          MINIUPNPC_LIB_PATH=src/miniupnpc/
+          # Uncomment for debug:
+          #QMAKE_CXXFLAGS += -g
+          #QMAKE_CFLAGS += -g
+          #LIBS += -g
+
+       5 - Type " qmake yacoin-qt.pro RELEASE=1 " to generate a Makefile. 
+
+       6 - Type " make " to build yacoin-qt
+
+       7 - Type " ./yacoin-qt & " to start YACoin QT GUI
+
