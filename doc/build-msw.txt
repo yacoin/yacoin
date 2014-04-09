@@ -16,7 +16,7 @@ Dependencies
 Libraries you need to download separately and build:
 
 MinGW        MinGW-gcc4.6.2-msys  http://www.mingw.org/
-OpenSSL      openssl-1.0.1e       http://www.openssl.org
+OpenSSL      openssl-1.0.1g       http://www.openssl.org
 Berkeley DB  db-4.8.30.NC-mgw     http://www.oracle.com/technetwork/database/database-technologies/berkeleydb/overview/index.html
 Boost        boost_1_54_0         http://www.boost.org
 miniupnpc    miniupnpc-1.6        http://miniupnp.tuxfamily.org
@@ -31,15 +31,15 @@ http://gccforgo.googlecode.com/files/MinGW-gcc4.6.2-msys.7z
 4) Right click My Computer, select Properties->Advanced tab->Environment Variables->select "Path"->click "Edit"->append ";C:\MinGW\bin" at the end of variable value
 
 5) Download openssl and place the file in C:\deps\
-http://www.openssl.org/source/openssl-1.0.1e.tar.gz
+http://www.openssl.org/source/openssl-1.0.1g.tar.gz
 
 6) Double-click the msys.bat shortcut, a terminal window pops up.
 
 7) Type:
 cd /c/deps
-md5sum openssl-1.0.1e.tar.gz  # make sure you get 66bf6f10f060d561929de96f9dfe5b8c
-tar xvzf openssl-1.0.1e.tar.gz
-cd openssl-1.0.1e
+md5sum openssl-1.0.1g.tar.gz  # make sure you get 66bf6f10f060d561929de96f9dfe5b8c
+tar xvzf openssl-1.0.1g.tar.gz
+cd openssl-1.0.1g
 ./config
 make
 
