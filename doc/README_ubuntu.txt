@@ -127,15 +127,15 @@ Section E - Build the OpenSSL Library
 
       1 - Type " cd " to get to the home directory
 
-      2 - Type " wget http://www.openssl.org/source/openssl-1.0.1e.tar.gz " to get the exact version
+      2 - Type " wget http://www.openssl.org/source/openssl-1.0.1g.tar.gz " to get the exact version
       of openssl we need from the Internet.
 
-      3 - Type " md5sum openssl-1.0.1e.tar.gz " and make sure you get
-      66bf6f10f060d561929de96f9dfe5b8c
+      3 - Type " md5sum openssl-1.0.1g.tar.gz " and make sure you get
+      de62b43dfcd858e66a74bee1c834e959
 
-      4 - Type " tar xvzf openssl-1.0.1e.tar.gz " to extract the source files.
+      4 - Type " tar xvzf openssl-1.0.1g.tar.gz " to extract the source files.
 
-      5 - Type " cd openssl-1.0.1e "
+      5 - Type " cd openssl-1.0.1g "
 
       6 - Type " ./config "
 
@@ -293,8 +293,8 @@ version of YACoin.
           BDB_LIB_PATH=../db-4.8.30.NC/build_unix
           BOOST_INCLUDE_PATH=../boost_1_54_0
           BOOST_LIB_PATH=../boost_1_54_0/stage/lib
-          OPENSSL_INCLUDE_PATH=../openssl-1.0.1e/include
-          OPENSSL_LIB_PATH=../openssl-1.0.1e
+          OPENSSL_INCLUDE_PATH=../openssl-1.0.1g/include
+          OPENSSL_LIB_PATH=../openssl-1.0.1g
           MINIUPNPC_INCLUDE_PATH=src
           MINIUPNPC_LIB_PATH=src/miniupnpc/
           # Uncomment for debug:

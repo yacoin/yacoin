@@ -14,12 +14,12 @@ INCLUDEPATHS= \
  -I"$(CURDIR)/scrypt-jane" \
  -I"c:/deps/boost_1_54_0" \
  -I"c:/deps/db-4.8.30.NC/build_unix" \
- -I"c:/deps/openssl-1.0.1e"	
+ -I"c:/deps/openssl-1.0.1g"	
 
 LIBPATHS= \
  -L"c:/deps/boost_1_54_0/stage/lib" \
  -L"c:/deps/db-4.8.30.NC/build_unix" \
- -L"c:/deps/openssl-1.0.1e"
+ -L"c:/deps/openssl-1.0.1g"
 
 LIBS= \
  -l boost_system$(BOOST_SUFFIX) \
@@ -134,7 +134,7 @@ all: yacoind.exe
 test check: test_yacoin.exe FORCE
 	test_yacoin.exe
 
-DEFS += $(addprefix -I,c:/deps/openssl-1.0.1e/include)
+DEFS += $(addprefix -I,c:/deps/openssl-1.0.1g/include)
 
 obj/scrypt-jane.o: scrypt-jane/scrypt-jane.c 
 	g++ -c -frandom-seed=$@ $(CFLAGS) -MMD -o $@ $<
