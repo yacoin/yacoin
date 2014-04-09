@@ -36,14 +36,29 @@
 
 /* determine compiler */
 #if defined(_MSC_VER)
-	#define COMPILER_MSVC _MSC_VER
-	#if ((COMPILER_MSVC > 1200) || defined(_mm_free))
-		#define COMPILER_MSVC6PP_AND_LATER
+	#define COMPILER_MSVC_VS6       120000000
+	#define COMPILER_MSVC_VS6PP     121000000
+	#define COMPILER_MSVC_VS2002    130000000
+	#define COMPILER_MSVC_VS2003    131000000
+	#define COMPILER_MSVC_VS2005    140050727
+	#define COMPILER_MSVC_VS2008    150000000
+	#define COMPILER_MSVC_VS2008SP1 150030729
+	#define COMPILER_MSVC_VS2010    160000000
+	#define COMPILER_MSVC_VS2010SP1 160040219
+	#define COMPILER_MSVC_VS2012RC  170000000
+	#define COMPILER_MSVC_VS2012    170050727
+
+	#if _MSC_FULL_VER > 100000000
+		#define COMPILER_MSVC (_MSC_FULL_VER)
+	#else
+		#define COMPILER_MSVC (_MSC_FULL_VER * 10)
 	#endif
-	#if (COMPILER_MSVC >= 1500)
-		#define COMPILER_HAS_TMMINTRIN
+
+	#if ((_MSC_VER == 1200) && defined(_mm_free))
+		#undef COMPILER_MSVC
+		#define COMPILER_MSVC COMPILER_MSVC_VS6PP
 	#endif
-	
+
 	#pragma warning(disable : 4127) /* conditional expression is constant */
 	#pragma warning(disable : 4100) /* unreferenced formal parameter */
 	
@@ -65,6 +80,8 @@
 	#define ROTR64(a,b) _rotr64(a,b)
 	#undef NOINLINE
 	#define NOINLINE __declspec(noinline)
+	#undef NORETURN
+	#define NORETURN
 	#undef INLINE
 	#define INLINE __forceinline
 	#undef FASTCALL
@@ -75,7 +92,7 @@
 	#define STDCALL __stdcall
 	#undef NAKED
 	#define NAKED __declspec(naked)
-	#define MM16 __declspec(align(16))
+	#define ALIGN(n) __declspec(align(n))
 #endif
 #if defined(__ICC)
 	#define COMPILER_INTEL
@@ -97,6 +114,12 @@
 	#else
 		#define NOINLINE
 	#endif
+	#undef NORETURN
+	#if (COMPILER_GCC >= 30000)
+		#define NORETURN __attribute__((noreturn))
+	#else
+		#define NORETURN
+	#endif
 	#undef INLINE
 	#if (COMPILER_GCC >= 30000)
 		#define INLINE __attribute__((always_inline))
@@ -113,7 +136,7 @@
 	#define CDECL __attribute__((cdecl))
 	#undef STDCALL
 	#define STDCALL __attribute__((stdcall))
-	#define MM16 __attribute__((aligned(16)))
+	#define ALIGN(n) __attribute__((aligned(n)))
 	#include <stdint.h>
 #endif
 #if defined(__MINGW32__) || defined(__MINGW64__)
@@ -247,7 +270,7 @@ scrypt_verify(const uint8_t *x, const uint8_t *y, size_t len) {
 	return (1 & ((differentbits - 1) >> 8));
 }
 
-void
+static void
 scrypt_ensure_zero(void *p, size_t len) {
 #if ((defined(CPU_X86) || defined(CPU_X86_64)) && defined(COMPILER_MSVC))
 		__stosb((unsigned char *)p, 0, len);
@@ -279,3 +302,6 @@ scrypt_ensure_zero(void *p, size_t len) {
 
 #include "scrypt-jane-portable-x86.h"
 
+#if !defined(asm_calling_convention)
+#define asm_calling_convention
+#endif
