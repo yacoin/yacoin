@@ -14,8 +14,8 @@ DEFS=-DBOOST_SPIRIT_THREADSAFE
 
 BOOST_INCLUDE_PATH=../../boost_1_54_0
 BOOST_LIB_PATH=../../boost_1_54_0/stage/lib
-OPENSSL_INCLUDE_PATH=../../openssl-1.0.1e/include
-OPENSSL_LIB_PATH=../../openssl-1.0.1e
+OPENSSL_INCLUDE_PATH=../../openssl-1.0.1g/include
+OPENSSL_LIB_PATH=../../openssl-1.0.1g
 BDB_INCLUDE_PATH=../../db-4.8.30.NC/build_unix
 BDB_LIB_PATH=../../db-4.8.30.NC/build_unix
 MINIUPNC_LIB_PATH=./miniupnpc
