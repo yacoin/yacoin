@@ -777,24 +777,19 @@ bool AppInit2()
 
     RegisterWallet(pwalletMain);
 
-    CBlockIndex *pindexRescan = pindexBest;
-    if (GetBoolArg("-rescan"))
-        pindexRescan = pindexGenesisBlock;
-    else
-    {
-        CWalletDB walletdb("wallet.dat");
-        CBlockLocator locator;
-        if (walletdb.ReadBestBlock(locator))
-            pindexRescan = locator.GetBlockIndex();
+    if (GetBoolArg("-rescan")) {
+        // Erase all transactions. Scan will start from beginning.
+        std::map<uint256, CWalletTx> mapWalletCopy;
+        mapWalletCopy = pwalletMain->mapWallet;
+        for(std::map<uint256, CWalletTx>::iterator it = mapWalletCopy.begin(); it != mapWalletCopy.end(); ++it)
+        {
+            pwalletMain->EraseFromWallet(it->second.GetHash());
+        }
     }
-    if (pindexBest != pindexRescan && pindexBest && pindexRescan && pindexBest->nHeight > pindexRescan->nHeight)
-    {
-        uiInterface.InitMessage(_("<b>Rescanning...</b>"));
-        printf("Rescanning last %i blocks (from block %i)...\n", pindexBest->nHeight - pindexRescan->nHeight, pindexRescan->nHeight);
-        nStart = GetTimeMillis();
-        pwalletMain->ScanForWalletTransactions(pindexRescan, true);
-        printf(" rescan      %15"PRI64d"ms\n", GetTimeMillis() - nStart);
-    }
+
+    // Scan for transactions
+    if (!NewThread(ThreadTxnScanner, pwalletMain))
+        printf("Error: NewThread(ThreadTxnScanner) failed\n");
 
     // ********************************************************* Step 9: import blocks
 

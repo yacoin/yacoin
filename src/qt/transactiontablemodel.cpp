@@ -25,11 +25,12 @@ static int column_alignments[] = {
         Qt::AlignLeft|Qt::AlignVCenter,
         Qt::AlignLeft|Qt::AlignVCenter,
         Qt::AlignLeft|Qt::AlignVCenter,
+        Qt::AlignRight|Qt::AlignVCenter,
         Qt::AlignRight|Qt::AlignVCenter
     };
 
 // Comparison operator for sort/binary search of model tx list
-struct TxLessThan
+struct TxLessThanHash
 {
     bool operator()(const TransactionRecord &a, const TransactionRecord &b) const
     {
@@ -42,6 +43,15 @@ struct TxLessThan
     bool operator()(const uint256 &a, const TransactionRecord &b) const
     {
         return a < b.hash;
+    }
+};
+
+// Comparison operator for sort of model tx list
+struct TxLessThanKey
+{
+    bool operator()(const TransactionRecord &a, const TransactionRecord &b) const
+    {
+        return a.status.sortKey < b.status.sortKey;
     }
 };
 
@@ -62,6 +72,7 @@ public:
      * this is sorted by sha256.
      */
     QList<TransactionRecord> cachedWallet;
+    QList<TransactionRecord> keySortedWallet;
 
     /* Query entire wallet anew from core.
      */
@@ -76,6 +87,57 @@ public:
                 if(TransactionRecord::showTransaction(it->second))
                     cachedWallet.append(TransactionRecord::decomposeTransaction(wallet, it->second));
             }
+            // Get the status of all the transaction records
+            for (int i = 0 ;i < cachedWallet.size(); i++)
+            {
+                TransactionRecord *rec = &cachedWallet[i];
+    
+                rec->presort_i = i;
+                rec->balance = 0;
+                std::map<uint256, CWalletTx>::iterator mi = wallet->mapWallet.find(rec->hash);
+
+                if(mi != wallet->mapWallet.end())
+                {
+                    rec->updateStatus(mi->second);
+                }
+            }
+        }
+        balanceWallet(true);
+    }
+
+    void balanceWallet(bool sortRequired = false)
+    {
+        if (sortRequired) {
+            for (int i = 0 ;i < cachedWallet.size(); i++)
+            {
+                TransactionRecord *rec = &cachedWallet[i];
+    
+                rec->presort_i = i;
+                rec->balance = 0;
+                std::map<uint256, CWalletTx>::iterator mi = wallet->mapWallet.find(rec->hash);
+
+                if(mi != wallet->mapWallet.end())
+                {
+                    rec->updateStatus(mi->second);
+                }
+            }
+            keySortedWallet.clear();
+            keySortedWallet = cachedWallet;
+            qSort(keySortedWallet.begin(), keySortedWallet.end(), TxLessThanKey());
+        }
+
+        int64 balance=0;
+        for( int i=0; i<keySortedWallet.count(); ++i )
+        { 
+            TransactionRecord *wtx = &cachedWallet[keySortedWallet[i].presort_i];
+            if(!wtx->status.confirmed || wtx->status.maturity != TransactionStatus::Mature) {
+                balance += wtx->debit;
+            }
+            else {
+                balance += (wtx->credit + wtx->debit);
+            }
+
+            wtx->balance = balance;
         }
     }
 
@@ -96,9 +158,9 @@ public:
 
             // Find bounds of this transaction in model
             QList<TransactionRecord>::iterator lower = qLowerBound(
-                cachedWallet.begin(), cachedWallet.end(), hash, TxLessThan());
+                cachedWallet.begin(), cachedWallet.end(), hash, TxLessThanHash());
             QList<TransactionRecord>::iterator upper = qUpperBound(
-                cachedWallet.begin(), cachedWallet.end(), hash, TxLessThan());
+                cachedWallet.begin(), cachedWallet.end(), hash, TxLessThanHash());
             int lowerIndex = (lower - cachedWallet.begin());
             int upperIndex = (upper - cachedWallet.begin());
             bool inModel = (lower != upper);
@@ -165,6 +227,8 @@ public:
                 break;
             }
         }
+        // TODO: sometimes we don't need to re-sort?
+        balanceWallet(true);
     }
 
     int size()
@@ -172,7 +236,7 @@ public:
         return cachedWallet.size();
     }
 
-    TransactionRecord *index(int idx)
+    TransactionRecord *index99(int idx)
     {
         if(idx >= 0 && idx < cachedWallet.size())
         {
@@ -189,7 +253,9 @@ public:
 
                     if(mi != wallet->mapWallet.end())
                     {
-                        rec->updateStatus(mi->second);
+                        if (rec->updateStatus(mi->second)) {
+                            balanceWallet(false);
+                        }
                     }
                 }
             }
@@ -223,7 +289,7 @@ TransactionTableModel::TransactionTableModel(CWallet* wallet, WalletModel *paren
         priv(new TransactionTablePriv(wallet, this)),
         cachedNumBlocks(0)
 {
-    columns << QString() << tr("Date") << tr("Type") << tr("Address") << tr("Amount");
+    columns << QString() << tr("Date") << tr("Type") << tr("Address") << tr("Amount") << tr("Balance");
 
     priv->refreshWallet();
 
@@ -436,9 +502,21 @@ QString TransactionTableModel::formatTxAmount(const TransactionRecord *wtx, bool
     {
         if(!wtx->status.confirmed || wtx->status.maturity != TransactionStatus::Mature)
         {
-            str = QString("[") + str + QString("]");
+            if (wtx->type == TransactionRecord::StakeInterest) {
+                QString staked = BitcoinUnits::format(walletModel->getOptionsModel()->getDisplayUnit(), -wtx->debit);
+                str = QString("[") + str + QString("] - ") + staked;
+            }
+            else {
+                str = QString("[") + str + QString("]");
+            }
         }
     }
+    return QString(str);
+}
+
+QString TransactionTableModel::formatTxBalance(const TransactionRecord *wtx, bool showUnconfirmed) const
+{
+    QString str = BitcoinUnits::format(walletModel->getOptionsModel()->getDisplayUnit(), wtx->balance);
     return QString(str);
 }
 
@@ -527,6 +605,8 @@ QVariant TransactionTableModel::data(const QModelIndex &index, int role) const
             return formatTxToAddress(rec, false);
         case Amount:
             return formatTxAmount(rec);
+        case Balance:
+            return formatTxBalance(rec);
         }
         break;
     case Qt::EditRole:
@@ -543,6 +623,8 @@ QVariant TransactionTableModel::data(const QModelIndex &index, int role) const
             return formatTxToAddress(rec, true);
         case Amount:
             return rec->credit + rec->debit;
+        case Balance:
+            return rec->time;
         }
         break;
     case Qt::ToolTipRole:
@@ -586,6 +668,8 @@ QVariant TransactionTableModel::data(const QModelIndex &index, int role) const
                                           rec->status.maturity != TransactionStatus::Mature);
     case FormattedAmountRole:
         return formatTxAmount(rec, false);
+    case FormattedBalanceRole:
+        return formatTxBalance(rec, false);
     }
     return QVariant();
 }
@@ -615,6 +699,8 @@ QVariant TransactionTableModel::headerData(int section, Qt::Orientation orientat
                 return tr("Destination address of transaction.");
             case Amount:
                 return tr("Amount removed from or added to balance.");
+            case Balance:
+                return tr("Wallet balance after transaction.");
             }
         }
     }
@@ -624,10 +710,10 @@ QVariant TransactionTableModel::headerData(int section, Qt::Orientation orientat
 QModelIndex TransactionTableModel::index(int row, int column, const QModelIndex &parent) const
 {
     Q_UNUSED(parent);
-    TransactionRecord *data = priv->index(row);
+    TransactionRecord *data = priv->index99(row);
     if(data)
     {
-        return createIndex(row, column, priv->index(row));
+        return createIndex(row, column, priv->index99(row));
     }
     else
     {
