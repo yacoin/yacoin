@@ -778,13 +778,16 @@ bool AppInit2()
     RegisterWallet(pwalletMain);
 
     if (GetBoolArg("-rescan")) {
-        // Erase all transactions. Scan will start from beginning.
+        // Erase all cached transactions from wallet. Rescan will restore all valid transactions.
+        uiInterface.InitMessage(_("<b>Purging transactions for rescan.</b>"));
+        printf("Purging transactions before rescan ...\n");
         std::map<uint256, CWalletTx> mapWalletCopy;
         mapWalletCopy = pwalletMain->mapWallet;
         for(std::map<uint256, CWalletTx>::iterator it = mapWalletCopy.begin(); it != mapWalletCopy.end(); ++it)
         {
             pwalletMain->EraseFromWallet(it->second.GetHash());
         }
+        printf("... purge is complete.\n");
     }
 
     // Scan for transactions

@@ -799,7 +799,6 @@ int CWallet::ScanForWalletTransactions(CBlockIndex* pindexStart, bool fUpdate)
         while (pindex)
         {
             {
-                //LOCK(cs_wallet);
                 CBlock block;
                 block.ReadFromDisk(pindex, true);
                 BOOST_FOREACH(CTransaction& tx, block.vtx)
@@ -892,6 +891,7 @@ void CWallet::ReacceptWalletTransactions()
             //if (ScanForWalletTransactions(pindexGenesisBlock))
             //    fRepeat = true;  // Found missing transactions: re-do re-accept.
             printf("ReacceptWalletTransactions found missing transactions. Please use -rescan.\n");
+            strMiscWarning = _("Error: Found missing transactions. Please use -rescan.");
         }
     }
 }

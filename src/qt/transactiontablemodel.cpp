@@ -72,6 +72,8 @@ public:
      * this is sorted by sha256.
      */
     QList<TransactionRecord> cachedWallet;
+    /* A copy sorted by key for balance calculation.
+     */
     QList<TransactionRecord> keySortedWallet;
 
     /* Query entire wallet anew from core.
@@ -87,20 +89,6 @@ public:
                 if(TransactionRecord::showTransaction(it->second))
                     cachedWallet.append(TransactionRecord::decomposeTransaction(wallet, it->second));
             }
-            // Get the status of all the transaction records
-            for (int i = 0 ;i < cachedWallet.size(); i++)
-            {
-                TransactionRecord *rec = &cachedWallet[i];
-    
-                rec->presort_i = i;
-                rec->balance = 0;
-                std::map<uint256, CWalletTx>::iterator mi = wallet->mapWallet.find(rec->hash);
-
-                if(mi != wallet->mapWallet.end())
-                {
-                    rec->updateStatus(mi->second);
-                }
-            }
         }
         balanceWallet(true);
     }
@@ -108,17 +96,21 @@ public:
     void balanceWallet(bool sortRequired = false)
     {
         if (sortRequired) {
-            for (int i = 0 ;i < cachedWallet.size(); i++)
             {
-                TransactionRecord *rec = &cachedWallet[i];
-    
-                rec->presort_i = i;
-                rec->balance = 0;
-                std::map<uint256, CWalletTx>::iterator mi = wallet->mapWallet.find(rec->hash);
-
-                if(mi != wallet->mapWallet.end())
+                LOCK(wallet->cs_wallet);
+                // We need updated status for all the transaction records
+                for (int i = 0 ;i < cachedWallet.size(); i++)
                 {
-                    rec->updateStatus(mi->second);
+                    TransactionRecord *rec = &cachedWallet[i];
+        
+                    rec->presort_i = i;
+                    rec->balance = 0;
+                    std::map<uint256, CWalletTx>::iterator mi = wallet->mapWallet.find(rec->hash);
+    
+                    if(mi != wallet->mapWallet.end())
+                    {
+                        rec->updateStatus(mi->second);
+                    }
                 }
             }
             keySortedWallet.clear();
@@ -129,7 +121,8 @@ public:
         int64 balance=0;
         for( int i=0; i<keySortedWallet.count(); ++i )
         { 
-            TransactionRecord *wtx = &cachedWallet[keySortedWallet[i].presort_i];
+            TransactionRecord *rec = &keySortedWallet[i];
+            TransactionRecord *wtx = &cachedWallet[rec->presort_i];
             if(!wtx->status.confirmed || wtx->status.maturity != TransactionStatus::Mature) {
                 balance += wtx->debit;
             }
@@ -138,6 +131,7 @@ public:
             }
 
             wtx->balance = balance;
+            rec->balance = balance;
         }
     }
 
@@ -236,7 +230,7 @@ public:
         return cachedWallet.size();
     }
 
-    TransactionRecord *index99(int idx)
+    TransactionRecord *index(int idx)
     {
         if(idx >= 0 && idx < cachedWallet.size())
         {
@@ -710,10 +704,10 @@ QVariant TransactionTableModel::headerData(int section, Qt::Orientation orientat
 QModelIndex TransactionTableModel::index(int row, int column, const QModelIndex &parent) const
 {
     Q_UNUSED(parent);
-    TransactionRecord *data = priv->index99(row);
+    TransactionRecord *data = priv->index(row);
     if(data)
     {
-        return createIndex(row, column, priv->index99(row));
+        return createIndex(row, column, priv->index(row));
     }
     else
     {

@@ -4350,7 +4350,10 @@ void TransactionScanner(CWallet *pwallet)
     {
         printf("Rescanning last %i blocks (from block %i)...\n", pindexBest->nHeight - pindexRescan->nHeight, pindexRescan->nHeight);
         pwallet->ScanForWalletTransactions(pindexRescan, true);
-        pwallet->ReacceptWalletTransactions();
+        if (!fShutdown)
+        {
+            pwallet->ReacceptWalletTransactions();
+        }
     }
     // Stop showing the progress bar
     nScanned = -1;
