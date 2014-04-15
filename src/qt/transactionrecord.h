@@ -76,20 +76,20 @@ public:
     static const int NumConfirmations = 6;
 
     TransactionRecord():
-            hash(), time(0), type(Other), address(""), debit(0), credit(0), idx(0)
+            hash(), time(0), type(Other), address(""), debit(0), credit(0), balance(0), idx(0)
     {
     }
 
     TransactionRecord(uint256 hash, int64 time):
             hash(hash), time(time), type(Other), address(""), debit(0),
-            credit(0), idx(0)
+            credit(0), balance(0), idx(0)
     {
     }
 
     TransactionRecord(uint256 hash, int64 time,
                 Type type, const std::string &address,
                 int64 debit, int64 credit):
-            hash(hash), time(time), type(type), address(address), debit(debit), credit(credit),
+            hash(hash), time(time), type(type), address(address), debit(debit), credit(credit), balance(0),
             idx(0)
     {
     }
@@ -109,6 +109,9 @@ public:
     int64 credit;
     /**@}*/
 
+    int64 balance;
+    int presort_i; // position in QList
+
     /** Subtransaction index, for sort key */
     int idx;
 
@@ -120,7 +123,7 @@ public:
 
     /** Update status from core wallet tx.
      */
-    void updateStatus(const CWalletTx &wtx);
+    bool updateStatus(const CWalletTx &wtx);
 
     /** Return whether a status update is needed.
      */
