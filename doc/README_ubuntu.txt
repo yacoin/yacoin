@@ -3,9 +3,8 @@ Oracle VirtualBox. When completed, you will be able to build the static loaded y
 tested versions of libraries YACoin needs to run properly. A fresh install of Ubuntu Server 12.04 is
 used so as to have a consistent build environment UN-tarnished by system changes.
 
-NOTE: Since this is targeted for Ubuntu Server 12.04, these instructions will not coverer how to
-build the GUI version of YACoin. The windows version of the GUI gets much more attention from
-developers, so if you want to use the GUI, running the Windows version is recommended.
+These instructions are targeted for Ubuntu Server 12.04 and Ubuntu Desktop 12.04, but should be 
+useful for other Linux flavors as well. A section for CentOS 6.5 has been added to the bottom.
 
 NOTE: The makefile for these instructions is found in src/makefile.ubuntu
 
@@ -189,16 +188,16 @@ Section I - Build the miniupnpc library
 
       1 - Type " cd " to get to the home directory
 
-      2 - Type " cd yacoin/src " miniupnpc goes here
+      2 - Type " wget http://miniupnp.free.fr/files/miniupnpc-1.8.tar.gz "
 
-      3 - Type " wget http://miniupnp.free.fr/files/miniupnpc-1.8.tar.gz "
-
-      4 - Type " md5sum miniupnpc-1.8.tar.gz " and make sure you get
+      3 - Type " md5sum miniupnpc-1.8.tar.gz " and make sure you get
       065bf20a20ebe605c675b7a5aaef340a
 
-      5 - Type " tar xvzf miniupnpc-1.8.tar.gz "
+      4 - Type " tar xvzf miniupnpc-1.8.tar.gz "
 
-      6 - Type " mv miniupnpc-1.8 miniupnpc " to move miniupnpc
+      5 - Type " cd yacoin/src " miniupnpc is needed here
+
+      6 - Type " ln -s ../../miniupnpc-1.8 miniupnpc " to make a symbolic link.
 
       7 - Type " cd miniupnpc "
 
@@ -287,7 +286,7 @@ version of YACoin.
 
       3 - Type " cd yacoin " 
 
-      4 - Edit the file called yacoin-qt.pro and add the folowing lines near the top:
+      4 - Edit the file called yacoin-qt.pro and add the following lines near the top:
 
           BDB_INCLUDE_PATH=../db-4.8.30.NC/build_unix
           BDB_LIB_PATH=../db-4.8.30.NC/build_unix
@@ -307,4 +306,34 @@ version of YACoin.
        6 - Type " make " to build yacoin-qt
 
        7 - Type " ./yacoin-qt & " to start YACoin QT GUI
+
+Section CentOS 6.5:
+
+A few minor changes will work on CentOS 6.5. It should work on RHEL and Fedora too. All the steps
+are the same until you get to section QT above.
+
+       1 - Instead of QT-1 above,
+           Type " sudo yum install qt4-devel " to install QT development.
+
+       2 - Do QT-2 through QT-4 above.
+
+       3 - While you are editing yacoin-qt.pro also make these changes. First, find and delete the 
+           line with -lrt in it.
+
+           !windows:!macx {
+                DEFINES += LINUX
+                LIBS += -lrt               <----- Delete this line
+           }
+           Put these 3 lines before the last line of the file (the system line):
+           
+           !windows:!macx {
+               LIBS += -lrt
+           }
+
+       3 - Instead of QT-5,
+           Type " /usr/lib64/qt4/bin/qmake yacoin-qt.pro RELEASE=1 "
+
+       4 - Type " make "
+
+       5 - Type " ./yacoin-qt & " to start YACoin QT GUI
 
