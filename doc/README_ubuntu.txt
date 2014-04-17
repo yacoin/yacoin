@@ -130,7 +130,7 @@ Section E - Build the OpenSSL Library
       of openssl we need from the Internet.
 
       3 - Type " md5sum openssl-1.0.1g.tar.gz " and make sure you get
-      66bf6f10f060d561929de96f9dfe5b8c
+      de62b43dfcd858e66a74bee1c834e959
 
       4 - Type " tar xvzf openssl-1.0.1g.tar.gz " to extract the source files.
 
