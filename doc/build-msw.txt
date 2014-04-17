@@ -37,7 +37,7 @@ http://www.openssl.org/source/openssl-1.0.1g.tar.gz
 
 7) Type:
 cd /c/deps
-md5sum openssl-1.0.1g.tar.gz  # make sure you get 66bf6f10f060d561929de96f9dfe5b8c
+md5sum openssl-1.0.1g.tar.gz  # make sure you get de62b43dfcd858e66a74bee1c834e959
 tar xvzf openssl-1.0.1g.tar.gz
 cd openssl-1.0.1g
 ./config
