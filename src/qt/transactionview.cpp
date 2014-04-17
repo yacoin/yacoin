@@ -127,6 +127,7 @@ TransactionView::TransactionView(QWidget *parent) :
     QAction *copyAddressAction = new QAction(tr("Copy address"), this);
     QAction *copyLabelAction = new QAction(tr("Copy label"), this);
     QAction *copyAmountAction = new QAction(tr("Copy amount"), this);
+    QAction *copyBalanceAction = new QAction(tr("Copy balance"), this);
     QAction *editLabelAction = new QAction(tr("Edit label"), this);
     QAction *showDetailsAction = new QAction(tr("Show transaction details"), this);
 
@@ -134,6 +135,7 @@ TransactionView::TransactionView(QWidget *parent) :
     contextMenu->addAction(copyAddressAction);
     contextMenu->addAction(copyLabelAction);
     contextMenu->addAction(copyAmountAction);
+    contextMenu->addAction(copyBalanceAction);
     contextMenu->addAction(editLabelAction);
     contextMenu->addAction(showDetailsAction);
 
@@ -149,6 +151,7 @@ TransactionView::TransactionView(QWidget *parent) :
     connect(copyAddressAction, SIGNAL(triggered()), this, SLOT(copyAddress()));
     connect(copyLabelAction, SIGNAL(triggered()), this, SLOT(copyLabel()));
     connect(copyAmountAction, SIGNAL(triggered()), this, SLOT(copyAmount()));
+    connect(copyBalanceAction, SIGNAL(triggered()), this, SLOT(copyBalance()));
     connect(editLabelAction, SIGNAL(triggered()), this, SLOT(editLabel()));
     connect(showDetailsAction, SIGNAL(triggered()), this, SLOT(showDetails()));
 }
@@ -184,6 +187,8 @@ void TransactionView::setModel(WalletModel *model)
                 TransactionTableModel::ToAddress, QHeaderView::Stretch);
         transactionView->horizontalHeader()->resizeSection(
                 TransactionTableModel::Amount, 100);
+        transactionView->horizontalHeader()->resizeSection(
+                TransactionTableModel::Balance, 100);
     }
 }
 
@@ -285,6 +290,7 @@ void TransactionView::exportClicked()
     writer.addColumn(tr("Label"), 0, TransactionTableModel::LabelRole);
     writer.addColumn(tr("Address"), 0, TransactionTableModel::AddressRole);
     writer.addColumn(tr("Amount"), 0, TransactionTableModel::FormattedAmountRole);
+    writer.addColumn(tr("Balance"), 0, TransactionTableModel::FormattedBalanceRole);
     writer.addColumn(tr("ID"), 0, TransactionTableModel::TxIDRole);
 
     if(!writer.write())
@@ -316,6 +322,11 @@ void TransactionView::copyLabel()
 void TransactionView::copyAmount()
 {
     GUIUtil::copyEntryData(transactionView, 0, TransactionTableModel::FormattedAmountRole);
+}
+
+void TransactionView::copyBalance()
+{
+    GUIUtil::copyEntryData(transactionView, 0, TransactionTableModel::FormattedBalanceRole);
 }
 
 void TransactionView::editLabel()

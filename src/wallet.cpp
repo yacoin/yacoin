@@ -790,20 +790,37 @@ bool CWalletTx::WriteToDisk()
 int CWallet::ScanForWalletTransactions(CBlockIndex* pindexStart, bool fUpdate)
 {
     int ret = 0;
+    int64 nLast, nNow;
+
+    nLast = GetTimeMillis();
 
     CBlockIndex* pindex = pindexStart;
     {
-        LOCK(cs_wallet);
         while (pindex)
         {
-            CBlock block;
-            block.ReadFromDisk(pindex, true);
-            BOOST_FOREACH(CTransaction& tx, block.vtx)
             {
-                if (AddToWalletIfInvolvingMe(tx, &block, fUpdate))
-                    ret++;
+                CBlock block;
+                block.ReadFromDisk(pindex, true);
+                BOOST_FOREACH(CTransaction& tx, block.vtx)
+                {
+                    if (AddToWalletIfInvolvingMe(tx, &block, fUpdate))
+                        ret++;
+                }
             }
             pindex = pindex->pnext;
+            // Update the progress bar
+            nScanned++;
+            // Log progress every 5 seconds
+            nNow = GetTimeMillis();
+            if (nNow - nLast > 5000) {
+                printf("ScanForWalletTransactions: scanned %d blocks\n", nScanned);
+                nLast = nNow;
+            }
+            // Stop the scan if shutting down
+            if (fShutdown)
+            {
+                return ret;
+            }
         }
     }
     return ret;
@@ -870,9 +887,11 @@ void CWallet::ReacceptWalletTransactions()
         }
         if (!vMissingTx.empty())
         {
-            // TODO: optimize this to scan just part of the block chain?
-            if (ScanForWalletTransactions(pindexGenesisBlock))
-                fRepeat = true;  // Found missing transactions: re-do re-accept.
+            // Groko - This is a pain in the butt. User can request -rescan on his own. 
+            //if (ScanForWalletTransactions(pindexGenesisBlock))
+            //    fRepeat = true;  // Found missing transactions: re-do re-accept.
+            printf("ReacceptWalletTransactions found missing transactions. Please use -rescan.\n");
+            strMiscWarning = _("Error: Found missing transactions. Please use -rescan.");
         }
     }
 }
