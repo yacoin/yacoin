@@ -5,9 +5,9 @@
 
 /* Return positive answer if transaction should be shown in list.
  */
-bool TransactionRecord::showTransaction(const CWalletTx &wtx)
+bool TransactionRecord::showTransaction(const CWalletTx &wtx, bool testStake)
 {
-    if (wtx.IsCoinBase())
+    if (wtx.IsCoinBase() || (testStake && wtx.IsCoinStake()))
     {
         // Ensures we show generated coins / mined transactions at depth 1
         if (!wtx.IsInMainChain())
@@ -31,38 +31,48 @@ QList<TransactionRecord> TransactionRecord::decomposeTransaction(const CWallet *
     uint256 hash = wtx.GetHash();
     std::map<std::string, std::string> mapValue = wtx.mapValue;
 
-    if (nNet > 0 || wtx.IsCoinBase())
+    if (nNet > 0 || wtx.IsCoinBase() || wtx.IsCoinStake())
     {
-        //
-        // Credit
-        //
-        BOOST_FOREACH(const CTxOut& txout, wtx.vout)
+        if (wtx.IsCoinStake()) 
         {
-            if(wallet->IsMine(txout))
+            const CTxOut& txout = wtx.vout[1];
+            CTxDestination address;
+            ExtractDestination(txout.scriptPubKey, address);
+            parts.append(TransactionRecord(hash, nTime, TransactionRecord::StakeInterest, 
+	        CBitcoinAddress(address).ToString(), 0, nNet));
+        }
+        else {
+            //
+            // Credit
+            //
+            BOOST_FOREACH(const CTxOut& txout, wtx.vout)
             {
-                TransactionRecord sub(hash, nTime);
-                CTxDestination address;
-                sub.idx = parts.size(); // sequence number
-                sub.credit = txout.nValue;
-                if (ExtractDestination(txout.scriptPubKey, address) && IsMine(*wallet, address))
+                if(wallet->IsMine(txout))
                 {
-                    // Received by Bitcoin Address
-                    sub.type = TransactionRecord::RecvWithAddress;
-                    sub.address = CBitcoinAddress(address).ToString();
+                    TransactionRecord sub(hash, nTime);
+                    CTxDestination address;
+                    sub.idx = parts.size(); // sequence number
+                    sub.credit = txout.nValue;
+                    if (ExtractDestination(txout.scriptPubKey, address) && IsMine(*wallet, address))
+                    {
+                        // Received by Bitcoin Address
+                        sub.type = TransactionRecord::RecvWithAddress;
+                        sub.address = CBitcoinAddress(address).ToString();
+                    }
+                    else
+                    {
+                        // Received by IP connection (deprecated features), or a multisignature or other non-simple transaction
+                        sub.type = TransactionRecord::RecvFromOther;
+                        sub.address = mapValue["from"];
+                    }
+                    if (wtx.IsCoinBase())
+                    {
+                        // Generated
+                        sub.type = TransactionRecord::Generated;
+                    }
+    
+                    parts.append(sub);
                 }
-                else
-                {
-                    // Received by IP connection (deprecated features), or a multisignature or other non-simple transaction
-                    sub.type = TransactionRecord::RecvFromOther;
-                    sub.address = mapValue["from"];
-                }
-                if (wtx.IsCoinBase())
-                {
-                    // Generated
-                    sub.type = TransactionRecord::Generated;
-                }
-
-                parts.append(sub);
             }
         }
     }
@@ -192,10 +202,10 @@ void TransactionRecord::updateStatus(const CWalletTx &wtx)
     }
 
     // For generated transactions, determine maturity
-    if(type == TransactionRecord::Generated)
+    if(type == TransactionRecord::Generated ||
+       type == TransactionRecord::StakeInterest)
     {
-        int64 nCredit = wtx.GetCredit(true);
-        if (nCredit == 0)
+        if (!wtx.IsMature())
         {
             status.maturity = TransactionStatus::Immature;
 

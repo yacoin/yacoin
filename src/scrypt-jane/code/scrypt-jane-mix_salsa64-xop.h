@@ -1,10 +1,10 @@
 /* x64 */
-#if defined(X86_64ASM_AVX) && (!defined(SCRYPT_CHOOSE_COMPILETIME) || !defined(SCRYPT_SALSA64_INCLUDED)) && !defined(CPU_X86_FORCE_INTRINSICS)
+#if defined(X86_64ASM_XOP) && (!defined(SCRYPT_CHOOSE_COMPILETIME) || !defined(SCRYPT_SALSA64_INCLUDED)) && !defined(CPU_X86_FORCE_INTRINSICS)
 
-#define SCRYPT_SALSA64_AVX
+#define SCRYPT_SALSA64_XOP
 
-asm_naked_fn_proto(void, scrypt_ChunkMix_avx)(uint64_t *Bout/*[chunkBytes]*/, uint64_t *Bin/*[chunkBytes]*/, uint64_t *Bxor/*[chunkBytes]*/, uint32_t r)
-asm_naked_fn(scrypt_ChunkMix_avx)
+asm_naked_fn_proto(void, scrypt_ChunkMix_xop)(uint64_t *Bout/*[chunkBytes]*/, uint64_t *Bin/*[chunkBytes]*/, uint64_t *Bxor/*[chunkBytes]*/, uint32_t r)
+asm_naked_fn(scrypt_ChunkMix_xop)
 	a1(push rbp)
 	a2(mov rbp, rsp)
 	a2(and rsp, ~63)
@@ -23,7 +23,7 @@ asm_naked_fn(scrypt_ChunkMix_avx)
 	a2(vmovdqa xmm5,[rax+80])
 	a2(vmovdqa xmm6,[rax+96])
 	a2(vmovdqa xmm7,[rax+112])
-	aj(jz scrypt_ChunkMix_avx_no_xor1)
+	aj(jz scrypt_ChunkMix_xop_no_xor1)
 	a3(vpxor xmm0,xmm0,[r9+0])
 	a3(vpxor xmm1,xmm1,[r9+16])
 	a3(vpxor xmm2,xmm2,[r9+32])
@@ -32,10 +32,10 @@ asm_naked_fn(scrypt_ChunkMix_avx)
 	a3(vpxor xmm5,xmm5,[r9+80])
 	a3(vpxor xmm6,xmm6,[r9+96])
 	a3(vpxor xmm7,xmm7,[r9+112])
-	a1(scrypt_ChunkMix_avx_no_xor1:)
+	a1(scrypt_ChunkMix_xop_no_xor1:)
 	a2(xor r9,r9)
 	a2(xor r8,r8)
-	a1(scrypt_ChunkMix_avx_loop:)
+	a1(scrypt_ChunkMix_xop_loop:)
 		a2(and rdx, rdx)
 		a3(vpxor xmm0,xmm0,[rsi+r9+0])
 		a3(vpxor xmm1,xmm1,[rsi+r9+16])
@@ -45,7 +45,7 @@ asm_naked_fn(scrypt_ChunkMix_avx)
 		a3(vpxor xmm5,xmm5,[rsi+r9+80])
 		a3(vpxor xmm6,xmm6,[rsi+r9+96])
 		a3(vpxor xmm7,xmm7,[rsi+r9+112])
-		aj(jz scrypt_ChunkMix_avx_no_xor2)
+		aj(jz scrypt_ChunkMix_xop_no_xor2)
 		a3(vpxor xmm0,xmm0,[rdx+r9+0])
 		a3(vpxor xmm1,xmm1,[rdx+r9+16])
 		a3(vpxor xmm2,xmm2,[rdx+r9+32])
@@ -54,7 +54,7 @@ asm_naked_fn(scrypt_ChunkMix_avx)
 		a3(vpxor xmm5,xmm5,[rdx+r9+80])
 		a3(vpxor xmm6,xmm6,[rdx+r9+96])
 		a3(vpxor xmm7,xmm7,[rdx+r9+112])
-		a1(scrypt_ChunkMix_avx_no_xor2:)
+		a1(scrypt_ChunkMix_xop_no_xor2:)
 		a2(vmovdqa [rsp+0],xmm0)
 		a2(vmovdqa [rsp+16],xmm1)
 		a2(vmovdqa [rsp+32],xmm2)
@@ -64,7 +64,7 @@ asm_naked_fn(scrypt_ChunkMix_avx)
 		a2(vmovdqa [rsp+96],xmm6)
 		a2(vmovdqa [rsp+112],xmm7)
 		a2(mov rax,8)
-		a1(scrypt_salsa64_avx_loop: )
+		a1(scrypt_salsa64_xop_loop: )
 			a3(vpaddq xmm8, xmm0, xmm2)
 			a3(vpaddq xmm9, xmm1, xmm3)
 			a3(vpshufd xmm8, xmm8, 0xb1)
@@ -73,22 +73,14 @@ asm_naked_fn(scrypt_ChunkMix_avx)
 			a3(vpxor xmm7, xmm7, xmm9)
 			a3(vpaddq xmm10, xmm0, xmm6)
 			a3(vpaddq xmm11, xmm1, xmm7)
-			a3(vpsrlq xmm8, xmm10, 51)
-			a3(vpsrlq xmm9, xmm11, 51)
-			a3(vpsllq xmm10, xmm10, 13)
-			a3(vpsllq xmm11, xmm11, 13)
-			a3(vpxor xmm4, xmm4, xmm8)
-			a3(vpxor xmm5, xmm5, xmm9)
+			a3(vprotq xmm10, xmm10, 13)
+			a3(vprotq xmm11, xmm11, 13)
 			a3(vpxor xmm4, xmm4, xmm10)
 			a3(vpxor xmm5, xmm5, xmm11)
 			a3(vpaddq xmm8, xmm6, xmm4)
 			a3(vpaddq xmm9, xmm7, xmm5)
-			a3(vpsrlq xmm10, xmm8, 25)
-			a3(vpsrlq xmm11, xmm9, 25)
-			a3(vpsllq xmm8, xmm8, 39)
-			a3(vpsllq xmm9, xmm9, 39)
-			a3(vpxor xmm2, xmm2, xmm10)
-			a3(vpxor xmm3, xmm3, xmm11)
+			a3(vprotq xmm8, xmm8, 39)
+			a3(vprotq xmm9, xmm9, 39)
 			a3(vpxor xmm2, xmm2, xmm8)
 			a3(vpxor xmm3, xmm3, xmm9)
 			a3(vpaddq xmm10, xmm4, xmm2)
@@ -111,22 +103,14 @@ asm_naked_fn(scrypt_ChunkMix_avx)
 			a3(vpxor xmm7, xmm7, xmm11)
 			a3(vpaddq xmm8, xmm0, xmm6)
 			a3(vpaddq xmm9, xmm1, xmm7)
-			a3(vpsrlq xmm10, xmm8, 51)
-			a3(vpsrlq xmm11, xmm9, 51)
-			a3(vpsllq xmm8, xmm8, 13)
-			a3(vpsllq xmm9, xmm9, 13)
-			a3(vpxor xmm5, xmm5, xmm10)
-			a3(vpxor xmm4, xmm4, xmm11)
+			a3(vprotq xmm8, xmm8, 13)
+			a3(vprotq xmm9, xmm9, 13)
 			a3(vpxor xmm5, xmm5, xmm8)
 			a3(vpxor xmm4, xmm4, xmm9)
 			a3(vpaddq xmm10, xmm6, xmm5)
 			a3(vpaddq xmm11, xmm7, xmm4)
-			a3(vpsrlq xmm8, xmm10, 25)
-			a3(vpsrlq xmm9, xmm11, 25)
-			a3(vpsllq xmm10, xmm10, 39)
-			a3(vpsllq xmm11, xmm11, 39)
-			a3(vpxor xmm2, xmm2, xmm8)
-			a3(vpxor xmm3, xmm3, xmm9)
+			a3(vprotq xmm10, xmm10, 39)
+			a3(vprotq xmm11, xmm11, 39)
 			a3(vpxor xmm2, xmm2, xmm10)
 			a3(vpxor xmm3, xmm3, xmm11)
 			a3(vpaddq xmm8, xmm5, xmm2)
@@ -142,7 +126,7 @@ asm_naked_fn(scrypt_ChunkMix_avx)
 			a4(vpalignr xmm6, xmm11, xmm10, 8)
 			a4(vpalignr xmm7, xmm10, xmm11, 8)
 			a2(sub rax, 2)
-			aj(ja scrypt_salsa64_avx_loop)
+			aj(ja scrypt_salsa64_xop_loop)
 		a3(vpaddq xmm0,xmm0,[rsp+0])
 		a3(vpaddq xmm1,xmm1,[rsp+16])
 		a3(vpaddq xmm2,xmm2,[rsp+32])
@@ -166,22 +150,22 @@ asm_naked_fn(scrypt_ChunkMix_avx)
 		a2(vmovdqa [rax+80],xmm5)
 		a2(vmovdqa [rax+96],xmm6)
 		a2(vmovdqa [rax+112],xmm7)
-		aj(jne scrypt_ChunkMix_avx_loop)
+		aj(jne scrypt_ChunkMix_xop_loop)
 	a2(mov rsp, rbp)
 	a1(pop rbp)
 	a1(ret)
-asm_naked_fn_end(scrypt_ChunkMix_avx)
+asm_naked_fn_end(scrypt_ChunkMix_xop)
 
 #endif
 
 
 /* intrinsic */
-#if defined(X86_INTRINSIC_AVX) && (!defined(SCRYPT_CHOOSE_COMPILETIME) || !defined(SCRYPT_SALSA64_INCLUDED))
+#if defined(X86_INTRINSIC_XOP) && (!defined(SCRYPT_CHOOSE_COMPILETIME) || !defined(SCRYPT_SALSA64_INCLUDED))
 
-#define SCRYPT_SALSA64_AVX
+#define SCRYPT_SALSA64_XOP
 
 static void asm_calling_convention
-scrypt_ChunkMix_avx(uint64_t *Bout/*[chunkBytes]*/, uint64_t *Bin/*[chunkBytes]*/, uint64_t *Bxor/*[chunkBytes]*/, uint32_t r) {
+scrypt_ChunkMix_xop(uint64_t *Bout/*[chunkBytes]*/, uint64_t *Bin/*[chunkBytes]*/, uint64_t *Bxor/*[chunkBytes]*/, uint32_t r) {
 	uint32_t i, blocksPerChunk = r * 2, half = 0;
 	xmmi *xmmp,x0,x1,x2,x3,x4,x5,x6,x7,t0,t1,t2,t3,t4,t5,t6,t7,z0,z1,z2,z3;
 	size_t rounds;
@@ -253,23 +237,15 @@ scrypt_ChunkMix_avx(uint64_t *Bout/*[chunkBytes]*/, uint64_t *Bin/*[chunkBytes]*
 
 			z0 = _mm_add_epi64(x6, x0);
 			z1 = _mm_add_epi64(x7, x1);
-			z2 = _mm_srli_epi64(z0, 64-13);
-			z3 = _mm_srli_epi64(z1, 64-13);
-			z0 = _mm_slli_epi64(z0, 13);
-			z1 = _mm_slli_epi64(z1, 13);
-			x4 = _mm_xor_si128(x4, z2);
-			x5 = _mm_xor_si128(x5, z3);
+			z0 = _mm_roti_epi64(z0, 13);
+			z1 = _mm_roti_epi64(z1, 13);
 			x4 = _mm_xor_si128(x4, z0);
 			x5 = _mm_xor_si128(x5, z1);
 
 			z0 = _mm_add_epi64(x4, x6);
 			z1 = _mm_add_epi64(x5, x7);
-			z2 = _mm_srli_epi64(z0, 64-39);
-			z3 = _mm_srli_epi64(z1, 64-39);
-			z0 = _mm_slli_epi64(z0, 39);
-			z1 = _mm_slli_epi64(z1, 39);
-			x2 = _mm_xor_si128(x2, z2);
-			x3 = _mm_xor_si128(x3, z3);
+			z0 = _mm_roti_epi64(z0, 39);
+			z1 = _mm_roti_epi64(z1, 39);
 			x2 = _mm_xor_si128(x2, z0);
 			x3 = _mm_xor_si128(x3, z1);
 
@@ -296,23 +272,15 @@ scrypt_ChunkMix_avx(uint64_t *Bout/*[chunkBytes]*/, uint64_t *Bin/*[chunkBytes]*
 
 			z0 = _mm_add_epi64(x6, x0);
 			z1 = _mm_add_epi64(x7, x1);
-			z2 = _mm_srli_epi64(z0, 64-13);
-			z3 = _mm_srli_epi64(z1, 64-13);
-			z0 = _mm_slli_epi64(z0, 13);
-			z1 = _mm_slli_epi64(z1, 13);
-			x5 = _mm_xor_si128(x5, z2);
-			x4 = _mm_xor_si128(x4, z3);
+			z0 = _mm_roti_epi64(z0, 13);
+			z1 = _mm_roti_epi64(z1, 13);
 			x5 = _mm_xor_si128(x5, z0);
 			x4 = _mm_xor_si128(x4, z1);
 
 			z0 = _mm_add_epi64(x5, x6);
 			z1 = _mm_add_epi64(x4, x7);
-			z2 = _mm_srli_epi64(z0, 64-39);
-			z3 = _mm_srli_epi64(z1, 64-39);
-			z0 = _mm_slli_epi64(z0, 39);
-			z1 = _mm_slli_epi64(z1, 39);
-			x2 = _mm_xor_si128(x2, z2);
-			x3 = _mm_xor_si128(x3, z3);
+			z0 = _mm_roti_epi64(z0, 39);
+			z1 = _mm_roti_epi64(z1, 39);
 			x2 = _mm_xor_si128(x2, z0);
 			x3 = _mm_xor_si128(x3, z1);
 
@@ -357,11 +325,11 @@ scrypt_ChunkMix_avx(uint64_t *Bout/*[chunkBytes]*/, uint64_t *Bin/*[chunkBytes]*
 
 #endif
 
-#if defined(SCRYPT_SALSA64_AVX)
+#if defined(SCRYPT_SALSA64_XOP)
 	/* uses salsa64_core_tangle_sse2 */
 	
 	#undef SCRYPT_MIX
-	#define SCRYPT_MIX "Salsa64/8-AVX"
+	#define SCRYPT_MIX "Salsa64/8-XOP"
 	#undef SCRYPT_SALSA64_INCLUDED
 	#define SCRYPT_SALSA64_INCLUDED
 #endif

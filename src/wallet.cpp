@@ -629,12 +629,24 @@ void CWalletTx::GetAmounts(int64& nGeneratedImmature, int64& nGeneratedMature, l
     listSent.clear();
     strSentAccount = strFromAccount;
 
-    if (IsCoinBase() || IsCoinStake())
+    if (IsCoinBase())
     {
         if (GetBlocksToMaturity() > 0)
             nGeneratedImmature = pwallet->GetCredit(*this);
         else
             nGeneratedMature = GetCredit();
+        return;
+    }
+
+    if (IsCoinStake())
+    {
+        if (GetBlocksToMaturity() > 0) 
+        {
+            nGeneratedImmature = pwallet->GetCredit(*this) - pwallet->GetDebit(*this);
+            nGeneratedMature = - pwallet->GetDebit(*this);
+        }
+        else 
+            nGeneratedMature = GetCredit() - GetDebit();
         return;
     }
 
@@ -673,7 +685,7 @@ void CWalletTx::GetAmounts(int64& nGeneratedImmature, int64& nGeneratedMature, l
 void CWalletTx::GetAccountAmounts(const string& strAccount, int64& nGenerated, int64& nReceived,
                                   int64& nSent, int64& nFee) const
 {
-    nReceived = nSent = nFee = 0;
+    nGenerated = nReceived = nSent = nFee = 0;
 
     int64 allGeneratedImmature, allGeneratedMature, allFee;
     string strSentAccount;
@@ -956,7 +968,7 @@ int64 CWallet::GetBalance() const
         for (map<uint256, CWalletTx>::const_iterator it = mapWallet.begin(); it != mapWallet.end(); ++it)
         {
             const CWalletTx* pcoin = &(*it).second;
-            if (pcoin->IsFinal() && pcoin->IsConfirmed())
+            if (pcoin->IsMature() && pcoin->IsFinal() && pcoin->IsConfirmed())
                 nTotal += pcoin->GetAvailableCredit();
         }
     }
@@ -972,7 +984,7 @@ int64 CWallet::GetUnconfirmedBalance() const
         for (map<uint256, CWalletTx>::const_iterator it = mapWallet.begin(); it != mapWallet.end(); ++it)
         {
             const CWalletTx* pcoin = &(*it).second;
-            if (!pcoin->IsFinal() || !pcoin->IsConfirmed())
+            if ((!pcoin->IsFinal() || !pcoin->IsConfirmed()) && !pcoin->IsCoinBase() && !pcoin->IsCoinStake())
                 nTotal += pcoin->GetAvailableCredit();
         }
     }
@@ -987,8 +999,12 @@ int64 CWallet::GetImmatureBalance() const
         for (map<uint256, CWalletTx>::const_iterator it = mapWallet.begin(); it != mapWallet.end(); ++it)
         {
             const CWalletTx& pcoin = (*it).second;
-            if (pcoin.IsCoinBase() && pcoin.GetBlocksToMaturity() > 0 && pcoin.IsInMainChain())
-                nTotal += GetCredit(pcoin);
+            if (!pcoin.IsMature() && pcoin.IsInMainChain()) {
+                if (pcoin.IsCoinBase())
+                    nTotal += GetCredit(pcoin);
+                if (pcoin.IsCoinStake())
+                    nTotal += GetCredit(pcoin) - GetDebit(pcoin);
+            }
         }
     }
     return nTotal;
@@ -1061,7 +1077,7 @@ static void ApproximateBestSubset(vector<pair<int64, pair<const CWalletTx*,unsig
 }
 
 // ppcoin: total coins staked (non-spendable until maturity)
-int64 CWallet::GetStake() const
+int64 CWallet::GetStakedCoin() const
 {
     int64 nTotal = 0;
     LOCK(cs_wallet);
@@ -1069,7 +1085,7 @@ int64 CWallet::GetStake() const
     {
         const CWalletTx* pcoin = &(*it).second;
         if (pcoin->IsCoinStake() && pcoin->GetBlocksToMaturity() > 0 && pcoin->GetDepthInMainChain() > 0)
-            nTotal += CWallet::GetCredit(*pcoin);
+            nTotal += CWallet::GetDebit(*pcoin);
     }
     return nTotal;
 }
@@ -1081,8 +1097,10 @@ int64 CWallet::GetNewMint() const
     for (map<uint256, CWalletTx>::const_iterator it = mapWallet.begin(); it != mapWallet.end(); ++it)
     {
         const CWalletTx* pcoin = &(*it).second;
-        if (pcoin->IsCoinBase() && pcoin->GetBlocksToMaturity() > 0 && pcoin->GetDepthInMainChain() > 0)
+        if (pcoin->IsCoinBase() && !pcoin->IsMature() && pcoin->GetDepthInMainChain() > 0)
             nTotal += CWallet::GetCredit(*pcoin);
+        if (pcoin->IsCoinStake() && !pcoin->IsMature() && pcoin->GetDepthInMainChain() > 0)
+            nTotal += CWallet::GetCredit(*pcoin) - CWallet::GetDebit(*pcoin);
     }
     return nTotal;
 }
@@ -1362,6 +1380,8 @@ bool CWallet::CreateCoinStake(const CKeyStore& keystore, unsigned int nBits, int
     // Should not be adjusted if you don't understand the consequences
     static unsigned int nStakeSplitAge = (60 * 60 * 24 * 90);
     int64 nCombineThreshold = GetProofOfWorkReward(GetLastBlockIndex(pindexBest, false)->nBits) / 3;
+    // Keep a table of stuff to speed up POS mining
+    static map<uint256, PosMiningStuff *> mapMiningStuff;
 
     CBigNum bnTargetPerCoinDay;
     bnTargetPerCoinDay.SetCompact(nBits);
@@ -1393,7 +1413,8 @@ bool CWallet::CreateCoinStake(const CKeyStore& keystore, unsigned int nBits, int
     {
         CTxDB txdb("r");
         CTxIndex txindex;
-        if (!txdb.ReadTxIndex(pcoin.first->GetHash(), txindex))
+        uint256 txHash = pcoin.first->GetHash();
+        if (!txdb.ReadTxIndex(txHash, txindex))
             continue;
 
         // Read block header
@@ -1404,6 +1425,35 @@ bool CWallet::CreateCoinStake(const CKeyStore& keystore, unsigned int nBits, int
         if (block.GetBlockTime() + nStakeMinAge > txNew.nTime - nMaxStakeSearchInterval)
             continue; // only count coins meeting min age requirement
 
+        // Groko's POS miner performance fix:
+        PosMiningStuff *miningStuff = NULL;
+        if (mapMiningStuff.count(txHash)) {
+            // re-use the block header hash and the kernel stake modifiers
+            miningStuff = mapMiningStuff[txHash];
+            block.SetHash(miningStuff->hashBlockFrom);
+        }
+        else {
+            // All this takes quite a long time, and only needs to be done once for each input.
+            uint64 nStakeModifier = 0;
+            int nStakeModifierHeight = 0;
+            int64 nStakeModifierTime = 0;
+            uint256 hashBlockFrom;
+            // Calculate the block header hash
+            hashBlockFrom = block.GetHash();
+            // Calculate the kernel stake modifiers
+            if (GetKernelStakeModifier(hashBlockFrom, nStakeModifier, nStakeModifierHeight, nStakeModifierTime)) {
+                miningStuff = (PosMiningStuff *)malloc(sizeof(PosMiningStuff));
+    
+                miningStuff->hashBlockFrom = hashBlockFrom;
+                miningStuff->nStakeModifier = nStakeModifier;
+                miningStuff->nStakeModifierHeight = nStakeModifierHeight;
+                miningStuff->nStakeModifierTime = nStakeModifierTime;
+    
+                // Save it all for faster POS mining.
+                mapMiningStuff.insert(make_pair(txHash, miningStuff));
+            }
+        }
+
         bool fKernelFound = false;
         for (unsigned int n=0; n<min(nSearchInterval,(int64)nMaxStakeSearchInterval) && !fKernelFound && !fShutdown; n++)
         {
@@ -1411,7 +1461,7 @@ bool CWallet::CreateCoinStake(const CKeyStore& keystore, unsigned int nBits, int
             // Search nSearchInterval seconds back up to nMaxStakeSearchInterval
             uint256 hashProofOfStake = 0;
             COutPoint prevoutStake = COutPoint(pcoin.first->GetHash(), pcoin.second);
-            if (CheckStakeKernelHash(nBits, block, txindex.pos.nTxPos - txindex.pos.nBlockPos, *pcoin.first, prevoutStake, txNew.nTime - n, hashProofOfStake))
+            if (CheckStakeKernelHash(nBits, block, txindex.pos.nTxPos - txindex.pos.nBlockPos, *pcoin.first, prevoutStake, txNew.nTime - n, hashProofOfStake, false, miningStuff))
             {
                 // Found a kernel
                 if (fDebug && GetBoolArg("-printcoinstake"))

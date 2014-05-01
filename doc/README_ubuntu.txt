@@ -127,15 +127,15 @@ Section E - Build the OpenSSL Library
 
       1 - Type " cd " to get to the home directory
 
-      2 - Type " wget http://www.openssl.org/source/openssl-1.0.1e.tar.gz " to get the exact version
+      2 - Type " wget http://www.openssl.org/source/openssl-1.0.1g.tar.gz " to get the exact version
       of openssl we need from the Internet.
 
-      3 - Type " md5sum openssl-1.0.1e.tar.gz " and make sure you get
-      66bf6f10f060d561929de96f9dfe5b8c
+      3 - Type " md5sum openssl-1.0.1g.tar.gz " and make sure you get
+      de62b43dfcd858e66a74bee1c834e959
 
-      4 - Type " tar xvzf openssl-1.0.1e.tar.gz " to extract the source files.
+      4 - Type " tar xvzf openssl-1.0.1g.tar.gz " to extract the source files.
 
-      5 - Type " cd openssl-1.0.1e "
+      5 - Type " cd openssl-1.0.1g "
 
       6 - Type " ./config "
 
@@ -171,14 +171,19 @@ Section G - Build the Boost library
 
       6 - Type " ./bootstrap.sh "
 
-      7 - Type " ./b2 --with-chrono --with-filesystem --with-program_options --with-thread
+      7 - Type " ./b2 --with-chrono --with-filesystem --with-program_options --with-thread \
       --with-test stage "
 
-Section H - Get the latest production YACoin source
+Section H - Get the latest stable branch of the YACoin source
 
       1 - Type " cd " to get to the home directory
 
       2 - Type " git clone https://github.com/yacoin/yacoin " to get the YACoin source code.
+
+      3 - Type " git tag -l " to see a list of stable branches.
+
+      4 - Type " git checkout tags/stable_0.4.2 " to set your source files to the most recent
+      stable branch.
 
 Section I - Build the miniupnpc library
 
@@ -270,4 +275,36 @@ tests that don't compile for now.
       10 - Type " git checkout test/miner_tests.cpp " to restore deleted test file.
 
       11 - Type " git checkout test/wallet_tests.cpp " to restore deleted test file.
+
+Section QT - Make a QT GUI version of YACoin
+  
+If you do all the above steps on Ubuntu 12.04 Desktop (instead of Server), you can also build the QT GUI 
+version of YACoin.
+
+      1 - Type " sudo apt-get install qt4-qmake libqt4-dev " to install QT development
+
+      2 - Type " cd " to get to the home directory
+
+      3 - Type " cd yacoin " 
+
+      4 - Edit the file called yacoin-qt.pro and add the folowing lines near the top:
+
+          BDB_INCLUDE_PATH=../db-4.8.30.NC/build_unix
+          BDB_LIB_PATH=../db-4.8.30.NC/build_unix
+          BOOST_INCLUDE_PATH=../boost_1_54_0
+          BOOST_LIB_PATH=../boost_1_54_0/stage/lib
+          OPENSSL_INCLUDE_PATH=../openssl-1.0.1g/include
+          OPENSSL_LIB_PATH=../openssl-1.0.1g
+          MINIUPNPC_INCLUDE_PATH=src
+          MINIUPNPC_LIB_PATH=src/miniupnpc/
+          # Uncomment for debug:
+          #QMAKE_CXXFLAGS += -g
+          #QMAKE_CFLAGS += -g
+          #LIBS += -g
+
+       5 - Type " qmake yacoin-qt.pro RELEASE=1 " to generate a Makefile. 
+
+       6 - Type " make " to build yacoin-qt
+
+       7 - Type " ./yacoin-qt & " to start YACoin QT GUI
 

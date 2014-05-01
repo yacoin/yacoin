@@ -2194,8 +2194,8 @@ CBigNum CBlockIndex::GetBlockTrust() const
     if (bnTarget <= 0)
         return 0;
 
-    // saironiq: new trust rules
-    if (nHeight >= nConsecutiveStakeSwitchHeight) {
+    // saironiq: new trust rules (since specific block on mainnet and always on testnet)
+    if (nHeight >= nConsecutiveStakeSwitchHeight || fTestNet) {
         // first block trust - for future compatibility (i.e., forks :P)
         if (pprev == NULL)
             return 1;
@@ -2351,7 +2351,7 @@ bool ProcessBlock(CNode* pfrom, CBlock* pblock)
         mapOrphanBlocksByPrev.erase(hashPrev);
     }
 
-    printf("ProcessBlock: ACCEPTED\n");
+    printf("ProcessBlock: ACCEPTED %s BLOCK\n", pblock->IsProofOfStake()?"POS":"POW");
 
     // ppcoin: if responsible for sync-checkpoint send it
     if (pfrom && !CSyncCheckpoint::strMasterPrivKey.empty())
@@ -4377,6 +4377,12 @@ void BitcoinMiner(CWallet *pwallet, bool fProofOfStake)
         //
         unsigned int nTransactionsUpdatedLast = nTransactionsUpdated;
         CBlockIndex* pindexPrev = pindexBest;
+
+        if (fProofOfStake && pindexPrev->IsProofOfStake()) {
+            bool fFastPOS = GetArg("-fastpos", 0);
+            if (!fFastPOS) Sleep(500);
+            continue;
+        }
 
         auto_ptr<CBlock> pblock(CreateNewBlock(pwallet, fProofOfStake));
         if (!pblock.get())

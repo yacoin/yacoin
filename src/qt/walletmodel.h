@@ -37,7 +37,7 @@ class WalletModel : public QObject
 
 public:
     explicit WalletModel(CWallet *wallet, OptionsModel *optionsModel, QObject *parent = 0);
-    ~WalletModel();
+    ~WalletModel();    
 
     enum StatusCode // Returned by sendCoins
     {
@@ -117,6 +117,24 @@ public:
     };
 
     UnlockContext requestUnlock();
+
+    // Used for unlocking wallet for stake minting, returned by requestUnlockStake()
+    class UnlockContextStake
+    {
+    public:
+        UnlockContextStake(WalletModel *wallet, bool valid, bool foo);
+        ~UnlockContextStake();
+
+        bool isValid() const { return valid; }
+
+    private:
+        WalletModel *wallet;
+        bool valid;
+        bool foo;
+    };
+
+    UnlockContextStake requestUnlockStake();
+
 
     bool getPubKey(const CKeyID &address, CPubKey& vchPubKeyOut) const;
     void getOutputs(const std::vector<COutPoint>& vOutpoints, std::vector<COutput>& vOutputs);

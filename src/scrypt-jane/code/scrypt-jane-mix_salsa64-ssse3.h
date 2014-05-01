@@ -1,5 +1,5 @@
 /* x64 */
-#if defined(X86_64ASM_SSSE3) && (!defined(SCRYPT_CHOOSE_COMPILETIME) || !defined(SCRYPT_SALSA64_INCLUDED))
+#if defined(X86_64ASM_SSSE3) && (!defined(SCRYPT_CHOOSE_COMPILETIME) || !defined(SCRYPT_SALSA64_INCLUDED)) && !defined(CPU_X86_FORCE_INTRINSICS)
 
 #define SCRYPT_SALSA64_SSSE3
 
@@ -9,7 +9,7 @@ asm_naked_fn(scrypt_ChunkMix_ssse3)
 	a2(mov rbp, rsp)
 	a2(and rsp, ~63)
 	a2(sub rsp, 128)
-	a2(lea rcx,[rcx*2])
+	a2(lea rcx,[ecx*2]) /* zero extend uint32_t by using ecx, win64 can leave garbage in the top half */
 	a2(shl rcx,7)
 	a2(lea r9,[rcx-128])
 	a2(lea rax,[rsi+r9])
@@ -23,7 +23,7 @@ asm_naked_fn(scrypt_ChunkMix_ssse3)
 	a2(movdqa xmm5,[rax+80])
 	a2(movdqa xmm6,[rax+96])
 	a2(movdqa xmm7,[rax+112])
-	a1(jz scrypt_ChunkMix_ssse3_no_xor1)
+	aj(jz scrypt_ChunkMix_ssse3_no_xor1)
 	a2(pxor xmm0,[r9+0])
 	a2(pxor xmm1,[r9+16])
 	a2(pxor xmm2,[r9+32])
@@ -45,7 +45,7 @@ asm_naked_fn(scrypt_ChunkMix_ssse3)
 		a2(pxor xmm5,[rsi+r9+80])
 		a2(pxor xmm6,[rsi+r9+96])
 		a2(pxor xmm7,[rsi+r9+112])
-		a1(jz scrypt_ChunkMix_ssse3_no_xor2)
+		aj(jz scrypt_ChunkMix_ssse3_no_xor2)
 		a2(pxor xmm0,[rdx+r9+0])
 		a2(pxor xmm1,[rdx+r9+16])
 		a2(pxor xmm2,[rdx+r9+32])
@@ -174,7 +174,7 @@ asm_naked_fn(scrypt_ChunkMix_ssse3)
 			a2(movdqa xmm7, xmm10)
 			a3(palignr xmm6, xmm10, 8)
 			a3(palignr xmm7, xmm11, 8)
-			a1(ja scrypt_salsa64_ssse3_loop)
+			aj(ja scrypt_salsa64_ssse3_loop)
 		a2(paddq xmm0,[rsp+0])
 		a2(paddq xmm1,[rsp+16])
 		a2(paddq xmm2,[rsp+32])
@@ -198,7 +198,7 @@ asm_naked_fn(scrypt_ChunkMix_ssse3)
 		a2(movdqa [rax+80],xmm5)
 		a2(movdqa [rax+96],xmm6)
 		a2(movdqa [rax+112],xmm7)
-		a1(jne scrypt_ChunkMix_ssse3_loop)
+		aj(jne scrypt_ChunkMix_ssse3_loop)
 	a2(mov rsp, rbp)
 	a1(pop rbp)
 	a1(ret)
@@ -208,7 +208,7 @@ asm_naked_fn_end(scrypt_ChunkMix_ssse3)
 
 
 /* intrinsic */
-#if defined(X86_INTRINSIC_SSSE3) && (!defined(SCRYPT_CHOOSE_COMPILETIME) || !defined(SCRYPT_SALSA64_INCLUDED)) && !defined(SCRYPT_SALSA64_SSSE3)
+#if defined(X86_INTRINSIC_SSSE3) && (!defined(SCRYPT_CHOOSE_COMPILETIME) || !defined(SCRYPT_SALSA64_INCLUDED))
 
 #define SCRYPT_SALSA64_SSSE3
 
