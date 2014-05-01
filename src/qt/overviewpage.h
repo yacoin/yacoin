@@ -45,7 +45,7 @@ private:
     TransactionFilterProxy *filter;
 
 private slots:
-    void on_checkBox_stateChanged(int ckState);
+    void checkBox_toggled(bool checked);
     void updateDisplayUnit();
     void handleTransactionClicked(const QModelIndex &index);
 };
