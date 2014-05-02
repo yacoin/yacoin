@@ -69,6 +69,7 @@ extern CBlockIndex* pindexGenesisBlock;
 extern unsigned int nStakeMinAge;
 extern int nCoinbaseMaturity;
 extern int nBestHeight;
+extern int nScanned;
 extern int64 nBestHeightTime;
 extern CBigNum bnBestChainTrust;
 extern CBigNum bnBestInvalidTrust;
@@ -127,7 +128,9 @@ bool GetTransaction(const uint256 &hash, CTransaction &tx, uint256 &hashBlock);
 uint256 WantedByOrphan(const CBlock* pblockOrphan);
 const CBlockIndex* GetLastBlockIndex(const CBlockIndex* pindex, bool fProofOfStake);
 void BitcoinMiner(CWallet *pwallet, bool fProofOfStake);
+void TransactionScanner(CWallet *pwallet);
 void ResendWalletTransactions();
+void ThreadTxnScanner(void* parg);
 
 // yacoin: calculate Nfactor using timestamp
 unsigned char GetNfactor(int64 nTimestamp);

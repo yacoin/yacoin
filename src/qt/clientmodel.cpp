@@ -15,7 +15,7 @@ static const int64 nClientStartupTime = GetTime();
 
 ClientModel::ClientModel(OptionsModel *optionsModel, QObject *parent) :
     QObject(parent), optionsModel(optionsModel),
-    cachedNumBlocks(0), cachedNumBlocksOfPeers(0), pollTimer(0)
+    cachedNumBlocks(0), cachedNumBlocksOfPeers(0), cachedNumScanned(0), pollTimer(0)
 {
     numBlocksAtStartup = -1;
 
@@ -42,6 +42,11 @@ int ClientModel::getNumBlocks() const
     return nBestHeight;
 }
 
+int ClientModel::getNumScanned() const
+{
+    return nScanned;
+}
+
 int ClientModel::getNumBlocksAtStartup()
 {
     if (numBlocksAtStartup == -1) numBlocksAtStartup = getNumBlocks();
@@ -59,13 +64,16 @@ void ClientModel::updateTimer()
     // Periodically check and update with a timer.
     int newNumBlocks = getNumBlocks();
     int newNumBlocksOfPeers = getNumBlocksOfPeers();
+    int newNumScanned = getNumScanned();
 
-    if(cachedNumBlocks != newNumBlocks || cachedNumBlocksOfPeers != newNumBlocksOfPeers)
+    if(cachedNumBlocks != newNumBlocks || cachedNumBlocksOfPeers != newNumBlocksOfPeers ||
+       cachedNumScanned != newNumScanned)
     {
         cachedNumBlocks = newNumBlocks;
         cachedNumBlocksOfPeers = newNumBlocksOfPeers;
+        cachedNumScanned = newNumScanned;
 
-        emit numBlocksChanged(newNumBlocks, newNumBlocksOfPeers);
+        emit numBlocksChanged(newNumBlocks, newNumBlocksOfPeers, newNumScanned);
     }
 }
 
@@ -90,7 +98,7 @@ void ClientModel::updateAlert(const QString &hash, int status)
 
     // Emit a numBlocksChanged when the status message changes,
     // so that the view recomputes and updates the status bar.
-    emit numBlocksChanged(getNumBlocks(), getNumBlocksOfPeers());
+    emit numBlocksChanged(getNumBlocks(), getNumBlocksOfPeers(), getNumScanned());
 }
 
 bool ClientModel::isTestNet() const

@@ -44,6 +44,7 @@ int64 nChainStartTime = 1367991200;
 int nCoinbaseMaturity = 500;
 CBlockIndex* pindexGenesisBlock = NULL;
 int nBestHeight = -1;
+int nScanned = -1;
 int64 nBestHeightTime = 0;   // WM - Keep track of timestamp of block at best height.
 CBigNum bnBestChainTrust = 0;
 CBigNum bnBestInvalidTrust = 0;
@@ -4325,6 +4326,62 @@ bool CheckWork(CBlock* pblock, CWallet& wallet, CReserveKey& reservekey)
     }
 
     return true;
+}
+
+void TransactionScanner(CWallet *pwallet)
+{
+    printf("TransactionScanner scaning for transactions\n");
+
+    CReserveKey reservekey(pwallet);
+    CBlockIndex *pindexRescan = pindexBest;
+    if (GetBoolArg("-rescan")) 
+    {
+        // Start the scan from the beginning
+        pindexRescan = pindexGenesisBlock;
+    }
+    else
+    {
+        CWalletDB walletdb("wallet.dat");
+        CBlockLocator locator;
+        if (walletdb.ReadBestBlock(locator))
+            pindexRescan = locator.GetBlockIndex();
+    }
+    if (pindexBest != pindexRescan && pindexBest && pindexRescan && pindexBest->nHeight > pindexRescan->nHeight)
+    {
+        printf("Rescanning last %i blocks (from block %i)...\n", pindexBest->nHeight - pindexRescan->nHeight, pindexRescan->nHeight);
+        pwallet->ScanForWalletTransactions(pindexRescan, true);
+        if (!fShutdown)
+        {
+            pwallet->ReacceptWalletTransactions();
+        }
+    }
+    // Stop showing the progress bar
+    nScanned = -1;
+
+    printf("TransactionScanner scan complete\n");
+}
+
+// Thread to scan for transactions
+void ThreadTxnScanner(void* parg)
+{
+    if (vnThreadsRunning[THREAD_TXNSCANNER] == 0) {
+        try
+        {
+            vnThreadsRunning[THREAD_TXNSCANNER]++;
+            printf("ThreadTxnScanner started\n");
+            CWallet* pwallet = (CWallet*)parg;
+            TransactionScanner(pwallet);
+            vnThreadsRunning[THREAD_TXNSCANNER]--;
+        }
+        catch (std::exception& e) {
+            vnThreadsRunning[THREAD_TXNSCANNER]--;
+            PrintException(&e, "ThreadTxnScanner()");
+        } catch (...) {
+            vnThreadsRunning[THREAD_TXNSCANNER]--;
+            PrintException(NULL, "ThreadTxnScanner()");
+        }
+        printf("ThreadTxnScanner exiting, %d threads remaining\n", vnThreadsRunning[THREAD_TXNSCANNER]);
+    }
 }
 
 void static ThreadBitcoinMiner(void* parg);

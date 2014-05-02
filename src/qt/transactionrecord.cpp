@@ -39,7 +39,7 @@ QList<TransactionRecord> TransactionRecord::decomposeTransaction(const CWallet *
             CTxDestination address;
             ExtractDestination(txout.scriptPubKey, address);
             parts.append(TransactionRecord(hash, nTime, TransactionRecord::StakeInterest, 
-	        CBitcoinAddress(address).ToString(), 0, nNet));
+	        CBitcoinAddress(address).ToString(), -nDebit, nCredit));
         }
         else {
             //
@@ -152,8 +152,12 @@ QList<TransactionRecord> TransactionRecord::decomposeTransaction(const CWallet *
     return parts;
 }
 
-void TransactionRecord::updateStatus(const CWalletTx &wtx)
+bool TransactionRecord::updateStatus(const CWalletTx &wtx)
 {
+    int prevMaturity = status.maturity;
+    int prevStatus = status.status;
+    bool prevConfirmed = status.confirmed;
+
     // Determine transaction status
 
     // Find the block the tx is in
@@ -227,6 +231,13 @@ void TransactionRecord::updateStatus(const CWalletTx &wtx)
             status.maturity = TransactionStatus::Mature;
         }
     }
+
+    // Will balance need re-calculated?
+    if (prevMaturity  == status.maturity &&
+        prevStatus    == status.status   &&
+        prevConfirmed == status.confirmed)
+        return false;
+    else return true;
 }
 
 bool TransactionRecord::statusUpdateNeeded()
