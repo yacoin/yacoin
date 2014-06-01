@@ -10,10 +10,17 @@
 // target servers or GUI users specifically.
 
 // WM - const std::string CLIENT_NAME("Satoshi");
+#ifdef _MSC_VER
+    const std::string CLIENT_NAME("YACoin-WM MSC++");
+
+// Client version number
+    #define CLIENT_VERSION_SUFFIX   "-yac-wm on MSVC++"
+#else    
 const std::string CLIENT_NAME("YACoin-WM");
 
 // Client version number
 #define CLIENT_VERSION_SUFFIX   "-yac-wm"
+#endif
 
 
 // The following part of the code determines the CLIENT_BUILD variable.

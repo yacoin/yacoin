@@ -6,7 +6,11 @@
 
 #include <map>
 #include "net.h"
+#ifdef _MSC_VER
+    #include "sync.h"
+#else
 #include "util.h"
+#endif
 
 #define CHECKPOINT_MAX_SPAN (60 * 60 * 4) // max 4 hours before latest block
 

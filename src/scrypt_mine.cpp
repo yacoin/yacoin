@@ -27,6 +27,12 @@
  * online backup system.
  */
 
+#ifdef _MSC_VER
+    #include <stdint.h>
+
+    #include "msvc_warnings.push.h"
+#endif
+
 #include <stdlib.h>
 #include <stdint.h>
 #include <xmmintrin.h>
@@ -34,6 +40,11 @@
 extern "C" {
 #include "scrypt-jane/scrypt-jane.h"
 }
+
+#ifdef _MSC_VER
+    // it seems I need this? I don't know how to make it find the CPU type?
+    #define __i386__
+#endif
 
 #include "scrypt_mine.h"
 #include "pbkdf2.h"
@@ -216,3 +227,6 @@ unsigned int scanhash_scrypt(block_header *pdata,
 
     return (unsigned int) -1;
 }
+#ifdef _MSC_VER
+    #include "msvc_warnings.pop.h"
+#endif

@@ -48,7 +48,18 @@ public:
         page_size(page_size)
     {
         // Determine bitmask for extracting page from address
+#ifdef _MSC_VER
+        bool
+            fTest = (!(page_size & (page_size-1))); // size must be power of two
+    #ifdef _DEBUG
+        assert(fTest);
+    #else
+        if( !fTest )
+            releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
+    #endif
+#else
         assert(!(page_size & (page_size-1))); // size must be power of two
+#endif
         page_mask = ~(page_size - 1);
     }
 
@@ -86,7 +97,18 @@ public:
         for(size_t page = start_page; page <= end_page; page += page_size)
         {
             Histogram::iterator it = histogram.find(page);
+#ifdef _MSC_VER
+            bool
+                fTest = (it != histogram.end()); // Cannot unlock an area that was not locked
+    #ifdef _DEBUG
+            assert(fTest);
+    #else
+            if( !fTest )
+                releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
+    #endif
+#else
             assert(it != histogram.end()); // Cannot unlock an area that was not locked
+#endif
             // Decrease counter for page, when it is zero, the page will be unlocked
             it->second -= 1;
             if(it->second == 0) // Nothing on the page anymore that keeps it locked

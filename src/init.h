@@ -8,6 +8,10 @@
 #include "wallet.h"
 
 extern CWallet* pwalletMain;
+#ifdef WIN32
+extern char
+    *walletPath;   // useful for printf style messages, etc.
+#endif
 
 void StartShutdown();
 void Shutdown(void* parg);

@@ -83,7 +83,11 @@ static void InitMessage(const std::string &message)
 {
     if(splashref)
     {
+#ifdef WIN32
+        splashref->showMessage(QString::fromStdString(message), Qt::AlignBottom|Qt::AlignHCenter, Qt::black);
+#else
         splashref->showMessage(QString::fromStdString(message), Qt::AlignBottom|Qt::AlignHCenter, QColor(255,255,200));
+#endif
         QApplication::instance()->processEvents();
     }
 }
@@ -196,7 +200,11 @@ int main(int argc, char *argv[])
         return 1;
     }
 
+#if defined(WIN32)
+    QSplashScreen splash(QPixmap(":/images/splash"), Qt::WindowStaysOnTopHint);
+#else
     QSplashScreen splash(QPixmap(":/images/splash"), 0);
+#endif
     if (GetBoolArg("-splash", true) && !GetBoolArg("-min"))
     {
         splash.show();

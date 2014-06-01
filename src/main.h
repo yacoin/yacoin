@@ -5,6 +5,13 @@
 #ifndef BITCOIN_MAIN_H
 #define BITCOIN_MAIN_H
 
+#ifdef _MSC_VER
+    #include <stdint.h>
+//    #define __PRETTY_FUNCTION__ __FUNCTION__
+    //#define __PRETTY_FUNCTION__ __FUNCSIG__
+    #include "justincase.h"       // for releaseModeAssertionfailure()
+#endif
+
 #include "bignum.h"
 #include "sync.h"
 #include "net.h"
@@ -135,7 +142,10 @@ void ThreadTxnScanner(void* parg);
 // yacoin: calculate Nfactor using timestamp
 unsigned char GetNfactor(int64 nTimestamp);
 
-
+#ifdef _MSC_VER
+extern unsigned int nStakeMaxAge;
+extern unsigned int nStakeTargetSpacing;
+#endif
 
 
 
@@ -984,7 +994,11 @@ public:
 //        if (nHeight >= 9689)
         {
             // Take last bit of block hash as entropy bit
+#ifdef _MSC_VER
+            unsigned int nEntropyBit = ((GetHash().Get64()) & 1);
+#else                       
             unsigned int nEntropyBit = ((GetHash().Get64()) & 1llu);
+#endif            
             if (fDebug && GetBoolArg("-printstakemodifier"))
                 printf("GetStakeEntropyBit: nHeight=%u hashBlock=%s nEntropyBit=%u\n", nHeight, GetHash().ToString().c_str(), nEntropyBit);
             return nEntropyBit;

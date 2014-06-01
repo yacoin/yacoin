@@ -3,6 +3,12 @@
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#ifdef _MSC_VER
+    #include <stdint.h>
+
+    #include "msvc_warnings.push.h"
+#endif
+
 #include "util.h"
 #include "sync.h"
 #include "strlcpy.h"
@@ -293,6 +299,9 @@ string vstrprintf(const char *format, va_list ap)
     loop
     {
         va_list arg_ptr;
+#ifdef _MSC_VER
+    #define va_copy(dest, src) (dest = src)
+#endif   
         va_copy(arg_ptr, ap);
 #ifdef WIN32
         ret = _vsnprintf(p, limit, format, arg_ptr);
@@ -1158,7 +1167,11 @@ void ShrinkDebugFile()
     {
         // Restart the file with some of the end
         char pch[200000];
+#ifdef _MSC_VER        
+        fseek(file, -long(sizeof(pch)), SEEK_END);        
+#else        
         fseek(file, -sizeof(pch), SEEK_END);
+#endif        
         int nBytes = fread(pch, 1, sizeof(pch), file);
         fclose(file);
 
@@ -1347,3 +1360,6 @@ bool NewThread(void(*pfn)(void*), void* parg)
     }
     return true;
 }
+#ifdef _MSC_VER
+    #include "msvc_warnings.pop.h"
+#endif

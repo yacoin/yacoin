@@ -3,6 +3,12 @@
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#ifdef _MSC_VER
+    #include <stdint.h>
+
+    #include "msvc_warnings.push.h"
+#endif
+
 #include "wallet.h"
 #include "walletdb.h"
 #include "crypter.h"
@@ -11,8 +17,14 @@
 #include "coincontrol.h" 
 #include "kernel.h"
 
+#ifdef WIN32
+#include "init.h"   // for walletPath
+#endif
 using namespace std;
+#ifdef _MSC_VER
+#else
 extern int nStakeMaxAge;
+#endif
 
 
 //////////////////////////////////////////////////////////////////////////////
@@ -784,10 +796,195 @@ bool CWalletTx::WriteToDisk()
     return CWalletDB(pwallet->strWalletFile).WriteTx(GetHash(), *this);
 }
 
+#ifdef WIN32
+//_____________________________________________________________________________
+static inline void
+    DoRescanProgress( int nCount, int nTotalToScan, int64 n64MsStartTime )
+{
+    int64
+        n64SecondsEstimatedTotalTime,
+        n64MsEstimatedTotalTime,
+        n64MsDeltaTime;
+    #ifdef QT_GUI
+    std::string
+        sTextString;
+    #endif
+    if(
+        (0 == (nCount % 10) )   // every 10th time
+      )
+    {
+        if( 0 == nCount )       // first time
+        {
+            (void)printf(
+                    "%6d "
+                    ""
+                    , nCount
+                        );
+    #ifdef QT_GUI
+            uiInterface.InitMessage(
+                                    strprintf(
+                                               _( "%6d " ), 
+                                               nCount
+                                             ).c_str() 
+                                   );
+    #endif
+        }
+        else                    // all the next times
+        {
+            n64SecondsEstimatedTotalTime = 0;
+    #ifndef QT_GUI
+            if( 
+                (0 == (nCount % 100) )   // every 100th time (every 10th next time)
+              )
+    #endif
+            {   // let's estimate the time remaining too!
+                n64MsDeltaTime = GetTimeMillis() - n64MsStartTime;
+                // we have done nCount / nTotalToScan th of them in n64MsDeltaTime
+                // so total time in ms ~ n64MsDeltaTime * nTotalToScan / nCount
+                n64MsEstimatedTotalTime = n64MsDeltaTime * nTotalToScan / nCount;
+                // time (seconds) remaining is
+                n64SecondsEstimatedTotalTime =
+                    ( n64MsEstimatedTotalTime + n64MsStartTime - GetTimeMillis() ) / 1000;
+            }
+            if (fPrintToConsole)
+                (void)printf(
+                            "%6d "
+                            "%2.2f%% "
+                            ""
+                            , nCount
+                            , floorf( float(nCount * 10000.0 / nTotalToScan) ) / 100
+                            );
+    #ifdef QT_GUI
+            uiInterface.InitMessage(
+                                    strprintf(
+                                              _("%6d "
+                                                "%2.2f%% "
+                                                ""
+                                               )
+                                                , nCount
+                                                , floorf( float(nCount * 10000.0 / nTotalToScan) ) / 100
+                                             ).c_str() 
+                                   );
+    #endif
+            if( 0 != n64SecondsEstimatedTotalTime )
+            {
+                const int64
+                    nSecondsPerMinute = 60,
+                    nMinutesPerHour = 60;
+                int64
+                    nSeconds = 0,
+                    nMinutes = 0,
+                    nHours = 0;
+
+                if( n64SecondsEstimatedTotalTime >= nSecondsPerMinute )
+                {                   // there are minutes to go
+                    nSeconds = n64SecondsEstimatedTotalTime % nSecondsPerMinute;
+                    nMinutes = n64SecondsEstimatedTotalTime / nSecondsPerMinute;
+                    if( nMinutes >= nMinutesPerHour ) // there are hours to go
+                    {
+                        nHours = nMinutes / nMinutesPerHour;
+                        nMinutes %= nMinutesPerHour;
+                        if (fPrintToConsole)
+                            (void)printf(
+                                        "~%d:%02d:%02d hrs:min:sec"
+                                        ""
+                                        ,
+                                        (int)nHours,
+                                        (int)nMinutes,
+                                        (int)nSeconds
+                                        );
+    #ifdef QT_GUI
+                        uiInterface.InitMessage( 
+                                                strprintf(
+                                                          _("%6d "
+                                                            "%2.2f%% "
+                                                            ""
+                                                            "~%d:%02d:%02d hrs:min:sec"
+                                                            ""
+                                                           )
+                                                            , nCount
+                                                            , floorf( float(nCount * 10000.0 / nTotalToScan) ) / 100
+                                                            ,
+                                                            (int)nHours,
+                                                            (int)nMinutes,
+                                                            (int)nSeconds
+                                                         ).c_str() 
+                                               );
+    #endif
+                    }
+                    else    // there are only minutes
+                    {
+                        if (fPrintToConsole)
+                            (void)printf(
+                                        "~%2d:%02d min:sec    "
+                                        "\r"
+                                        ""
+                                        ,
+                                        (int)nMinutes,
+                                        (int)nSeconds
+                                        );
+    #ifdef QT_GUI
+                        uiInterface.InitMessage( 
+                                                strprintf(
+                                                          _("%6d "
+                                                            "%2.2f%% "
+                                                            ""
+                                                            "~%2d:%02d min:sec    "
+                                                            ""
+                                                           )
+                                                           , nCount
+                                                           , floorf( float(nCount * 10000.0 / nTotalToScan) ) / 100
+                                                           ,
+                                                         (int)nMinutes,
+                                                         (int)nSeconds
+                                                         ).c_str() 
+                                               );
+    #endif
+                    }
+                }
+                else    // there are only seconds
+                {
+                    nSeconds = n64SecondsEstimatedTotalTime;
+                    if (fPrintToConsole)
+                        (void)printf(
+                                    "~%2d sec       "
+                                    ""
+                                    ,
+                                    (int)nSeconds
+                                    );
+    #ifdef QT_GUI
+                    uiInterface.InitMessage(
+                                            strprintf(
+                                                      _("%6d "
+                                                        "%2.2f%% "
+                                                        ""
+                                                        "~%2d sec       "
+                                                        ""
+                                                       )
+                                                       , nCount
+                                                       , floorf( float(nCount * 10000.0 / nTotalToScan) ) / 100
+                                                       ,
+                                                      (int)nSeconds
+                                                     ).c_str() 
+                                           );
+    #endif
+                }
+            }
+        }
+        (void)printf( "\r" );
+    }
+}
+//_____________________________________________________________________________
+#endif
+
 // Scan the block chain (starting in pindexStart) for transactions
 // from or to us. If fUpdate is true, found transactions that already
 // exist in the wallet will be updated.
+#ifdef WIN32
+int CWallet::ScanForWalletTransactions(CBlockIndex* pindexStart, bool fUpdate, int nTotalToScan)
+#else
 int CWallet::ScanForWalletTransactions(CBlockIndex* pindexStart, bool fUpdate)
+#endif
 {
     int ret = 0;
     int64 nLast, nNow;
@@ -796,6 +993,12 @@ int CWallet::ScanForWalletTransactions(CBlockIndex* pindexStart, bool fUpdate)
 
     CBlockIndex* pindex = pindexStart;
     {
+#ifdef WIN32
+        int
+            nCount = 0;
+        int64
+            n64MsStartTime = GetTimeMillis();
+#endif        
         while (pindex)
         {
             {
@@ -809,7 +1012,7 @@ int CWallet::ScanForWalletTransactions(CBlockIndex* pindexStart, bool fUpdate)
             }
             pindex = pindex->pnext;
             // Update the progress bar
-            nScanned++;
+            ++nScanned;
             // Log progress every 5 seconds
             nNow = GetTimeMillis();
             if (nNow - nLast > 5000) {
@@ -821,7 +1024,16 @@ int CWallet::ScanForWalletTransactions(CBlockIndex* pindexStart, bool fUpdate)
             {
                 return ret;
             }
+#ifdef WIN32
+            ++nCount;
+            DoRescanProgress( nCount, nTotalToScan, n64MsStartTime );
         }
+        if (fPrintToConsole)     // this could be a progress bar, % meter etc.
+            (void)printf( "\n" );// but we would need another parameter of the total
+                                 // # of blocks to scan
+#else
+        }
+#endif        
     }
     return ret;
 }
@@ -1700,7 +1912,17 @@ string CWallet::SendMoney(CScript scriptPubKey, int64 nValue, CWalletTx& wtxNew,
         return "ABORTED";
 
     if (!CommitTransaction(wtxNew, reservekey))
+#ifdef WIN32
+        return strprintf(
+                _("Error: The transaction was rejected.  "
+                 "This might happen if some of the coins in your wallet "
+                 "were already spent, such as if you used a copy of "
+                 "%s and coins were spent in the copy but not marked as spent here."
+                ), walletPath
+                        ).c_str();
+#else
         return _("Error: The transaction was rejected.  This might happen if some of the coins in your wallet were already spent, such as if you used a copy of wallet.dat and coins were spent in the copy but not marked as spent here.");
+#endif
 
     return "";
 }
@@ -1899,7 +2121,18 @@ void CWallet::ReserveKeyFromKeyPool(int64& nIndex, CKeyPool& keypool)
             throw runtime_error("ReserveKeyFromKeyPool() : read failed");
         if (!HaveKey(keypool.vchPubKey.GetID()))
             throw runtime_error("ReserveKeyFromKeyPool() : unknown key in key pool");
+#ifdef _MSC_VER
+        bool
+            fTest = (keypool.vchPubKey.IsValid());
+    #ifdef _DEBUG
+        assert(fTest);
+    #else
+        if( !fTest )
+            releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
+    #endif
+#else
         assert(keypool.vchPubKey.IsValid());
+#endif
         if (fDebug && GetBoolArg("-printkeypool"))
             printf("keypool reserve %"PRI64d"\n", nIndex);
     }
@@ -2185,7 +2418,18 @@ CPubKey CReserveKey::GetReservedKey()
             vchPubKey = pwallet->vchDefaultKey;
         }
     }
+#ifdef _MSC_VER
+    bool
+        fTest = (vchPubKey.IsValid());
+    #ifdef _DEBUG
+    assert(fTest);
+    #else
+    if( !fTest )
+        releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
+    #endif
+#else
     assert(vchPubKey.IsValid());
+#endif
     return vchPubKey;
 }
 
@@ -2217,7 +2461,18 @@ void CWallet::GetAllReserveKeys(set<CKeyID>& setAddress)
         CKeyPool keypool;
         if (!walletdb.ReadPool(id, keypool))
             throw runtime_error("GetAllReserveKeyHashes() : read failed");
+#ifdef _MSC_VER
+        bool
+            fTest = (keypool.vchPubKey.IsValid());
+    #ifdef _DEBUG
+        assert(fTest);
+    #else
+        if( !fTest )
+            releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
+    #endif
+#else
         assert(keypool.vchPubKey.IsValid());
+#endif
         CKeyID keyID = keypool.vchPubKey.GetID();
         if (!HaveKey(keyID))
             throw runtime_error("GetAllReserveKeyHashes() : unknown key in key pool");
@@ -2235,3 +2490,6 @@ void CWallet::UpdatedTransaction(const uint256 &hashTx)
             NotifyTransactionChanged(this, hashTx, CT_UPDATED);
     }
 }
+#ifdef _MSC_VER
+    #include "msvc_warnings.pop.h"
+#endif

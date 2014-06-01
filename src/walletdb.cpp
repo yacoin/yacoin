@@ -3,9 +3,18 @@
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#ifdef _MSC_VER
+    #include <stdint.h>
+
+    #include "msvc_warnings.push.h"
+#endif
+
 #include "walletdb.h"
 #include "wallet.h"
 #include <boost/filesystem.hpp>
+#ifdef WIN32
+#include "init.h"   // for walletPath
+#endif
 
 using namespace std;
 using namespace boost;
@@ -527,7 +536,11 @@ void ThreadFlushWalletDB(void* parg)
                     map<string, int>::iterator mi = bitdb.mapFileUseCount.find(strFile);
                     if (mi != bitdb.mapFileUseCount.end())
                     {
+#ifdef WIN32
+                        printf("Flushing %s\n", walletPath);
+#else
                         printf("Flushing wallet.dat\n");
+#endif
                         nLastFlushed = nWalletDBUpdated;
                         int64 nStart = GetTimeMillis();
 
@@ -536,7 +549,11 @@ void ThreadFlushWalletDB(void* parg)
                         bitdb.CheckpointLSN(strFile);
 
                         bitdb.mapFileUseCount.erase(mi++);
+#ifdef WIN32
+                        printf("Flushed %s %"PRI64d"ms\n", walletPath, GetTimeMillis() - nStart);
+#else
                         printf("Flushed wallet.dat %"PRI64d"ms\n", GetTimeMillis() - nStart);
+#endif
                     }
                 }
             }
@@ -560,7 +577,12 @@ bool BackupWallet(const CWallet& wallet, const string& strDest)
                 bitdb.mapFileUseCount.erase(wallet.strWalletFile);
 
                 // Copy wallet.dat
+#ifdef WIN32
+                filesystem::path 
+                    pathSrc = std::string( walletPath );
+#else
                 filesystem::path pathSrc = GetDataDir() / wallet.strWalletFile;
+#endif
                 filesystem::path pathDest(strDest);
                 if (filesystem::is_directory(pathDest))
                     pathDest /= wallet.strWalletFile;
@@ -571,10 +593,18 @@ bool BackupWallet(const CWallet& wallet, const string& strDest)
 #else
                     filesystem::copy_file(pathSrc, pathDest);
 #endif
+#ifdef WIN32 
+                    printf("copied %s to %s\n", walletPath, pathDest.string().c_str());
+#else
                     printf("copied wallet.dat to %s\n", pathDest.string().c_str());
+#endif
                     return true;
                 } catch(const filesystem::filesystem_error &e) {
+#ifdef WIN32
+                    printf("error copying %s to %s - %s\n", walletPath, pathDest.string().c_str(), e.what());
+#else
                     printf("error copying wallet.dat to %s - %s\n", pathDest.string().c_str(), e.what());
+#endif
                     return false;
                 }
             }
@@ -674,3 +704,6 @@ bool CWalletDB::Recover(CDBEnv& dbenv, std::string filename)
 {
     return CWalletDB::Recover(dbenv, filename, false);
 }
+#ifdef _MSC_VER
+    #include "msvc_warnings.pop.h"
+#endif
