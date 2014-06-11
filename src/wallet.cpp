@@ -790,20 +790,37 @@ bool CWalletTx::WriteToDisk()
 int CWallet::ScanForWalletTransactions(CBlockIndex* pindexStart, bool fUpdate)
 {
     int ret = 0;
+    int64 nLast, nNow;
+
+    nLast = GetTimeMillis();
 
     CBlockIndex* pindex = pindexStart;
     {
-        LOCK(cs_wallet);
         while (pindex)
         {
-            CBlock block;
-            block.ReadFromDisk(pindex, true);
-            BOOST_FOREACH(CTransaction& tx, block.vtx)
             {
-                if (AddToWalletIfInvolvingMe(tx, &block, fUpdate))
-                    ret++;
+                CBlock block;
+                block.ReadFromDisk(pindex, true);
+                BOOST_FOREACH(CTransaction& tx, block.vtx)
+                {
+                    if (AddToWalletIfInvolvingMe(tx, &block, fUpdate))
+                        ret++;
+                }
             }
             pindex = pindex->pnext;
+            // Update the progress bar
+            nScanned++;
+            // Log progress every 5 seconds
+            nNow = GetTimeMillis();
+            if (nNow - nLast > 5000) {
+                printf("ScanForWalletTransactions: scanned %d blocks\n", nScanned);
+                nLast = nNow;
+            }
+            // Stop the scan if shutting down
+            if (fShutdown)
+            {
+                return ret;
+            }
         }
     }
     return ret;
@@ -870,9 +887,11 @@ void CWallet::ReacceptWalletTransactions()
         }
         if (!vMissingTx.empty())
         {
-            // TODO: optimize this to scan just part of the block chain?
-            if (ScanForWalletTransactions(pindexGenesisBlock))
-                fRepeat = true;  // Found missing transactions: re-do re-accept.
+            // Groko - This is a pain in the butt. User can request -rescan on his own. 
+            //if (ScanForWalletTransactions(pindexGenesisBlock))
+            //    fRepeat = true;  // Found missing transactions: re-do re-accept.
+            printf("ReacceptWalletTransactions found missing transactions. Please use -rescan.\n");
+            strMiscWarning = _("Error: Found missing transactions. Please use -rescan.");
         }
     }
 }
@@ -1376,10 +1395,11 @@ bool CWallet::CreateTransaction(CScript scriptPubKey, int64 nValue, CWalletTx& w
 // ppcoin: create coin stake transaction
 bool CWallet::CreateCoinStake(const CKeyStore& keystore, unsigned int nBits, int64 nSearchInterval, CTransaction& txNew)
 {
-    // The following split & combine thresholds are important to security
-    // Should not be adjusted if you don't understand the consequences
-    static unsigned int nStakeSplitAge = (60 * 60 * 24 * 90);
-    int64 nCombineThreshold = GetProofOfWorkReward(GetLastBlockIndex(pindexBest, false)->nBits) / 3;
+    // Keep combining coins until 10 times POW reward is reached.
+    int64 nCombineThreshold = GetProofOfWorkReward(GetLastBlockIndex(pindexBest, false)->nBits) * 10;
+    // Minimum age for coins that will be combined.
+    unsigned int nStakeCombineAge = 60 * 60 * 24 * 31;
+
     // Keep a table of stuff to speed up POS mining
     static map<uint256, PosMiningStuff *> mapMiningStuff;
 
@@ -1504,8 +1524,6 @@ bool CWallet::CreateCoinStake(const CKeyStore& keystore, unsigned int nBits, int
                 nCredit += pcoin.first->vout[pcoin.second].nValue;
                 vwtxPrev.push_back(pcoin.first);
                 txNew.vout.push_back(CTxOut(0, scriptPubKeyOut));
-                if (block.GetBlockTime() + nStakeSplitAge > txNew.nTime)
-                    txNew.vout.push_back(CTxOut(0, scriptPubKeyOut)); //split stake
                 if (fDebug && GetBoolArg("-printcoinstake"))
                     printf("CreateCoinStake : added kernel type=%d\n", whichType);
                 fKernelFound = true;
@@ -1537,7 +1555,7 @@ bool CWallet::CreateCoinStake(const CKeyStore& keystore, unsigned int nBits, int
             if (pcoin.first->vout[pcoin.second].nValue > nCombineThreshold)
                 continue;
             // Do not add input that is still too young
-            if (pcoin.first->nTime + nStakeMaxAge > txNew.nTime)
+            if (pcoin.first->nTime + nStakeCombineAge > txNew.nTime)
                 continue;
             txNew.vin.push_back(CTxIn(pcoin.first->GetHash(), pcoin.second));
             nCredit += pcoin.first->vout[pcoin.second].nValue;

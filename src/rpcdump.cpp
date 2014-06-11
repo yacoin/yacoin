@@ -64,8 +64,10 @@ Value importprivkey(const Array& params, bool fHelp)
         if (!pwalletMain->AddKey(key))
             throw JSONRPCError(RPC_WALLET_ERROR, "Error adding key to wallet");
 
-        pwalletMain->ScanForWalletTransactions(pindexGenesisBlock, true);
-        pwalletMain->ReacceptWalletTransactions();
+        // Groko - This is a pain in the butt. User can request -rescan after he is done importing
+        //         his private keys.
+        //pwalletMain->ScanForWalletTransactions(pindexGenesisBlock, true);
+        //pwalletMain->ReacceptWalletTransactions();
     }
 
     return Value::null;
