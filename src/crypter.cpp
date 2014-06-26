@@ -2,12 +2,23 @@
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#ifdef _MSC_VER
+    #include <stdint.h>
+
+    #include "msvc_warnings.push.h"        
+#endif
+
 #include <openssl/aes.h>
 #include <openssl/evp.h>
 #include <vector>
 #include <string>
+
 #ifdef WIN32
-#include <windows.h>
+    #ifdef _MSC_VER
+        #include "justincase.h"       // for releaseModeAssertionfailure()
+    #else
+        #include <windows.h>    // for MinGW
+    #endif
 #endif
 
 #include "crypter.h"
@@ -119,3 +130,6 @@ bool DecryptSecret(const CKeyingMaterial& vMasterKey, const std::vector<unsigned
         return false;
     return cKeyCrypter.Decrypt(vchCiphertext, *((CKeyingMaterial*)&vchPlaintext));
 }
+#ifdef _MSC_VER
+    #include "msvc_warnings.pop.h"        
+#endif

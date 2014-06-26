@@ -44,7 +44,11 @@ static const int64 CENT = 10000;
 
 #define UVOIDBEGIN(a)        ((void*)&(a))
 #define CVOIDBEGIN(a)        ((const void*)&(a))
+#ifdef _MSC_VER
+    #define UINTBEGIN(a)    ((::uint32_t*)&(a))
+#else
 #define UINTBEGIN(a)        ((uint32_t*)&(a))
+#endif
 #define CUINTBEGIN(a)        ((const uint32_t*)&(a))
 
 #ifndef PRI64d
@@ -565,7 +569,18 @@ public:
     T median() const
     {
         int size = vSorted.size();
+#ifdef _MSC_VER
+        bool
+            fTest = (size>0);
+    #ifdef _DEBUG
+        assert(fTest);
+    #else
+        if( !fTest )
+            releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
+    #endif
+#else
         assert(size>0);
+#endif
         if(size & 1) // Odd number of elements
         {
             return vSorted[size/2];
@@ -620,11 +635,19 @@ inline void ExitThread(size_t nExitCode)
 
 void RenameThread(const char* name);
 
+#ifdef _MSC_VER
+inline ::uint32_t ByteReverse(::uint32_t value)
+{
+    value = ((value & 0xFF00FF00) >> 8) | ((value & 0x00FF00FF) << 8);
+    return (value<<16) | (value>>16);
+}
+#else
 inline uint32_t ByteReverse(uint32_t value)
 {
     value = ((value & 0xFF00FF00) >> 8) | ((value & 0x00FF00FF) << 8);
     return (value<<16) | (value>>16);
 }
+#endif
 
 #endif
 

@@ -2,6 +2,12 @@
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#ifdef _MSC_VER
+    #include <stdint.h>
+
+    #include "msvc_warnings.push.h"
+#endif
+
 #include "sync.h"
 #include "util.h"
 
@@ -126,3 +132,6 @@ void LeaveCritical()
 }
 
 #endif /* DEBUG_LOCKORDER */
+#ifdef _MSC_VER
+    #include "msvc_warnings.pop.h"
+#endif

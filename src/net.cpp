@@ -4,6 +4,10 @@
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#ifdef _MSC_VER
+    #include "msvc_warnings.push.h"
+#endif
+
 #include "irc.h"
 #include "db.h"
 #include "net.h"
@@ -1194,7 +1198,11 @@ void MapPort()
 // The first name is used as information source for addrman.
 // The second name should resolve to a list of seed addresses.
 static const char *strDNSSeed[][2] = {
+#ifdef _MSC_VER
+    NULL, NULL
+#else
     //{"yacoin.org", "seed.novacoin.su"},    // WM - Umm...  FIXME
+#endif
 };
 
 void ThreadDNSAddressSeed(void* parg)
@@ -1669,14 +1677,43 @@ void ThreadOpenAddedConnections2(void* parg)
         {
             LOCK(cs_vNodes);
             BOOST_FOREACH(CNode* pnode, vNodes)
+            {
                 for (vector<vector<CService> >::iterator it = vservConnectAddresses.begin(); it != vservConnectAddresses.end(); it++)
+                {
                     BOOST_FOREACH(CService& addrNode, *(it))
+#ifndef _MSC_VER
+                    {
                         if (pnode->addr == addrNode)
                         {
                             it = vservConnectAddresses.erase(it);
                             it--;
                             break;
                         }
+                    }
+#else
+                    {
+                        if (pnode->addr == addrNode)
+                        {
+                            it = vservConnectAddresses.erase(it);
+
+                            // now it get tricky!
+                            if( vservConnectAddresses.empty() )
+                                break;          // can't legally --it, nor ++it
+                            // else it's not empty, so
+                            if (it == vservConnectAddresses.begin()) // can't --it
+                                break;
+                            --it;               // finally, a legal place!!    
+                            break;
+                        }
+                        // else we stay in the inner BOOST_FOREACH() loop
+                    }
+                    if( vservConnectAddresses.empty() )
+                        break;      // can't do a ++it
+                    if (it == vservConnectAddresses.end())
+                        break;      // can't do a ++it
+#endif
+                }
+            }
         }
         BOOST_FOREACH(vector<CService>& vserv, vservConnectAddresses)
         {
@@ -2103,6 +2140,17 @@ public:
     }
     ~CNetCleanup()
     {
+#ifdef _MSC_VER
+        bool
+            fDidThisAlready = false;
+
+        if( !fDidThisAlready )
+        {
+            fDidThisAlready = true;
+            (void)printf(
+                        "~CNetCleanup() destructor called..."
+                        );
+#endif
         // Close sockets
         BOOST_FOREACH(CNode* pnode, vNodes)
             if (pnode->hSocket != INVALID_SOCKET)
@@ -2116,6 +2164,14 @@ public:
         // Shutdown Windows Sockets
         WSACleanup();
 #endif
+#ifdef _MSC_VER
+            (void)printf( " done\n" );
+        }
+#endif
     }
 }
 instance_of_cnetcleanup;
+
+#ifdef _MSC_VER
+    #include "msvc_warnings.pop.h"
+#endif
