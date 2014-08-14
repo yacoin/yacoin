@@ -7,17 +7,17 @@ CXX ?= g++
 USE_UPNP:=-
 USE_IPV6:=1
 
-BOOST_SUFFIX?=-mgw46-mt-sd-1_54
+BOOST_SUFFIX?=-mgw48-mt-sd-1_55
 
 INCLUDEPATHS= \
  -I"$(CURDIR)" \
  -I"$(CURDIR)/scrypt-jane" \
- -I"c:/deps/boost_1_54_0" \
+ -I"c:/deps/boost_1_55_0" \
  -I"c:/deps/db-4.8.30.NC/build_unix" \
  -I"c:/deps/openssl-1.0.1g"	
 
 LIBPATHS= \
- -L"c:/deps/boost_1_54_0/stage/lib" \
+ -L"c:/deps/boost_1_55_0/stage/lib" \
  -L"c:/deps/db-4.8.30.NC/build_unix" \
  -L"c:/deps/openssl-1.0.1g"
 
