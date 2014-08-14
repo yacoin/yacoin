@@ -82,7 +82,7 @@ BitcoinGUI::BitcoinGUI(QWidget *parent):
                   QString::number(a) + "." +
                   QString::number(c);
 
-    setWindowTitle(tr("YACoin ") + tr("Wallet ") + "v" + (titVersion));
+    setWindowTitle(tr("YACoin TESTING ") + tr("Wallet ") + "v" + (titVersion));
 
 #ifndef Q_OS_MAC
     qApp->setWindowIcon(QIcon(":icons/bitcoin"));
@@ -364,8 +364,8 @@ void BitcoinGUI::setClientModel(ClientModel *clientModel)
         setNumConnections(clientModel->getNumConnections());
         connect(clientModel, SIGNAL(numConnectionsChanged(int)), this, SLOT(setNumConnections(int)));
 
-        setNumBlocks(clientModel->getNumBlocks(), clientModel->getNumBlocksOfPeers());
-        connect(clientModel, SIGNAL(numBlocksChanged(int,int)), this, SLOT(setNumBlocks(int,int)));
+        setNumBlocks(clientModel->getNumBlocks(), clientModel->getNumBlocksOfPeers(), clientModel->getNumScanned());
+        connect(clientModel, SIGNAL(numBlocksChanged(int,int,int)), this, SLOT(setNumBlocks(int,int,int)));
 
         // Report errors from network/worker thread
         connect(clientModel, SIGNAL(error(QString,QString,bool)), this, SLOT(error(QString,QString,bool)));
@@ -484,7 +484,7 @@ void BitcoinGUI::setNumConnections(int count)
     labelConnectionsIcon->setToolTip(tr("%n active connection(s) to YACoin network", "", count));
 }
 
-void BitcoinGUI::setNumBlocks(int count, int nTotalBlocks)
+void BitcoinGUI::setNumBlocks(int count, int nTotalBlocks, int nScanned)
 {
     // don't show / hide progress bar and its label if we have no connection to the network
     if (!clientModel || clientModel->getNumConnections() == 0)
@@ -517,11 +517,29 @@ void BitcoinGUI::setNumBlocks(int count, int nTotalBlocks)
     }
     else
     {
-        if (strStatusBarWarnings.isEmpty())
-            progressBarLabel->setVisible(false);
+        if (nScanned > 0) 
+        {
+            int nRemainingBlocks = nTotalBlocks - nScanned;
+            float nPercentageDone = nScanned / (nTotalBlocks * 0.01f);
+            if (strStatusBarWarnings.isEmpty())
+            {
+                progressBarLabel->setText(tr("Scanning for transactions..."));
+                progressBarLabel->setVisible(true);
+                progressBar->setFormat(tr("%n more blocks to scan", "", nRemainingBlocks));
+                progressBar->setMaximum(nTotalBlocks);
+                progressBar->setValue(nScanned);
+                progressBar->setVisible(true);
+            }
+            tooltip = tr("Scanned %1 of %2 blocks of transaction history (%3% done).").arg(nScanned).arg(nTotalBlocks).arg(nPercentageDone, 0, 'f', 2);
+        }
+        else
+        {
+            if (strStatusBarWarnings.isEmpty())
+                progressBarLabel->setVisible(false);
 
-        progressBar->setVisible(false);
-        tooltip = tr("Downloaded %1 blocks of transaction history.").arg(count);
+            progressBar->setVisible(false);
+            tooltip = tr("Downloaded %1 blocks of transaction history.").arg(count);
+        }
     }
 
     // Override progressBarLabel text and hide progress bar, when we have warnings to display

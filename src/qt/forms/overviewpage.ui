@@ -220,8 +220,11 @@
      </item>
      <item>
       <widget class="QCheckBox" name="checkBox">
+       <property name="toolTip">
+        <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;This allows you to enable stake minting and earn interest on your Yacoins. Note: If your wallet is unlocked for whatever reason, checking/unchecking this box has no effect; you will earn interest regardless. &lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+       </property>
        <property name="text">
-        <string>Enable Stake Minting</string>
+        <string>Earn Interest</string>
        </property>
       </widget>
      </item>

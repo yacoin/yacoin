@@ -3,6 +3,12 @@
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#ifdef _MSC_VER
+    #include <stdint.h>
+
+    #include "msvc_warnings.push.h"
+#endif
+
 #include "protocol.h"
 #include "util.h"
 #include "netbase.h"
@@ -147,4 +153,6 @@ void CInv::print() const
 {
     printf("CInv(%s)\n", ToString().c_str());
 }
-
+#ifdef _MSC_VER
+    #include "msvc_warnings.pop.h"
+#endif

@@ -73,7 +73,11 @@ bool OptionsModel::Upgrade()
     settings.setValue("bImportFinished", true);
 
     // Move settings from old wallet.dat (if any):
+#ifdef WIN32
+    CWalletDB walletdb( walletPath );
+#else
     CWalletDB walletdb("wallet.dat");
+#endif
 
     QList<QString> intOptions;
     intOptions << "nDisplayUnit" << "nTransactionFee";

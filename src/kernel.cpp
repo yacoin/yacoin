@@ -2,6 +2,12 @@
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#ifdef _MSC_VER
+    #include <stdint.h>
+
+    #include "msvc_warnings.push.h"
+#endif
+
 #include <boost/assign/list_of.hpp>
 
 #include "kernel.h"
@@ -9,8 +15,11 @@
 
 using namespace std;
 
+#ifdef _MSC_VER
+#else
 extern int nStakeMaxAge;
 extern int nStakeTargetSpacing;
+#endif
 
 // Modifier interval: time to elapse before new modifier is computed
 // Set to 6-hour for production network and 20-minute for test network
@@ -416,3 +425,6 @@ bool CheckStakeModifierCheckpoints(int nHeight, unsigned int nStakeModifierCheck
         return nStakeModifierChecksum == mapStakeModifierCheckpoints[nHeight];
     return true;
 }
+#ifdef _MSC_VER
+    #include "msvc_warnings.pop.h"
+#endif

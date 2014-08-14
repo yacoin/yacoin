@@ -2,6 +2,20 @@
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#ifdef _MSC_VER
+    #include <stdint.h>
+
+    #include "msvc_warnings.push.h"
+
+    #include "checkpoints.h"
+
+    #include "main.h"
+    #include "uint256.h"
+    #include "db.h"                     // for CTxDB
+
+    #include <boost/assign/list_of.hpp> // for 'map_list_of()'
+    #include <boost/foreach.hpp>
+#else
 #include <boost/assign/list_of.hpp> // for 'map_list_of()'
 #include <boost/foreach.hpp>
 
@@ -10,6 +24,7 @@
 #include "db.h"
 #include "main.h"
 #include "uint256.h"
+#endif
 
 namespace Checkpoints
 {
@@ -231,7 +246,18 @@ namespace Checkpoints
 
         LOCK(cs_hashSyncCheckpoint);
         // sync-checkpoint should always be accepted block
+#ifdef _MSC_VER
+        bool
+            fTest = (mapBlockIndex.count(hashSyncCheckpoint));
+    #ifdef _DEBUG
+        assert(fTest);
+    #else
+        if( !fTest )
+            releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
+    #endif
+#else
         assert(mapBlockIndex.count(hashSyncCheckpoint));
+#endif
         const CBlockIndex* pindexSync = mapBlockIndex[hashSyncCheckpoint];
 
         if (nHeight > pindexSync->nHeight)
@@ -369,7 +395,18 @@ namespace Checkpoints
     {
         LOCK(cs_hashSyncCheckpoint);
         // sync-checkpoint should always be accepted block
+#ifdef _MSC_VER
+        bool
+            fTest = (mapBlockIndex.count(hashSyncCheckpoint));
+    #ifdef _DEBUG
+        assert(fTest);
+    #else
+        if( !fTest )
+            releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
+    #endif
+#else
         assert(mapBlockIndex.count(hashSyncCheckpoint));
+#endif
         const CBlockIndex* pindexSync = mapBlockIndex[hashSyncCheckpoint];
         return (nBestHeight >= pindexSync->nHeight + nCoinbaseMaturity ||
                 pindexSync->GetBlockTime() + nStakeMinAge < GetAdjustedTime());
@@ -465,3 +502,6 @@ bool CSyncCheckpoint::ProcessSyncCheckpoint(CNode* pfrom)
     printf("ProcessSyncCheckpoint: sync-checkpoint at %s\n", hashCheckpoint.ToString().c_str());
     return true;
 }
+#ifdef _MSC_VER
+    #include "msvc_warnings.pop.h"
+#endif

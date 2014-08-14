@@ -6,18 +6,44 @@
 #define BITCOIN_NET_H
 
 #include <deque>
+#ifdef _MSC_VER
+#else
 #include <boost/array.hpp>
 #include <boost/foreach.hpp>
 #include <openssl/rand.h>
+#endif
 
 #ifndef WIN32
 #include <arpa/inet.h>
-#endif
 
 #include "mruset.h"
 #include "netbase.h"
 #include "protocol.h"
 #include "addrman.h"
+#else
+    #ifdef _MSC_VER
+        #ifdef H_BITCOIN_SCRIPT
+            #include "mruset.h"
+            //#include "netbase.h"
+            //#include "protocol.h"
+            #include "addrman.h"
+        #else
+            #include "mruset.h"
+            #include "netbase.h"
+            #include "protocol.h"
+            #include "addrman.h"
+        #endif
+
+        #include <boost/array.hpp>
+        #include <boost/foreach.hpp>
+        //#include <openssl/rand.h>
+    #else
+        #include "mruset.h"
+        #include "netbase.h"
+        #include "protocol.h"
+        #include "addrman.h"
+    #endif
+#endif
 
 class CRequestTracker;
 class CNode;
@@ -108,6 +134,7 @@ enum threadId
     THREAD_DUMPADDRESS,
     THREAD_RPCHANDLER,
     THREAD_MINTER,
+    THREAD_TXNSCANNER,
 
     THREAD_MAX
 };
@@ -382,7 +409,18 @@ public:
         uint256 hash = Hash(vSend.begin() + nMessageStart, vSend.end());
         unsigned int nChecksum = 0;
         memcpy(&nChecksum, &hash, sizeof(nChecksum));
+#ifdef _MSC_VER
+        bool
+            fTest = ((nMessageStart - nHeaderStart) >= (CMessageHeader::CHECKSUM_OFFSET + sizeof(nChecksum)));
+    #ifdef _DEBUG
+        assert(fTest);
+    #else
+        if( !fTest )
+            releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
+    #endif
+#else
         assert(nMessageStart - nHeaderStart >= CMessageHeader::CHECKSUM_OFFSET + sizeof(nChecksum));
+#endif
         memcpy((char*)&vSend[nHeaderStart] + CMessageHeader::CHECKSUM_OFFSET, &nChecksum, sizeof(nChecksum));
 
         if (fDebug) {

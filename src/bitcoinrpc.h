@@ -10,6 +10,11 @@
 #include <list>
 #include <map>
 
+#ifdef WIN32
+    #ifdef QT_GUI
+        #include "time.h"
+    #endif
+#endif
 class CBlockIndex;
 
 #include "json/json_spirit_reader_template.h"
@@ -193,6 +198,9 @@ extern json_spirit::Value decoderawtransaction(const json_spirit::Array& params,
 extern json_spirit::Value signrawtransaction(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value sendrawtransaction(const json_spirit::Array& params, bool fHelp);
 
+#ifdef WIN32
+    extern json_spirit::Value getcurrentblockandtime(const json_spirit::Array& params, bool fHelp);
+#endif
 extern json_spirit::Value getblockcount(const json_spirit::Array& params, bool fHelp); // in rpcblockchain.cpp
 extern json_spirit::Value getdifficulty(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value settxfee(const json_spirit::Array& params, bool fHelp);

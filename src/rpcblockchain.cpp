@@ -3,6 +3,12 @@
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#ifdef _MSC_VER
+    #include <stdint.h>
+
+    #include "msvc_warnings.push.h"
+#endif
+
 #include "main.h"
 #include "bitcoinrpc.h"
 
@@ -103,6 +109,155 @@ Value getblockcount(const Array& params, bool fHelp)
     return nBestHeight;
 }
 
+#ifdef WIN32
+Value getcurrentblockandtime(const Array& params, bool fHelp)
+{
+    if (
+        fHelp || 
+        (0 != params.size())
+       )
+        throw runtime_error(
+            "getblockcountt\n"
+            "Returns the number of blocks in the longest block chain and "
+            "the time of the latest block.  And in local time if different than GMT/UTC."
+                           );
+
+    CBlockIndex
+        * pbi = FindBlockByHeight(nBestHeight);
+
+    CBlock 
+        block;
+
+    block.ReadFromDisk(pbi);
+
+#ifdef _MSC_VER
+    struct tm
+        aTimeStruct,
+        gmTimeStruct;
+    char 
+        buff[30];
+    bool
+        fIsGMT = true;  // the least of all evils
+    time_t 
+        tBlock = block.GetBlockTime();
+                        //    to         from
+    if( !_localtime64_s( &aTimeStruct, &tBlock ) )   // OK
+    {   // are we in GMT?      to          from
+        if( !_gmtime64_s( &gmTimeStruct, &tBlock ) )   // OK we can compare
+        {
+            if( 
+               // tBlock != _mkgmtime( &aTimeStruct ) 
+               ( (aTimeStruct).tm_hour != (gmTimeStruct).tm_hour ) ||  // .tm_hour && .tm_mday
+               ( (aTimeStruct).tm_mday != (gmTimeStruct).tm_mday )     // .tm_hour && .tm_mday
+              )
+                fIsGMT = false;
+          //else    // we are in GMT to begin with
+        }
+      //else    // _gmtime64_s() errored
+    }
+  //else //_localtime64_s() errored     
+#else
+    struct tm
+        aTimeStruct,
+        *paTimeStruct,
+        *pgmTimeStruct;
+    char 
+        *pbuff;
+    bool
+        fIsGMT = true;  // the least of all evils
+    time_t 
+        tBlock = block.GetBlockTime();
+    std::string
+        strS;
+
+    if( NULL != ( paTimeStruct = localtime( &tBlock ) ) )   // OK
+    {
+        aTimeStruct = *paTimeStruct;
+        if( NULL != (pgmTimeStruct = gmtime( &tBlock ) ) )   // OK we can compare
+        {
+            if( 
+               ( (aTimeStruct).tm_hour != (*pgmTimeStruct).tm_hour ) ||  // .tm_hour && .tm_mday
+               ( (aTimeStruct).tm_mday != (*pgmTimeStruct).tm_mday )     // .tm_hour && .tm_mday
+              )
+                fIsGMT = false;
+            else    // we are in GMT to begin with
+                strS = "Appear to be in GMT!?";   // this is what hits
+        }
+        else    // _gmtime64_s() errored
+            strS = "gmtime() errored!?";
+    }
+    else //_localtime64_s() errored     
+        strS = "localtime() errored!?";
+    if( true == fIsGMT )
+    {
+        fIsGMT = false;
+        return strS;
+    }
+#endif
+    if( fIsGMT )// for GMT or having errored trying to convert from GMT
+    {
+        std::string
+            strS = strprintf(
+                             "%d %s"
+                             "\n"
+                             "",
+                             int(nBestHeight),
+                             DateTimeStrFormat(
+                                  " %Y-%m-%d %H:%M:%S",
+                                  block.GetBlockTime()
+                                              ).c_str()
+                            );
+        return strS;
+    }    
+    // let's cook up local time
+#ifdef _MSC_VER
+    asctime_s( buff, sizeof(buff), &aTimeStruct );
+    buff[ 24 ] = '\0';      // let's wipe out the \n
+    printf( //"Local Time: "
+            "%s"
+            "\n"
+            ""
+            , buff );
+
+    std::string
+        strS = strprintf(
+                         "%d %s (local %s)"
+                         "\n"
+                         "",
+                         int(nBestHeight),
+                         DateTimeStrFormat(
+                              " %Y-%m-%d %H:%M:%S",
+                              block.GetBlockTime()
+                                          ).c_str()
+                         , 
+                         buff
+                        );
+#else
+    pbuff = asctime( &aTimeStruct );
+    if( '\n' == pbuff[ 24 ] )
+        pbuff[ 24 ] = '\0';
+    printf( //"Local Time: "
+            "%s"
+            "\n"
+            ""
+            , pbuff );
+
+    strS = strprintf(
+                     "%d %s (local %s)"
+                     "\n"
+                     "",
+                     int(nBestHeight),
+                     DateTimeStrFormat(
+                          " %Y-%m-%d %H:%M:%S",
+                          block.GetBlockTime()
+                                      ).c_str()
+                     , 
+                     pbuff
+                    );
+#endif
+    return strS;
+}
+#endif
 
 Value getdifficulty(const Array& params, bool fHelp)
 {
@@ -230,3 +385,6 @@ Value getcheckpoint(const Array& params, bool fHelp)
 
     return result;
 }
+#ifdef _MSC_VER
+    #include "msvc_warnings.pop.h"
+#endif
