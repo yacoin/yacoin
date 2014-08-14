@@ -82,7 +82,7 @@ BitcoinGUI::BitcoinGUI(QWidget *parent):
                   QString::number(a) + "." +
                   QString::number(c);
 
-    setWindowTitle(tr("Yacoin") + tr("Wallet ") + "v" + (titVersion));
+    setWindowTitle(tr("Yacoin ") + tr("Wallet ") + "v" + (titVersion));
 
 #ifndef Q_OS_MAC
     qApp->setWindowIcon(QIcon(":icons/bitcoin"));
