@@ -5,6 +5,7 @@
 // Distributed under the MIT License, see accompanying file LICENSE.txt
 
 // json spirit version 4.03
+#include "util.h"
 
 #include "json_spirit_value.h"
 
@@ -126,8 +127,13 @@ namespace json_spirit
                 case int_type:   output_int( value );         break;
 
                 /// Bitcoin: Added std::fixed and changed precision from 16 to 8
-                case real_type:  os_ << std::showpoint << std::fixed << std::setprecision(8)
-                                     << value.get_real();     break;
+                // YACoin should be 6!
+                case real_type:  os_ << 
+                                 std::showpoint << 
+                                 std::fixed << 
+                               //std::setprecision(8) << 
+                                 std::setprecision( COINdecimalPower ) << 
+                                 value.get_real();            break;
 
                 case null_type:  os_ << "null";               break;
                 default: assert( false );

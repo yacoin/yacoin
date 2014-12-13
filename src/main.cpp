@@ -15,6 +15,9 @@
 #include "net.h"
 #include "init.h"
 #include "ui_interface.h"
+#ifdef QT_GUI
+    #include "explorer.h"  
+#endif
 #include "kernel.h"
 #include "scrypt_mine.h"
 #include <boost/algorithm/string/replace.hpp>
@@ -709,6 +712,11 @@ bool CTxMemPool::accept(CTxDB& txdb, CTransaction &tx, bool fCheckInputs,
     printf("CTxMemPool::accept() : accepted %s (poolsz %"PRIszu")\n",
            hash.ToString().substr(0,10).c_str(),
            mapTx.size());
+#ifdef QT_GUI
+    lastTxHash.storeLasthash( hash );
+    uiInterface.NotifyBlocksChanged();
+#endif
+
     return true;
 }
 
@@ -1165,6 +1173,9 @@ void static InvalidChainFound(CBlockIndex* pindexNew)
     printf("InvalidChainFound:  current best=%s  height=%d  trust=%s  date=%s\n",
       hashBestChain.ToString().substr(0,20).c_str(), nBestHeight, bnBestChainTrust.ToString().c_str(),
       DateTimeStrFormat("%x %H:%M:%S", pindexBest->GetBlockTime()).c_str());
+#ifdef QT_GUI
+    uiInterface.NotifyBlocksChanged();
+#endif
 }
 
 void CBlock::UpdateTime(const CBlockIndex* pindexPrev)
@@ -1889,6 +1900,9 @@ bool CBlock::SetBestChain(CTxDB& txdb, CBlockIndex* pindexNew)
     printf("SetBestChain: new best=%s  height=%d  trust=%s  date=%s\n",
       hashBestChain.ToString().substr(0,20).c_str(), nBestHeight, bnBestChainTrust.ToString().c_str(),
       DateTimeStrFormat("%x %H:%M:%S", pindexBest->GetBlockTime()).c_str());
+#ifdef QT_GUI
+    uiInterface.NotifyBlocksChanged();
+#endif
 
     // Check the version of the last 100 blocks to see if we need to upgrade:
     if (!fIsInitialDownload)
@@ -2057,8 +2071,9 @@ bool CBlock::AddToBlockIndex(unsigned int nFile, unsigned int nBlockPos)
         UpdatedTransaction(hashPrevBestCoinBase);
         hashPrevBestCoinBase = vtx[0].GetHash();
     }
-
+#ifdef QT_GUI
     uiInterface.NotifyBlocksChanged();
+#endif
     return true;
 }
 
@@ -2392,6 +2407,9 @@ bool ProcessBlock(CNode* pfrom, CBlock* pblock)
     // ppcoin: if responsible for sync-checkpoint send it
     if (pfrom && !CSyncCheckpoint::strMasterPrivKey.empty())
         Checkpoints::SendSyncCheckpoint(Checkpoints::AutoSelectSyncCheckpoint());
+#ifdef QT_GUI
+    uiInterface.NotifyBlocksChanged();
+#endif
 
     return true;
 }

@@ -13,6 +13,7 @@ class RPCConsole: public QDialog
 {
     Q_OBJECT
 
+
 public:
     explicit RPCConsole(QWidget *parent = 0);
     ~RPCConsole();
@@ -37,6 +38,8 @@ private slots:
     void on_openDebugLogfileButton_clicked();
     /** display messagebox with program parameters (same as yacoin-qt --help) */
     void on_showCLOptionsButton_clicked();
+        void on_infoCloseButton_clicked();
+        void on_consoleCloseButton_clicked();
 
 public slots:
     void clear();

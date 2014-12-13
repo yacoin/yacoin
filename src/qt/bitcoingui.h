@@ -9,6 +9,7 @@ class ClientModel;
 class WalletModel;
 class TransactionView;
 class OverviewPage;
+    class ExplorerPage; // for the new explorer dialogs
 class AddressBookPage;
 class SendCoinsDialog;
 class SignVerifyMessageDialog;
@@ -27,8 +28,9 @@ class QUrl;
 QT_END_NAMESPACE
 
 /**
-  Bitcoin GUI main class. This class represents the main window of the Bitcoin UI. It communicates with both the client and
-  wallet models to give the user an up-to-date view of the current core state.
+  Bitcoin GUI main class. This class represents the main window of the Bitcoin UI. 
+  It communicates with both the client and wallet models to give the user an 
+  up-to-date view of the current core state.
 */
 class BitcoinGUI : public QMainWindow
 {
@@ -38,14 +40,17 @@ public:
     ~BitcoinGUI();
 
     /** Set the client model.
-        The client model represents the part of the core that communicates with the P2P network, and is wallet-agnostic.
+        The client model represents the part of the core that communicates with the P2P network, 
+        and is wallet-agnostic.
     */
     void setClientModel(ClientModel *clientModel);
     /** Set the wallet model.
-        The wallet model represents a bitcoin wallet, and offers access to the list of transactions, address book and sending
-        functionality.
+        The wallet model represents a bitcoin wallet, and offers access to the list of transactions, 
+        address book and sending functionality.
     */
     void setWalletModel(WalletModel *walletModel);
+
+    void showTrayIcon();
 
 protected:
     void changeEvent(QEvent *e);
@@ -60,6 +65,7 @@ private:
     QStackedWidget *centralWidget;
 
     OverviewPage *overviewPage;
+
     QWidget *transactionsPage;
     AddressBookPage *addressBookPage;
     AddressBookPage *receiveCoinsPage;
@@ -73,6 +79,7 @@ private:
     QProgressBar *progressBar;
 
     QMenuBar *appMenuBar;
+
     QAction *overviewAction;
     QAction *historyAction;
     QAction *quitAction;
@@ -90,11 +97,13 @@ private:
     QAction *changePassphraseAction;
     QAction *aboutQtAction;
     QAction *openRPCConsoleAction;
+    QAction *explorerAction;        // new
 
     QSystemTrayIcon *trayIcon;
     Notificator *notificator;
     TransactionView *transactionView;
     RPCConsole *rpcConsole;
+    ExplorerPage *pExplorerDialog;
 
     QMovie *syncIconMovie;
 
@@ -142,7 +151,6 @@ private slots:
     void gotoReceiveCoinsPage();
     /** Switch to send coins page */
     void gotoSendCoinsPage();
-
     /** Show Sign/Verify Message dialog and switch to sign message tab */
     void gotoSignMessageTab(QString addr = "");
     /** Show Sign/Verify Message dialog and switch to verify message tab */
@@ -152,6 +160,8 @@ private slots:
     void optionsClicked();
     /** Show about dialog */
     void aboutClicked();
+    /** Show explorer dialog */
+    void explorerClicked();
 #ifndef Q_OS_MAC
     /** Handle tray icon clicked */
     void trayIconActivated(QSystemTrayIcon::ActivationReason reason);

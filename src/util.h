@@ -33,6 +33,8 @@ typedef long long  int64;
 typedef unsigned long long  uint64;
 
 static const int64 COIN = 1000000;
+static const int COINdecimalPower = 6;     // i.e. log10( COIN )
+
 static const int64 CENT = 10000;
 
 #define loop                for (;;)

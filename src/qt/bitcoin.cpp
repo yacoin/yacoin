@@ -241,6 +241,7 @@ int main(int argc, char *argv[])
                 window.setClientModel(&clientModel);
                 window.setWalletModel(&walletModel);
 
+                guiref->showTrayIcon();
                 // If -min option passed, start window minimized.
                 if(GetBoolArg("-min"))
                 {
