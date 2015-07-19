@@ -165,7 +165,7 @@ public:
     bool Lock(const void *addr, size_t len)
     {
 #ifdef WIN32
-        return VirtualLock(const_cast<void*>(addr), len);
+        return (bool)VirtualLock(const_cast<void*>(addr), len);
 #else
         return mlock(addr, len) == 0;
 #endif
@@ -176,7 +176,7 @@ public:
     bool Unlock(const void *addr, size_t len)
     {
 #ifdef WIN32
-        return VirtualUnlock(const_cast<void*>(addr), len);
+        return (bool)VirtualUnlock(const_cast<void*>(addr), len);
 #else
         return munlock(addr, len) == 0;
 #endif

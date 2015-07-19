@@ -5,9 +5,11 @@
 // Distributed under the MIT License, see accompanying file LICENSE.txt
 
 // json spirit version 4.03
-#include "util.h"
 
 #include "json_spirit_value.h"
+
+#include "..\util.h"
+//extern const int COINdecimalPower;
 
 #include <cassert>
 #include <sstream>

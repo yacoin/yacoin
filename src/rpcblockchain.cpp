@@ -51,10 +51,15 @@ double GetDifficulty(const CBlockIndex* blockindex)
 
 Object blockToJSON(const CBlock& block, const CBlockIndex* blockindex, bool fPrintTransactionDetail)
 {
-    Object result;
+    Object 
+        result;
+
     result.push_back(Pair("hash", block.GetHash().GetHex()));
-    CMerkleTx txGen(block.vtx[0]);
+
+    CMerkleTx txGen( block.vtx[ 0 ] );
+
     txGen.SetMerkleBranch(&block);
+
     result.push_back(Pair("confirmations", (int)txGen.GetDepthInMainChain()));
     result.push_back(Pair("size", (int)::GetSerializeSize(block, SER_NETWORK, PROTOCOL_VERSION)));
     result.push_back(Pair("height", blockindex->nHeight));
@@ -71,17 +76,37 @@ Object blockToJSON(const CBlock& block, const CBlockIndex* blockindex, bool fPri
     if (blockindex->pnext)
         result.push_back(Pair("nextblockhash", blockindex->pnext->GetBlockHash().GetHex()));
 
-    result.push_back(Pair("flags", strprintf("%s%s", blockindex->IsProofOfStake()? "proof-of-stake" : "proof-of-work", blockindex->GeneratedStakeModifier()? " stake-modifier": "")));
-    result.push_back(Pair("proofhash", blockindex->IsProofOfStake()? blockindex->hashProofOfStake.GetHex() : blockindex->GetBlockHash().GetHex()));
+    result.push_back(
+                    Pair(
+                        "flags", 
+                        strprintf(
+                                "%s%s", 
+                                blockindex->IsProofOfStake()? "proof-of-stake" : "proof-of-work", 
+                                blockindex->GeneratedStakeModifier()? " stake-modifier": ""
+                                 )
+                        )
+                    );
+    result.push_back(
+                    Pair(
+                        "proofhash", 
+                        blockindex->IsProofOfStake()? 
+                            blockindex->hashProofOfStake.GetHex() : 
+                            blockindex->GetBlockHash().GetHex()
+                        )
+                    );
     result.push_back(Pair("entropybit", (int)blockindex->GetStakeEntropyBit()));
     result.push_back(Pair("modifier", strprintf("%016"PRI64x, blockindex->nStakeModifier)));
     result.push_back(Pair("modifierchecksum", strprintf("%08x", blockindex->nStakeModifierChecksum)));
-    Array txinfo;
+
+    Array 
+        txinfo;
+
     BOOST_FOREACH (const CTransaction& tx, block.vtx)
     {
         if (fPrintTransactionDetail)
         {
-            Object entry;
+            Object 
+                entry;
 
             entry.push_back(Pair("txid", tx.GetHash().GetHex()));
             TxToJSON(tx, 0, entry);
@@ -110,6 +135,157 @@ Value getblockcount(const Array& params, bool fHelp)
 }
 
 #ifdef WIN32
+
+double doGetYACprice()
+{
+    //-------------------------------------------------
+    char 
+        *csDomain = "pubapi2.cryptsy.com";
+    //Set-Cookie: NAME=VALUE; OPTIONS is there a cookie?
+
+    string
+        sfb,
+        sDomain = "pubapi2.cryptsy.com",
+        sNewUrl1 = 
+                    "GET"
+                    " "
+                    "/api.php?method=singlemarketdata&marketid=11"
+                    " "
+                    "HTTP/1.1"
+                    "\r\n"
+                    "Content-Type: text/html"
+                    "\r\n"
+                    "Accept: application/json, text/html"
+                    "\r\n"
+                    "Host: ";
+    sNewUrl1 += sDomain;
+    sNewUrl1 += 
+                "\r\n"
+                "Connection: close"
+                "\r\n"
+                "\r\n"
+                "";
+
+    string
+        sNewUrl2 = 
+                    "GET"
+                    " "
+                    "/api.php?method=singlemarketdata&marketid=2"
+                    " "
+                    "HTTP/1.1"
+                    "\r\n"
+                    "Content-Type: text/html"
+                    "\r\n"
+                    "Accept: application/json, text/html"
+                    "\r\n"
+                    "Host: ";
+    sNewUrl2 += sDomain;
+    sNewUrl2 += 
+                "\r\n"
+                "Connection: close"
+                "\r\n"
+                "\r\n"
+                "";
+
+    sfb = strprintf(
+                    "Command 1:\n%s"
+                    "\n"
+                    "Command 2:\n%s"
+                    "\n"
+                    "",
+                    sNewUrl1.c_str()
+                    ,
+                    sNewUrl2.c_str()
+                   );
+    if (fPrintToConsole) 
+        printf( "%s", sfb.c_str() );
+
+    Object 
+        result;
+
+    CNetAddr
+        ipRet;
+    
+    int
+        nResult;
+
+    const char* 
+        pszGet = sNewUrl1.c_str();
+    string
+        sDestination1 = "",
+        sDestination2 = "";
+
+    double
+        dYACtoUSDPrice = 0.0,
+        dBTCtoUSDPrice = 0.0,
+        dYACtoBTCPrice = 0.0;
+
+    if (GetMyExternalWebPage( sDomain, pszGet, sDestination1, dYACtoBTCPrice ) )   // the webpage is  ~40,023 bytes long
+    {   //OK, now we have YAC/BTC
+        pszGet = sNewUrl2.c_str();
+        if (GetMyExternalWebPage( sDomain, pszGet, sDestination2, dBTCtoUSDPrice ) )
+        {   // OK now we have BTC/USD
+            dYACtoUSDPrice = dYACtoBTCPrice * dBTCtoUSDPrice;
+        }
+        else
+        {
+            throw runtime_error(
+                        "getYACprice\n"
+                        "Could not get page 2?"
+                               );
+        }
+    }
+    else
+    {
+        throw runtime_error(
+            "getYACprice\n"
+            "Could not get page 1?"
+                           );
+    }
+    std::string
+        stest = strprintf(
+                            "result"
+                            "\n"
+                            "___________________________________________________________\n"
+                            "___________________________________________________________\n"
+                            "%s"
+                            "\n"
+                            "___________________________________________________________\n"
+                            "%s"
+                            "___________________________________________________________\n"
+                            "___________________________________________________________\n"
+                            "",
+                            sDestination1.c_str(),
+                            sDestination2.c_str()
+                         );
+    //if( dYACtoUSDPrice > 0.0 )
+    return dYACtoUSDPrice;
+    //return stest;
+}
+
+Value getYACprice(const Array& params, bool fHelp)
+{
+    if (
+        fHelp || 
+        (0 < params.size())
+       )
+    {
+        throw runtime_error(
+            "getyacprice \n"
+            "Returns the current price of YAC "
+            "given by Cryptsy.com using their public API for YAC/BTC and BTC/USD."
+                           );
+    }
+
+    double 
+        dPrice = doGetYACprice();
+
+    string
+        sTemp = strprintf( "%0.6lf", dPrice );
+
+    return sTemp;
+}
+
 Value getcurrentblockandtime(const Array& params, bool fHelp)
 {
     if (
@@ -130,7 +306,7 @@ Value getcurrentblockandtime(const Array& params, bool fHelp)
 
     block.ReadFromDisk(pbi);
 
-#ifdef _MSC_VER
+    #ifdef _MSC_VER
     struct tm
         aTimeStruct,
         gmTimeStruct;
@@ -155,8 +331,8 @@ Value getcurrentblockandtime(const Array& params, bool fHelp)
         }
       //else    // _gmtime64_s() errored
     }
-  //else //_localtime64_s() errored     
-#else
+    //else //_localtime64_s() errored     
+    #else
     struct tm
         aTimeStruct,
         *paTimeStruct,
@@ -193,7 +369,7 @@ Value getcurrentblockandtime(const Array& params, bool fHelp)
         fIsGMT = false;
         return strS;
     }
-#endif
+    #endif
     if( fIsGMT )// for GMT or having errored trying to convert from GMT
     {
         std::string
@@ -210,7 +386,7 @@ Value getcurrentblockandtime(const Array& params, bool fHelp)
         return strS;
     }    
     // let's cook up local time
-#ifdef _MSC_VER
+    #ifdef _MSC_VER
     asctime_s( buff, sizeof(buff), &aTimeStruct );
     buff[ 24 ] = '\0';      // let's wipe out the \n
     printf( //"Local Time: "
@@ -232,7 +408,7 @@ Value getcurrentblockandtime(const Array& params, bool fHelp)
                          , 
                          buff
                         );
-#else
+    #else
     pbuff = asctime( &aTimeStruct );
     if( '\n' == pbuff[ 24 ] )
         pbuff[ 24 ] = '\0';
@@ -254,7 +430,7 @@ Value getcurrentblockandtime(const Array& params, bool fHelp)
                      , 
                      pbuff
                     );
-#endif
+    #endif
     return strS;
 }
 #endif
@@ -321,48 +497,81 @@ Value getblockhash(const Array& params, bool fHelp)
 
 Value getblock(const Array& params, bool fHelp)
 {
-    if (fHelp || params.size() < 1 || params.size() > 2)
+    if (
+        fHelp || 
+        params.size() < 1 || 
+        params.size() > 2
+       )
         throw runtime_error(
-            "getblock <hash> [txinfo]\n"
+            "getblock <hash> [true | false (txinfo)]\n"
             "txinfo optional to print more detailed tx info\n"
             "Returns details of a block with given block-hash.");
 
-    std::string strHash = params[0].get_str();
-    uint256 hash(strHash);
+    std::string 
+        strHash = params[0].get_str();
+
+    uint256 
+        hash(strHash);
 
     if (mapBlockIndex.count(hash) == 0)
         throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Block not found");
 
-    CBlock block;
-    CBlockIndex* pblockindex = mapBlockIndex[hash];
+    CBlock 
+        block;
+
+    CBlockIndex
+        * pblockindex = mapBlockIndex[hash];
+
     block.ReadFromDisk(pblockindex, true);
 
-    return blockToJSON(block, pblockindex, params.size() > 1 ? params[1].get_bool() : false);
+    return blockToJSON(
+                        block, 
+                        pblockindex, 
+                        params.size() > 1 ? params[1].get_bool() : false
+                      );
 }
 
 Value getblockbynumber(const Array& params, bool fHelp)
 {
-    if (fHelp || params.size() < 1 || params.size() > 2)
+    if (
+        fHelp || 
+        params.size() < 1 || 
+        params.size() > 2
+       )
         throw runtime_error(
-            "getblock <number> [txinfo]\n"
-            "txinfo optional to print more detailed tx info\n"
+            "getblockbynumber <number> [txinfo]\n"
+            "txinfo [1|0] optional to print more detailed tx info\n"
             "Returns details of a block with given block-number.");
 
-    int nHeight = params[0].get_int();
-    if (nHeight < 0 || nHeight > nBestHeight)
+    int 
+        nHeight = params[0].get_int();
+
+    if (
+        nHeight < 0 || 
+        nHeight > nBestHeight
+       )
         throw runtime_error("Block number out of range.");
 
-    CBlock block;
-    CBlockIndex* pblockindex = mapBlockIndex[hashBestChain];
+    CBlock 
+        block;
+
+    CBlockIndex
+        * pblockindex = mapBlockIndex[hashBestChain];
+
     while (pblockindex->nHeight > nHeight)
         pblockindex = pblockindex->pprev;
 
-    uint256 hash = pblockindex->GetHash();
+    uint256 
+        hash = pblockindex->GetHash();
 
     pblockindex = mapBlockIndex[hash];
     block.ReadFromDisk(pblockindex, true);
 
-    return blockToJSON(block, pblockindex, params.size() > 1 ? params[1].get_bool() : false);
+    return blockToJSON(
+                        block, 
+                        pblockindex, 
+                        params.size() > 1 ? params[1].get_bool() : false
+                      );
 }
 
 // ppcoin: get information of sync-checkpoint

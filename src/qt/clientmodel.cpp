@@ -14,12 +14,17 @@
 static const int64 nClientStartupTime = GetTime();
 
 ClientModel::ClientModel(OptionsModel *optionsModel, QObject *parent) :
-    QObject(parent), optionsModel(optionsModel),
-    cachedNumBlocks(0), cachedNumBlocksOfPeers(0), cachedNumScanned(0), pollTimer(0)
+    QObject(parent), 
+    optionsModel(optionsModel),
+    cachedNumBlocks(0), 
+    cachedNumBlocksOfPeers(0), 
+    cachedNumScanned(0), 
+    pollTimer(0)
 {
     numBlocksAtStartup = -1;
 
-    pollTimer = new QTimer(this);
+    pollTimer = 
+        new QTimer(this);
     pollTimer->setInterval(MODEL_UPDATE_DELAY);
     pollTimer->start();
     connect(pollTimer, SIGNAL(timeout()), this, SLOT(updateTimer()));
@@ -49,7 +54,8 @@ int ClientModel::getNumScanned() const
 
 int ClientModel::getNumBlocksAtStartup()
 {
-    if (numBlocksAtStartup == -1) numBlocksAtStartup = getNumBlocks();
+    if (numBlocksAtStartup == -1) 
+        numBlocksAtStartup = getNumBlocks();
     return numBlocksAtStartup;
 }
 
@@ -60,21 +66,30 @@ QDateTime ClientModel::getLastBlockDate() const
 
 void ClientModel::updateTimer()
 {
-    // Some quantities (such as number of blocks) change so fast that we don't want to be notified for each change.
+    // Some quantities (such as number of blocks) change so fast that 
+    // we don't want to be notified for each change. (Sure we do!)
     // Periodically check and update with a timer.
-    int newNumBlocks = getNumBlocks();
-    int newNumBlocksOfPeers = getNumBlocksOfPeers();
-    int newNumScanned = getNumScanned();
+    int 
+        newNumBlocks = getNumBlocks();                  // # of blocks now
+    int 
+        newNumBlocksOfPeers = getNumBlocksOfPeers();    // what the peers say
+    int 
+        newNumScanned = getNumScanned();
 
-    if(cachedNumBlocks != newNumBlocks || cachedNumBlocksOfPeers != newNumBlocksOfPeers ||
-       cachedNumScanned != newNumScanned)
+    if(
+        cachedNumBlocks != newNumBlocks ||              // our last check
+        cachedNumBlocksOfPeers != newNumBlocksOfPeers ||// our peers have upped their count
+        cachedNumScanned != newNumScanned
+      )
     {
         cachedNumBlocks = newNumBlocks;
         cachedNumBlocksOfPeers = newNumBlocksOfPeers;
         cachedNumScanned = newNumScanned;
 
-        emit numBlocksChanged(newNumBlocks, newNumBlocksOfPeers, newNumScanned);
+        emit numBlocksChanged(newNumBlocks, newNumBlocksOfPeers, newNumScanned); // do an update
     }
+    //if( new tx )
+    //
 }
 
 void ClientModel::updateNumConnections(int numConnections)
@@ -151,13 +166,26 @@ static void NotifyBlocksChanged(ClientModel *clientmodel)
 {
     // This notification is too frequent. Don't trigger a signal.
     // Don't remove it, though, as it might be useful later.
+    const int
+        nObsoleteVaribleDummyValue = 0;
+    //clientmodel->setNumBlocks(nBestHeight, nObsoleteVaribleDummyValue);
+    QMetaObject::invokeMethod(
+                              clientmodel, 
+                              "updateTimer", 
+                              Qt::QueuedConnection
+                              //, Q_ARG(int, nBestHeight)
+                             );
+
 }
 
 static void NotifyNumConnectionsChanged(ClientModel *clientmodel, int newNumConnections)
 {
     // Too noisy: OutputDebugStringF("NotifyNumConnectionsChanged %i\n", newNumConnections);
-    QMetaObject::invokeMethod(clientmodel, "updateNumConnections", Qt::QueuedConnection,
-                              Q_ARG(int, newNumConnections));
+    QMetaObject::invokeMethod(clientmodel, 
+                              "updateNumConnections", 
+                              Qt::QueuedConnection,
+                              Q_ARG(int, newNumConnections)
+                             );
 }
 
 static void NotifyAlertChanged(ClientModel *clientmodel, const uint256 &hash, ChangeType status)
@@ -171,7 +199,9 @@ static void NotifyAlertChanged(ClientModel *clientmodel, const uint256 &hash, Ch
 void ClientModel::subscribeToCoreSignals()
 {
     // Connect signals to client
-    uiInterface.NotifyBlocksChanged.connect(boost::bind(NotifyBlocksChanged, this));
+    uiInterface.NotifyBlocksChanged.connect( boost::bind( NotifyBlocksChanged, this ) );
+      //uiInterface.NotifyTxChanged.connect( boost::bind( NotifyTxChanged, this ) );
+
     uiInterface.NotifyNumConnectionsChanged.connect(boost::bind(NotifyNumConnectionsChanged, this, _1));
     uiInterface.NotifyAlertChanged.connect(boost::bind(NotifyAlertChanged, this, _1, _2));
 }
@@ -179,7 +209,9 @@ void ClientModel::subscribeToCoreSignals()
 void ClientModel::unsubscribeFromCoreSignals()
 {
     // Disconnect signals from client
-    uiInterface.NotifyBlocksChanged.disconnect(boost::bind(NotifyBlocksChanged, this));
+    uiInterface.NotifyBlocksChanged.disconnect( boost::bind( NotifyBlocksChanged, this ) );
+      //uiInterface.NotifyTxChanged.disconnect( boost::bind( NotifyTxChanged, this ) );
+
     uiInterface.NotifyNumConnectionsChanged.disconnect(boost::bind(NotifyNumConnectionsChanged, this, _1));
     uiInterface.NotifyAlertChanged.disconnect(boost::bind(NotifyAlertChanged, this, _1, _2));
 }

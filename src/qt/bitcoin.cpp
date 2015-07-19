@@ -10,7 +10,11 @@
 
 #include "init.h"
 #include "ui_interface.h"
-#include "qtipcserver.h"
+
+#ifdef WIN32
+#else
+//#include "qtipcserver.h"
+#endif
 
 #include <QApplication>
 #include <QMessageBox>
@@ -42,11 +46,14 @@ static void ThreadSafeMessageBox(const std::string& message, const std::string& 
     {
         bool modal = (style & CClientUIInterface::MODAL);
         // in case of modal message, use blocking connection to wait for user to click OK
-        QMetaObject::invokeMethod(guiref, "error",
-                                   modal ? GUIUtil::blockingGUIThreadConnection() : Qt::QueuedConnection,
-                                   Q_ARG(QString, QString::fromStdString(caption)),
-                                   Q_ARG(QString, QString::fromStdString(message)),
-                                   Q_ARG(bool, modal));
+        QMetaObject::invokeMethod(
+                                    guiref, 
+                                    "error",
+                                    modal ? GUIUtil::blockingGUIThreadConnection() : Qt::QueuedConnection,
+                                    Q_ARG(QString, QString::fromStdString(caption)),
+                                    Q_ARG(QString, QString::fromStdString(message)),
+                                    Q_ARG(bool, modal)
+                                 );
     }
     else
     {
@@ -118,8 +125,10 @@ static void handleRunawayException(std::exception *e)
 int main(int argc, char *argv[])
 {
     // Do this early as we don't want to bother initializing if we are just calling IPC
-    ipcScanRelay(argc, argv);
-
+#ifdef WIN32
+#else
+    ipcScanRelay(argc, argv);    // seems to blow up boost? if we link with -static ????
+#endif
     // Internal string conversion is all UTF-8
     QTextCodec::setCodecForTr(QTextCodec::codecForName("UTF-8"));
     QTextCodec::setCodecForCStrings(QTextCodec::codecForTr());
@@ -249,12 +258,14 @@ int main(int argc, char *argv[])
                 }
                 else
                 {
-                    window.show();
+                    window.show();  // again only after Splash exits
                 }
 
                 // Place this here as guiref has to be defined if we don't want to lose URIs
-                ipcInit(argc, argv);
-
+#ifdef WIN32
+#else
+                ipcInit(argc, argv);  // seems to blow up boost? if we link with -static ????
+#endif
                 app.exec();
 
                 window.hide();

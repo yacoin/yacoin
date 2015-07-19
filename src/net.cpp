@@ -208,8 +208,71 @@ CAddress GetLocalAddress(const CNetAddr *paddrPeer)
     return ret;
 }
 
+bool ReceiveALine(SOCKET hSocket, string& strLine)
+{
+    size_t
+        nArbitrarySize = 9000; // 9000?  Why?????????
+
+    strLine = "";
+    loop
+    {
+        char 
+            c;
+
+        int 
+            nBytes = recv(hSocket, &c, 1, 0);
+
+        if (nBytes > 0)
+        {
+            if (c == '\n')
+                continue;
+            if (c == '\r')
+                return true;
+            strLine += c;
+            if (strLine.size() >= nArbitrarySize)   // why limit to 9,000 characters?
+                return true;
+        }
+        else if (nBytes <= 0)
+        {
+            if (fShutdown)
+                return false;
+            if (nBytes < 0)
+            {
+                int nErr = WSAGetLastError();
+                if (nErr == WSAEMSGSIZE)
+                    continue;
+                if (nErr == WSAEWOULDBLOCK || nErr == WSAEINTR || nErr == WSAEINPROGRESS)
+                {
+                    Sleep(10);
+                    continue;
+                }
+                // else some other error happened
+            }
+            if (!strLine.empty()) // maybe we should continue?
+                return true;
+                //continue;
+
+            if (nBytes == 0)
+            {   // socket closed (maybe?)
+                printf("socket closed\n");
+                return false;
+            }
+            else
+            {   // socket error
+                int 
+                    nErr = WSAGetLastError();
+                printf("recv failed: %d\n", nErr);
+                return false;
+            }
+        }
+    }
+}
+
 bool RecvLine(SOCKET hSocket, string& strLine)
 {
+    size_t
+        nArbitrarySize = 9000;      //Is this arbitray? Required? Wild ass guess? What?
+
     strLine = "";
     loop
     {
@@ -222,7 +285,7 @@ bool RecvLine(SOCKET hSocket, string& strLine)
             if (c == '\r')
                 return true;
             strLine += c;
-            if (strLine.size() >= 9000)
+            if (strLine.size() >= nArbitrarySize)   // why limit to 9,000 characters?
                 return true;
         }
         else if (nBytes <= 0)
@@ -371,15 +434,217 @@ bool IsReachable(const CNetAddr& addr)
     return vfReachable[net] && !vfLimited[net];
 }
 
+#ifdef WIN32
+
+bool recvAline( SOCKET &hSocket, string & strLine )
+{
+    char 
+        c;
+    int
+        nBytes;
+
+    do
+    {
+        nBytes = recv(hSocket, &c, 1, 0);   // better be one or zero!
+
+        if (1 == nBytes)
+        {   // OK
+            strLine += c;
+            if( '\n' == c )  // the signal for a line received
+                break;
+        }
+        else
+        {
+            if (SOCKET_ERROR == nBytes) // error, which error? Some aren't
+            {
+                int 
+                    nErr = WSAGetLastError();
+
+                if (nErr == WSAEMSGSIZE)
+                    continue;
+                if (
+                    nErr == WSAEWOULDBLOCK || 
+                    nErr == WSAEINTR || 
+                    nErr == WSAEINPROGRESS
+                   )
+                {
+                   Sleep(10);
+                    continue;
+                }
+            }
+            if (0 == nBytes)
+            {   // done
+                return false;
+            }
+            else
+            {
+                // socket error
+                int 
+                    nErr = WSAGetLastError();
+                printf("recv failed: error %d\n", nErr);
+                return false;
+            }
+        }
+    }while( true );
+    return true;
+}
+
+class CdoSocket
+{
+    private:
+    struct hostent 
+        *host;
+    SOCKET 
+        SocketCopy;
+
+    public:
+    explicit CdoSocket( SOCKET & Socket, const string & sDomain )
+    {
+        Socket = socket(AF_INET,SOCK_STREAM,IPPROTO_TCP);
+        
+        host = gethostbyname( sDomain.c_str() );
+
+        SOCKADDR_IN 
+            SockAddr;
+
+        SockAddr.sin_port = htons(80);
+        SockAddr.sin_family = AF_INET;
+        SockAddr.sin_addr.s_addr = *((unsigned long*)host->h_addr);
+
+        //cout << "Connecting...\n";
+
+        int
+            nResult = connect(Socket,(SOCKADDR*)(&SockAddr),sizeof(SockAddr) );
+
+        if ( SOCKET_ERROR == nResult )
+        {
+            std::string
+                sS = strprintf(
+                    "Could not connect"
+                    "connect function failed with error: %ld\n", WSAGetLastError()
+                              );
+            nResult = closesocket(Socket);
+            if (nResult == SOCKET_ERROR)
+                wprintf(L"closesocket function failed with error: %ld\n", WSAGetLastError());
+            WSACleanup();
+            throw runtime_error(
+                    "getYACprice\n"
+                    "Could not connect?"
+                               );
+        }
+        SocketCopy = Socket;
+    }
+
+    ~CdoSocket()
+    {
+        closesocket( SocketCopy );
+    }    
+};
+
+bool GetMyExternalWebPage(const string & sDomain, const char* pszGet, string & strBuffer, double &dPrice)
+{
+    SOCKET 
+        hSocket = NULL;
+
+    CdoSocket CthisSocketConnection( hSocket, sDomain );    //RAII attempt on the socket!?
+    if (hSocket)    // then it's OK
+    {
+        int
+            nBytesSent = send(hSocket, pszGet, strlen(pszGet), MSG_NOSIGNAL);
+
+        if (nBytesSent != strlen(pszGet) )
+        {
+            printf(
+                    "send() error: only sent %d of %d?"
+                    "\n", 
+                    nBytesSent,
+                    strlen(pszGet)
+                  );
+        }
+        string
+            strLine = "";
+        bool 
+            fLineOK = false;
+        do
+        {
+            fLineOK = recvAline(hSocket, strLine);
+            if (fShutdown)
+            {
+                return false;
+            }
+            if (fLineOK)
+            {
+                strBuffer += strLine;
+                if( string::npos != strLine.find( "volume", 0 ) ) // search 11, YAC/BTC & 2, BTC/USD
+                {
+                    string
+                        skey = "lasttradeprice";
+                    // it looks like this
+                    //"YAC\/BTC","lasttradeprice":"0.00000535","volume":
+                    if( string::npos != strLine.find( skey, 0 ) ) // search 11, YAC/BTC & 2, BTC/USD
+                    {   // pickup the price
+                        string
+                            sTemp = strLine.substr( strLine.find( skey, 0 ) + skey.size() + 3);
+                                  //           strtod( .cstr(), NULL
+                                  //  dPrice = stod( const string & sTemp, NULL )
+                        double 
+                            dTemp;
+
+                        if (1 == sscanf( sTemp.c_str(), "%lf", &dTemp ) )
+                        {
+                           dPrice = dTemp;  // just so I can debug.  A good compiler 
+                                            // can optimize this dTemp out!
+                        }
+                    }
+                    // read rest of result
+                    strLine = "";            
+                    do
+                    {
+                        fLineOK = recvAline(hSocket, strLine);
+                        Sleep( 10 );
+                        strLine = "";            
+                    }while( fLineOK );
+                    break;
+                }
+            }
+            strLine = "";            
+        }while( fLineOK );
+
+        if ( 0 < strBuffer.size() )
+        {
+            printf(
+                    "GetMyExternalWebPage() received:\n"
+                    "%s"
+                    "\n", 
+                    strBuffer.c_str()
+                  );
+            return true;
+        }
+        else
+        {
+            return error("error in recv() : connection closed?");
+        }
+    }
+    else
+    {
+        return false;
+    }
+}
+#endif
+
 bool GetMyExternalIP2(const CService& addrConnect, const char* pszGet, const char* pszKeyword, CNetAddr& ipRet)
 {
-    SOCKET hSocket;
+    SOCKET 
+        hSocket;
+
     if (!ConnectSocket(addrConnect, hSocket))
         return error("GetMyExternalIP() : connection to %s failed", addrConnect.ToString().c_str());
 
     send(hSocket, pszGet, strlen(pszGet), MSG_NOSIGNAL);
 
-    string strLine;
+    string 
+        strLine;
+
     while (RecvLine(hSocket, strLine))
     {
         if (strLine.empty()) // HTTP response is separated from headers by blank line
@@ -400,12 +665,16 @@ bool GetMyExternalIP2(const CService& addrConnect, const char* pszGet, const cha
                 }
             }
             closesocket(hSocket);
+
             if (strLine.find("<") != string::npos)
                 strLine = strLine.substr(0, strLine.find("<"));
             strLine = strLine.substr(strspn(strLine.c_str(), " \t\n\r"));
             while (strLine.size() > 0 && isspace(strLine[strLine.size()-1]))
                 strLine.resize(strLine.size()-1);
-            CService addr(strLine,0,true);
+
+            CService 
+                addr(strLine,0,true);
+
             printf("GetMyExternalIP() received [%s] %s\n", strLine.c_str(), addr.ToString().c_str());
             if (!addr.IsValid() || !addr.IsRoutable())
                 return false;
@@ -424,54 +693,56 @@ bool GetMyExternalIP(CNetAddr& ipRet)
     const char* pszGet;
     const char* pszKeyword;
 
-    for (int nLookup = 0; nLookup <= 1; nLookup++)
-    for (int nHost = 1; nHost <= 2; nHost++)
+    for (int nLookup = 0; nLookup <= 1; ++nLookup)
     {
-        // We should be phasing out our use of sites like these.  If we need
-        // replacements, we should ask for volunteers to put this simple
-        // php file on their web server that prints the client IP:
-        //  <?php echo $_SERVER["REMOTE_ADDR"]; ?>
-        if (nHost == 1)
+        for (int nHost = 1; nHost <= 2; ++nHost)
         {
-            addrConnect = CService("91.198.22.70",80); // checkip.dyndns.org
-
-            if (nLookup == 1)
+            // We should be phasing out our use of sites like these.  If we need
+            // replacements, we should ask for volunteers to put this simple
+            // php file on their web server that prints the client IP:
+            //  <?php echo $_SERVER["REMOTE_ADDR"]; ?>
+            if (nHost == 1)
             {
-                CService addrIP("checkip.dyndns.org", 80, true);
-                if (addrIP.IsValid())
-                    addrConnect = addrIP;
+                addrConnect = CService("91.198.22.70",80); // checkip.dyndns.org
+
+                if (nLookup == 1)
+                {
+                    CService addrIP("checkip.dyndns.org", 80, true);
+                    if (addrIP.IsValid())
+                        addrConnect = addrIP;
+                }
+
+                pszGet = "GET / HTTP/1.1\r\n"
+                         "Host: checkip.dyndns.org\r\n"
+                         "User-Agent: Mozilla/4.0 (compatible; MSIE 7.0; Windows NT 5.1)\r\n"
+                         "Connection: close\r\n"
+                         "\r\n";
+
+                pszKeyword = "Address:";
+            }
+            else if (nHost == 2)
+            {
+                addrConnect = CService("74.208.43.192", 80); // www.showmyip.com
+
+                if (nLookup == 1)
+                {
+                    CService addrIP("www.showmyip.com", 80, true);
+                    if (addrIP.IsValid())
+                        addrConnect = addrIP;
+                }
+
+                pszGet = "GET /simple/ HTTP/1.1\r\n"
+                         "Host: www.showmyip.com\r\n"
+                         "User-Agent: Mozilla/4.0 (compatible; MSIE 7.0; Windows NT 5.1)\r\n"
+                         "Connection: close\r\n"
+                         "\r\n";
+
+                pszKeyword = NULL; // Returns just IP address
             }
 
-            pszGet = "GET / HTTP/1.1\r\n"
-                     "Host: checkip.dyndns.org\r\n"
-                     "User-Agent: Mozilla/4.0 (compatible; MSIE 7.0; Windows NT 5.1)\r\n"
-                     "Connection: close\r\n"
-                     "\r\n";
-
-            pszKeyword = "Address:";
+            if (GetMyExternalIP2(addrConnect, pszGet, pszKeyword, ipRet))
+                return true;
         }
-        else if (nHost == 2)
-        {
-            addrConnect = CService("74.208.43.192", 80); // www.showmyip.com
-
-            if (nLookup == 1)
-            {
-                CService addrIP("www.showmyip.com", 80, true);
-                if (addrIP.IsValid())
-                    addrConnect = addrIP;
-            }
-
-            pszGet = "GET /simple/ HTTP/1.1\r\n"
-                     "Host: www.showmyip.com\r\n"
-                     "User-Agent: Mozilla/4.0 (compatible; MSIE 7.0; Windows NT 5.1)\r\n"
-                     "Connection: close\r\n"
-                     "\r\n";
-
-            pszKeyword = NULL; // Returns just IP address
-        }
-
-        if (GetMyExternalIP2(addrConnect, pszGet, pszKeyword, ipRet))
-            return true;
     }
 
     return false;
@@ -1199,7 +1470,8 @@ void MapPort()
 // The second name should resolve to a list of seed addresses.
 static const char *strDNSSeed[][2] = {
 #ifdef _MSC_VER
-    NULL, NULL
+    "", ""
+    //NULL, NULL
 #else
     //{"yacoin.org", "seed.novacoin.su"},    // WM - Umm...  FIXME
 #endif
@@ -2166,6 +2438,7 @@ public:
 #endif
 #ifdef _MSC_VER
             (void)printf( " done\n" );
+            Sleep( 2000 );  // 2 seconds just to see who is the slowest to close
         }
 #endif
     }

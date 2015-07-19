@@ -328,7 +328,7 @@ public:
 
     unsigned int GetSerializeSize(int, int=0) const
     {
-        return pend - pbegin;
+        return (unsigned int)(pend - pbegin);
     }
 
     template<typename Stream>
@@ -901,7 +901,7 @@ public:
         if (it == vch.begin() + nReadPos && (unsigned int)(last - first) <= nReadPos)
         {
             // special case for inserting at the front when there's room
-            nReadPos -= (last - first);
+            nReadPos -= (unsigned int)(last - first);
             memcpy(&vch[nReadPos], &first[0], last - first);
         }
         else
@@ -925,7 +925,7 @@ public:
         if (it == vch.begin() + nReadPos && (unsigned int)(last - first) <= nReadPos)
         {
             // special case for inserting at the front when there's room
-            nReadPos -= (last - first);
+            nReadPos -= (unsigned int)(last - first);
             memcpy(&vch[nReadPos], &first[0], last - first);
         }
         else
@@ -950,7 +950,7 @@ public:
         if (it == vch.begin() + nReadPos && (unsigned int)(last - first) <= nReadPos)
         {
             // special case for inserting at the front when there's room
-            nReadPos -= (last - first);
+            nReadPos -= (unsigned int)(last - first);
             memcpy(&vch[nReadPos], &first[0], last - first);
         }
         else
@@ -987,7 +987,7 @@ public:
             }
             else
             {
-                nReadPos = (last - vch.begin());
+                nReadPos = (unsigned int)(last - vch.begin());
                 return last;
             }
         }
@@ -1006,7 +1006,7 @@ public:
         // Rewind by n characters if the buffer hasn't been compacted yet
         if (n > nReadPos)
             return false;
-        nReadPos -= n;
+        nReadPos -= (unsigned int)n;
         return true;
     }
 

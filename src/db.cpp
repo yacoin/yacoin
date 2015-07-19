@@ -25,10 +25,7 @@
 using namespace std;
 using namespace boost;
 
-
 unsigned int nWalletDBUpdated;
-
-
 
 //
 // CDB
@@ -765,28 +762,43 @@ bool CTxDB::LoadBlockIndex()
     vSortedByHeight.reserve(mapBlockIndex.size());
 #ifdef WIN32
     if (fPrintToConsole) 
-        (void)printf( "Sorting by height..." );        
+        (void)printf( "Sorting by height...\n" );        
     #ifdef QT_GUI
     uiInterface.InitMessage(
                             _("Sorting by height...")
                            );
     #endif
+    int
+        nCount = 0;
 #endif        
     BOOST_FOREACH(const PAIRTYPE(uint256, CBlockIndex*)& item, mapBlockIndex)
     {
         CBlockIndex* pindex = item.second;
         vSortedByHeight.push_back(make_pair(pindex->nHeight, pindex));
+#ifdef WIN32
+        ++nCount;
+        if( 0 == (nCount % 10000) )
+        {
+    #ifdef QT_GUI
+            uiInterface.InitMessage( strprintf( _("%7d"), nCount ) );
+    #else
+        #ifdef _MSC_VER
+            if (fPrintToConsole) 
+                printf( "%7d\r", nCount );
+        #endif
+    #endif
+        }
+#endif        
     }
     sort(vSortedByHeight.begin(), vSortedByHeight.end());
 #ifdef WIN32
     if (fPrintToConsole) 
-        (void)printf( "done\nChecking stake checksums..." );        
+        (void)printf( "\ndone\nChecking stake checksums...\n" );        
     #ifdef QT_GUI
     uiInterface.InitMessage( _("done") );
     uiInterface.InitMessage( _("Checking stake checksums...") );
     #endif
-    int
-        nCount = 0;
+    nCount = 0;
 #endif
     BOOST_FOREACH(const PAIRTYPE(int, CBlockIndex*)& item, vSortedByHeight)
     {
@@ -797,16 +809,23 @@ bool CTxDB::LoadBlockIndex()
         if (!CheckStakeModifierCheckpoints(pindex->nHeight, pindex->nStakeModifierChecksum))
             return error("CTxDB::LoadBlockIndex() : Failed stake modifier checkpoint height=%d, modifier=0x%016"PRI64x, pindex->nHeight, pindex->nStakeModifier);
 #ifdef WIN32
-    #ifdef QT_GUI
         ++nCount;
         if( 0 == (nCount % 10000) )
+        {
+    #ifdef QT_GUI
             uiInterface.InitMessage( strprintf( _("%7d"), nCount ) );
+    #else
+        #ifdef _MSC_VER
+            if (fPrintToConsole) 
+                printf( "%7d\r", nCount );
+        #endif
     #endif
+        }
 #endif        
     }
 #ifdef WIN32
     if (fPrintToConsole) 
-        (void)printf( "...done\n"
+        (void)printf( "\ndone\n"
                       "Read best chain\n" 
                     );        
     #ifdef QT_GUI
@@ -854,7 +873,7 @@ bool CTxDB::LoadBlockIndex()
             nMINUTESperBLOCK = 1,   // or whatever you want to do in this *coin
             nMINUTESperHOUR = 60,
             nBLOCKSperHOUR = nMINUTESperHOUR / nMINUTESperBLOCK,
-            nHOURStoCHECK = 12,     // this could be a variable
+            nHOURStoCHECK = 1,   //12,     // this could be a variable
             nBLOCKSinLAST12HOURS = nBLOCKSperHOUR * nHOURStoCHECK;
 
         nCheckDepth = nBLOCKSinLAST12HOURS;
@@ -886,8 +905,11 @@ bool CTxDB::LoadBlockIndex()
                         );        
     #endif        
     #ifdef QT_GUI
-        sX = strprintf( _("Verifying the last %4d blocks"), nCheckDepth - nCount );
-        uiInterface.InitMessage( sX.c_str() );
+        if( !( (nCheckDepth - nCount) % 2 ) )
+        {
+            sX = strprintf( _("Verifying the last %4d blocks"), nCheckDepth - nCount );
+            uiInterface.InitMessage( sX.c_str() );
+        }
     #endif
 #endif
         if (!block.ReadFromDisk(pindex))
@@ -1169,6 +1191,16 @@ bool CTxDB::LoadBlockIndexGuts()
     int
         nMaxHeightGuess = 0,
         nCount = 0;
+    const int
+    #ifdef _DEBUG
+        nRefresh = 2000;
+    #else
+        #ifdef QT_GUI
+        nRefresh = 4000;
+        #else
+        nRefresh = 5000;    //10000;
+        #endif
+    #endif
 #endif
     // Load mapBlockIndex
     unsigned int fFlags = DB_SET_RANGE;
@@ -1247,35 +1279,36 @@ bool CTxDB::LoadBlockIndexGuts()
                 if (pindexNew->IsProofOfStake())
                     setStakeSeen.insert(make_pair(pindexNew->prevoutStake, pindexNew->nStakeTime));
 #ifdef WIN32
-                if( 0 == ( nCount % 10000 ) )  // every 10,000th time through the loop
+                // could "guess at the max nHeight & %age against the loop count
+                // to "hone in on" the %age done.  
+                // Towards the end it ought to be pretty accurate.
+                if( nMaxHeightGuess < pindexNew->nHeight )
+                    nMaxHeightGuess = pindexNew->nHeight;
+                if( 
+                    ( 0 != nCount ) &&
+                    0 == ( nCount % nRefresh ) 
+                  )  // every nRefresh-th time through the loop
                 {
-                    // could "guess at the max nHeight & %age against the loop count
-                    // to "hone in on" the %age done.  Towards the end it ought to be pretty accurate.
-                    if( nMaxHeightGuess < pindexNew->nHeight )
-                        nMaxHeightGuess = pindexNew->nHeight;
-                    if( 0 != nCount )
-                    {
-                        std::string 
-                            sGutsNoise = strprintf(
-                                        "%7d (%2.2f%%)"
-                                        "",
-                                        pindexNew->nHeight
-                                        ,               // these #s are just to slosh the . around
-                                        (floorf( float(nCount * 10000.0 / nMaxHeightGuess) ) / 100) > 100.0?
-                                        100.0: (floorf( float(nCount * 10000.0 / nMaxHeightGuess) ) / 100)
-                                                  );
-                        if (fPrintToConsole)
-                            (void)printf( 
-                                        "%s"
-                                        ""
-                                        "\r"
-                                        "",
-                                        sGutsNoise.c_str()
-                                        );
+                    float                   // these #s are just to slosh the . around
+                        dEstimate = float( ( 100.0 * nCount ) / nMaxHeightGuess );
+                    std::string 
+                        sGutsNoise = strprintf(
+                                    "%7d (%3.2f%%)"
+                                    "",
+                                    pindexNew->nHeight,
+                                    dEstimate > 100.0? 100.0: dEstimate
+                                              );
+                    if (fPrintToConsole)
+                        (void)printf( 
+                                    "%s"
+                                    "   "
+                                    "\r"
+                                    "",
+                                    sGutsNoise.c_str()
+                                    );
     #ifdef QT_GUI
-                        uiInterface.InitMessage( sGutsNoise.c_str() );
+                    uiInterface.InitMessage( sGutsNoise.c_str() );
     #endif
-                    }
                 }
                 ++nCount;
 #endif

@@ -12,6 +12,8 @@
 #include <sys/time.h>
 #include <sys/resource.h>
 #else
+#include <stdint.h>    // test
+
 typedef int pid_t; /* define for Windows compatibility */
 #endif
 #include <map>
@@ -33,8 +35,8 @@ typedef long long  int64;
 typedef unsigned long long  uint64;
 
 static const int64 COIN = 1000000;
-static const int COINdecimalPower = 6;     // i.e. log10( COIN )
-
+       const int COINdecimalPower = 6;     // i.e. log10( COIN )
+//2000000000
 static const int64 CENT = 10000;
 
 #define loop                for (;;)

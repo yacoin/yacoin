@@ -37,26 +37,26 @@
 #include "macdockiconhandler.h"
 #endif
 
-#include <QApplication>
-#include <QMainWindow>
+#include    <QApplication>
+#include    <QMainWindow>
 #include <QMenuBar>
 #include <QMenu>
 #include <QIcon>
-#include <QTabWidget>
+#include    <QTabWidget>
 #include <QVBoxLayout>
 #include <QToolBar>
 #include <QStatusBar>
 #include <QLabel>
-#include <QLineEdit>
-#include <QPushButton>
-#include <QLocale>
+#include    <QLineEdit>
+#include    <QPushButton>
+#include    <QLocale>
 #include <QMessageBox>
 #include <QProgressBar>
 #include <QStackedWidget>
 #include <QDateTime>
 #include <QMovie>
-#include <QFileDialog>
-#include <QDesktopServices>
+#include    <QFileDialog>
+#include    <QDesktopServices>
 #include <QTimer>
 #include <QDragEnterEvent>
 #include <QUrl>
@@ -501,6 +501,8 @@ void BitcoinGUI::setClientModel(ClientModel *clientModel)
                     clientModel->getNumScanned()
                     );
         connect(clientModel, SIGNAL(numBlocksChanged(int,int,int)), this, SLOT(setNumBlocks(int,int,int)));
+
+        //connect(clientModel, SIGNAL( ), this, SLOT( ));
 
         // Report errors from network/worker thread
         connect(clientModel, SIGNAL(error(QString,QString,bool)), this, SLOT(error(QString,QString,bool)));

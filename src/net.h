@@ -59,6 +59,9 @@ inline unsigned int SendBufferSize() { return 1000*GetArg("-maxsendbuffer", 1*10
 void AddOneShot(std::string strDest);
 bool RecvLine(SOCKET hSocket, std::string& strLine);
 bool GetMyExternalIP(CNetAddr& ipRet);
+#ifdef WIN32
+    bool GetMyExternalWebPage(const std::string & sDomain, const char* pszGet, std::string &strLine, double &dPrice);
+#endif
 void AddressCurrentlyConnected(const CService& addr);
 CNode* FindNode(const CNetAddr& ip);
 CNode* FindNode(const CService& ip);

@@ -92,7 +92,11 @@ public:
         *pBlockHashLineEdit,
         *pBlockNumberLineEdit;
     QLabel
-        *pQLaverage; 
+        *pQLpriceText, 
+        *pQLprice, 
+        *pQLaverage;
+    double
+        dLastPrice; 
     bool
         fBlockEditConnected,
         fBlockHashEditConnected,

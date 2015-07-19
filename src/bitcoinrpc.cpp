@@ -113,7 +113,7 @@ int64 AmountFromValue(const Value& value)
 
 Value ValueFromAmount(int64 amount)
 {
-    return (double)amount / (double)COIN;
+    return (double)amount / (double)COIN; 
 }
 
 std::string HexBits(unsigned int nBits)
@@ -221,6 +221,7 @@ static const CRPCCommand vRPCCommands[] =
     { "getblockcount",          &getblockcount,          true,   false },
 #ifdef WIN32
     { "getblockcountt",         &getcurrentblockandtime, true,   false },
+    { "getyacprice",            &getYACprice,            true,   false },
 #endif
     { "getconnectioncount",     &getconnectioncount,     true,   false },
     { "getpeerinfo",            &getpeerinfo,            true,   false },
@@ -285,7 +286,7 @@ static const CRPCCommand vRPCCommands[] =
     { "repairwallet",           &repairwallet,           false,  true},
     { "resendtx",               &resendtx,               false,  true},
     { "makekeypair",            &makekeypair,            false,  true},
-    { "sendalert",              &sendalert,              false,  false},
+    { "sendalert",              &sendalert,              false,  false}
 };
 
 CRPCTable::CRPCTable()

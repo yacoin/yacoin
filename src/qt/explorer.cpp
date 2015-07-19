@@ -113,6 +113,9 @@ ExplorerPage::ExplorerPage(QWidget *parent) :
 
     vBlockPeriods.resize( nROWS_OF_DISPLAYED_BLOCKS );  
     pQLaverage = ui->AveBkPeriodField;
+    pQLpriceText = ui->labelPrice;
+    pQLprice = ui->label_ThePrice;
+    dLastPrice = 0.0;
 
     pBlockNumberLineEdit = ui->BlockNumberLineEdit;
     pBlockHashLineEdit = ui->BlockHashLineEdit;
@@ -121,15 +124,15 @@ ExplorerPage::ExplorerPage(QWidget *parent) :
     //QList< QVector< QString > > qlistOfBlockRows;
 
     char 
-        *pcArrayOfBlockHeaders[ BLOCK_VIEW_SIZE ];
-
-    pcArrayOfBlockHeaders[ HEIGHT       ] = "Height";
-    pcArrayOfBlockHeaders[ TIME         ] = "Time (local)";
-    pcArrayOfBlockHeaders[ AGE          ] = "Age";
-    pcArrayOfBlockHeaders[ TRANSACTIONS ] = "Txs";
-    pcArrayOfBlockHeaders[ TOTAL_SENT   ] = "Total Sent";
+        //*pcArrayOfBlockHeaders[ BLOCK_VIEW_SIZE ];
+        **ppcArrayOfBlockHeaders = new char*[ BLOCK_VIEW_SIZE ];
+    ppcArrayOfBlockHeaders[ HEIGHT       ] = "Height";
+    ppcArrayOfBlockHeaders[ TIME         ] = "Time (local)";
+    ppcArrayOfBlockHeaders[ AGE          ] = "Age";
+    ppcArrayOfBlockHeaders[ TRANSACTIONS ] = "Txs";
+    ppcArrayOfBlockHeaders[ TOTAL_SENT   ] = "Total Sent";
                            //RELAYED_BY  //"Relayed By";
-    pcArrayOfBlockHeaders[ SIZE_kB      ] = "Size (kB)"; 
+    ppcArrayOfBlockHeaders[ SIZE_kB      ] = "Size (kB)"; 
 
     pExplorerBlockDialog = new BlockExplorerPage( this );
     pExplorerTransactionDialog = new TransactionExplorerPage( this );
@@ -176,7 +179,7 @@ ExplorerPage::ExplorerPage(QWidget *parent) :
                                             column, 
                                             new QStandardItem( 
                                                               QString( 
-                                                              pcArrayOfBlockHeaders[ column ] 
+                                                              ppcArrayOfBlockHeaders[ column ] 
                                                                      ) 
                                                              ) 
                                             );
@@ -193,20 +196,21 @@ ExplorerPage::ExplorerPage(QWidget *parent) :
     //_________________________________________________________________________
     // Generate transaction headers
     char 
-        *pcArrayOfTransactionHeaders[ TX_VIEW_SIZE ];
+        //*pcArrayOfTransactionHeaders[ TX_VIEW_SIZE ];
+        **ppcArrayOfTransactionHeaders = new char*[ TX_VIEW_SIZE ];
 
-    pcArrayOfTransactionHeaders[ TX_ID     ] = "                       Tx ID                       ";
-    pcArrayOfTransactionHeaders[ TX_TIME   ] = "Time (local)";
-    pcArrayOfTransactionHeaders[ TX_AGE    ] = "Age";
-    pcArrayOfTransactionHeaders[ TX_AMOUNT ] = "Amount";
+    ppcArrayOfTransactionHeaders[ TX_ID     ] = "                       Tx ID                       ";
+    ppcArrayOfTransactionHeaders[ TX_TIME   ] = "Time (local)";
+    ppcArrayOfTransactionHeaders[ TX_AGE    ] = "Age";
+    ppcArrayOfTransactionHeaders[ TX_AMOUNT ] = "Amount";
                 /********************************
-    pcArrayOfTransactionHeaders[ TX_nm ] = "Test Area";
+    ppcArrayOfTransactionHeaders[ TX_nm ] = "Test Area";
                 ********************************/
     pQSIMtransactions = new QStandardItemModel( nROWS_OF_DISPLAYED_TRANSACTIONS, TX_VIEW_SIZE, this );
     for (int column = 0; column < TX_VIEW_SIZE; ++column)
     {
         QString
-            QS = QString( pcArrayOfTransactionHeaders[ column ] );
+            QS = QString( ppcArrayOfTransactionHeaders[ column ] );
 
         QStandardItem
             *pQSI = new QStandardItem( QS );
@@ -710,6 +714,60 @@ void ExplorerPage::showBkInfoDetails( QModelIndex QMI )
     pExplorerBlockDialog->pQTVblockinfo->selectionModel()->select( QMI, QItemSelectionModel::Deselect );
 }
 //_____________________________________________________________________________
+// a POF to display YAC price & direction
+//_____________________________________________________________________________
+std::string doPrettyPrice( double & dlastPrice, double & dPrice )
+{
+    enum{
+        PRICE_INCREASING = 1,
+        PRICE_DECREASING = -1,
+        PRICE_NOCHANGE = 0
+        };
+
+    std::string
+        sColorText = "<font color = '",
+        sTemp = strprintf( "%0.6lf", dPrice );  // we should only show the decimal power of the coin
+    
+    int 
+        nPriceSignal;
+
+    if ( dPrice > dlastPrice )
+    {
+        nPriceSignal = (int)PRICE_INCREASING;
+    }
+    else
+        if ( dPrice < dlastPrice )
+        {
+            nPriceSignal = (int)PRICE_DECREASING;
+        }
+        else // they are equal
+        {
+            nPriceSignal = (int)PRICE_NOCHANGE;
+        }
+    dlastPrice = dPrice;
+
+    switch( nPriceSignal )
+    {
+        case (int)PRICE_INCREASING:
+            sColorText += "green' >";
+            break;
+        case (int)PRICE_DECREASING:
+            sColorText += "red' >";
+            break;
+        case (int)PRICE_NOCHANGE:
+            sColorText += "black' >";
+            break;
+    }
+    sTemp += "</font >";
+    sColorText += sTemp;
+    
+//    pP->setText( sColorText.c_str() );   // so we can put this label basically on any page
+    return sColorText;
+    // try to place this text on the overviewpage, somehow!??
+    // signal( )
+}
+
+//_____________________________________________________________________________
 // a POF to assist ExplorerPage::showTxInfoDetails()
 //_____________________________________________________________________________
 
@@ -1135,6 +1193,9 @@ void ExplorerPage::setNumBlocks( int currentHeight )
         pblockindex = mapBlockIndex[theDefiningBlockHash];
         nHeight = pblockindex->nHeight;
 
+        bool
+            fMostlyUpToDate = false;
+
         QDateTime
             Qnow = QDateTime::currentDateTime(),
             QdateOfBestBlock = QDateTime::fromTime_t( pblockindex->GetBlockTime() );
@@ -1290,14 +1351,25 @@ void ExplorerPage::setNumBlocks( int currentHeight )
                                         nONE_HOUR_in_seconds = 60 * 60;
     
                                     if( nBlockAge >= nONE_HOUR_in_seconds )
+                                    {
                                         strTemporary = QDateTime::fromTime_t( nBlockAge ).
                                                        toUTC().toString("hh:mm:ss").toStdString();
+                                    }
                                     else
+                                    {
                                         strTemporary = QDateTime::fromTime_t( nBlockAge ).
                                                        toUTC().toString("mm:ss").toStdString();
+
+                                        if ( nBlockAge < 90 )
+                                            fMostlyUpToDate = true;
+                                    }
                                 }
                                 else
+                                {
                                     strTemporary = strprintf( "%d sec", nBlockAge );
+                                    if ( nBlockAge > -90 )
+                                        fMostlyUpToDate = true;
+                                }
                                 //vStringBlockDataRow[ AGE ] = strTemporary.c_str();
 
                                 pQSIMblocks->setData( 
@@ -1382,9 +1454,37 @@ void ExplorerPage::setNumBlocks( int currentHeight )
                     // Since blocks come ~1 minute apart, there seems to be no need!?
             {       
             }
+            if (fMostlyUpToDate)
+            {
+                if (!pQLprice->isVisible())
+                {
+                    pQLpriceText->setVisible( true );
+                    pQLprice->setVisible( true );
+                }
+
+                fMostlyUpToDate = false;
+
+                // add the price update here
+                double 
+                    dPrice = doGetYACprice();
+            
+                if ( 0.0 != dPrice )
+                {
+                    std::string
+                        sP = doPrettyPrice( dLastPrice, dPrice );
+
+                    // finally put the price into a QLabel!
+                    pQLprice->setText( sP.c_str() );
+                }
+            }
         }
         else        // in the catch up process, so stay quiet since blocks are too old
         {
+            if (pQLprice->isVisible())
+            {
+                pQLprice->setVisible( false );                
+            }
+            pQLpriceText->setVisible( false );
         }
 //_____________________________________________________________________________
 //_____________________________________________________________________________
