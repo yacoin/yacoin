@@ -2,7 +2,6 @@
 // Copyright (c) 2009-2012 The Bitcoin developers
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
-
 #ifdef _MSC_VER
     #include <stdint.h>
 
@@ -10,8 +9,18 @@
 #endif
 
 #include "protocol.h"
-#include "util.h"
-#include "netbase.h"
+//#include "util.h"
+//#include "netbase.h"
+
+#include "net.h"    
+// to bring in 
+//enum
+//{
+//    MSG_TX = 1,
+//    MSG_BLOCK = 2,
+//    MSG_TYPELIST_LENGTH = 3
+//};
+// and somehow time it to ppszTypeName (below), if only in this comment!!!
 
 #ifndef WIN32
 # include <arpa/inet.h>
@@ -19,8 +28,8 @@
 
 static const char* ppszTypeName[] =
 {
-    "ERROR",
-    "tx",
+    "ERROR",       
+    "tx",        // I believe these are directly related to the enum in net.h!????
     "block",
 };
 
@@ -86,7 +95,7 @@ CAddress::CAddress() : CService()
     Init();
 }
 
-CAddress::CAddress(CService ipIn, uint64 nServicesIn) : CService(ipIn)
+CAddress::CAddress(CService ipIn, ::uint64_t nServicesIn) : CService(ipIn)
 {
     Init();
     nServices = nServicesIn;
@@ -153,6 +162,4 @@ void CInv::print() const
 {
     printf("CInv(%s)\n", ToString().c_str());
 }
-#ifdef _MSC_VER
-    #include "msvc_warnings.pop.h"
-#endif
+

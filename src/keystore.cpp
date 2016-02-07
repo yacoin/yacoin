@@ -2,16 +2,18 @@
 // Copyright (c) 2009-2012 The Bitcoin developers
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
-
 #ifdef _MSC_VER
     #include <stdint.h>
 
-    #include "msvc_warnings.push.h"        
-    #include "justincase.h"       // for releaseModeAssertionfailure()
+    #include "msvc_warnings.push.h"
+    #include "JustInCase.h"
 #endif
 
 #include "keystore.h"
 #include "script.h"
+#include "base58.h"
+
+extern bool fWalletUnlockMintOnly;
 
 bool CKeyStore::GetPubKey(const CKeyID &address, CPubKey &vchPubKeyOut) const
 {
@@ -35,9 +37,19 @@ bool CBasicKeyStore::AddKey(const CKey& key)
 
 bool CBasicKeyStore::AddCScript(const CScript& redeemScript)
 {
+    if (redeemScript.size() > MAX_SCRIPT_ELEMENT_SIZE)
+        return error("CBasicKeyStore::AddCScript() : redeemScripts > %i bytes are invalid", MAX_SCRIPT_ELEMENT_SIZE);
+
     {
         LOCK(cs_KeyStore);
+#ifdef _MSC_VER
+        if( 0 < redeemScript.size() )
+            mapScripts[redeemScript.GetID()] = redeemScript;  // will crash if redeemScript is 0 length []
+        else
+            return error("CBasicKeyStore::AddCScript() : redeemScript is nul vector?");
+#else
         mapScripts[redeemScript.GetID()] = redeemScript;
+#endif
     }
     return true;
 }
@@ -67,6 +79,42 @@ bool CBasicKeyStore::GetCScript(const CScriptID &hash, CScript& redeemScriptOut)
     return false;
 }
 
+bool CBasicKeyStore::AddWatchOnly(const CScript &dest)
+{
+    LOCK(cs_KeyStore);
+
+    CTxDestination address;
+    if (ExtractDestination(dest, address)) {
+        CKeyID keyID;
+        CBitcoinAddress(address).GetKeyID(keyID);
+        if (HaveKey(keyID))
+            return false;
+    }
+
+    setWatchOnly.insert(dest);
+    return true;
+}
+
+
+bool CBasicKeyStore::RemoveWatchOnly(const CScript &dest)
+{
+    LOCK(cs_KeyStore);
+    setWatchOnly.erase(dest);
+    return true;
+}
+
+bool CBasicKeyStore::HaveWatchOnly(const CScript &dest) const
+{
+    LOCK(cs_KeyStore);
+    return setWatchOnly.count(dest) > 0;
+}
+
+bool CBasicKeyStore::HaveWatchOnly() const
+{
+    LOCK(cs_KeyStore);
+    return (!setWatchOnly.empty());
+}
+
 bool CCryptoKeyStore::SetCrypted()
 {
     {
@@ -88,6 +136,7 @@ bool CCryptoKeyStore::Lock()
     {
         LOCK(cs_KeyStore);
         vMasterKey.clear();
+        fWalletUnlockMintOnly = false;
     }
 
     NotifyStatusChanged(this);
@@ -128,6 +177,13 @@ bool CCryptoKeyStore::AddKey(const CKey& key)
 {
     {
         LOCK(cs_KeyStore);
+
+        CScript script;
+        script.SetDestination(key.GetPubKey().GetID());
+
+        if (HaveWatchOnly(script))
+            return false;
+
         if (!IsCrypted())
             return CBasicKeyStore::AddKey(key);
 
@@ -226,6 +282,33 @@ bool CCryptoKeyStore::EncryptKeys(CKeyingMaterial& vMasterKeyIn)
     }
     return true;
 }
-#ifdef _MSC_VER
-    #include "msvc_warnings.pop.h"        
-#endif
+
+bool CCryptoKeyStore::DecryptKeys(const CKeyingMaterial& vMasterKeyIn)
+{
+    {
+        LOCK(cs_KeyStore);
+        if (!IsCrypted())
+            return false;
+
+        CryptedKeyMap::const_iterator mi = mapCryptedKeys.begin();
+        for (; mi != mapCryptedKeys.end(); ++mi)
+        {
+            const CPubKey &vchPubKey = (*mi).second.first;
+            const std::vector<unsigned char> &vchCryptedSecret = (*mi).second.second;
+            CSecret vchSecret;
+            if(!DecryptSecret(vMasterKeyIn, vchCryptedSecret, vchPubKey.GetHash(), vchSecret))
+                return false;
+            if (vchSecret.size() != 32)
+                return false;
+            CKey key;
+            key.SetPubKey(vchPubKey);
+            key.SetSecret(vchSecret);
+            if (!CBasicKeyStore::AddKey(key))
+                return false;
+        }
+
+        mapCryptedKeys.clear();
+    }
+
+    return true;
+}

@@ -2,24 +2,28 @@
 // Copyright (c) 2009-2012 The Bitcoin developers
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
-
 #ifdef _MSC_VER
     #include <stdint.h>
 
     #include "msvc_warnings.push.h"
+#endif
 
-    #include "netbase.h"
-    //#include "util.h"
-    //#include "sync.h"
-    #include "db.h"     // for ssize_t
-#else    
 #include "netbase.h"
 #include "util.h"
 #include "sync.h"
-#endif
+#include "hash.h"
 
 #ifndef WIN32
+#ifdef ANDROID
+#include <fcntl.h>
+#else
 #include <sys/fcntl.h>
+#endif
+#endif
+
+#ifdef _MSC_VER
+#include <BaseTsd.h>
+typedef SSIZE_T ssize_t;
 #endif
 
 #include "strlcpy.h"
@@ -31,7 +35,8 @@ using namespace std;
 static proxyType proxyInfo[NET_MAX];
 static proxyType nameproxyInfo;
 static CCriticalSection cs_proxyInfos;
-int nConnectTimeout = 5000;
+//int nConnectTimeout = 5000;
+int nConnectTimeout = 10 * 1000;
 bool fNameLookup = false;
 
 static const unsigned char pchIPv4[12] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0xff, 0xff };
@@ -106,41 +111,42 @@ bool static LookupIntern(const char *pszName, std::vector<CNetAddr>& vIP, unsign
     struct addrinfo *aiTrav = aiRes;
     while (aiTrav != NULL && (nMaxSolutions == 0 || vIP.size() < nMaxSolutions))
     {
-        if (aiTrav->ai_family == AF_INET)
+        switch (aiTrav->ai_family)
         {
+            case (AF_INET):
 #ifdef _MSC_VER
-            bool
-                fTest = (aiTrav->ai_addrlen >= sizeof(sockaddr_in));
+                bool
+                    fTest = (aiTrav->ai_addrlen >= sizeof(sockaddr_in));
     #ifdef _DEBUG
-            assert(fTest);
+                assert(fTest);
     #else
-            if( !fTest )
-                releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
+                if( !fTest )
+                    releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
     #endif
 #else
-            assert(aiTrav->ai_addrlen >= sizeof(sockaddr_in));
+                assert(aiTrav->ai_addrlen >= sizeof(sockaddr_in));
 #endif
-            vIP.push_back(CNetAddr(((struct sockaddr_in*)(aiTrav->ai_addr))->sin_addr));
-        }
+                vIP.push_back(CNetAddr(((struct sockaddr_in*)(aiTrav->ai_addr))->sin_addr));
+            break;
 
 #ifdef USE_IPV6
-        if (aiTrav->ai_family == AF_INET6)
-        {
+            case (AF_INET6):
 #ifdef _MSC_VER
-            bool
-                fTest = (aiTrav->ai_addrlen >= sizeof(sockaddr_in6));
+                bool
+                    fTest = (aiTrav->ai_addrlen >= sizeof(sockaddr_in6));
     #ifdef _DEBUG
-            assert(fTest);
+                assert(fTest);
     #else
-            if( !fTest )
-                releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
+                if( !fTest )
+                    releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
     #endif
 #else
-            assert(aiTrav->ai_addrlen >= sizeof(sockaddr_in6));
+                assert(aiTrav->ai_addrlen >= sizeof(sockaddr_in6));
 #endif
-            vIP.push_back(CNetAddr(((struct sockaddr_in6*)(aiTrav->ai_addr))->sin6_addr));
+                vIP.push_back(CNetAddr(((struct sockaddr_in6*)(aiTrav->ai_addr))->sin6_addr));
+            break;
+#endif
         }
-#endif
 
         aiTrav = aiTrav->ai_next;
     }
@@ -361,12 +367,15 @@ bool static ConnectSocketDirectly(const CService &addrConnect, SOCKET& hSocketRe
     struct sockaddr sockaddr;
 #endif
     socklen_t len = sizeof(sockaddr);
-    if (!addrConnect.GetSockAddr((struct sockaddr*)&sockaddr, &len)) {
+    if (!addrConnect.GetSockAddr((struct sockaddr*)&sockaddr, &len)) 
+    {
         printf("Cannot connect to %s: unsupported network\n", addrConnect.ToString().c_str());
         return false;
     }
 
-    SOCKET hSocket = socket(((struct sockaddr*)&sockaddr)->sa_family, SOCK_STREAM, IPPROTO_TCP);
+    SOCKET 
+        hSocket = socket(((struct sockaddr*)&sockaddr)->sa_family, SOCK_STREAM, IPPROTO_TCP);
+
     if (hSocket == INVALID_SOCKET)
         return false;
 #ifdef SO_NOSIGPIPE
@@ -375,21 +384,89 @@ bool static ConnectSocketDirectly(const CService &addrConnect, SOCKET& hSocketRe
 #endif
 
 #ifdef WIN32
-    u_long fNonblock = 1;
-    if (ioctlsocket(hSocket, FIONBIO, &fNonblock) == SOCKET_ERROR)
+
+//___________________________________
+    BOOL
+        bOptVal = TRUE;
+    int 
+        iResult = 0;
+    int 
+        bOptLen = sizeof (BOOL);
+
+    int 
+        iOptVal = 0;
+    int 
+        iOptLen = sizeof (int);
+
+    iResult = getsockopt(hSocket, SOL_SOCKET, SO_KEEPALIVE, (char *) &iOptVal, &iOptLen);
+    if (iResult == SOCKET_ERROR) 
+    {
+        wprintf(L"getsockopt for SO_KEEPALIVE failed with error: %u\n", WSAGetLastError());
+    } 
+    //else
+        //wprintf(L"SO_KEEPALIVE Value: %ld\n", iOptVal);
+
+    iResult = setsockopt(hSocket, SOL_SOCKET, SO_KEEPALIVE, (char *) &bOptVal, bOptLen);
+    if (iResult == SOCKET_ERROR) 
+    {
+        wprintf(L"setsockopt for SO_KEEPALIVE failed with error: %u\n", WSAGetLastError());
+    } 
+    //else
+        //wprintf(L"Set SO_KEEPALIVE: ON\n");
+
+    iResult = getsockopt(hSocket, SOL_SOCKET, SO_KEEPALIVE, (char *) &iOptVal, &iOptLen);
+    if (iResult == SOCKET_ERROR) 
+    {
+        wprintf(L"getsockopt for SO_KEEPALIVE failed with error: %u\n", WSAGetLastError());
+    } 
+    //else
+        //wprintf(L"SO_KEEPALIVE Value: %ld\n", iOptVal);
+//___________________________________
+
+
+    u_long 
+        fNonblock = 1;
+    int 
+        nIoCtlSocketReturnValue = ioctlsocket(hSocket, FIONBIO, &fNonblock);
+    if (SOCKET_ERROR == nIoCtlSocketReturnValue )
 #else
     int fFlags = fcntl(hSocket, F_GETFL, 0);
     if (fcntl(hSocket, F_SETFL, fFlags | O_NONBLOCK) == -1)
 #endif
     {
+#ifdef WIN32
+        switch( nIoCtlSocketReturnValue )
+        {
+            case WSANOTINITIALISED:
+                break;
+            case WSAENETDOWN:
+                break;
+            case WSAEINPROGRESS:
+                break;
+            case WSAENOTSOCK:
+                break;
+            case WSAEFAULT:
+                break;
+            //case WSAEINVAL:
+            //    break;
+            default:
+                break;
+        }
+#endif
         closesocket(hSocket);
         return false;
     }
 
-    if (connect(hSocket, (struct sockaddr*)&sockaddr, len) == SOCKET_ERROR)
+    if (SOCKET_ERROR == connect(hSocket, (struct sockaddr*)&sockaddr, len) )
     {
+        int
+            nLastSocketError = WSAGetLastError();
         // WSAEINVAL is here because some legacy version of winsock uses it
-        if (WSAGetLastError() == WSAEINPROGRESS || WSAGetLastError() == WSAEWOULDBLOCK || WSAGetLastError() == WSAEINVAL)
+        if (
+            (nLastSocketError == WSAEINPROGRESS) || 
+            (nLastSocketError == WSAEWOULDBLOCK) || 
+            (nLastSocketError == WSAEINVAL)
+           )
         {
             struct timeval timeout;
             timeout.tv_sec  = nTimeout / 1000;
@@ -398,16 +475,28 @@ bool static ConnectSocketDirectly(const CService &addrConnect, SOCKET& hSocketRe
             fd_set fdset;
             FD_ZERO(&fdset);
             FD_SET(hSocket, &fdset);
-            int nRet = select(hSocket + 1, NULL, &fdset, NULL, &timeout);
+            int nRet = select(
+                              hSocket + 1, 
+                              NULL, 
+                              &fdset, 
+                              NULL, 
+                              &timeout
+                             );
             if (nRet == 0)
             {
-                printf("connection timeout\n");
+                printf("connection timeout %s"
+                        "\n"
+                        , addrConnect.ToString().c_str()
+                      );
                 closesocket(hSocket);
                 return false;
             }
             if (nRet == SOCKET_ERROR)
             {
-                printf("select() for connection failed: %i\n",WSAGetLastError());
+                printf("select() for connection %s failed: %i\n",
+                        addrConnect.ToString().c_str(),
+                        WSAGetLastError()
+                      );
                 closesocket(hSocket);
                 return false;
             }
@@ -418,16 +507,24 @@ bool static ConnectSocketDirectly(const CService &addrConnect, SOCKET& hSocketRe
             if (getsockopt(hSocket, SOL_SOCKET, SO_ERROR, &nRet, &nRetSize) == SOCKET_ERROR)
 #endif
             {
-                printf("getsockopt() for connection failed: %i\n",WSAGetLastError());
+                printf("getsockopt() for connection %s failed: %i\n",
+                       addrConnect.ToString().c_str(),
+                       WSAGetLastError()
+                      );
                 closesocket(hSocket);
                 return false;
             }
-            if (nRet != 0)
+            // therefore getsockopt of SO_ERROR returned successfully
+            if (nRet != 0)  // then there was an error on this socket
             {
-                printf("connect() failed after select(): %s\n",strerror(nRet));
+                printf("connect() %s failed after select(): %s\n",
+                       addrConnect.ToString().c_str(),
+                       strerror(nRet));
                 closesocket(hSocket);
                 return false;
             }
+
+            // if we ever get here, what does it mean??
         }
 #ifdef WIN32
         else if (WSAGetLastError() != WSAEISCONN)
@@ -435,7 +532,10 @@ bool static ConnectSocketDirectly(const CService &addrConnect, SOCKET& hSocketRe
         else
 #endif
         {
-            printf("connect() failed: %i\n",WSAGetLastError());
+            printf("connect() %s failed: %i\n",
+                   addrConnect.ToString().c_str(),
+                   WSAGetLastError()
+                  );
             closesocket(hSocket);
             return false;
         }
@@ -445,13 +545,37 @@ bool static ConnectSocketDirectly(const CService &addrConnect, SOCKET& hSocketRe
     // CNode::ConnectNode immediately turns the socket back to non-blocking
     // but we'll turn it back to blocking just in case
 #ifdef WIN32
-    fNonblock = 0;
-    if (ioctlsocket(hSocket, FIONBIO, &fNonblock) == SOCKET_ERROR)
+    fNonblock = 1;
+    if (SOCKET_ERROR == ioctlsocket(hSocket, FIONBIO, &fNonblock) )
 #else
     fFlags = fcntl(hSocket, F_GETFL, 0);
     if (fcntl(hSocket, F_SETFL, fFlags & !O_NONBLOCK) == SOCKET_ERROR)
 #endif
     {
+#ifdef WIN32
+        int
+            nErr = WSAGetLastError();
+        string
+            strError = iGetLastErrorText( nErr );
+        printf( "ioctlsocket error: %s\n", strError.c_str() );
+        switch( nErr )
+        {
+            case WSANOTINITIALISED:
+                break;
+            case WSAENETDOWN:
+                break;
+            case WSAEINPROGRESS:
+                break;
+            case WSAENOTSOCK:
+                break;
+            case WSAEFAULT:
+                break;
+            //case WSAEINVAL:
+            //    break;
+            default:
+                break;
+        }
+#endif
         closesocket(hSocket);
         return false;
     }
@@ -460,7 +584,8 @@ bool static ConnectSocketDirectly(const CService &addrConnect, SOCKET& hSocketRe
     return true;
 }
 
-bool SetProxy(enum Network net, CService addrProxy, int nSocksVersion) {
+bool SetProxy(enum Network net, CService addrProxy, int nSocksVersion) 
+{
 #ifdef _MSC_VER
     bool
         fTest = (net >= 0 && net < NET_MAX);
@@ -482,7 +607,8 @@ bool SetProxy(enum Network net, CService addrProxy, int nSocksVersion) {
     return true;
 }
 
-bool GetProxy(enum Network net, proxyType &proxyInfoOut) {
+bool GetProxy(enum Network net, proxyType &proxyInfoOut) 
+{
 #ifdef _MSC_VER
     bool
         fTest = (net >= 0 && net < NET_MAX);
@@ -502,7 +628,8 @@ bool GetProxy(enum Network net, proxyType &proxyInfoOut) {
     return true;
 }
 
-bool SetNameProxy(CService addrProxy, int nSocksVersion) {
+bool SetNameProxy(CService addrProxy, int nSocksVersion) 
+{
     if (nSocksVersion != 0 && nSocksVersion != 5)
         return false;
     if (nSocksVersion != 0 && !addrProxy.IsValid())
@@ -512,7 +639,8 @@ bool SetNameProxy(CService addrProxy, int nSocksVersion) {
     return true;
 }
 
-bool GetNameProxy(proxyType &nameproxyInfoOut) {
+bool GetNameProxy(proxyType &nameproxyInfoOut) 
+{
     LOCK(cs_proxyInfos);
     if (!nameproxyInfo.second)
         return false;
@@ -520,14 +648,17 @@ bool GetNameProxy(proxyType &nameproxyInfoOut) {
     return true;
 }
 
-bool HaveNameProxy() {
+bool HaveNameProxy() 
+{
     LOCK(cs_proxyInfos);
     return nameproxyInfo.second != 0;
 }
 
-bool IsProxy(const CNetAddr &addr) {
+bool IsProxy(const CNetAddr &addr) 
+{
     LOCK(cs_proxyInfos);
-    for (int i = 0; i < NET_MAX; i++) {
+    for (int i = 0; i < NET_MAX; i++) 
+    {
         if (proxyInfo[i].second && (addr == (CNetAddr)proxyInfo[i].first))
             return true;
     }
@@ -549,7 +680,8 @@ bool ConnectSocket(const CService &addrDest, SOCKET& hSocketRet, int nTimeout)
         return false;
 
     // do socks negotiation
-    switch (proxy.second) {
+    switch (proxy.second) 
+    {
     case 4:
         if (!Socks4(addrDest, hSocket))
             return false;
@@ -795,7 +927,7 @@ bool CNetAddr::IsValid() const
     if (IsIPv4())
     {
         // INADDR_NONE
-        uint32_t ipNone = INADDR_NONE;
+        ::uint32_t ipNone = INADDR_NONE;
         if (memcmp(ip+12, &ipNone, 4) == 0)
             return false;
 
@@ -969,10 +1101,10 @@ std::vector<unsigned char> CNetAddr::GetGroup() const
     return vchRet;
 }
 
-uint64 CNetAddr::GetHash() const
+::uint64_t CNetAddr::GetHash() const
 {
     uint256 hash = Hash(&ip[0], &ip[16]);
-    uint64 nRet;
+    ::uint64_t nRet;
     memcpy(&nRet, &hash, sizeof(nRet));
     return nRet;
 }
@@ -1255,6 +1387,3 @@ void CService::SetPort(unsigned short portIn)
 {
     port = portIn;
 }
-#ifdef _MSC_VER
-    #include "msvc_warnings.pop.h"
-#endif
