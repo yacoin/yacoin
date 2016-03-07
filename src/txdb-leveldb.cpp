@@ -470,10 +470,11 @@ bool CTxDB::LoadBlockIndex()
     #ifdef _DEBUG
         nRefresh = 2000;    // generally resfresh rates are chosen to give ~1 update/sec
     #else
+        // seems to be slowing down??
         #ifdef QT_GUI
         nRefresh = 10000;
         #else
-        nRefresh = 15000;    //10000;
+        nRefresh = 7000;    // 15000;    //10000;
         #endif
     #endif
 #endif
@@ -635,15 +636,13 @@ bool CTxDB::LoadBlockIndex()
         if (pindexNew->IsProofOfStake())
             setStakeSeen.insert(make_pair(pindexNew->prevoutStake, pindexNew->nStakeTime));
 #ifdef WIN32
+        ++nCounter;
         // could "guess at the max nHeight & %age against the loop count
         // to "hone in on" the %age done.  
         // Towards the end it ought to be pretty accurate.
         if( nMaxHeightGuess < pindexNew->nHeight )
             nMaxHeightGuess = pindexNew->nHeight;
-        if( 
-            ( 0 != nCounter ) &&
-            0 == ( nCounter % nRefresh ) 
-          )  // every nRefresh-th time through the loop
+        if( 0 == ( nCounter % nRefresh ) )  // every nRefresh-th time through the loop
         {
             float                   // these #s are just to slosh the . around
                 dEstimate = float( ( 100.0 * nCounter ) / nMaxHeightGuess );
@@ -666,7 +665,6 @@ bool CTxDB::LoadBlockIndex()
             uiInterface.InitMessage( sGutsNoise.c_str() );
     #endif
         }
-        ++nCounter;
 #endif
         iterator->Next();
     }
@@ -702,7 +700,7 @@ bool CTxDB::LoadBlockIndex()
         vSortedByHeight.reserve(mapBlockIndex.size());
         //vSortedByHeight.resize( mapBlockIndex.size() );
 
-        const int
+        int
             nUpdatePeriod = 10000;
         BOOST_FOREACH(const PAIRTYPE(uint256, CBlockIndex*)& item, mapBlockIndex)
         {
@@ -735,7 +733,10 @@ bool CTxDB::LoadBlockIndex()
         sort(vSortedByHeight.begin(), vSortedByHeight.end());
  #ifdef WIN32
         if (fPrintToConsole) 
-            (void)printf( "\ndone\nChecking stake checksums...\n" );        
+            (void)printf( "\ndone\nChecking stake checksums...\n" );
+    #ifdef _DEBUG
+        nUpdatePeriod /= 4; // speed up update for debug mode
+    #endif
     #ifdef QT_GUI
         uiInterface.InitMessage( _("done") );
         uiInterface.InitMessage( _("Checking stake checksums...") );

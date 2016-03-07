@@ -49,7 +49,7 @@ double GetDifficulty(const CBlockIndex* blockindex)
 double GetPoWMHashPS()
 {
     int nPoWInterval = 72;
-    ::int64_t nTargetSpacingWorkMin = 30, nTargetSpacingWork = 30;
+    int64_t nTargetSpacingWorkMin = 30, nTargetSpacingWork = 30;
 
     CBlockIndex* pindex = pindexGenesisBlock;
     CBlockIndex* pindexPrevWork = pindexGenesisBlock;
@@ -58,7 +58,7 @@ double GetPoWMHashPS()
     {
         if (pindex->IsProofOfWork())
         {
-            ::int64_t nActualSpacingWork = pindex->GetBlockTime() - pindexPrevWork->GetBlockTime();
+            int64_t nActualSpacingWork = pindex->GetBlockTime() - pindexPrevWork->GetBlockTime();
             nTargetSpacingWork = ((nPoWInterval - 1) * nTargetSpacingWork + nActualSpacingWork + nActualSpacingWork) / (nPoWInterval + 1);
             nTargetSpacingWork = max(nTargetSpacingWork, nTargetSpacingWorkMin);
             pindexPrevWork = pindex;
@@ -174,177 +174,145 @@ Value getblockcount(const Array& params, bool fHelp)
 
 double doGetYACprice()
 {
-    //-------------------------------------------------
-// an https test vector
-// "https://blockchain.info/address/1BitcoinEaterAddressDontSendf59kuE?format=json";
-    //Set-Cookie: NAME=VALUE; OPTIONS is there a cookie?
-    string
-        sfb,
-        //http://data.bter.com/api/1/ticker/yac_btc
-          
-        //sDomain = "pubapi2.cryptsy.com",
-                //"/api.php?method=singlemarketdata&marketid=11"
-        //sYACpriceKey = "lasttradeprice",
-
-        sDomain = "data.bter.com",
-                //"/api/1/ticker/yac_btc"
-        sYACpriceKey = "last",
-
-        sNewUrl1 = 
-                    "GET"
-                    " "
-                  //"/api.php?method=singlemarketdata&marketid=11"
-                    "/api/1/ticker/yac_btc"
-                    " "
-                    "HTTP/1.1"
+    // first call gets BTC/YAC ratio
+    // second call gets USD/BTC, so the product is USD/YAC
+    const string
+        sLeadIn   = "GET ",
+                    // here's where the api argument goes
+        sPrologue = " HTTP/1.1"
                     "\r\n"
                     "Content-Type: text/html"
                     "\r\n"
                     "Accept: application/json, text/html"
                     "\r\n"
-                    "Host: ";
-    sNewUrl1 += sDomain;
-    sNewUrl1 += 
-                "\r\n"
-                "Connection: close"
-                "\r\n"
-                "\r\n"
-                "";
-
-    string
-        sDomain2 = 
-        //"/api.php?method=singlemarketdata&marketid=2"
-
-        //https://api.coinbase.com/v2/prices/spot?currency=USD
-        //"data.bter.com",
-
-        //"api.coinbase.com",
-        //http://api.coindesk.com/v1/bpi/currentprice.json
-        //sBTCpriceKey = "amount",
-
-        //api.bitcoinaverage.com/ticker/USD/last
-        //"api.bitcoinaverage.com",
-        //sBTCpriceKey = "",
-
-        //http://api.bitcoinvenezuela.com
-        "api.bitcoinvenezuela.com",
-        sBTCpriceKey = "USD",
-
-        sNewUrl2 = 
-                    "GET"
-                    " "
-                  //"/api.php?method=singlemarketdata&marketid=2"
-                  //  "/v2/prices/spot?currency=USD"
-                    //"/v1/bpi/currentprice.json"
-                    ///ticker/USD/last
-                    "/"
-                    " "
-                    "HTTP/1.1"
+                    "Host: ",
+                    // here's where the domain goes
+        sEpilogue = "\r\n"
+                    "Connection: close"
                     "\r\n"
-                    "Content-Type: text/html"
                     "\r\n"
-                    "Accept: application/json, text/html"
-                    "\r\n"
-                    "Host: ";
-    sNewUrl2 += sDomain2;
-    sNewUrl2 += 
-                "\r\n"
-                "Connection: close"
-                "\r\n"
-                "\r\n"
-                "";
-
-    sfb = strprintf(
-                    "Command 1:\n%s"
-                    "\n"
-                    "Command 2:\n%s"
-                    "\n"
-                    "",
-                    sNewUrl1.c_str()
-                    ,
-                    sNewUrl2.c_str()
-                   );
-    if (fPrintToConsole) 
-        printf( "%s", sfb.c_str() );
-
-    Object 
-        result;
-
-    CNetAddr
-        ipRet;
-    
-    int
-        nPort = 80;
-
-    const char* 
-        pszGet = sNewUrl1.c_str();
-
-    string
-        sDestination1 = "",
-        sDestination2 = "";
+                    "";
+    const int
+        nPort = DEFAULT_HTTP_PORT;
 
     double
-        dYACtoUSDPrice = 0.0,
-        dBTCtoUSDPrice = 0.0,
-        dYACtoBTCPrice = 0.0;
+        dPriceRatio = 0.0,
+        dUSDperYACprice = 0.0,
+        dUSDtoBTCprice = 0.0,
+        dBTCtoYACprice = 0.0;
 
-    if (GetMyExternalWebPage( 
-                            sDomain,
-                            sYACpriceKey,
-                            pszGet, 
-                            sDestination1, 
-                            dYACtoBTCPrice, 
-                            nPort 
-                            ) 
-       )   // the webpage is  ~40,023 bytes long
-    {   //OK, now we have YAC/BTC (Cryptsy's terminology), really BTC/YAC
-        pszGet = sNewUrl2.c_str();
-        if (GetMyExternalWebPage( 
-                                sDomain2, 
-                                sBTCpriceKey,
-                                pszGet, 
-                                sDestination2, 
-                                dBTCtoUSDPrice, 
-                                nPort 
-                                ) 
-           )
-        {   // OK now we have BTC/USD (Cryptsy's terminology), really USD/BTC
-            dYACtoUSDPrice = dYACtoBTCPrice * dBTCtoUSDPrice;   // really USD/YAC
-        }
-        else
-        {
-            throw runtime_error(
-                        "getYACprice\n"
-                        "Could not get page 2?"
-                               );
-        }
-    }
-    else
+    string
+        sDestination = "",
+        sDomain,
+        sApi,
+        sUrl,
+        sPriceRatioKey;
+
+    sDomain         = "data.bter.com",
+    sPriceRatioKey  = "last",
+    sApi            = "/api/1/ticker/yac_btc",
+
+    sUrl = strprintf(
+                     "%s%s%s%s%s",
+                     sLeadIn.c_str(),
+                     sApi.c_str(),
+                     sPrologue.c_str(),
+                     sDomain.c_str(),
+                     sEpilogue.c_str()
+                    );
+    if (fPrintToConsole) 
     {
+        string
+            sfb = strprintf( "Command:\n%s\n", sUrl.c_str() );
+        printf( "%s", sfb.c_str() );
+    }
+    const char
+        *pszTheFullUrl = sUrl.c_str();
+
+    if (!GetMyExternalWebPage( 
+                              sDomain,
+                              sPriceRatioKey,
+                              pszTheFullUrl, 
+                              sDestination, 
+                              dPriceRatio 
+                              //nPort 
+                             ) 
+       )
+    {   // we could try another provider, if there was one!
         throw runtime_error(
             "getYACprice\n"
             "Could not get page 1?"
                            );
+        return dUSDperYACprice;
     }
-    std::string
-        stest = strprintf(
-                            "result"
-                            "\n"
-                            "___________________________________________________________\n"
-                            "___________________________________________________________\n"
-                            "%s"
-                            "\n"
-                            "___________________________________________________________\n"
-                            "%s"
-                            "___________________________________________________________\n"
-                            "___________________________________________________________\n"
-                            "",
-                            sDestination1.c_str(),
-                            sDestination2.c_str()
-                         );
-    //if( dYACtoUSDPrice > 0.0 )
-    return dYACtoUSDPrice;
-    //return stest;
+    //else    //OK, now we have YAC/BTC (Cryptsy's terminology), really BTC/YAC
+    dBTCtoYACprice = dPriceRatio;
+
+    if (fPrintToConsole) 
+    {
+        printf(
+                "%s => b/y %lf"
+                "\n", 
+                sDestination.c_str(),
+                dBTCtoYACprice
+              );
+    }
+    sDestination = "";
+    dPriceRatio = 0.0;
+
+    sDomain         = "btc.blockr.io",
+    sPriceRatioKey  = "value",
+    sApi            = "/api/v1/coin/info",
+
+    sUrl = strprintf(
+                     "%s%s%s%s%s",
+                     sLeadIn.c_str(),
+                     sApi.c_str(),
+                     sPrologue.c_str(),
+                     sDomain.c_str(),
+                     sEpilogue.c_str()
+                    );
+    if (fPrintToConsole) 
+    {
+        string
+            sfb = strprintf( "Command:\n%s\n", sUrl.c_str() );
+        printf( "%s", sfb.c_str() );
+    }
+    pszTheFullUrl = sUrl.c_str();
+    if (!GetMyExternalWebPage( 
+                              sDomain, 
+                              sPriceRatioKey,
+                              pszTheFullUrl, 
+                              sDestination, 
+                              dPriceRatio
+                              //nPort 
+                             ) 
+       )
+    {
+        throw runtime_error(
+                            "getYACprice\n"
+                            "Could not get page 2?"
+                           );
+    }
+    // else USD/BTC is OK
+    dUSDtoBTCprice = dPriceRatio;
+
+    if( 0.0 == dUSDtoBTCprice )
+    {       // that provider failed, so we should try another
+
+    }
+    dUSDperYACprice = dBTCtoYACprice * dUSDtoBTCprice;   // really USD/YAC
+    if (fPrintToConsole) 
+    {
+        printf(
+                "b/y %lf, $/b %lf, $/y = %lf"
+                "\n"
+                , dBTCtoYACprice
+                , dUSDtoBTCprice 
+                , dUSDperYACprice
+              );
+    }
+    return dUSDperYACprice;
 }
 
 Value getYACprice(const Array& params, bool fHelp)
@@ -356,8 +324,7 @@ Value getYACprice(const Array& params, bool fHelp)
     {
         throw runtime_error(
             "getyacprice \n"
-            "Returns the current price of YAC "
-            "given by Cryptsy.com using their public API for YAC/BTC and BTC/USD."
+            "Returns the current price of YAC in USD"
                            );
     }
 
@@ -365,7 +332,7 @@ Value getYACprice(const Array& params, bool fHelp)
         dPrice = doGetYACprice();
 
     string
-        sTemp = strprintf( "%0.6lf", dPrice );
+        sTemp = strprintf( "%0.8lf", dPrice );
 
     return sTemp;
 }
@@ -423,13 +390,13 @@ Value getcurrentblockandtime(const Array& params, bool fHelp)
     struct tm
         aTimeStruct;
 
-    char 
-        buff[30];
-
     time_t 
         tBlock = block.GetBlockTime();
 
-    #ifdef _MSC_VER
+#ifdef _MSC_VER
+    char 
+        buff[30];
+
     bool
         fIsGMT = true;  // the least of all evils
     fIsGMT = isThisInGMT( tBlock, aTimeStruct );
@@ -453,7 +420,7 @@ Value getcurrentblockandtime(const Array& params, bool fHelp)
     }
     //else //_localtime64_s() errored     
 **********************/
-    #else
+#else
     struct tm
         *paTimeStruct,
         *pgmTimeStruct;
@@ -487,7 +454,7 @@ Value getcurrentblockandtime(const Array& params, bool fHelp)
         fIsGMT = false;
         return strS;
     }
-    #endif
+#endif
     if( fIsGMT )// for GMT or having errored trying to convert from GMT
     {
         std::string
@@ -504,7 +471,7 @@ Value getcurrentblockandtime(const Array& params, bool fHelp)
         return strS;
     }    
     // let's cook up local time
-    #ifdef _MSC_VER
+#ifdef _MSC_VER
     asctime_s( buff, sizeof(buff), &aTimeStruct );
     buff[ 24 ] = '\0';      // let's wipe out the \n
     printf( //"Local Time: "
@@ -526,7 +493,7 @@ Value getcurrentblockandtime(const Array& params, bool fHelp)
                          , 
                          buff
                         );
-    #else
+#else
     pbuff = asctime( &aTimeStruct );
     if( '\n' == pbuff[ 24 ] )
         pbuff[ 24 ] = '\0';
@@ -548,7 +515,7 @@ Value getcurrentblockandtime(const Array& params, bool fHelp)
                      , 
                      pbuff
                     );
-    #endif
+#endif
     return strS;
 }
 #endif

@@ -10,12 +10,17 @@
 #endif
 
 #include "alert.h"
-#include "checkpoints.h"
+#ifndef WIN32
+    #include "checkpoints.h"
+#endif
 #include "db.h"
 #include "txdb.h"
 #include "net.h"
 #include "init.h"
 #include "ui_interface.h"
+#ifdef QT_GUI
+    #include "explorer.h"  
+#endif
 #include "checkqueue.h"
 #include "kernel.h"
 #include <boost/algorithm/string/replace.hpp>
@@ -24,7 +29,9 @@
 #include <boost/math/special_functions/round.hpp>
 
 #include "main.h"
-
+#ifdef WIN32
+    #include "checkpoints.h"
+#endif
 using namespace std;
 using namespace boost;
 
@@ -224,7 +231,7 @@ bool AddOrphanTx(const CTransaction& tx)
     // 10,000 orphans, each of which is at most 5,000 bytes big is
     // at most 500 megabytes of orphans:
 
-    size_t nSize = tx.GetSerializeSize(SER_NETWORK, CTransaction::CURRENT_VERSION);
+    size_t nSize = tx.GetSerializeSize(SER_NETWORK, CTransaction::CURRENT_VERSION_of_Tx);
 
     if (nSize > 5000)
     {
@@ -312,7 +319,7 @@ bool CTransaction::ReadFromDisk(COutPoint prevout)
 
 bool CTransaction::IsStandard(string& strReason) const
 {
-    if (nVersion > CTransaction::CURRENT_VERSION)
+    if (nVersion > CTransaction::CURRENT_VERSION_of_Tx)
     {
         strReason = "version";
         return false;
@@ -786,6 +793,11 @@ bool CTxMemPool::accept(CTxDB& txdb, CTransaction &tx, bool fCheckInputs,
     printf("CTxMemPool::accept() : accepted %s (poolsz %" PRIszu ")\n",
            hash.ToString().substr(0,10).c_str(),
            mapTx.size());
+#ifdef QT_GUI
+    lastTxHash.storeLasthash( hash );
+    uiInterface.NotifyBlocksChanged();
+#endif
+
     return true;
 }
 
@@ -1035,31 +1047,55 @@ uint256 WantedByOrphan(const CBlock* pblockOrphan)
 const unsigned char minNfactor = 4;
 const unsigned char maxNfactor = 30;
 
-unsigned char GetNfactor(::int64_t nTimestamp) {
-    int l = 0;
+unsigned char GetNfactor(::int64_t nTimestamp) 
+{
+    int 
+        nBitCount = 0;
 
     if (nTimestamp <= nChainStartTime)
         return 4;
 
-    ::int64_t s = nTimestamp - nChainStartTime;
-    while ((s >> 1) > 3) {
-      l += 1;
-      s >>= 1;
+    ::int64_t 
+        nAgeOfBlockOrTxInSeconds = nTimestamp - nChainStartTime,
+        nSavedAgeOfBlockOrTxInSeconds = nAgeOfBlockOrTxInSeconds;
+
+    while ((nAgeOfBlockOrTxInSeconds >> 1) > 3)     // nAgeOfBlockOrTxInSeconds / 2 is 4 or more
+    {
+        nBitCount += 1;
+        nAgeOfBlockOrTxInSeconds >>= 1;             // /2 again
     }
+    nAgeOfBlockOrTxInSeconds &= 0x03;   //3;    // really a mask on the low 2 bits.  But why?
 
-    s &= 3;
+    int                             // is 3 max
+        n = ( (nBitCount * 170) + (nAgeOfBlockOrTxInSeconds * 25) - 2320) / 100;
 
-    int n = (l * 170 + s * 25 - 2320) / 100;
-
-    if (n < 0) n = 0;
-
+    if (n < 0) 
+        n = 0;
     if (n > 255)
       //printf("GetNfactor(%ld) - something wrong(n == %d)\n", nTimestamp, n);
         printf("GetNfactor(%"PRI64d") - something wrong(n == %d)\n", nTimestamp, n); // for g++
 
+    // so n is between 0 and 0xff
     unsigned char N = (unsigned char)n;
-    //printf("GetNfactor: %d -> %d %d : %d / %d\n", nTimestamp - nChainStartTime, l, s, n, min(max(N, minNfactor), maxNfactor));
-
+#ifdef _DEBUG
+    if( fDebug )
+    {
+        printf(
+                "GetNfactor: %"PRI64d" -> %d %"PRI64d" : %d / %d\n", 
+                nTimestamp - nChainStartTime,   // 64 bit int
+                nBitCount, 
+                nAgeOfBlockOrTxInSeconds, 
+                n, 
+                (unsigned int)min(
+                                    max(
+                                        N, 
+                                        minNfactor
+                                       ), 
+                                    maxNfactor
+                                 )
+                );
+    }
+#endif
     return min(max(N, minNfactor), maxNfactor);
 }
 
@@ -1195,6 +1231,18 @@ CBigNum inline GetProofOfStakeLimit(int nHeight, unsigned int nTime)
     return min(nSubsidy, MAX_MINT_PROOF_OF_WORK) + nFees;
 }
 
+// ppcoin: miner's coin stake is rewarded based on coin age spent (coin-days)
+::int64_t GetProofOfStakeReward(::int64_t nCoinAge)
+{
+    static ::int64_t
+        nRewardCoinYear = 5 * CENT;  // creation amount per coin-year
+
+    ::int64_t 
+        nSubsidy = nCoinAge * 33 / (365 * 33 + 8) * nRewardCoinYear;
+    if (fDebug && GetBoolArg("-printcreation"))
+        printf("GetProofOfStakeReward(): create=%s nCoinAge=%"PRI64d"\n", FormatMoney(nSubsidy).c_str(), nCoinAge);
+    return nSubsidy;
+}
 // miner's coin stake reward based on nBits and coin age spent (coin-days)
 ::int64_t GetProofOfStakeReward(::int64_t nCoinAge, unsigned int nBits, ::int64_t nTime, bool bCoinYearOnly)
 {
@@ -1533,7 +1581,9 @@ void static InvalidChainFound(CBlockIndex* pindexNew)
     {
         bnBestInvalidTrust = pindexNew->bnChainTrust;
         CTxDB().WriteBestInvalidTrust(bnBestInvalidTrust);
+#ifdef QT_GUI
         uiInterface.NotifyBlocksChanged();
+#endif
     }
 
     CBigNum bnBestInvalidBlockTrust = pindexNew->bnChainTrust - pindexNew->pprev->bnChainTrust;
@@ -1730,14 +1780,24 @@ unsigned int CTransaction::GetP2SHSigOpCount(const MapPrevTx& inputs) const
     return nSigOps;
 }
 
-bool CScriptCheck::operator()() const {
-    const CScript &scriptSig = ptxTo->vin[nIn].scriptSig;
+bool CScriptCheck::operator()() const 
+{
+    const CScript 
+        &scriptSig = ptxTo->vin[nIn].scriptSig;
     if (!VerifyScript(scriptSig, scriptPubKey, *ptxTo, nIn, nFlags, nHashType))
-        return error("CScriptCheck() : %s VerifySignature failed", ptxTo->GetHash().ToString().substr(0,10).c_str());
+        return error("CScriptCheck() : %s VerifySignature failed", 
+                     ptxTo->GetHash().ToString().substr(0,10).c_str()
+                    );
     return true;
 }
 
-bool VerifySignature(const CTransaction& txFrom, const CTransaction& txTo, unsigned int nIn, unsigned int flags, int nHashType)
+bool VerifySignature(
+                     const CTransaction& txFrom, 
+                     const CTransaction& txTo, 
+                     unsigned int nIn, 
+                     unsigned int flags, 
+                     int nHashType
+                    )
 {
     return CScriptCheck(txFrom, txTo, nIn, flags, nHashType)();
 }
@@ -2356,6 +2416,9 @@ bool CBlock::SetBestChain(CTxDB& txdb, CBlockIndex* pindexNew)
             DateTimeStrFormat("%x %H:%M:%S", 
             pindexBest->GetBlockTime()).c_str()
           );
+#ifdef QT_GUI
+    uiInterface.NotifyBlocksChanged();
+#endif
 
     // Check the version of the last 100 blocks to see if we need to upgrade:
     if (!fIsInitialDownload)
@@ -2364,12 +2427,12 @@ bool CBlock::SetBestChain(CTxDB& txdb, CBlockIndex* pindexNew)
         const CBlockIndex* pindex = pindexBest;
         for (int i = 0; i < 100 && pindex != NULL; ++i)
         {
-            if (pindex->nVersion > CBlock::CURRENT_VERSION)
+            if (pindex->nVersion > CBlock::CURRENT_VERSION_of_block)
                 ++nUpgraded;
             pindex = pindex->pprev;
         }
         if (nUpgraded > 0)
-            printf("SetBestChain: %d of last 100 blocks above version %d\n", nUpgraded, CBlock::CURRENT_VERSION);
+            printf("SetBestChain: %d of last 100 blocks above version %d\n", nUpgraded, CBlock::CURRENT_VERSION_of_block);
         if (nUpgraded > 100/2)
             // strMiscWarning is read by GetWarnings(), called by Qt and the JSON-RPC code to warn the user:
             strMiscWarning = _("Warning: This version is obsolete, upgrade required!");
@@ -2476,7 +2539,11 @@ bool CBlock::AddToBlockIndex(unsigned int nFile, unsigned int nBlockPos)
     }
 
     // ppcoin: compute chain trust score
-    pindexNew->bnChainTrust = (pindexNew->pprev ? pindexNew->pprev->bnChainTrust : CBigNum(0)) + pindexNew->GetBlockTrust();
+    pindexNew->bnChainTrust = (pindexNew->pprev ? 
+                                pindexNew->pprev->bnChainTrust : 
+                                CBigNum(0)
+                              ) + 
+                              pindexNew->GetBlockTrust();
 
     // ppcoin: compute stake entropy bit for stake modifier
     if (!pindexNew->SetStakeEntropyBit(GetStakeEntropyBit(pindexNew->nHeight)))
@@ -2527,12 +2594,18 @@ bool CBlock::AddToBlockIndex(unsigned int nFile, unsigned int nBlockPos)
         hashPrevBestCoinBase = vtx[0].GetHash();
     }
 
+#ifdef QT_GUI
     static ::int8_t counter = 0;
     if( 
-       ((++counter & 0x0F) == 0) ||     // every 16 blocks
+       ((++counter & 0x0F) == 0) ||     // every 16 blocks, why?
        !IsInitialBlockDownload()
       ) // repaint every 16 blocks if not in initial block download
         uiInterface.NotifyBlocksChanged();
+    else
+    {
+    uiInterface.NotifyBlocksChanged();
+    }
+#endif
     return true;
 }
 
@@ -2700,10 +2773,16 @@ bool CBlock::AcceptBlock()
     bool cpSatisfies = Checkpoints::CheckSync(hash, pindexPrev);
 
     // Check that the block satisfies synchronized checkpoint
-    if (CheckpointsMode == Checkpoints::STRICT && !cpSatisfies)
+    if (
+        (CheckpointsMode == ::Checkpoints::STRICT) && 
+        !cpSatisfies
+       )
         return error("AcceptBlock() : rejected by synchronized checkpoint");
 
-    if (CheckpointsMode == Checkpoints::ADVISORY && !cpSatisfies)
+    if (
+        (CheckpointsMode == ::Checkpoints::ADVISORY) && 
+        !cpSatisfies
+       )
         strMiscWarning = _("WARNING: syncronized checkpoint violation detected, but skipped!");
 
     // Enforce rule that the coinbase starts with serialized block height
@@ -2875,7 +2954,7 @@ CBigNum CBlockIndex::GetBlockTrust() const
         // PoS after PoW? trust = prev_trust + 1!
         if (IsProofOfStake() && pprev->IsProofOfWork())
             return pprev->GetBlockTrust() + 1;  //<<<<<<<<<<<<< does this mean this is recursive??????
-
+                                                // sure looks thatway!  Is this the intent?
         // PoW trust calculation
         if (IsProofOfWork()) 
         {
@@ -3052,6 +3131,9 @@ bool ProcessBlock(CNode* pfrom, CBlock* pblock)
     // ppcoin: if responsible for sync-checkpoint send it
     if (pfrom && !CSyncCheckpoint::strMasterPrivKey.empty())
         Checkpoints::SendSyncCheckpoint(Checkpoints::AutoSelectSyncCheckpoint());
+#ifdef QT_GUI
+    uiInterface.NotifyBlocksChanged();
+#endif
 
     return true;
 }

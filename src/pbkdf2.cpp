@@ -3,17 +3,17 @@
 #include <string.h>
 #include "pbkdf2.h"
 
-static inline ::uint32_t
+static inline uint32_t
 be32dec(const void *pp)
 {
     const uint8_t *p = (uint8_t const *)pp;
 
-    return ((::uint32_t)(p[3]) + ((::uint32_t)(p[2]) << 8) +
-        ((::uint32_t)(p[1]) << 16) + ((::uint32_t)(p[0]) << 24));
+    return ((uint32_t)(p[3]) + ((uint32_t)(p[2]) << 8) +
+        ((uint32_t)(p[1]) << 16) + ((uint32_t)(p[0]) << 24));
 }
 
 static inline void
-be32enc(void *pp, ::uint32_t x)
+be32enc(void *pp, uint32_t x)
 {
     uint8_t * p = (uint8_t *)pp;
 
@@ -96,14 +96,14 @@ HMAC_SHA256_Final(unsigned char digest[32], HMAC_SHA256_CTX * ctx)
  */
 void
 PBKDF2_SHA256(const uint8_t * passwd, size_t passwdlen, const uint8_t * salt,
-    size_t saltlen, ::uint64_t c, uint8_t * buf, size_t dkLen)
+    size_t saltlen, uint64_t c, uint8_t * buf, size_t dkLen)
 {
     HMAC_SHA256_CTX PShctx, hctx;
     size_t i;
     uint8_t ivec[4];
     uint8_t U[32];
     uint8_t T[32];
-    ::uint64_t j;
+    uint64_t j;
     int k;
     size_t clen;
 
@@ -114,7 +114,7 @@ PBKDF2_SHA256(const uint8_t * passwd, size_t passwdlen, const uint8_t * salt,
     /* Iterate through the blocks. */
     for (i = 0; i * 32 < dkLen; i++) {
         /* Generate INT(i + 1). */
-        be32enc(ivec, (::uint32_t)(i + 1));
+        be32enc(ivec, (uint32_t)(i + 1));
 
         /* Compute U_1 = PRF(P, S || INT(i)). */
         memcpy(&hctx, &PShctx, sizeof(HMAC_SHA256_CTX));

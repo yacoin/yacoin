@@ -131,7 +131,7 @@ public:
     void setuint32(::uint32_t n)
     {
         if (!BN_set_word(this, n))
-            throw bignum_error("CBigNum conversion from ::uint32_t : BN_set_word failed");
+            throw bignum_error("CBigNum conversion from uint32_t : BN_set_word failed");
     }
 
     ::uint32_t getuint32() const
@@ -208,11 +208,11 @@ public:
 
     void setuint64(::uint64_t n)
     {
-        // Use BN_set_word if word size is sufficient for ::uint64_t
+        // Use BN_set_word if word size is sufficient for uint64_t
         if (sizeof(n) <= sizeof(BN_ULONG))
         {
             if (!BN_set_word(this, (BN_ULONG)n))
-                throw bignum_error("CBigNum conversion from ::uint64_t : BN_set_word failed");
+                throw bignum_error("CBigNum conversion from uint64_t : BN_set_word failed");
             return;
         }
 

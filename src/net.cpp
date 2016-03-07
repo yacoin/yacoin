@@ -41,7 +41,14 @@ unsigned int
                         // or is the INTENT 360 blocks??????????????????
                         // another way to put it is, WHAT ARE THE UNITS, seconds or blocks??????????
 
-static const int nDEFAULT_BAN_TIME_in_seconds = nHoursPerDay * nSecondsPerHour;
+static const int 
+#ifdef WIN32
+    nDEFAULT_BAN_SCORE = 1000,
+    nDEFAULT_BAN_TIME_in_seconds = 3 * nSecondsperMinute;
+#else
+    nDEFAULT_BAN_SCORE = 100,
+    nDEFAULT_BAN_TIME_in_seconds = nHoursPerDay * nSecondsPerHour;  // one day
+#endif
 
 // WM - static const int MAX_OUTBOUND_CONNECTIONS = 8;
 static const int DEFAULT_MAX_CONNECTIONS        = 125;    // WM - Default value for -maxconnections= parameter.
@@ -456,13 +463,14 @@ bool recvAline( SOCKET &hSocket, string & strLine )
                 }
                 // else it was something worthy of consideration?
             }
+            if (!strLine.empty() )
+                break;
             if (0 == nBytes)
-            {   // done
+            {   // done, socket closed
                 return false;
             }
             else
-            {
-                // socket error
+            {   // socket error
                 int 
                     nErr = WSAGetLastError();
                 printf("recv failed: error %d\n", nErr);
@@ -484,7 +492,7 @@ class CdoSocket
         SocketCopy;
 
     public:
-    explicit CdoSocket( SOCKET & Socket, const string & sDomain, int & nPort )
+    explicit CdoSocket( SOCKET & Socket, const string & sDomain, const int & nPort = DEFAULT_HTTP_PORT )
     {
         Socket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
         
@@ -532,10 +540,10 @@ class CdoSocket
 bool GetMyExternalWebPage(
                             const string & sDomain,
                             const string & skey,
-                            const char* pszGet, 
+                            const char* pszTheFullUrl, 
                             string & strBuffer, 
                             double &dPrice,
-                            int & nPort
+                            const int & nPort
                          )
 {
     {
@@ -547,9 +555,23 @@ bool GetMyExternalWebPage(
             hSocket = 0;
 #endif
 
-        CdoSocket 
-            CthisSocketConnection( hSocket, sDomain, nPort );    //RAII attempt on the socket!?
-
+        if( DEFAULT_HTTP_PORT != nPort )
+        {
+            CdoSocket 
+                CthisSocketConnection( 
+                                      hSocket, 
+                                      sDomain,          // for gethostbyname()
+                                      nPort             // the usual
+                                     );                 //RAII attempt on the socket!?
+        }
+        else
+        {
+            CdoSocket 
+                CthisSocketConnection( 
+                                      hSocket, 
+                                      sDomain           // for gethostbyname()
+                                     );                 //RAII attempt on the socket!?
+        }
         if (!hSocket)
         {
             return false;
@@ -557,17 +579,18 @@ bool GetMyExternalWebPage(
         else    //if (hSocket)    // then it's OK
         {
             int
-               nBytesSent;
+                nUrlLength = (int)strlen(pszTheFullUrl),
+                nBytesSent;
             {
-                nBytesSent = send(hSocket, pszGet, strlen(pszGet), MSG_NOSIGNAL);
+                nBytesSent = send(hSocket, pszTheFullUrl, nUrlLength, MSG_NOSIGNAL);
             }
-            if ((unsigned int)nBytesSent != strlen(pszGet) )
+            if (nBytesSent != nUrlLength )
             {
                 printf(
                         "send() error: only sent %d of %d?"
                         "\n", 
                         nBytesSent,
-                        strlen(pszGet)
+                        nUrlLength
                       );
             }
             Sleep( nArbitraryShortTimeInMilliseconds );
@@ -588,33 +611,27 @@ bool GetMyExternalWebPage(
                 if (fLineOK)
                 {
                     strBuffer += strLine;
-                  // for cryptsy  
-                  //if( string::npos != strLine.find( "volume", 0 ) ) // search 11, YAC/BTC & 2, BTC/USD
-                    if( string::npos != strLine.find( skey, 0 ) ) // search 11, YAC/BTC & 2, BTC/USD
+                    if( string::npos != strLine.find( skey, 0 ) )
                     {
-                        //string
-                          //skey = "lasttradeprice";    // for cryptsy
-                          //skey = "last";              // for BTER
-
-                        // it looks like this
-                        //"YAC\/BTC","lasttradeprice":"0.00000535","volume":
                         if(
                             ("" == skey)
                             ||
                             string::npos != strLine.find( skey, 0 ) 
-                          ) // search 11, YAC/BTC & 2, BTC/USD
-                        {   // pickup the price
+                          ) 
+                        {
                             string
                                 sTemp;
 
                             if("" != skey)
                             {
-                                if( "USD" != skey )         // lasttradeprice":"0.00000535"
-                                    sTemp = strLine.substr( strLine.find( skey, 0 ) + skey.size() + 3);
-                                else                        // "BTC":{"USD":372.845,
+                                if(
+                                    ("USD" == skey)
+                                    ||
+                                    ("value" == skey)
+                                  )
                                     sTemp = strLine.substr( strLine.find( skey, 0 ) + skey.size() + 2);
-                                  //           strtod( .cstr(), NULL
-                                  //  dPrice = stod( const string & sTemp, NULL )
+                                else
+                                    sTemp = strLine.substr( strLine.find( skey, 0 ) + skey.size() + 3);
                             }
                             else
                                 sTemp = strLine;
@@ -624,32 +641,16 @@ bool GetMyExternalWebPage(
 
                             if (1 == sscanf( sTemp.c_str(), "%lf", &dTemp ) )
                             {
-                               dPrice = dTemp;  // just so I can debug.  A good compiler 
-                                        // can optimize this dTemp out!
+                               dPrice = dTemp;      // just so I can debug.  A good compiler 
+                                                    // can optimize this dTemp out!
                             }
                         }
-                        // for BTER it looks like this
-                        // {"result":"true",
-                        //  "last":"0.00000109",
-                        //  "high":"0.00000114","low":"0.00000103",
-                        //  "avg":"0.00000105",
-                        //  "sell":"0.00000110","buy":"0.00000106",
-                        //  "vol_yac":198790.552,"vol_btc":0.20933,
-                        //  "rate_change_percentage":"-1.80"}
-
-                        // for USD/YAC it looks like this
-                        //{"result":"true","last":162.951,
-                        // "high":324.88,"low":1.021,"avg":162.951,
-                        // "sell":324.88,"buy":1.021,"vol_btc":"0.00000000",
-                        // "vol_usd":"0.00000000","rate_change_percentage":"0.00"
-                        //}
-
                         // read rest of result
                         strLine = "";
                         do
                         {
                             fLineOK = recvAline(hSocket, strLine);
-                            Sleep( nArbitraryShortTimeInMilliseconds ); // May not even be needed?
+                            Sleep( nArbitraryShortTimeInMilliseconds ); // may not even be needed?
                             strLine = "";            
                         }
                         while( fLineOK );
@@ -663,12 +664,15 @@ bool GetMyExternalWebPage(
     }
     if ( 0 < strBuffer.size() )
     {
-        printf(
-                "GetMyExternalWebPage() received:\n"
-                "%s"
-                "\n", 
-                strBuffer.c_str()
-              );
+        if (fPrintToConsole) 
+        {
+            printf(
+                    "GetMyExternalWebPage() received:\n"
+                    "%s"
+                    "\n", 
+                    strBuffer.c_str()
+                  );
+        }
         return true;
     }
     else
@@ -1082,7 +1086,7 @@ bool CNode::Misbehaving(int howmuch)    // banned if banscore  exceeeded
             nMisbehavior-howmuch, 
             nMisbehavior
            );
-    if (nMisbehavior >= GetArg("-banscore", 100))
+    if (nMisbehavior >= GetArg("-banscore", nDEFAULT_BAN_SCORE))
     {
       //::int64_t banTime = GetTime()+GetArg("-bantime", 60*60*24);  // Default 24-hour ban
                                         //YOU CAN MAKE THIS CLEAR WITHOUT A COMMENT!!
@@ -1220,7 +1224,7 @@ static void updatePreviousNodecountIf(
     #ifdef _DEBUG
                 StartShutdown();
     #else
-                StartShutdown();
+                //StartShutdown();
     #endif
 #endif
             }

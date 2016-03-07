@@ -31,7 +31,7 @@
 #include <boost/shared_ptr.hpp>
 #include <list>
 
-#define printf OutputDebugStringF
+//#define printf OutputDebugStringF
 
 using namespace std;
 using namespace boost;

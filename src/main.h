@@ -62,6 +62,7 @@ static const int fHaveUPnP = false;
 static const uint256 hashGenesisBlock("0x0000060fc90618113cde415ead019a1052a9abc43afcccff38608ff8751353e5");
 static const uint256 hashGenesisBlockTestNet("0xfe20c2c2fc02b36d2473e1f51dba1fb123d41ff42966e2a4edabb98fdd7107e6");
 
+static const ::int64_t nMaxClockDrift = 2 * 60 * 60;        // two hours
 inline ::int64_t PastDrift(::int64_t nTime)   { return nTime - 2 * 60 * 60; } // up to 2 hours from the past
 inline ::int64_t FutureDrift(::int64_t nTime) { return nTime + 2 * 60 * 60; } // up to 2 hours from the future
 
@@ -129,6 +130,9 @@ bool CheckProofOfWork(uint256 hash, unsigned int nBits);
 unsigned int GetNextTargetRequired(const CBlockIndex* pindexLast, bool fProofOfStake);
 ::int64_t GetProofOfWorkReward(unsigned int nBits, ::int64_t nFees=0);
 ::int64_t GetProofOfStakeReward(::int64_t nCoinAge, unsigned int nBits, ::int64_t nTime, bool bCoinYearOnly=false);
+
+::int64_t GetProofOfStakeReward(::int64_t nCoinAge);
+
 unsigned int ComputeMinWork(unsigned int nBase, ::int64_t nTime);
 unsigned int ComputeMinStake(unsigned int nBase, ::int64_t nTime, unsigned int nBlockTime);
 int GetNumBlocksOfPeers();
@@ -455,7 +459,7 @@ typedef std::map<uint256, std::pair<CTxIndex, CTransaction> > MapPrevTx;
 class CTransaction
 {
 public:
-    static const int CURRENT_VERSION=1;
+    static const int CURRENT_VERSION_of_Tx=1;
     int nVersion;
     ::uint32_t nTime;
     std::vector<CTxIn> vin;
@@ -483,7 +487,7 @@ public:
 
     void SetNull()
     {
-        nVersion = CTransaction::CURRENT_VERSION;
+        nVersion = CTransaction::CURRENT_VERSION_of_Tx;
         nTime = (::uint32_t) GetAdjustedTime();
         vin.clear();
         vout.clear();
@@ -892,7 +896,9 @@ class CBlock
 {
 public:
     // header
-    static const int CURRENT_VERSION=6;
+    static const int CURRENT_VERSION_of_block=6;
+    static const int CURRENT_VERSION_previous = 3;
+
     ::int32_t nVersion;
     uint256 hashPrevBlock;
     uint256 hashMerkleRoot;
@@ -943,7 +949,7 @@ public:
 
     void SetNull()
     {
-        nVersion = CBlock::CURRENT_VERSION;
+        nVersion = CBlock::CURRENT_VERSION_of_block;
         hashPrevBlock = 0;
         hashMerkleRoot = 0;
         nTime = 0;
@@ -978,7 +984,8 @@ public:
 		else if ( nTime < 1401545632 ) nfactor = 14;
 		else if ( nTime < 1409934240 ) nfactor = 15;
 		else if ( nTime < 1435100064 ) nfactor = 16;
-		else if ( nTime < YACOIN_2015_SWITCH_TIME ) nfactor = 17;	// as soon as possible
+	  //else if ( nTime < YACOIN_2015_SWITCH_TIME ) nfactor = 17;	// as soon as possible
+		else if ( nTime < 1468654496 ) nfactor = 17;	// as soon as possible
 		else
           nfactor = 4;
 

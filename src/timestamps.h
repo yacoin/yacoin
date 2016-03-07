@@ -1,14 +1,26 @@
 #ifndef BITCOIN_TIMESTAMPS_H
 #define BITCOIN_TIMESTAMPS_H
 
+#ifndef _MSC_VER
+    #include <limits.h>
+#endif
 // saironiq : block height where "no consecutive PoS blocks" rule activates
 // Yacoin, updated to time.
 //static const int nConsecutiveStakeSwitchHeight = 420000;
-static const unsigned int CONSECUTIVE_STAKE_SWITCH_TIME = 1392241857;
+static const unsigned int 
+    CONSECUTIVE_STAKE_SWITCH_TIME = (unsigned int)1392241857;   // 02/12/2014 9:50pm (UTC)
+// we should set the above value as given to match the no two consecutive 
+// PoS rule which went into effect at block 420000 (2/12/14 9:50pm Z
+// this will allow 0.4.5 to agree with 0.4.4 with respect to new blocks.
 
-// yacoin2015 protocol switch time: 1450000000 - Sun, 13 Dec 2015 09:46:40
-static const unsigned int YACOIN_2015_SWITCH_TIME = 1450000000;
 
+static const unsigned int 
+    nApril_1_2016 = 1459468800U,
+    YACOIN_2015_SWITCH_TIME = nApril_1_2016;
+// we should set the above value as given to match the future time we expect 
+// all nodes will have upgraded and "caught up".  
+// I believe this will create various blocks, therefore branches, forks, that 
+// 0.4.4 code will not accept
 
 // YACOIN TODO
 static const unsigned int 

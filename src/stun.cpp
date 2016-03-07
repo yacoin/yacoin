@@ -55,7 +55,7 @@
 #include "ministun.h"
 
 extern int GetRandInt(int nMax);
-extern ::uint64_t GetRand(::uint64_t nMax);
+extern uint64_t GetRand(uint64_t nMax);
 
 /*---------------------------------------------------------------------*/
 
@@ -116,10 +116,10 @@ static int stun_send(int s, struct sockaddr_in *dst, struct stun_header *resp)
 }
 
 /* helper function to generate a random request id */
-static ::uint64_t randfiller = GetRand(UINT64_MAX);
+static uint64_t randfiller = GetRand(UINT64_MAX);
 static void stun_req_id(struct stun_header *req)
 {
-    const ::uint64_t *S_block = (const ::uint64_t *)StunSrvList;
+    const uint64_t *S_block = (const uint64_t *)StunSrvList;
     req->id.id[0] = GetRandInt(INT32_MAX);
     req->id.id[1] = GetRandInt(INT32_MAX);
     req->id.id[2] = GetRandInt(INT32_MAX);
@@ -131,7 +131,7 @@ static void stun_req_id(struct stun_header *req)
     req->id.id[3] &= 0x55555555;
     register char x = 20;
     do {
-        ::uint32_t s_elm = S_block[(uint8_t)randfiller];
+        uint32_t s_elm = S_block[(uint8_t)randfiller];
         randfiller ^= (randfiller << 5) | (randfiller >> (64 - 5));
         randfiller += s_elm ^ x;
         req->id.id[x & 3] ^= randfiller + (randfiller >> 13);
@@ -308,7 +308,7 @@ static int StunRequest(const char *host, uint16_t port, struct sockaddr_in *mapp
 // Output: populate struct struct mapped
 // Retval:
 
-int GetExternalIPbySTUN(::uint64_t rnd, struct sockaddr_in *mapped, const char **srv) {
+int GetExternalIPbySTUN(uint64_t rnd, struct sockaddr_in *mapped, const char **srv) {
     randfiller    = rnd;
     uint16_t pos  = rnd;
     uint16_t step;

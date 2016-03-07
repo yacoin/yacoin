@@ -35,9 +35,11 @@ const ::int64_t
     nMinutesPerHour = 60,
     nOneHourInSeconds = nSecondsPerMinute * nMinutesPerHour,
     nTwoHoursInSeconds = 2 * nOneHourInSeconds,
+    nTwelveHoursInSeconds = 12 * nOneHourInSeconds,
     nOneDayInSeconds = 24 * nOneHourInSeconds;
 
 const int
+    DEFAULT_HTTP_PORT = 80,
     nOneMinuteInSeconds = 60,
     nTenMilliseconds = 10,
     nOneHundredMilliseconds = 100;
@@ -71,7 +73,7 @@ bool RecvLine(SOCKET hSocket, std::string& strLine);
                                 const char* pszGet, 
                                 std::string & strLine, 
                                 double & dPrice,
-                                int & nPort
+                                const int & nPort = DEFAULT_HTTP_PORT
                              );
 #endif
 bool GetMyExternalIP(CNetAddr& ipRet);

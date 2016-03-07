@@ -47,7 +47,7 @@ struct addrManItemSort
 {
     bool operator()(const CAddrInfo &leftItem, const CAddrInfo &rightItem) 
     {
-        ::int64_t 
+        int64_t 
             nTime = GetTime();
 
         return leftItem.GetChance(nTime) > rightItem.GetChance(nTime);

@@ -70,7 +70,7 @@ public:
     boost::signals2::signal<void (const std::string& message, const std::string& caption, int style)> ThreadSafeMessageBox;
 
     /** Ask the user whether they want to pay a fee or not. */
-    boost::signals2::signal<bool (::int64_t nFeeRequired, const std::string& strCaption), boost::signals2::last_value<bool> > ThreadSafeAskFee;
+    boost::signals2::signal<bool (int64_t nFeeRequired, const std::string& strCaption), boost::signals2::last_value<bool> > ThreadSafeAskFee;
 
     /** Handle a URL passed at the command line. */
     boost::signals2::signal<void (const std::string& strURI)> ThreadSafeHandleURI;
@@ -84,9 +84,10 @@ public:
     /** Translate a message to the native language of the user. */
     boost::signals2::signal<std::string (const char* psz)> Translate;
 
+#ifdef QT_GUI
     /** Block chain changed. */
     boost::signals2::signal<void ()> NotifyBlocksChanged;
-
+#endif
     /** Number of network connections changed. */
     boost::signals2::signal<void (int newNumConnections)> NotifyNumConnectionsChanged;
 

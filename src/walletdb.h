@@ -27,7 +27,7 @@ enum DBErrors
 class CKeyMetadata
 {
 public:
-    static const int CURRENT_VERSION=1;
+    static const int CURRENT_VERSION_of_Key_stuff=1;
     int nVersion;
     ::int64_t nCreateTime; // 0 means unknown
 
@@ -37,7 +37,7 @@ public:
     }
     CKeyMetadata(::int64_t nCreateTime_)
     {
-        nVersion = CKeyMetadata::CURRENT_VERSION;
+        nVersion = CKeyMetadata::CURRENT_VERSION_of_Key_stuff;
         nCreateTime = nCreateTime_;
     }
 
@@ -50,7 +50,7 @@ public:
 
     void SetNull()
     {
-        nVersion = CKeyMetadata::CURRENT_VERSION;
+        nVersion = CKeyMetadata::CURRENT_VERSION_of_Key_stuff;
         nCreateTime = 0;
     }
 };

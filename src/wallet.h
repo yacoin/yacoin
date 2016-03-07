@@ -229,7 +229,19 @@ public:
 
     void GetStakeStats(float &nKernelsRate, float &nCoinDaysRate);
     void GetStakeWeightFromValue(const ::int64_t& nTime, const ::int64_t& nValue, ::uint64_t& nWeight);
-    bool CreateCoinStake(const CKeyStore& keystore, unsigned int nBits, ::uint32_t nSearchInterval, CTransaction& txNew, CKey& key);
+    bool CreateCoinStake(
+                        const CKeyStore& keystore, 
+                        unsigned int nBits, 
+                        ::int64_t nSearchInterval, 
+                        CTransaction& txNew
+                        );
+    bool CreateCoinStake(
+                        const CKeyStore& keystore, 
+                        unsigned int nBits, 
+                        ::uint32_t nSearchInterval, 
+                        CTransaction& txNew, 
+                        CKey& key
+                        );
     bool MergeCoins(const ::int64_t& nAmount, const ::int64_t& nMinValue, const ::int64_t& nMaxValue, std::list<uint256>& listMerged);
 
     std::string SendMoney(CScript scriptPubKey, ::int64_t nValue, CWalletTx& wtxNew, bool fAskFee=false);

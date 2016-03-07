@@ -120,19 +120,28 @@ CBlock* CreateNewBlock(CWallet* pwallet, bool fProofOfStake)
     if (!pblock.get())
         return NULL;
 
+    if( pindexBest->nTime < YACOIN_2015_SWITCH_TIME)
+    {
+        pblock->nVersion = CBlock::CURRENT_VERSION_previous;
+    }
     // Create coinbase tx
     CTransaction txNew;
     txNew.vin.resize(1);
     txNew.vin[0].prevout.SetNull();
     txNew.vout.resize(1);
 
+    CReserveKey 
+        reservekey(pwallet);
+
     if (!fProofOfStake)
     {
-        CReserveKey reservekey(pwallet);
         txNew.vout[0].scriptPubKey.SetDestination(reservekey.GetReservedKey().GetID());
     }
     else
+    {
         txNew.vout[0].SetEmpty();
+        txNew.vout[0].scriptPubKey << reservekey.GetReservedKey() << OP_CHECKSIG; // seems to be missing?
+    }
 
     // Add our coinbase tx as first transaction
     pblock->vtx.push_back(txNew);
@@ -162,6 +171,53 @@ CBlock* CreateNewBlock(CWallet* pwallet, bool fProofOfStake)
         ParseMoney(mapArgs["-mintxfee"], nMinTxFee);
 
     CBlockIndex* pindexPrev = pindexBest;
+/*********************/
+    // ppcoin: if coinstake available add coinstake tx
+    static int64_t nLastCoinStakeSearchTime = GetAdjustedTime();  // only initialized at startup
+    //CBlockIndex* pindexPrev = pindexBest;
+
+    if (fProofOfStake)  // attemp to find a coinstake
+    {
+        pblock->nBits = GetNextTargetRequired(pindexPrev, true);
+
+        CTransaction 
+            txCoinStake;
+
+        int64_t 
+            nSearchTime = txCoinStake.nTime; // search to current time
+
+        if (nSearchTime > nLastCoinStakeSearchTime)
+        {
+            CKey 
+                key;
+
+            if (pwallet->CreateCoinStake(
+                                         *pwallet, 
+                                         pblock->nBits,
+                                         nSearchTime-nLastCoinStakeSearchTime, 
+                                         txCoinStake,
+                                         key
+                                        )
+               )
+            {
+                if (
+                    txCoinStake.nTime >= max(
+                                             pindexPrev->GetMedianTimePast()+1, 
+                                             pindexPrev->GetBlockTime() - nMaxClockDrift
+                                            )
+                   )
+                {   // make sure coinstake would meet timestamp protocol
+                    // as it would be the same as the block timestamp
+                    pblock->vtx[0].vout[0].SetEmpty();
+                    pblock->vtx[0].nTime = txCoinStake.nTime;
+                    pblock->vtx.push_back(txCoinStake);
+                }
+            }
+            nLastCoinStakeSearchInterval = nSearchTime - nLastCoinStakeSearchTime;
+            nLastCoinStakeSearchTime = nSearchTime;
+        }
+    }
+/**********************/
 
     pblock->nBits = GetNextTargetRequired(pindexPrev, fProofOfStake);
 
@@ -496,18 +552,28 @@ bool CheckWork(CBlock* pblock, CWallet& wallet, CReserveKey& reservekey)
 
 bool CheckStake(CBlock* pblock, CWallet& wallet)
 {
-    uint256 proofHash = 0, hashTarget = 0;
+    uint256 
+        proofHash = 0, 
+        hashTarget = 0;
     uint256 hashBlock = pblock->GetHash();
 
     if(!pblock->IsProofOfStake())
-        return error("CheckStake() : %s is not a proof-of-stake block", hashBlock.GetHex().c_str());
+        return error("CheckStake() : %s is not a proof-of-stake block", 
+                     hashBlock.GetHex().c_str()
+                    );
 
     // verify hash target and signature of coinstake tx
     if (!CheckProofOfStake(pblock->vtx[1], pblock->nBits, proofHash, hashTarget))
         return error("CheckStake() : proof-of-stake checking failed");
 
     //// debug print
-    printf("CheckStake() : new proof-of-stake block found  \n  hash: %s \nproofhash: %s  \ntarget: %s\n", hashBlock.GetHex().c_str(), proofHash.GetHex().c_str(), hashTarget.GetHex().c_str());
+    printf(
+            "CheckStake() : new proof-of-stake block found  \n"
+            "hash: %s \nproofhash: %s  \ntarget: %s\n", 
+            hashBlock.GetHex().c_str(), 
+            proofHash.GetHex().c_str(), 
+            hashTarget.GetHex().c_str()
+          );
     pblock->print();
     printf("out %s\n", FormatMoney(pblock->vtx[1].GetValueOut()).c_str());
 
@@ -561,14 +627,31 @@ void StakeMiner(CWallet *pwallet)
         }
 
         // to temporarily stop mining
-        continue;
+        //continue;
+        CBlockIndex
+            * pindexPrev = pindexBest;
 
+        if( pindexPrev->nTime < YACOIN_2015_SWITCH_TIME )   // before the new PoW/PoS rules
+        {                                                   // behave as previously
+            if (
+                //fProofOfStake && 
+                pindexPrev->IsProofOfStake()
+               ) 
+            {
+                bool 
+                    fFastPOS = GetArg("-fastpos", 0);
+
+                if (!fFastPOS) 
+                    Sleep(500);
+                continue;       // does this mean we stay at this point?  It looks that way?
+            }
+        }
         //
         // Create new block
         //
-        CBlockIndex* pindexPrev = pindexBest;
+        auto_ptr<CBlock> 
+            pblock(CreateNewBlock(pwallet, true));
 
-        auto_ptr<CBlock> pblock(CreateNewBlock(pwallet, true));
         if (!pblock.get())
             return;
         IncrementExtraNonce(pblock.get(), pindexPrev, nExtraNonce);
@@ -579,11 +662,11 @@ void StakeMiner(CWallet *pwallet)
             SetThreadPriority(THREAD_PRIORITY_NORMAL);
             CheckStake(pblock.get(), *pwallet);
             SetThreadPriority(THREAD_PRIORITY_LOWEST);
-            Sleep(500);
+            //Sleep(500);
         }
-        else
-            Sleep(nMinerSleep);
+        //else
+        Sleep(nMinerSleep);
 
-        continue;
+        //continue;
     }
 }

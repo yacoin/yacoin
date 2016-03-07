@@ -83,7 +83,13 @@ void LogStackTrace();
     #define PRId64  "I64d"
     #define PRIu64  "I64u"
     #define PRIx64  "I64x"
+    #define PRI64x  "I64x"
 #else /* C99 standard */
+    // these seem to be missing?
+    #define PRI64d  "lld"
+    #define PRI64u  "llu"
+    #define PRI64x  "llx"
+
   #define PRIszx    "zx"
   #define PRIszu    "zu"
   #define PRIszd    "zd"
