@@ -16,6 +16,7 @@
 #include "addrman.h"
 #include "ui_interface.h"
 
+#include <vector>
 #ifdef WIN32
 #include <string.h>
 #endif
@@ -34,7 +35,7 @@ unsigned int
     nStakeMinAge = 30 * nSecondsPerDay,             //60 * 60 * 24 * 30; // 30 days as zero time weight
     nStakeMaxAge = 90 * nSecondsPerDay,             //60 * 60 * 24 * 90; // 90 days as full weight
     nStakeTargetSpacing = 1 * nSecondsperMinute,    //1 * 60; // 1-minute stake spacing
-    nOnedayOfAverageBlocks = nSecondsPerDay / nStakeTargetSpacing,  // should be 144
+    nOnedayOfAverageBlocks = nSecondsPerDay / nStakeTargetSpacing,  // should be 144 if it's BTC!
     nModifierInterval = 6 * nSecondsPerHour;        //6 * 60 * 60; 
                         // time (in seconds????)to elapse before new modifier is computed
                         // i.e 6 hours?????
@@ -111,6 +112,54 @@ CCriticalSection cs_price;  // just want one call to getYACprice to not
                             // interrupt another call to the same function.
 
 static CSemaphore *semOutbound = NULL;
+
+#ifdef WIN32
+static const int
+    nDefaultCharacterOffset = 3,
+    nUnusualCharacterOffset = 2;
+CProvider aBTCtoYACProviders[] = 
+    {    
+        {   
+            "data.bter.com",            // sDomain
+            "last",                     // sPriceRatioKey
+            "/api/1/ticker/yac_btc",    // sApi
+            nDefaultCharacterOffset
+        }
+        ,
+        {   
+            "pubapi2.cryptsy.com",      
+            "lasttradeprice",   
+            "/api.php?method=singlemarketdata&marketid=11", 
+            nDefaultCharacterOffset 
+        }
+    };
+CProvider aCurrencyToBTCProviders[] = 
+    {
+        {   
+            "btc.blockr.io",
+            "value",
+            "/api/v1/coin/info",
+            nUnusualCharacterOffset    
+        }
+        ,
+        {   
+            "api.bitcoinvenezuela.com",
+            "USD",
+            "/",
+            nUnusualCharacterOffset
+        }
+        ,
+        {   
+            "pubapi2.cryptsy.com",
+            "lastdata",
+            "/api.php?method=singlemarketdata&marketid=2",
+            nDefaultCharacterOffset
+        }
+    };
+std::vector< CProvider > vBTCtoYACProviders;
+std::vector< CProvider > vUSDtoBTCProviders;
+#endif
+
 
 void AddOneShot(string strDest)
 {
@@ -483,51 +532,188 @@ bool recvAline( SOCKET &hSocket, string & strLine )
     return true;
 }
 
+//_____________________________________________________________________________
+static bool read_in_new_provider( std::string sKey, std::vector< CProvider > & vProviders )
+{
+    // here is where we should read in new providers from the configuration file
+    // arguments, and add them to the vectors we already have.  This way we don't
+    // have to recompile if there is even a temporary failure with a web provider.
+    bool
+        fProviderAdded;
+
+    //fProviderAdded = IsProviderAdded( key, vProviders );
+
+    std::string
+        sProvider = GetArg( sKey, "" );
+
+    static const int
+        nArbitrayUrlDomainLength = 200,
+        nArbitrayUrlArgumentLength = 200;
+
+    CProvider 
+        cNewProvider;
+
+    if( "" != sProvider )
+    {
+        string
+            sTemp = "%200[^,],%200[^,],%200[^,],%d";
+
+        if( fPrintToConsole )
+        {
+            printf( "scan string: %s\n", sTemp.c_str() );
+        }
+        printf( "received provider string:\n" );
+        {
+            printf( "%s\n", sProvider.c_str() );
+        }
+        if( nArbitrayUrlArgumentLength < (int)sProvider.length() )
+        {   // could be trouble
+            if( fPrintToConsole )
+            {
+                printf( "scan string: %s\n", sTemp.c_str() );
+                printf( "Error: Probably too long?\n", sTemp.c_str() );
+            }
+            return false;
+        }
+        char
+            caDomain[ nArbitrayUrlDomainLength + 1 ],
+            caKey[ nArbitrayUrlDomainLength + 1 ],
+            caApi[ nArbitrayUrlArgumentLength + 1 ];
+        int
+            nOffset,
+            nPort;
+        int
+            nConverted = sscanf( 
+                                sProvider.c_str(),
+                                sTemp.c_str(),
+                                caDomain,
+                                caKey,
+                                caApi,
+                                &nOffset
+                               );
+        if( 4 == nConverted )
+        {
+            cNewProvider.sDomain        = caDomain;
+            cNewProvider.sPriceRatioKey = caKey;
+            cNewProvider.sApi           = caApi;
+            cNewProvider.nOffset        = nOffset;
+            vProviders.insert( vProviders.begin(), cNewProvider );
+          //vBTCtoYACProviders.push_back( cNewProvider );
+          //nIndexBtcToYac = 0;
+            if( fPrintToConsole )
+            {
+                printf( "adding new provider:"
+                        "\n"
+                        "%s\n%s\n%s\n%d"
+                        "\n",
+                        cNewProvider.sDomain.c_str(),
+                        cNewProvider.sPriceRatioKey.c_str(),
+                        cNewProvider.sApi.c_str(),
+                        cNewProvider.nOffset 
+                      );
+            }
+            return true;
+        }
+        else
+        {
+            printf( "error parsing configuration file for provider, found string:"
+                   "\n"
+                   "%s"
+                   "\n",
+                   sProvider.c_str()
+                  );
+        }
+    }
+    return false;
+}
+
+//_____________________________________________________________________________
+static void build_vectors()
+{
+    const int
+        array_sizeUtoB = (int)( sizeof( aCurrencyToBTCProviders ) / sizeof( aCurrencyToBTCProviders[ 0 ] ) ),
+        array_sizeBtoY = (int)( sizeof( aBTCtoYACProviders ) / sizeof( aBTCtoYACProviders[ 0 ] ) );
+
+    for( int index = 0; index < array_sizeUtoB; ++index )
+    {
+        vUSDtoBTCProviders.push_back( aCurrencyToBTCProviders[ index ] );
+    }
+    for( int index = 0; index < array_sizeBtoY; ++index )
+    {
+        vBTCtoYACProviders.push_back( aBTCtoYACProviders[ index ] );
+    }
+}
+//_____________________________________________________________________________
+
+void initialize_price_vectors( int & nIndexBtcToYac, int & nIndexUsdToBtc )
+{
+    build_vectors();
+    if( read_in_new_provider( "-btcyacprovider", vBTCtoYACProviders ) )
+        nIndexBtcToYac = 0;
+    if( read_in_new_provider( "-usdbtcprovider", vUSDtoBTCProviders) )
+        nIndexUsdToBtc = 0;
+}
+//_____________________________________________________________________________
+
 class CdoSocket
 {
-    private:
+private:
     struct hostent 
         *host;
     SOCKET 
         SocketCopy;
 
-    public:
+    CdoSocket( const CdoSocket & );
+    CdoSocket &operator = ( const CdoSocket & );
+
+public:
     explicit CdoSocket( SOCKET & Socket, const string & sDomain, const int & nPort = DEFAULT_HTTP_PORT )
     {
         Socket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
         
         host = gethostbyname( sDomain.c_str() );
 
-        SOCKADDR_IN 
-            SockAddr;
-
-        SockAddr.sin_port = htons( (unsigned short)nPort ); // was 80
-        SockAddr.sin_family = AF_INET;
-        SockAddr.sin_addr.s_addr = *((unsigned long*)host->h_addr);
-
-        //cout << "Connecting...\n";
-
-        int
-            nResult = connect(Socket,(SOCKADDR*)(&SockAddr),sizeof(SockAddr) );
-
-        if ( SOCKET_ERROR == nResult )
+        if( NULL != host )
         {
-            std::string
-                sS = strprintf(
-                    "Could not connect"
-                    "connect function failed with error: %d\n", WSAGetLastError()
-                              );
-            clearLocalSocketError( Socket );
-            nResult = closesocket(Socket);
-            if (nResult == SOCKET_ERROR)
-                wprintf(L"closesocket function failed with error: %ld\n", WSAGetLastError());
-            //WSACleanup();
+            SOCKADDR_IN 
+                SockAddr;
+
+            SockAddr.sin_port = htons( (unsigned short)nPort ); // was 80
+            SockAddr.sin_family = AF_INET;
+            SockAddr.sin_addr.s_addr = *((unsigned long*)host->h_addr); //  null ptr if net is down!!
+
+            //cout << "Connecting...\n";
+
+            int
+                nResult = connect(Socket,(SOCKADDR*)(&SockAddr),sizeof(SockAddr) );
+
+            if ( SOCKET_ERROR == nResult )
+            {
+                std::string
+                    sS = strprintf(
+                                    "Could not connect"
+                                    "connect function failed with error: %d\n", 
+                                    WSAGetLastError()
+                                  );
+                clearLocalSocketError( Socket );
+                nResult = closesocket(Socket);
+                if (nResult == SOCKET_ERROR)
+                    wprintf(L"closesocket function failed with error: %ld\n", WSAGetLastError());
+                //WSACleanup();
+                throw runtime_error(
+                        "getYACprice\n"
+                        "Could not connect?"
+                                   );
+            }
+            SocketCopy = Socket;
+        }
+        else    // network is down?
+        {
             throw runtime_error(
-                    "getYACprice\n"
-                    "Could not connect?"
+                                "getYACprice\n"
+                                "Network is down?"
                                );
         }
-        SocketCopy = Socket;
     }
 
     ~CdoSocket()
@@ -536,16 +722,22 @@ class CdoSocket
         closesocket( SocketCopy );
     }    
 };
-
-bool GetMyExternalWebPage(
-                            const string & sDomain,
-                            const string & skey,
-                            const char* pszTheFullUrl, 
-                            string & strBuffer, 
-                            double &dPrice,
-                            const int & nPort
+//_____________________________________________________________________________
+static bool GetMyExternalWebPage(
+                          const string & sDomain,
+                          const string & skey,
+                          const char* pszTheFullUrl, 
+                          string & strBuffer, 
+                          double &dPrice,
+                          const int & nOffset,
+                          const int & nPort
                          )
 {
+    // here we should
+    // pick a provider from vBTCtoYACProviders & vUSDtoBTCProviders
+    // attempt a price, if fail, try another provider until OK, or error return
+    // 
+    //
     {
         LOCK( cs_price );
         SOCKET 
@@ -554,23 +746,29 @@ bool GetMyExternalWebPage(
 #else
             hSocket = 0;
 #endif
-
-        if( DEFAULT_HTTP_PORT != nPort )
+        try
         {
-            CdoSocket 
-                CthisSocketConnection( 
-                                      hSocket, 
-                                      sDomain,          // for gethostbyname()
-                                      nPort             // the usual
-                                     );                 //RAII attempt on the socket!?
+            if( DEFAULT_HTTP_PORT != nPort )
+            {
+                CdoSocket 
+                    CthisSocketConnection( 
+                                          hSocket, 
+                                          sDomain,
+                                          nPort
+                                         );
+            }
+            else
+            {
+                CdoSocket 
+                    CthisSocketConnection( 
+                                          hSocket, 
+                                          sDomain           // for gethostbyname()
+                                         );                 //RAII attempt on the socket!?
+            }
         }
-        else
+        catch( std::exception &e )
         {
-            CdoSocket 
-                CthisSocketConnection( 
-                                      hSocket, 
-                                      sDomain           // for gethostbyname()
-                                     );                 //RAII attempt on the socket!?
+            printf( "%s\n", (string("error: ") + e.what()).c_str() );
         }
         if (!hSocket)
         {
@@ -629,9 +827,9 @@ bool GetMyExternalWebPage(
                                     ||
                                     ("value" == skey)
                                   )
-                                    sTemp = strLine.substr( strLine.find( skey, 0 ) + skey.size() + 2);
+                                    sTemp = strLine.substr( strLine.find( skey, 0 ) + skey.size() + nOffset);
                                 else
-                                    sTemp = strLine.substr( strLine.find( skey, 0 ) + skey.size() + 3);
+                                    sTemp = strLine.substr( strLine.find( skey, 0 ) + skey.size() + nOffset);
                             }
                             else
                                 sTemp = strLine;
@@ -673,13 +871,140 @@ bool GetMyExternalWebPage(
                     strBuffer.c_str()
                   );
         }
-        return true;
+        if( dPrice > 0.0 )
+        {
+            return true;
+        }
+        else
+            return false;
     }
     else
     {
         return error("error in recv() : connection closed?");
     }
 }
+//_____________________________________________________________________________
+static bool GetExternalWebPage(
+                        CProvider & Cprovider,
+                        string & strBuffer, 
+                        double &dPriceRatio
+                       )
+{
+    // we have all we need in Cprovider to get a price ratio,
+    // first of YAC/BTC, then USD/BTC
+    const string
+        sLeadIn   = "GET ",
+                    // here's where the api argument goes
+        sPrologue = " HTTP/1.1"
+                    "\r\n"
+                    "Content-Type: text/html"
+                    "\r\n"
+                    "Accept: application/json, text/html"
+                    "\r\n"
+                    "Host: ",
+                    // here's where the domain goes
+        sEpilogue = "\r\n"
+                    "Connection: close"
+                    "\r\n"
+                    "\r\n"
+                    "";
+    string
+        sDomain          = Cprovider.sDomain,
+        sPriceRatioKey   = Cprovider.sPriceRatioKey,
+        sApi             = Cprovider.sApi;
+    int
+        nCharacterOffset = Cprovider.nOffset,
+        nPort            = Cprovider.nPort;
+    string
+        sUrl = strprintf(
+                         "%s%s%s%s%s",
+                         sLeadIn.c_str(),
+                         sApi.c_str(),
+                         sPrologue.c_str(),
+                         sDomain.c_str(),
+                         sEpilogue.c_str()
+                        );
+    if (fPrintToConsole) 
+    {
+        string
+            sfb = strprintf( "Command:\n%s\n", sUrl.c_str() );
+        printf( "%s", sfb.c_str() );
+    }
+    const char
+        *pszTheFullUrl = sUrl.c_str();
+    bool
+        fReturnValue = GetMyExternalWebPage( 
+                                            sDomain, 
+                                            sPriceRatioKey,
+                                            pszTheFullUrl, 
+                                            strBuffer, 
+                                            dPriceRatio,
+                                            nCharacterOffset,
+                                            nPort
+                                           );
+    return fReturnValue;
+}
+//_____________________________________________________________________________
+bool GetMyExternalWebPage1( int & nIndexBtcToYac, string & strBuffer, double & dPrice )
+{
+    CProvider 
+        Cprovider;
+    int 
+        nSaved = nIndexBtcToYac,
+        nSize = (int)vBTCtoYACProviders.size();
+    do
+    {
+        Cprovider = vBTCtoYACProviders[ nIndexBtcToYac ];
+        if (GetExternalWebPage( 
+                                Cprovider,
+                                strBuffer, 
+                                dPrice
+                              )
+           )
+        {
+            break;
+        }
+        //else  // failure, so try another provider
+        nIndexBtcToYac = (++nIndexBtcToYac < nSize)? nIndexBtcToYac: nIndexBtcToYac = 0;
+        if( nSaved == nIndexBtcToYac )    // we can't find a provider, so quit
+        {
+            return error( "can't find a provider for page 1?" );
+        }
+    }while( true );
+    return true;
+}
+//_____________________________________________________________________________
+
+bool GetMyExternalWebPage2( int & nIndexUsdToBtc, string & strBuffer, double & dPrice )
+{
+    CProvider 
+        Cprovider;
+    int 
+        nSaved = nIndexUsdToBtc,
+        nSize = (int)vUSDtoBTCProviders.size();
+    do
+    {
+        Cprovider = vUSDtoBTCProviders[ nIndexUsdToBtc ];
+        if (GetExternalWebPage( 
+                                Cprovider,
+                                strBuffer, 
+                                dPrice
+                              )
+           )
+        {
+            break;
+        }
+        //else  // failure, so try another provider
+        nIndexUsdToBtc = (++nIndexUsdToBtc < nSize)? nIndexUsdToBtc: nIndexUsdToBtc = 0;
+        if( nSaved == nIndexUsdToBtc )    // we can't find a provider, so quit
+        {
+            return error( "can't find a provider for page 2?" );
+        }
+    }while( true );
+
+    return true;
+}
+//_____________________________________________________________________________
 #endif
 
 extern int GetExternalIPbySTUN(::uint64_t rnd, struct sockaddr_in *mapped, const char **srv);
@@ -923,6 +1248,7 @@ void CNode::CloseSocketDisconnect()
         if( nErr )
         {   // close socket errored!
             nErr = WSAGetLastError();
+#ifdef WIN32
             char
                 *pc = iGetLastErrorText( nErr );
 
@@ -955,7 +1281,6 @@ void CNode::CloseSocketDisconnect()
             }
         }
         printf( "\n" );
-#ifdef WIN32
         clearLocalSocketError( hSocket );
 #endif
         hSocket = INVALID_SOCKET;
@@ -1222,7 +1547,7 @@ static void updatePreviousNodecountIf(
                 // just while we are testing
 #ifdef _MSC_VER
     #ifdef _DEBUG
-                StartShutdown();
+                //StartShutdown();
     #else
                 //StartShutdown();
     #endif
@@ -1599,11 +1924,12 @@ void ThreadSocketHandler2(void* parg)
                                     {
                                         if (!pnode->fDisconnect)    //socket recv error 10054
                                         {
+#ifdef WIN32
                                             printf(
                                                     "socket recv error %d (%s)\n", 
                                                     nErr
                                                     , iGetLastErrorText( nErr )
-                                                  ); //<<<<<<<<<<<<<<<<<<
+                                                  ); //<<<<<<<<<<<<<<<<<< this was the only unguarded
                                             // these are the error codes that cause a disconnect
                                             switch( nErr )
                                             {
@@ -1679,7 +2005,7 @@ void ThreadSocketHandler2(void* parg)
                                                 default:
                                                     break;
                                             }
-
+#endif
                                         }
                                         pnode->CloseSocketDisconnect();
                                     }
@@ -3251,7 +3577,9 @@ public:
                 if (closesocket(hListenSocket) == SOCKET_ERROR)
                 {
                     printf("closesocket(hListenSocket) failed with error %d\n", WSAGetLastError());
-                    clearLocalSocketError( hListenSocket );
+#ifdef WIN32
+                    clearLocalSocketError( hListenSocket ); //<<<<<<<<<<<<<only unguarded
+#endif
                 }
             }
         }

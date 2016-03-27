@@ -984,7 +984,7 @@ public:
 		else if ( nTime < 1401545632 ) nfactor = 14;
 		else if ( nTime < 1409934240 ) nfactor = 15;
 		else if ( nTime < 1435100064 ) nfactor = 16;
-	  //else if ( nTime < YACOIN_2015_SWITCH_TIME ) nfactor = 17;	// as soon as possible
+	  //else if ( nTime < YACOIN_2016_SWITCH_TIME ) nfactor = 17;	// as soon as possible
 		else if ( nTime < 1468654496 ) nfactor = 17;	// as soon as possible
 		else
           nfactor = 4;

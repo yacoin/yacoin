@@ -361,7 +361,7 @@ uint256 GetProofOfStakeHash ( uint64_t nStakeModifier, uint32_t nTimeBlockFrom, 
 {
     uint256 thash;
 
-    if ( nTimeTx >= YACOIN_2015_SWITCH_TIME )
+    if ( nTimeTx >= YACOIN_2016_SWITCH_TIME )
     {
         // scrypt-jane used for hashProofOfStake from now on
         // valid stakeNfactor depends on transaction time and kernel Coin Day Weight

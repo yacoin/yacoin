@@ -1106,7 +1106,7 @@ unsigned int GetProofOfWorkMA(const CBlockIndex* pIndexLast)
     CBigNum wma(0);    // Weighted Moving Average of PoW target
     unsigned int nCount = 0;
 
-    if ( pIndexLast->nTime < YACOIN_2015_SWITCH_TIME )
+    if ( pIndexLast->nTime < YACOIN_2016_SWITCH_TIME )
         return 0;
 
     if ( pIndexLast->IsProofOfStake() )
@@ -1128,7 +1128,7 @@ unsigned int GetProofOfWorkMA(const CBlockIndex* pIndexLast)
             for ( int i = 0; i < overstep; i++ )
                 pindex = pindex->pprev;
         }
-        else    // ProofOfWork came after, last ProofOfStake block before YACOIN_2015_SWITCH_TIME
+        else    // ProofOfWork came after, last ProofOfStake block before YACOIN_2016_SWITCH_TIME
         {
             return GetProofOfWorkSMA( pIndexLast );
         }
@@ -1436,7 +1436,7 @@ unsigned int GetNextTargetRequired(const CBlockIndex* pindexLast, bool fProofOfS
     CBigNum bnTargetLimit = fProofOfStake ? bnProofOfStakeHardLimit : bnProofOfWorkLimit; // PoS(~uint256(0) >> 30), PoW(~uint256(0) >> 20)
     bool fCheckPreviousPoWBlockOverstep(false); // flag, used for check and ignore overstepped PoW block difficulty
 
-    if ( !fProofOfStake && pindexLast->nTime >= YACOIN_2015_SWITCH_TIME )
+    if ( !fProofOfStake && pindexLast->nTime >= YACOIN_2016_SWITCH_TIME )
     {
         if ( pindexLast->IsProofOfWork() )  // PoW after PoW
         {
@@ -2678,7 +2678,7 @@ bool CBlock::CheckBlock(bool fCheckPOW, bool fCheckMerkleRoot, bool fCheckSig) c
     else
     {
         // yacoin2015, nNonce must be greater than zero for proof-of-work blocks
-        if (nTime >= YACOIN_2015_SWITCH_TIME && nNonce == 0)
+        if (nTime >= YACOIN_2016_SWITCH_TIME && nNonce == 0)
             return DoS(50, error("CheckBlock() : zero nonce in proof-of-work block"));
 
         // Check proof of work matches claimed amount
@@ -2845,10 +2845,10 @@ CBigNum CBlockIndex::GetBlockTrust() const
     if (bnTarget <= 0)
         return CBigNum(0);
 
-    // is (nTime >= YACOIN_2015_SWITCH_TIME) actually true for blocks before 12/13/2015
+    // is (nTime >= YACOIN_2016_SWITCH_TIME) actually true for blocks before 12/13/2015
     if (
        // false &&    // temporary block
-        (nTime >= YACOIN_2015_SWITCH_TIME)
+        (nTime >= YACOIN_2016_SWITCH_TIME)
        )
     {
         ::int32_t iratio =  (::int32_t)boost::math::round( GetPoWPoSRatio() );
@@ -2912,7 +2912,7 @@ CBigNum CBlockIndex::GetBlockTrust() const
             else // IsProofOfWork() && pprev->IsProofOfWork()
             {
                 const CBlockIndex* ppos = GetLastBlockIndex( pprev->pprev, true ); // last ProofOfStake block preceding
-                if ( ppos->nBitsMA > 0 ) // this check is needed in case PoS block came before YACOIN_2015_SWITCH_TIME
+                if ( ppos->nBitsMA > 0 ) // this check is needed in case PoS block came before YACOIN_2016_SWITCH_TIME
 
                 {
                     int overstep = ( this->nHeight - ppos->nHeight ) - ppos->GetSpacingThreshold();

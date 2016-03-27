@@ -143,6 +143,7 @@ inline void Sleep(::int64_t n)
 #define ATTR_WARN_PRINTF(X,Y)
 #endif
 
+//#define printf OutputDebugStringF
 
 
 
@@ -160,7 +161,6 @@ extern bool fRequestShutdown;
 extern bool fShutdown;
 extern bool fDaemon;
 extern bool fServer;
-extern bool fCommandLine;
 extern std::string strMiscWarning;
 extern bool fTestNet;
 extern bool fNoListen;

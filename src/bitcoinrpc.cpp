@@ -6,8 +6,32 @@
     #include <stdint.h>
 
     #include "msvc_warnings.push.h"
-#endif
 
+    #include "init.h"
+    //#include "util.h"
+    //#include "sync.h"
+    //#include "ui_interface.h"
+    //#include "base58.h"
+    #include "bitcoinrpc.h"
+    //#include "db.h"
+
+    #undef printf
+    #include <boost/asio.hpp>
+    #include <boost/asio/ip/v6_only.hpp>
+    //#include <boost/bind.hpp>
+    //#include <boost/filesystem.hpp>
+    //#include <boost/foreach.hpp>
+    //#include <boost/iostreams/concepts.hpp>
+    #include <boost/iostreams/stream.hpp>
+    #include <boost/algorithm/string.hpp>
+    //#include <boost/lexical_cast.hpp>
+    #include <boost/asio/ssl.hpp>
+    //#include <boost/filesystem/fstream.hpp>
+    //#include <boost/shared_ptr.hpp>
+    //#include <list>
+
+    //#define printf OutputDebugStringF
+#else
 #include "init.h"
 #include "util.h"
 #include "sync.h"
@@ -32,6 +56,7 @@
 #include <list>
 
 //#define printf OutputDebugStringF
+#endif
 
 using namespace std;
 using namespace boost;
@@ -169,7 +194,7 @@ vector<unsigned char> ParseHexO(const Object& o, string strKey)
 
 string CRPCTable::help(string strCommand) const
 {
-    string strRet;
+    string strRet = "";
     set<rpcfn_type> setDone;
     for (map<string, const CRPCCommand*>::const_iterator mi = mapCommands.begin(); mi != mapCommands.end(); ++mi)
     {
@@ -187,7 +212,19 @@ string CRPCTable::help(string strCommand) const
             if (setDone.insert(pfn).second)
                 (*pfn)(params, true);
         }
-        catch (std::exception& e)
+        catch (const std::invalid_argument& ia) 
+        {
+            string strHelp = string( ia.what() );
+            if ( "" == strCommand )         // just a help w/ no arguments
+            {
+                if (strHelp.find('\n') != string::npos) // there is a \n in the message
+                {
+                    strHelp = strHelp.substr(0, strHelp.find('\n')); // truncate at that point, why?
+                }
+            }
+            strRet += strHelp + "\n";
+        }
+        catch (const std::exception& e)
         {
             // Help text is returned in an exception
             string strHelp = string(e.what());
@@ -206,11 +243,11 @@ string CRPCTable::help(string strCommand) const
 Value help(const Array& params, bool fHelp)
 {
     if (fHelp || params.size() > 1)
-        throw runtime_error(
-            "help [command]\n"
-            "List commands, or get help for a command.");
-
-    string strCommand;
+    {
+      //throw runtime_error( "help [command]\n" "List commands, or get help for a command." );
+        throw invalid_argument( "help [command]\n" "List commands, or get help for a command." );
+    }
+    string strCommand = "";
     if (params.size() > 0)
         strCommand = params[0].get_str();
 
@@ -242,7 +279,7 @@ Value stop(const Array& params, bool fHelp)
 static const CRPCCommand vRPCCommands[] =
 { //  name                      function                 safemd  unlocked
   //  ------------------------  -----------------------  ------  --------
-    { "help",                   &help,                   true,   true },
+    { "help",                   &help,                   true,   false },
     { "stop",                   &stop,                   true,   true },
     { "getbestblockhash",       &getbestblockhash,       true,   false },
     { "getblockcount",          &getblockcount,          true,   false },
@@ -321,7 +358,7 @@ static const CRPCCommand vRPCCommands[] =
     { "repairwallet",           &repairwallet,           false,  true},
     { "resendtx",               &resendtx,               false,  true},
     { "makekeypair",            &makekeypair,            false,  true},
-    { "sendalert",              &sendalert,              false,  false},
+    { "sendalert",              &sendalert,              false,  false}
 };
 
 CRPCTable::CRPCTable()
@@ -1063,6 +1100,11 @@ void ThreadRPCServer3(void* parg)
             ErrorReply(conn->stream(), objError, jreq.id);
             break;
         }
+        catch (const std::invalid_argument& ia) 
+        {
+            ErrorReply(conn->stream(), JSONRPCError(RPC_PARSE_ERROR, ia.what()), jreq.id);
+            break;
+        }
         catch (std::exception& e)
         {
             ErrorReply(conn->stream(), JSONRPCError(RPC_PARSE_ERROR, e.what()), jreq.id);
@@ -1104,9 +1146,16 @@ json_spirit::Value CRPCTable::execute(const std::string &strMethod, const json_s
         }
         return result;
     }
+    catch (std::invalid_argument& ia)
+    {
+        throw JSONRPCError(RPC_MISC_ERROR, ia.what());
+    }
     catch (std::exception& e)
     {
         throw JSONRPCError(RPC_MISC_ERROR, e.what());
+    }
+    catch (...)    {
+        throw JSONRPCError(RPC_MISC_ERROR, "unknown!?");
     }
 }
 
@@ -1304,6 +1353,16 @@ int CommandLineRPC(int argc, char *argv[])
                 strPrint = write_string(result, true);
         }
     }
+    catch (const std::runtime_error& e) 
+    {
+        strPrint = string("error: ") + e.what();
+        nRet = 85;  //WTFK
+    }
+    catch (const std::invalid_argument& ia) 
+    {
+        strPrint = string("error: ") + ia.what();
+        nRet = 86;  //WTFK
+    }
     catch (std::exception& e)
     {
         strPrint = string("error: ") + e.what();
@@ -1312,6 +1371,7 @@ int CommandLineRPC(int argc, char *argv[])
     catch (...)
     {
         PrintException(NULL, "CommandLineRPC()");
+        nRet = 88;
     }
 
     if (strPrint != "")

@@ -120,7 +120,7 @@ CBlock* CreateNewBlock(CWallet* pwallet, bool fProofOfStake)
     if (!pblock.get())
         return NULL;
 
-    if( pindexBest->nTime < YACOIN_2015_SWITCH_TIME)
+    if( pindexBest->nTime < YACOIN_2016_SWITCH_TIME)
     {
         pblock->nVersion = CBlock::CURRENT_VERSION_previous;
     }
@@ -631,7 +631,7 @@ void StakeMiner(CWallet *pwallet)
         CBlockIndex
             * pindexPrev = pindexBest;
 
-        if( pindexPrev->nTime < YACOIN_2015_SWITCH_TIME )   // before the new PoW/PoS rules
+        if( pindexPrev->nTime < YACOIN_2016_SWITCH_TIME )   // before the new PoW/PoS rules
         {                                                   // behave as previously
             if (
                 //fProofOfStake && 

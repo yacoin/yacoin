@@ -179,14 +179,31 @@ void RPCExecutor::request(const QString &command)
             std::string message = find_value(objError, "message").get_str();
             emit reply(RPCConsole::CMD_ERROR, QString::fromStdString(message) + " (code " + QString::number(code) + ")");
         }
+        catch (const std::invalid_argument& ia) 
+        {
+            emit reply(RPCConsole::CMD_ERROR, QString::fromStdString(write_string(json_spirit::Value(objError), false)));
+        }
         catch(std::runtime_error &) // raised when converting to invalid type, i.e. missing code or message
         {   // Show raw JSON object
             emit reply(RPCConsole::CMD_ERROR, QString::fromStdString(write_string(json_spirit::Value(objError), false)));
         }
+        //catch (...) 
+        //{
+        //    emit reply(RPCConsole::CMD_ERROR, QString("unknown error!?"));
+        //}
+    }
+    catch (const std::invalid_argument& ia) 
+    {
+      //emit reply(RPCConsole::CMD_ERROR, QString("Error: ") + QString::fromStdString(e.what()));
+        emit reply(RPCConsole::CMD_ERROR, QString("Error: ") + QString::fromStdString(ia.what()));
     }
     catch (std::exception& e)
     {
         emit reply(RPCConsole::CMD_ERROR, QString("Error: ") + QString::fromStdString(e.what()));
+    }
+    catch (...) 
+    {
+        emit reply(RPCConsole::CMD_ERROR, QString("unknown error!?"));
     }
 }
 

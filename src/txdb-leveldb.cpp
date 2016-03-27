@@ -472,9 +472,9 @@ bool CTxDB::LoadBlockIndex()
     #else
         // seems to be slowing down??
         #ifdef QT_GUI
-        nRefresh = 10000;
+        nRefresh = 4000;
         #else
-        nRefresh = 7000;    // 15000;    //10000;
+        nRefresh = 5000;    // 15000;    //10000;
         #endif
     #endif
 #endif
@@ -816,6 +816,7 @@ bool CTxDB::LoadBlockIndex()
     nCounter = 0;
     //#ifdef _MSC_VER
         #ifdef _DEBUG
+        /****************
         const int
             nMINUTESperBLOCK = 1,   // or whatever you want to do in this *coin
             nMINUTESperHOUR = 60,
@@ -824,6 +825,7 @@ bool CTxDB::LoadBlockIndex()
             nBLOCKSinLASTwhateverHOURS = nBLOCKSperHOUR * nHOURStoCHECK;
 
         nCheckDepth = nBLOCKSinLASTwhateverHOURS;
+        ****************/
         #endif
     //#endif
     #ifdef QT_GUI

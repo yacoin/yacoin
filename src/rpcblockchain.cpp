@@ -176,25 +176,6 @@ double doGetYACprice()
 {
     // first call gets BTC/YAC ratio
     // second call gets USD/BTC, so the product is USD/YAC
-    const string
-        sLeadIn   = "GET ",
-                    // here's where the api argument goes
-        sPrologue = " HTTP/1.1"
-                    "\r\n"
-                    "Content-Type: text/html"
-                    "\r\n"
-                    "Accept: application/json, text/html"
-                    "\r\n"
-                    "Host: ",
-                    // here's where the domain goes
-        sEpilogue = "\r\n"
-                    "Connection: close"
-                    "\r\n"
-                    "\r\n"
-                    "";
-    const int
-        nPort = DEFAULT_HTTP_PORT;
-
     double
         dPriceRatio = 0.0,
         dUSDperYACprice = 0.0,
@@ -202,106 +183,39 @@ double doGetYACprice()
         dBTCtoYACprice = 0.0;
 
     string
-        sDestination = "",
-        sDomain,
-        sApi,
-        sUrl,
-        sPriceRatioKey;
+        sDestination = "";
 
-    sDomain         = "data.bter.com",
-    sPriceRatioKey  = "last",
-    sApi            = "/api/1/ticker/yac_btc",
-
-    sUrl = strprintf(
-                     "%s%s%s%s%s",
-                     sLeadIn.c_str(),
-                     sApi.c_str(),
-                     sPrologue.c_str(),
-                     sDomain.c_str(),
-                     sEpilogue.c_str()
-                    );
-    if (fPrintToConsole) 
+    // if the provider is good, which we could use the next time called
+    // we could save which one say in a static index, set to 0 initially
+    static int
+        nIndexBtcToYac = 0,
+        nIndexUsdToBtc = 0; // these both assume that the arrays have >= 1 element each!
+    static bool
+        fCopied = false;
+    if( !fCopied )
     {
-        string
-            sfb = strprintf( "Command:\n%s\n", sUrl.c_str() );
-        printf( "%s", sfb.c_str() );
+        initialize_price_vectors( nIndexBtcToYac, nIndexUsdToBtc );
+        fCopied = true;
     }
-    const char
-        *pszTheFullUrl = sUrl.c_str();
 
-    if (!GetMyExternalWebPage( 
-                              sDomain,
-                              sPriceRatioKey,
-                              pszTheFullUrl, 
-                              sDestination, 
-                              dPriceRatio 
-                              //nPort 
-                             ) 
-       )
-    {   // we could try another provider, if there was one!
-        throw runtime_error(
-            "getYACprice\n"
-            "Could not get page 1?"
-                           );
+    if (!GetMyExternalWebPage1( nIndexBtcToYac, sDestination, dPriceRatio ) )
+    {
+        throw runtime_error( "getYACprice\n" "Could not get page 1?" );
         return dUSDperYACprice;
     }
     //else    //OK, now we have YAC/BTC (Cryptsy's terminology), really BTC/YAC
     dBTCtoYACprice = dPriceRatio;
-
-    if (fPrintToConsole) 
-    {
-        printf(
-                "%s => b/y %lf"
-                "\n", 
-                sDestination.c_str(),
-                dBTCtoYACprice
-              );
-    }
     sDestination = "";
     dPriceRatio = 0.0;
-
-    sDomain         = "btc.blockr.io",
-    sPriceRatioKey  = "value",
-    sApi            = "/api/v1/coin/info",
-
-    sUrl = strprintf(
-                     "%s%s%s%s%s",
-                     sLeadIn.c_str(),
-                     sApi.c_str(),
-                     sPrologue.c_str(),
-                     sDomain.c_str(),
-                     sEpilogue.c_str()
-                    );
-    if (fPrintToConsole) 
+     if (!GetMyExternalWebPage2( nIndexUsdToBtc, sDestination, dPriceRatio ) )
     {
-        string
-            sfb = strprintf( "Command:\n%s\n", sUrl.c_str() );
-        printf( "%s", sfb.c_str() );
-    }
-    pszTheFullUrl = sUrl.c_str();
-    if (!GetMyExternalWebPage( 
-                              sDomain, 
-                              sPriceRatioKey,
-                              pszTheFullUrl, 
-                              sDestination, 
-                              dPriceRatio
-                              //nPort 
-                             ) 
-       )
-    {
-        throw runtime_error(
-                            "getYACprice\n"
-                            "Could not get page 2?"
-                           );
+        throw runtime_error( "getYACprice\n" "Could not get page 2?" );
+        return dUSDperYACprice;
     }
     // else USD/BTC is OK
     dUSDtoBTCprice = dPriceRatio;
 
-    if( 0.0 == dUSDtoBTCprice )
-    {       // that provider failed, so we should try another
-
-    }
-    dUSDperYACprice = dBTCtoYACprice * dUSDtoBTCprice;   // really USD/YAC
+    dUSDperYACprice = dBTCtoYACprice * dUSDtoBTCprice;
     if (fPrintToConsole) 
     {
         printf(
@@ -328,12 +242,19 @@ Value getYACprice(const Array& params, bool fHelp)
                            );
     }
 
-    double 
-        dPrice = doGetYACprice();
+    string sTemp;
+    try
+    {
+        double 
+            dPrice = doGetYACprice();
 
-    string
         sTemp = strprintf( "%0.8lf", dPrice );
-
+    }
+    catch( std::exception &e )
+    {
+        printf( "%s\n", (string("error: ") + e.what()).c_str() );
+        sTemp = "";
+    }
     return sTemp;
 }
 

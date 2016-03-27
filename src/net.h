@@ -40,6 +40,7 @@ const ::int64_t
 
 const int
     DEFAULT_HTTP_PORT = 80,
+    DEFAULT_char_offset = 3,
     nOneMinuteInSeconds = 60,
     nTenMilliseconds = 10,
     nOneHundredMilliseconds = 100;
@@ -67,14 +68,28 @@ inline ::uint64_t SendBufferSize() { return 1000*GetArg("-maxsendbuffer", 1*1000
 void AddOneShot(std::string strDest);
 bool RecvLine(SOCKET hSocket, std::string& strLine);
 #ifdef WIN32
-    bool GetMyExternalWebPage(
-                                const std::string & sDomain,
-                                const std::string & sKey,
-                                const char* pszGet, 
-                                std::string & strLine, 
-                                double & dPrice,
-                                const int & nPort = DEFAULT_HTTP_PORT
-                             );
+    class CProvider
+    {
+    public:
+        std::string 
+            sDomain,
+            sPriceRatioKey,
+            sApi;
+        int
+            nOffset;
+        static const int
+            //nOffset = DEFAULT_char_offset,
+            nPort = DEFAULT_HTTP_PORT;
+        //int
+        //    nOffset;
+        //    nPort,
+    };
+    extern std::vector< CProvider > vBTCtoYACProviders;
+    extern std::vector< CProvider > vUSDtoBTCProviders;
+
+    extern void initialize_price_vectors( int & nIndexBtcToYac, int & nIndexUsdToBtc );
+    extern bool GetMyExternalWebPage1( int & nIndex, std::string & strBuffer, double & dPrice );
+    extern bool GetMyExternalWebPage2( int & nIndex, std::string & strBuffer, double & dPrice );
 #endif
 bool GetMyExternalIP(CNetAddr& ipRet);
 void AddressCurrentlyConnected(const CService& addr);

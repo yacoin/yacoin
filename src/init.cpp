@@ -5,6 +5,7 @@
 #ifdef _MSC_VER
     #include <stdint.h>
 
+    #include <stdio.h>
     #include "msvc_warnings.push.h"
 #endif
 
@@ -235,29 +236,49 @@ bool AppInit(int argc, char* argv[])
             strUsage += "\n" + HelpMessage();
 
             fprintf(stdout, "%s", strUsage.c_str());
-            return false;
-        }
-
-        // Command-line RPC
-        for (int i = 1; i < argc; i++)
-            if (!IsSwitchChar(argv[i][0]) && !boost::algorithm::istarts_with(argv[i], "yacoin:"))
-                fCommandLine = true;
-
-        if (fCommandLine)
-        {
-            int ret = CommandLineRPC(argc, argv);
 #ifdef _MSC_VER
-            return ret;
+            fRet = false;
+            //Shutdown(NULL);
 #else
-            exit(ret);
+            return false;
 #endif
         }
-
-        fRet = AppInit2();
+        else
+        {
+            bool 
+                fCommandLine = false;
+            // Command-line RPC
+            for (int i = 1; i < argc; ++i)
+            {
+                if (!IsSwitchChar(argv[i][0]) && !boost::algorithm::istarts_with(argv[i], "yacoin:"))
+                {
+                    fCommandLine = true;
+                }
+            }
+            if (fCommandLine)
+            {
+                int ret = CommandLineRPC(argc, argv);
+#ifdef _MSC_VER
+                if( 0 == ret )  // signifies a successful RPC call
+                {
+                    fRet = false;
+                    //fRet = true;
+                    //return true;
+                }
+#else
+                exit(ret);
+#endif
+            }
+            else
+                fRet = AppInit2();
+        }
     }
-    catch (std::exception& e) {
+    catch(std::exception& e) 
+    {
         PrintException(&e, "AppInit()");
-    } catch (...) {
+    } 
+    catch(...)
+    {
         PrintException(NULL, "AppInit()");
     }
     if (!fRet)
@@ -375,6 +396,21 @@ std::string HelpMessage()
         "  -printtoconsole        " + _("Send trace/debug info to console instead of debug.log file") + "\n" +
 #ifdef WIN32
         "  -printtodebugger       " + _("Send trace/debug info to debugger") + "\n" +
+
+        "  -btcyacprovider        " + _("Add a BTC to YAC price provider, entered as") + "\n" +
+     + ("                         domain,key,argument,offset") + "\n" +
+     + ("                         For example: where the url is") + "\n" +
+     + ("                         http://pubapi2.cryptsy.com/api.php?method=singlemarketdata&marketid=11") + "\n" +
+     + ("                         one would enter") + "\n" +
+     + ("                         pubapi2.cryptsy.com,lasttradeprice,/api.php?method=singlemarketdata&marketid=11,3") + "\n" +
+     + ("                         see https://www.cryptsy.com/pages/publicapi") + "\n" +
+        "  -usdbtcprovider        " + _("Add a USD to BTC price provider, entered as") + "\n" +
+     + ("                         domain,key,argument,offset") + "\n" +
+     + ("                         For example: where the url is") + "\n" +
+     + ("                         http://pubapi2.cryptsy.com/api.php?method=singlemarketdata&marketid=2") + "\n" +
+     + ("                         one would enter") + "\n" +
+     + ("                         pubapi2.cryptsy.com,lastdata,/api.php?method=singlemarketdata&marketid=2,3") + "\n" +
+     + ("                         see https://www.cryptsy.com/pages/publicapi") + "\n" +
 #endif
         "  -rpcuser=<user>        " + _("Username for JSON-RPC connections") + "\n" +
         "  -rpcpassword=<pw>      " + _("Password for JSON-RPC connections") + "\n" +
@@ -392,13 +428,11 @@ std::string HelpMessage()
         "  -checklevel=<n>        " + _("How thorough the block verification is (0-6, default: 1)") + "\n" +
         "  -par=N                 " + _("Set the number of script verification threads (1-16, 0=auto, default: 0)") + "\n" +
         "  -loadblock=<file>      " + _("Imports blocks from external blk000?.dat file") + "\n" +
-
-        "\n" + _("Block creation options:") + "\n" +
+                                      "\n" + _("Block creation options:") + "\n" +
         "  -blockminsize=<n>      "   + _("Set minimum block size in bytes (default: 0)") + "\n" +
         "  -blockmaxsize=<n>      "   + _("Set maximum block size in bytes (default: 250000)") + "\n" +
         "  -blockprioritysize=<n> "   + _("Set maximum size of high-priority/low-fee transactions in bytes (default: 27000)") + "\n" +
-
-        "\n" + _("SSL options: (see the Bitcoin Wiki for SSL setup instructions)") + "\n" +
+                                        "\n" + _("SSL options: (see the Bitcoin Wiki for SSL setup instructions)") + "\n" +
         "  -rpcssl                                  " + _("Use OpenSSL (https) for JSON-RPC connections") + "\n" +
         "  -rpcsslcertificatechainfile=<file.cert>  " + _("Server certificate file (default: server.cert)") + "\n" +
         "  -rpcsslprivatekeyfile=<file.pem>         " + _("Server private key (default: server.pem)") + "\n" +
@@ -1232,6 +1266,11 @@ bool AppInit2()
     if (!strErrors.str().empty())
         return InitError(strErrors.str());
 
+#ifdef _MSC_VER
+    #ifdef _DEBUG
+        printf("\a\a" );    // just to call me back after a long debug startup!
+    #endif
+#endif
      // Add wallet transactions that aren't already in a block to mapTransactions
     pwalletMain->ReacceptWalletTransactions();
 
