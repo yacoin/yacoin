@@ -2,15 +2,17 @@
 #include "ui_askpassphrasedialog.h"
 
 #include "guiconstants.h"
+#include "dialogwindowflags.h"
 #include "walletmodel.h"
-#include "overviewpage.h"
 
 #include <QMessageBox>
 #include <QPushButton>
 #include <QKeyEvent>
 
+extern bool fWalletUnlockMintOnly;
+
 AskPassphraseDialog::AskPassphraseDialog(Mode mode, QWidget *parent) :
-    QDialog(parent),
+    QDialog(parent, DIALOGWINDOWHINTS),
     ui(new Ui::AskPassphraseDialog),
     mode(mode),
     model(0),
@@ -35,6 +37,7 @@ AskPassphraseDialog::AskPassphraseDialog(Mode mode, QWidget *parent) :
             setWindowTitle(tr("Encrypt wallet"));
             break;
         case Unlock: // Ask passphrase
+        case UnlockMining:
             ui->warningLabel->setText(tr("This operation needs your wallet passphrase to unlock the wallet."));
             ui->passLabel2->hide();
             ui->passEdit2->hide();
@@ -110,7 +113,7 @@ void AskPassphraseDialog::accept()
                 {
                     QMessageBox::warning(this, tr("Wallet encrypted"),
                                          "<qt>" + 
-                                         tr("YACoin will close now to finish the encryption process. "
+                                         tr("Yacoin will close now to finish the encryption process. "
                                          "Remember that encrypting your wallet cannot fully protect "
                                          "your coins from being stolen by malware infecting your computer.") + 
                                          "<br><br><b>" + 
@@ -150,6 +153,18 @@ void AskPassphraseDialog::accept()
             QDialog::accept(); // Success
         }
         break;
+    case UnlockMining:
+        if(!model->setWalletLocked(false, oldpass))
+        {
+            QMessageBox::critical(this, tr("Wallet unlock failed"),
+                                  tr("The passphrase entered for the wallet decryption was incorrect."));
+        }
+        else
+        {
+            QDialog::accept(); // Success
+            fWalletUnlockMintOnly = true;
+        }
+        break;
     case Decrypt:
         if(!model->setWalletEncrypted(false, oldpass))
         {
@@ -158,7 +173,11 @@ void AskPassphraseDialog::accept()
         }
         else
         {
-            QDialog::accept(); // Success
+            QMessageBox::warning(this, tr("Wallet decrypted"),
+                                     "<qt>" + 
+                                     tr("Yacoin will close now to finish the decryption process. ") +
+                                     "</b></qt>");
+            QApplication::quit();
         }
         break;
     case ChangePass:
@@ -195,6 +214,7 @@ void AskPassphraseDialog::textChanged()
         acceptable = !ui->passEdit2->text().isEmpty() && !ui->passEdit3->text().isEmpty();
         break;
     case Unlock: // Old passphrase x1
+    case UnlockMining:
     case Decrypt:
         acceptable = !ui->passEdit1->text().isEmpty();
         break;

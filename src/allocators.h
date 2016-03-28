@@ -50,7 +50,7 @@ public:
         // Determine bitmask for extracting page from address
 #ifdef _MSC_VER
         bool
-            fTest = (!(page_size & (page_size-1))); // size must be power of two
+            fTest = (!(page_size & (page_size-1)));
     #ifdef _DEBUG
         assert(fTest);
     #else
@@ -99,7 +99,7 @@ public:
             Histogram::iterator it = histogram.find(page);
 #ifdef _MSC_VER
             bool
-                fTest = (it != histogram.end()); // Cannot unlock an area that was not locked
+                fTest = (it != histogram.end());
     #ifdef _DEBUG
             assert(fTest);
     #else
@@ -165,7 +165,7 @@ public:
     bool Lock(const void *addr, size_t len)
     {
 #ifdef WIN32
-        return VirtualLock(const_cast<void*>(addr), len);
+        return VirtualLock(const_cast<void*>(addr), len) != 0;
 #else
         return mlock(addr, len) == 0;
 #endif
@@ -176,7 +176,7 @@ public:
     bool Unlock(const void *addr, size_t len)
     {
 #ifdef WIN32
-        return VirtualUnlock(const_cast<void*>(addr), len);
+        return VirtualUnlock(const_cast<void*>(addr), len) != 0;
 #else
         return munlock(addr, len) == 0;
 #endif

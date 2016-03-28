@@ -23,8 +23,7 @@ public:
         Date = 1,
         Type = 2,
         ToAddress = 3,
-        Amount = 4,
-        Balance = 5
+        Amount = 4
     };
 
     /** Roles to get specific information from a transaction row.
@@ -45,12 +44,12 @@ public:
         AmountRole,
         /** Unique identifier */
         TxIDRole,
+        /** Transaction hash */
+        TxHashRole,
         /** Is transaction confirmed? */
         ConfirmedRole,
         /** Formatted amount, without brackets when unconfirmed */
-        FormattedAmountRole,
-        /** Formatted balance */
-        FormattedBalanceRole
+        FormattedAmountRole
     };
 
     int rowCount(const QModelIndex &parent) const;
@@ -58,6 +57,7 @@ public:
     QVariant data(const QModelIndex &index, int role) const;
     QVariant headerData(int section, Qt::Orientation orientation, int role) const;
     QModelIndex index(int row, int column, const QModelIndex & parent = QModelIndex()) const;
+    void refresh();
 private:
     CWallet* wallet;
     WalletModel *walletModel;
@@ -72,7 +72,6 @@ private:
     QString formatTxType(const TransactionRecord *wtx) const;
     QString formatTxToAddress(const TransactionRecord *wtx, bool tooltip) const;
     QString formatTxAmount(const TransactionRecord *wtx, bool showUnconfirmed=true) const;
-    QString formatTxBalance(const TransactionRecord *wtx, bool showUnconfirmed=true) const;
     QString formatTooltip(const TransactionRecord *rec) const;
     QVariant txStatusDecoration(const TransactionRecord *wtx) const;
     QVariant txAddressDecoration(const TransactionRecord *wtx) const;
@@ -81,6 +80,8 @@ public slots:
     void updateTransaction(const QString &hash, int status);
     void updateConfirmations();
     void updateDisplayUnit();
+    /** Updates the column title to "Amount (DisplayUnit)" and emits headerDataChanged() signal for table headers to react. */
+    void updateAmountColumnTitle();
 
     friend class TransactionTablePriv;
 };

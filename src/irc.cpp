@@ -2,7 +2,6 @@
 // Copyright (c) 2009-2012 The Bitcoin developers
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
-
 #ifdef _MSC_VER
     #include <stdint.h>
 
@@ -10,9 +9,9 @@
 #endif
 
 #include "irc.h"
-#include "net.h"
 #include "strlcpy.h"
 #include "base58.h"
+#include "net.h"
 
 using namespace std;
 using namespace boost;
@@ -28,7 +27,7 @@ void ThreadIRCSeed2(void* parg);
 struct ircaddr
 {
     struct in_addr ip;
-    short port;
+    unsigned short port;
 };
 #pragma pack(pop)
 
@@ -83,7 +82,7 @@ static bool Send(SOCKET hSocket, const char* pszSend)
 
 bool RecvLineIRC(SOCKET hSocket, string& strLine)
 {
-    loop
+    while (true)
     {
         bool fRet = RecvLine(hSocket, strLine);
         if (fRet)
@@ -106,7 +105,7 @@ bool RecvLineIRC(SOCKET hSocket, string& strLine)
 
 int RecvUntil(SOCKET hSocket, const char* psz1, const char* psz2=NULL, const char* psz3=NULL, const char* psz4=NULL)
 {
-    loop
+    while (true)
     {
         string strLine;
         strLine.reserve(10000);
@@ -141,7 +140,7 @@ bool Wait(int nSeconds)
 bool RecvCodeLine(SOCKET hSocket, const char* psz1, string& strRet)
 {
     strRet.clear();
-    loop
+    while (true)
     {
         string strLine;
         if (!RecvLineIRC(hSocket, strLine))
@@ -195,7 +194,7 @@ bool GetIPFromIRC(SOCKET hSocket, string strMyName, CNetAddr& ipRet)
 void ThreadIRCSeed(void* parg)
 {
     // Make this thread recognisable as the IRC seeding thread
-    RenameThread("bitcoin-ircseed");
+    RenameThread("yacoin-ircseed");
 
     try
     {
@@ -207,10 +206,6 @@ void ThreadIRCSeed(void* parg)
         PrintExceptionContinue(NULL, "ThreadIRCSeed()");
     }
     printf("ThreadIRCSeed exited\n");
-#ifdef _MSC_VER
-    // since it appears to be last,
-    ExitProcess(0); // now is the right moment
-#endif
 }
 
 void ThreadIRCSeed2(void* parg)
@@ -270,7 +265,7 @@ void ThreadIRCSeed2(void* parg)
         if (!fNoListen && GetLocal(addrLocal, &addrIPv4) && nNameRetry<3)
             strMyName = EncodeAddress(GetLocalAddress(&addrConnect));
         if (strMyName == "")
-            strMyName = strprintf("x%"PRI64u"", GetRand(1000000000));
+            strMyName = strprintf("x%" PRIu64 "", GetRand(1000000000));
 
         Send(hSocket, strprintf("NICK %s\r", strMyName.c_str()).c_str());
         Send(hSocket, strprintf("USER %s 8 * : %s\r", strMyName.c_str(), strMyName.c_str()).c_str());
@@ -324,7 +319,7 @@ void ThreadIRCSeed2(void* parg)
             Send(hSocket, strprintf("WHO #yacoin%02d\r", channel_number).c_str());
         }
 
-        int64 nStart = GetTime();
+        ::int64_t nStart = GetTime();
         string strLine;
         strLine.reserve(10000);
         while (!fShutdown && RecvLineIRC(hSocket, strLine))
@@ -412,7 +407,4 @@ int main(int argc, char *argv[])
     WSACleanup();
     return 0;
 }
-#endif
-#ifdef _MSC_VER
-    #include "msvc_warnings.pop.h"
 #endif
