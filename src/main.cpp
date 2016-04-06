@@ -1420,7 +1420,6 @@ unsigned int ComputeMinStake(unsigned int nBase, ::int64_t nTime, unsigned int n
     return ComputeMaxBits(GetProofOfStakeLimit(0, nBlockTime), nBase, nTime);
 }
 
-
 // ppcoin: find last block index up to pindex
 const CBlockIndex* GetLastBlockIndex(const CBlockIndex* pindex, bool fProofOfStake)
 {
@@ -1429,11 +1428,83 @@ const CBlockIndex* GetLastBlockIndex(const CBlockIndex* pindex, bool fProofOfSta
     return pindex;
 }
 
+//_____________________________________________________________________________
+static unsigned int GetNextTargetRequired044(const CBlockIndex* pindexLast, bool fProofOfStake)
+{
+    CBigNum 
+        bnTargetLimit = bnProofOfWorkLimit;
+
+    if(fProofOfStake)
+    {
+        // Proof-of-Stake blocks has own target limit since nVersion=3 
+        // supermajority on mainNet and always on testNet
+        if(fTestNet)
+            bnTargetLimit = bnProofOfStakeHardLimit;
+        else
+        {
+/*            if(fTestNet || (pindexLast->nHeight + 1 > 15000))
+                bnTargetLimit = bnProofOfStakeLimit;
+            else if(pindexLast->nHeight + 1 > 14060)*/ // DIFF
+                bnTargetLimit = bnProofOfStakeHardLimit;
+        }
+    }
+
+    if (pindexLast == NULL)
+        return bnTargetLimit.GetCompact(); // genesis block
+
+    const CBlockIndex
+        * pindexPrev = GetLastBlockIndex(pindexLast, fProofOfStake);
+
+    if (pindexPrev->pprev == NULL)
+        return bnInitialHashTarget.GetCompact(); // first block
+
+    const CBlockIndex
+        * pindexPrevPrev = GetLastBlockIndex(pindexPrev->pprev, fProofOfStake);
+
+    if (pindexPrevPrev->pprev == NULL)
+        return bnInitialHashTarget.GetCompact(); // second block
+
+    ::int64_t
+        nActualSpacing = pindexPrev->GetBlockTime() - pindexPrevPrev->GetBlockTime();
+
+    // ppcoin: target change every block
+    // ppcoin: retarget with exponential moving toward target spacing
+    CBigNum 
+        bnNew;
+
+    bnNew.SetCompact(pindexPrev->nBits);
+
+    ::int64_t
+        nTargetSpacing = fProofOfStake? 
+                         nStakeTargetSpacing : 
+                         min(
+                            nTargetSpacingWorkMax, 
+                            (::int64_t) nStakeTargetSpacing * (1 + pindexLast->nHeight - pindexPrev->nHeight)
+                            );
+
+    ::int64_t
+        nInterval = nTargetTimespan / nTargetSpacing;
+
+    bnNew *= (((nInterval - 1) * nTargetSpacing) + nActualSpacing + nActualSpacing);
+    bnNew /=  ((nInterval + 1) * nTargetSpacing);
+
+    if (bnNew > bnTargetLimit)
+        bnNew = bnTargetLimit;
+
+    return bnNew.GetCompact();
+}
+//_____________________________________________________________________________
 // yacoin2015 upgrade: penalize ignoring ProofOfStake blocks with high difficulty.
 // requires adjusted PoW-PoS ratio (GetSpacingThreshold), PoW target moving average (nBitsMA)
 unsigned int GetNextTargetRequired(const CBlockIndex* pindexLast, bool fProofOfStake)
 {
-    CBigNum bnTargetLimit = fProofOfStake ? bnProofOfStakeHardLimit : bnProofOfWorkLimit; // PoS(~uint256(0) >> 30), PoW(~uint256(0) >> 20)
+    if( pindexLast->nTime < YACOIN_2016_SWITCH_TIME )
+    {
+        return GetNextTargetRequired044( pindexLast, fProofOfStake );
+    }
+    CBigNum 
+        bnTargetLimit = fProofOfStake ? bnProofOfStakeHardLimit : bnProofOfWorkLimit; // PoS(~uint256(0) >> 30), PoW(~uint256(0) >> 20)
+
     bool fCheckPreviousPoWBlockOverstep(false); // flag, used for check and ignore overstepped PoW block difficulty
 
     if ( !fProofOfStake && pindexLast->nTime >= YACOIN_2016_SWITCH_TIME )
@@ -3138,9 +3209,77 @@ bool ProcessBlock(CNode* pfrom, CBlock* pblock)
     return true;
 }
 
+//_____________________________________________________________________________
+// ppcoin: sign block
+bool CBlock::SignBlock044(const CKeyStore& keystore)
+//bool SignBlock044(const CKeyStore& keystore)
+{
+    vector<valtype> vSolutions;
+    txnouttype whichType;
+
+    if(!IsProofOfStake())
+    {
+        for(unsigned int i = 0; i < vtx[0].vout.size(); i++)
+        {
+            const CTxOut& txout = vtx[0].vout[i];
+
+            if (!Solver(txout.scriptPubKey, whichType, vSolutions))
+                continue;
+
+            if (whichType == TX_PUBKEY)
+            {
+                // Sign
+                valtype& vchPubKey = vSolutions[0];
+                CKey key;
+
+                if (!keystore.GetKey(Hash160(vchPubKey), key))
+                    continue;
+                if (key.GetPubKey() != vchPubKey)
+                    continue;
+                if(!key.Sign(GetHash(), vchBlockSig))
+                    continue;
+
+                return true;
+            }
+        }
+    }
+    else
+    {
+        const CTxOut& txout = vtx[1].vout[1];
+
+        if (!Solver(txout.scriptPubKey, whichType, vSolutions))
+            return false;
+
+        if (whichType == TX_PUBKEY)
+        {
+            // Sign
+            valtype& vchPubKey = vSolutions[0];
+            CKey key;
+
+            if (!keystore.GetKey(Hash160(vchPubKey), key))
+                return false;
+            if (key.GetPubKey() != vchPubKey)
+                return false;
+
+            return key.Sign(GetHash(), vchBlockSig);
+        }
+    }
+
+    printf("Sign failed\n");
+    return false;
+}
+
+//_____________________________________________________________________________
 // novacoin: attempt to generate suitable proof-of-stake
 bool CBlock::SignBlock(CWallet& wallet)
 {
+    // if we are doing 0.4.4 blocks, let's check using 0.4.4 code
+    if( CURRENT_VERSION_previous == nVersion )
+    {
+        bool
+            fOldVersion = SignBlock044( wallet );
+        return fOldVersion;
+    }
     // if we are trying to sign
     //    something except proof-of-stake block template
     if (!vtx[0].vout[0].IsEmpty())

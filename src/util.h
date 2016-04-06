@@ -82,6 +82,7 @@ void LogStackTrace();
     #define PRI64d  "I64d"
     #define PRId64  "I64d"
     #define PRIu64  "I64u"
+    #define PRI64u  "I64u"
     #define PRIx64  "I64x"
     #define PRI64x  "I64x"
 #else /* C99 standard */

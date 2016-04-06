@@ -16,7 +16,7 @@ static const unsigned int
 
 static const unsigned int 
     nMay_1_2016 = 1468654496U,
-    nApril_1_2016 = 1459468800U,
+  //nApril_1_2016 = 1459468800U,
     YACOIN_2016_SWITCH_TIME = nMay_1_2016;
 // we should set the above value as given to match the future time we expect 
 // all nodes will have upgraded and "caught up".  
@@ -25,18 +25,19 @@ static const unsigned int
 
 // YACOIN TODO
 static const unsigned int 
-    nSecondsOfFriNov12_2055 = 2709614280U;
+    nSecondsOfFriNov12_2055 = 2709614280U,
+    nSomeObscureFutureTime = nSecondsOfFriNov12_2055;
 
-static const unsigned int STAKE_SWITCH_TIME         = 2709614280U;  // for gcc's benefit, not MSVC++!
-static const unsigned int TARGETS_SWITCH_TIME       = 2709614280U;  // Fri, 12 Nov 2055 06:38:00 GMT
+static const unsigned int STAKE_SWITCH_TIME         = nSomeObscureFutureTime;  // for gcc's benefit, not MSVC++!
+static const unsigned int TARGETS_SWITCH_TIME       = nSomeObscureFutureTime;  // Fri, 12 Nov 2055 06:38:00 GMT
 //static const unsigned int CHAINCHECKS_SWITCH_TIME = 2709614280;
-static const unsigned int STAKECURVE_SWITCH_TIME    = 2709614280U; 
+static const unsigned int STAKECURVE_SWITCH_TIME    = nSomeObscureFutureTime; 
 
-static const unsigned int VALIDATION_SWITCH_TIME    = 2709614280U; 
-static const unsigned int SIG_SWITCH_TIME           = 2709614280U; 
+static const unsigned int VALIDATION_SWITCH_TIME    = nSomeObscureFutureTime; 
+static const unsigned int SIG_SWITCH_TIME           = nSomeObscureFutureTime; 
 
 // Protocol switch time for fixed kernel modifier interval
-static const unsigned int nModifierSwitchTime       = 2709614280U;   
-static const unsigned int nModifierTestSwitchTime   = 2709614280U; 
+static const unsigned int nModifierSwitchTime       = nSomeObscureFutureTime;   
+static const unsigned int nModifierTestSwitchTime   = nSomeObscureFutureTime; 
 
 #endif
