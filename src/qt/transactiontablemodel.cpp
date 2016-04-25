@@ -103,8 +103,17 @@ public:
             int upperIndex = (upper - cachedWallet.begin());
             bool inModel = (lower != upper);
 
+            bool 
+                showTransaction;
             // Determine whether to show transaction or not
-            bool showTransaction = (inWallet && TransactionRecord::showTransaction(mi->second));
+            if( mi->second.nTimeReceived < YACOIN_2016_SWITCH_TIME )
+            {
+                showTransaction = (inWallet && TransactionRecord::showTransaction(mi->second, false));
+            }
+            else
+            {
+                showTransaction = (inWallet && TransactionRecord::showTransaction(mi->second));
+            }
 
             if(status == CT_UPDATED)
             {
@@ -380,6 +389,8 @@ QString TransactionTableModel::formatTxType(const TransactionRecord *wtx) const
     case TransactionRecord::SendToSelf:
         return tr("Payment to yourself");
     case TransactionRecord::Generated:
+        return tr("Minted");
+    case TransactionRecord::Mined:
         return tr("Mined");
     default:
         return QString();
@@ -391,6 +402,8 @@ QVariant TransactionTableModel::txAddressDecoration(const TransactionRecord *wtx
     switch(wtx->type)
     {
     case TransactionRecord::Generated:
+        return QIcon(":/icons/tx_mined");   // should be a minted icon
+    case TransactionRecord::Mined:
         return QIcon(":/icons/tx_mined");
     case TransactionRecord::RecvWithAddress:
     case TransactionRecord::RecvFromOther:
@@ -445,15 +458,39 @@ QVariant TransactionTableModel::addressColor(const TransactionRecord *wtx) const
 
 QString TransactionTableModel::formatTxAmount(const TransactionRecord *wtx, bool showUnconfirmed) const
 {
-    QString str = BitcoinUnits::format(walletModel->getOptionsModel()->getDisplayUnit(), wtx->credit + wtx->debit);
+    QString 
+        str = BitcoinUnits::format(
+                                    walletModel->getOptionsModel()->getDisplayUnit(), 
+                                    wtx->credit + wtx->debit
+                                  );
     if(showUnconfirmed)
     {
-        if(!wtx->status.confirmed || wtx->status.maturity != TransactionStatus::Mature)
+        if(
+           (!wtx->status.confirmed) || 
+           (wtx->status.maturity != TransactionStatus::Mature)
+          )
         {
-            str = QString("[") + str + QString("]");
+            if (wtx->type == TransactionRecord::Generated) //StakeInterest
+            {
+                QString 
+                    staked = BitcoinUnits::format(
+                                                  walletModel->getOptionsModel()->getDisplayUnit(), 
+                                                  -(wtx->debit)
+                                                 );
+                // it's strange, that by the time we get here, 0.4.5 zeros out 
+                // debit and makes credit = the net
+
+              //str = QString("[") + str + QString("] - ") + staked;
+                str = QString("[") + str + QString("] ") + staked;
+            }
+            else 
+            {
+                str = QString("[") + str + QString("]");
+            }
         }
     }
-    return QString(str);
+  //return QString(str);
+    return str;
 }
 
 QVariant TransactionTableModel::txStatusDecoration(const TransactionRecord *wtx) const
@@ -540,6 +577,8 @@ QVariant TransactionTableModel::data(const QModelIndex &index, int role) const
             return formatTxToAddress(rec, false);
         case Amount:
             return formatTxAmount(rec);
+        //case Balance:
+        //    return formatTxBalance(rec);        
         }
         break;
     case Qt::EditRole:
@@ -558,6 +597,8 @@ QVariant TransactionTableModel::data(const QModelIndex &index, int role) const
         case Amount:
             // Same here
             return static_cast<qlonglong>(rec->credit + rec->debit);
+        //case Balance:       // <<<<<<<<< added test
+        //    return rec->time;        
         }
         break;
     case Qt::ToolTipRole:
@@ -598,7 +639,11 @@ QVariant TransactionTableModel::data(const QModelIndex &index, int role) const
         return QString::fromStdString(rec->hash.ToString());
     case ConfirmedRole:
         // Return True if transaction counts for balance
-        return rec->status.confirmed && !(rec->type == TransactionRecord::Generated && rec->status.maturity != TransactionStatus::Mature);
+        return rec->status.confirmed && 
+                !(
+                  (rec->type == TransactionRecord::Generated) && 
+                  (rec->status.maturity != TransactionStatus::Mature)
+                 );
     case FormattedAmountRole:
         return formatTxAmount(rec, false);
     }

@@ -1078,7 +1078,11 @@ unsigned char GetNfactor(::int64_t nTimestamp)
     // so n is between 0 and 0xff
     unsigned char N = (unsigned char)n;
 #ifdef _DEBUG
-    if( fDebug )
+    if( 
+        false &&    // just a quick way to turn it off
+        fDebug &&
+        fPrintToConsole
+      )
     {
         printf(
                 "GetNfactor: %"PRI64d" -> %d %"PRI64d" : %d / %d\n", 
@@ -1634,14 +1638,15 @@ bool IsInitialBlockDownload()
 
     ::int64_t 
         nTwoHoursAgoInSeconds = nCurrentTime - nTwoHoursInSeconds,
-        nOnedayAgoInSeconds = nCurrentTime - nOneDayInSeconds;
+        nOnedayAgoInSeconds = nCurrentTime - nOneDayInSeconds,
+        n12MinutesAgo = nCurrentTime - (12 * nSecondsPerMinute);
 
     bool 
         fIsBestBlockOldEnough = (nTimeOfBestBlockInSeconds < nOnedayAgoInSeconds)? true: false;
 
     if( !fIsBestBlockOldEnough ) // being old enough means still "catching up"
     {                           // i.e. in the "initial download"
-        fIsBestBlockOldEnough = (nTimeOfBestBlockInSeconds < nTwoHoursAgoInSeconds)? true: false;
+        fIsBestBlockOldEnough = (nTimeOfBestBlockInSeconds < n12MinutesAgo)? true: false;
     }
     return fIsBestBlockOldEnough;
 }
@@ -3197,7 +3202,7 @@ bool ProcessBlock(CNode* pfrom, CBlock* pblock)
         mapOrphanBlocksByPrev.erase(hashPrev);
     }
 
-    printf("ProcessBlock: ACCEPTED\n");
+    printf("ProcessBlock: ACCEPTED %s BLOCK\n", pblock->IsProofOfStake()?"POS":"POW");
 
     // ppcoin: if responsible for sync-checkpoint send it
     if (pfrom && !CSyncCheckpoint::strMasterPrivKey.empty())

@@ -477,6 +477,8 @@ bool CTxDB::LoadBlockIndex()
         nRefresh = 5000;    // 15000;    //10000;
         #endif
     #endif
+    ::int64_t
+        n64MsStartTime = GetTimeMillis();
 #endif
     // The block index is an in-memory structure that maps hashes to on-disk
     // locations where the contents of the block can be found. Here, we scan it
@@ -654,13 +656,20 @@ bool CTxDB::LoadBlockIndex()
                             dEstimate > 100.0? 100.0: dEstimate
                                       );
             if (fPrintToConsole)
+            {
                 (void)printf( 
                             "%s"
                             "   "
-                            "\r"
                             "",
                             sGutsNoise.c_str()
                             );
+    //#ifdef _DEBUG
+                DoProgress( nCounter, nMaxHeightGuess, n64MsStartTime );
+    //#endif
+                (void)printf( 
+                            "\r"
+                            );
+            }
     #ifdef QT_GUI
             uiInterface.InitMessage( sGutsNoise.c_str() );
     #endif
@@ -709,23 +718,14 @@ bool CTxDB::LoadBlockIndex()
 
             vSortedByHeight.push_back(make_pair(pindex->nHeight, pindex));
 #ifdef WIN32
-            if( 0 == pindex->nHeight )
-            {
-    #ifdef _MSC_VER
-                if (fPrintToConsole) 
-                    printf( "Height 0 at count %7d\n", nCounter );
-    #endif
-            }
             ++nCounter;
             if( 0 == (nCounter % nUpdatePeriod) )
             {
     #ifdef QT_GUI
                 uiInterface.InitMessage( strprintf( _("%7d"), nCounter ) );
     #else
-        //#ifdef _MSC_VER
                 if (fPrintToConsole) 
                     printf( "%7d\r", nCounter );
-        //#endif
     #endif
             }
 #endif        

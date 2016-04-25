@@ -42,7 +42,8 @@ extern "C" {
 #include "pbkdf2.h"
 
 #include "util.h"
-#include "net.h"
+//#include "net.h"
+#include "main.h"
 
 #define SCRYPT_BUFFER_SIZE (131072 + 63)
 
@@ -140,38 +141,64 @@ void scrypt_buffer_free(void *scratchpad)
     free(scratchpad);
 }
 
-unsigned int scanhash_scrypt(block_header *pdata,
-    ::uint32_t max_nonce, ::uint32_t &hash_count,
-    void *result, block_header *res_header, unsigned char Nfactor)
+unsigned int scanhash_scrypt(
+                            block_header *pdata,
+                            ::uint32_t max_nonce, 
+                            ::uint32_t &hash_count,
+                            void *result, 
+                            block_header *res_header, 
+                            unsigned char Nfactor
+                            , CBlockIndex *pindexPrev
+                            , uint256 *phashTarget
+                            )
 {
     hash_count = 0;
-    block_header data = *pdata;
-    ::uint32_t hash[8];
-    unsigned char *hashc = (unsigned char *) &hash;
+    const ::uint32_t
+        nArbitraryHashCount = 70;
+    block_header 
+        data = *pdata;
+    ::uint32_t 
+        hash[8];
+    unsigned char 
+        *hashc = (unsigned char *) &hash;
+    ::uint32_t  // really any random uint32_t
+        n = (::uint32_t)GetRand( (::uint64_t)UINT_MAX );
 
+    while (true) 
+    {
+        if( UINT_MAX == n ) // not allowed as a nonce
+        {
+            ++n;
+        }
+        data.nonce = n;
 
-    ::uint32_t n = 0;
+        scrypt(
+               (const unsigned char*)&data, 
+               80,
+               (const unsigned char*)&data, 
+               80,
+               Nfactor, 
+               0, 
+               0, 
+               (unsigned char*)hash, 
+               32
+              );
+        ++hash_count;
 
-    while (true) {
-
-        data.nonce = n++;
-
-        scrypt((const unsigned char*)&data, 80,
-               (const unsigned char*)&data, 80,
-               Nfactor, 0, 0, (unsigned char*)hash, 32);
-        hash_count += 1;
-
-        if (hashc[31] == 0 && hashc[30] == 0) {
+        if (
+            (0 == hashc[31]) && 
+            (0 == hashc[30])
+           ) 
+        {
             memcpy(result, hash, 32);
-
             return data.nonce;
         }
-
-        if (n >= max_nonce) {
-            hash_count = 0xffff + 1;
-            break;
+        if (hash_count >= nArbitraryHashCount) 
+        {   // really we should hash for a while, then check
+            if (pindexPrev != pindexBest)
+                break;            break;
         }
+        ++n;
     }
-
-    return (unsigned int) -1;
+    return UINT_MAX;
 }

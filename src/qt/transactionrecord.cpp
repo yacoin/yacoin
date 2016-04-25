@@ -5,14 +5,28 @@
 
 /* Return positive answer if transaction should be shown in list.
  */
-bool TransactionRecord::showTransaction(const CWalletTx &wtx)
+bool TransactionRecord::showTransaction(const CWalletTx &wtx, bool fTestStake)
 {
-    if (wtx.IsCoinBase())
+    if( wtx.nTimeReceived < YACOIN_2016_SWITCH_TIME )
     {
-        // Ensures we show generated coins / mined transactions at depth 1
-        if (!wtx.IsInMainChain())
+        if ( wtx.IsCoinBase() || (fTestStake && wtx.IsCoinStake()) )
         {
-            return false;
+            // Ensures we show generated coins / mined transactions at depth 1
+            if (!wtx.IsInMainChain())
+            {
+                return false;
+            }
+        }    
+    }
+    else
+    {
+        if (wtx.IsCoinBase())
+        {
+            // Ensures we show generated coins / mined transactions at depth 1
+            if (!wtx.IsInMainChain())
+            {
+                return false;
+            }
         }
     }
     return true;
@@ -69,6 +83,7 @@ QList<TransactionRecord> TransactionRecord::decomposeTransaction(const CWallet *
                         continue; // last coinstake output
 
                     sub.type = TransactionRecord::Generated;
+                    // what ugly code!!
                     sub.credit = nNet > 0 ? nNet : wtx.GetValueOut() - nDebit;
                     hashPrev = hash;
                 }

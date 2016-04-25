@@ -1572,8 +1572,21 @@ int64_t CWallet::GetStake() const
     for (map<uint256, CWalletTx>::const_iterator it = mapWallet.begin(); it != mapWallet.end(); ++it)
     {
         const CWalletTx* pcoin = &(*it).second;
-        if (pcoin->IsCoinStake() && pcoin->GetBlocksToMaturity() > 0 && pcoin->GetDepthInMainChain() > 0)
-            nTotal += CWallet::GetCredit(*pcoin, MINE_ALL);
+        if (
+            pcoin->IsCoinStake() && 
+            pcoin->GetBlocksToMaturity() > 0 && 
+            pcoin->GetDepthInMainChain() > 0
+           )
+        {
+            if(pcoin->nTimeReceived < YACOIN_2016_SWITCH_TIME)  // probably should be for all times!
+            {
+                nTotal += CWallet::GetDebit(*pcoin, MINE_ALL);
+            }
+            else
+            {
+                nTotal += CWallet::GetCredit(*pcoin, MINE_ALL);
+            }
+        }
     }
     return nTotal;
 }
