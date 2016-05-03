@@ -63,7 +63,8 @@ public:
     enum Type
     {
         Other,
-        Generated,
+        Generated,          // minted
+        Mined,
         SendToAddress,
         SendToOther,
         RecvWithAddress,
@@ -72,7 +73,7 @@ public:
     };
 
     /** Number of confirmation needed for transaction */
-    static const int NumConfirmations = 6;
+    static const int NumConfirmations = 6;      // for bitcoin, but what about YACoin? 60?
 
     TransactionRecord():
             hash(), time(0), type(Other), address(""), debit(0), credit(0), idx(0)
@@ -95,7 +96,7 @@ public:
 
     /** Decompose CWallet transaction to model transaction records.
      */
-    static bool showTransaction(const CWalletTx &wtx);
+    static bool showTransaction(const CWalletTx &wtx, bool testStake = true);
     static QList<TransactionRecord> decomposeTransaction(const CWallet *wallet, const CWalletTx &wtx);
 
     /** @name Immutable transaction attributes

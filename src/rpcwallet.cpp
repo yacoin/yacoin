@@ -1215,12 +1215,12 @@ Value listtransactions(const Array& params, bool fHelp)
 
 Value listaccounts(const Array& params, bool fHelp)
 {
-    if (fHelp || params.size() > 1)
+    if (fHelp || params.size() > 2)
         throw runtime_error(
             "listaccounts [minconf=1]\n"
             "Returns Object that has account names as keys, account balances as values.");
 
-    int nMinDepth = 2;  //1;
+    int nMinDepth = 1;
     if (params.size() > 0)
         nMinDepth = params[0].get_int();
 
@@ -1228,9 +1228,15 @@ Value listaccounts(const Array& params, bool fHelp)
         includeWatchonly = MINE_SPENDABLE;
 
     if(params.size() > 1)
-        if(params[1].get_bool())
-            includeWatchonly = includeWatchonly | MINE_WATCH_ONLY;
-
+    {
+        bool
+            fTemp = params[1].get_bool();
+        if(fTemp)
+        {
+          //includeWatchonly = includeWatchonly | MINE_WATCH_ONLY;
+            includeWatchonly |= MINE_WATCH_ONLY;
+        }
+    }
 
     map<string, int64_t> 
         mapAccountBalances;
@@ -1311,13 +1317,17 @@ Value listsinceblock(const Array& params, bool fHelp)
             "listsinceblock [blockhash] [target-confirmations]\n"
             "Get all transactions in blocks since block [blockhash], or all transactions if omitted");
 
-    CBlockIndex *pindex = NULL;
-    int target_confirms = 1;
-    isminefilter filter = MINE_SPENDABLE;
+    CBlockIndex 
+        *pindex = NULL;
+    int 
+        target_confirms = 1;
+    isminefilter 
+        filter = MINE_SPENDABLE;
 
     if (params.size() > 0)
     {
-        uint256 blockId = 0;
+        uint256 
+            blockId = 0;
 
         blockId.SetHex(params[0].get_str());
         pindex = CBlockLocator(blockId).GetBlockIndex();
@@ -1335,46 +1345,64 @@ Value listsinceblock(const Array& params, bool fHelp)
         if(params[2].get_bool())
             filter = filter | MINE_WATCH_ONLY;
 
-    int depth = pindex ? (1 + nBestHeight - pindex->nHeight) : -1;
+    int 
+        depth = pindex ? (1 + nBestHeight - pindex->nHeight) : -1;
 
-    Array transactions;
+    Array 
+        transactions;
 
-    for (map<uint256, CWalletTx>::iterator it = pwalletMain->mapWallet.begin(); it != pwalletMain->mapWallet.end(); it++)
+    for (
+        map<uint256, CWalletTx>::iterator it = pwalletMain->mapWallet.begin(); 
+        it != pwalletMain->mapWallet.end(); 
+        ++it
+        )
     {
-        CWalletTx tx = (*it).second;
+        CWalletTx 
+            tx = (*it).second;
 
-        if (depth == -1 || tx.GetDepthInMainChain() < depth)
+        if (
+            (-1 == depth) || 
+            (tx.GetDepthInMainChain() < depth)
+           )
             ListTransactions(tx, "*", 0, true, transactions, filter);
     }
 
-    uint256 lastblock;
+    uint256 
+        lastblock;
 
-    if (target_confirms == 1)
+    if (1 == target_confirms)
     {
         lastblock = hashBestChain;
     }
     else
     {
-        int target_height = pindexBest->nHeight + 1 - target_confirms;
+        int 
+            target_height = pindexBest->nHeight + 1 - target_confirms;
 
-        CBlockIndex *block;
+        CBlockIndex 
+            *block;
         for (block = pindexBest;
              block && block->nHeight > target_height;
-             block = block->pprev)  { }
-
+             block = block->pprev
+            )  
+        { 
+        }
         lastblock = block ? block->GetBlockHash() : 0;
     }
-
-    Object ret;
+    Object 
+        ret;
     ret.push_back(Pair("transactions", transactions));
     ret.push_back(Pair("lastblock", lastblock.GetHex()));
-
     return ret;
 }
 
 Value gettransaction(const Array& params, bool fHelp)
 {
-    if (fHelp || params.size() != 1)
+    if (
+        fHelp || 
+        (params.size() < 1) ||
+        (params.size() > 2)
+       )
         throw runtime_error(
             "gettransaction <txid>\n"
             "Get detailed information about <txid>");
@@ -1382,7 +1410,9 @@ Value gettransaction(const Array& params, bool fHelp)
     uint256 hash;
     hash.SetHex(params[0].get_str());
 
-    isminefilter filter = MINE_SPENDABLE;
+    isminefilter 
+        filter = MINE_SPENDABLE;
+
     if(params.size() > 1)
         if(params[1].get_bool())
             filter = filter | MINE_WATCH_ONLY;
@@ -1400,6 +1430,8 @@ Value gettransaction(const Array& params, bool fHelp)
         int64_t nNet = nCredit - nDebit;
         int64_t nFee = (wtx.IsFromMe(filter) ? wtx.GetValueOut() - nDebit : 0);
 
+        entry.push_back(Pair("Credit", ValueFromAmount(nCredit)));
+        entry.push_back(Pair("Debit", ValueFromAmount(nDebit)));
         entry.push_back(Pair("amount", ValueFromAmount(nNet - nFee)));
         if (wtx.IsFromMe(filter))
             entry.push_back(Pair("fee", ValueFromAmount(nFee)));

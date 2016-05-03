@@ -27,4 +27,8 @@ bool CheckStake(CBlock* pblock, CWallet& wallet);
 /** Base sha256 mining transform */
 void SHA256Transform(void* pstate, void* pinput, const void* pinit);
 
+extern double dHashesPerSec;
+extern ::int64_t nHPSTimerStart;
+
+void GenerateYacoins(bool fGenerate, CWallet* pwallet);
 #endif // NOVACOIN_MINER_H

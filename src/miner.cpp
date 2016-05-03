@@ -13,6 +13,8 @@
 #include "txdb.h"
 #include "miner.h"
 #include "kernel.h"
+#include "init.h"
+#include "scrypt.h"
 
 using namespace std;
 
@@ -839,7 +841,7 @@ bool CheckStake(CBlock* pblock, CWallet& wallet)
     return true;
 }
 
-void StakeMiner(CWallet *pwallet)
+void StakeMinter(CWallet *pwallet)
 {
     SetThreadPriority(THREAD_PRIORITY_LOWEST);
 
@@ -908,7 +910,318 @@ void StakeMiner(CWallet *pwallet)
         }
         //else
         Sleep(nMinerSleep);
-
         //continue;
     }
 }
+//_____________________________________________________________________________
+
+static bool fGenerateBitcoins = false;
+static bool fLimitProcessors = false;
+static int nLimitProcessors = -1;
+
+static string strMintMessage = "Info: Minting suspended due to locked wallet.";
+static string strMintWarning;
+
+double dHashesPerSec;
+::int64_t nHPSTimerStart;
+//_____________________________________________________________________________
+
+static void YacoinMiner(CWallet *pwallet)  // here fProofOfStake is always false
+{
+    void 
+        *scratchbuf = scrypt_buffer_alloc();
+
+    printf("CPUMiner started for proof-of-work\n");
+    SetThreadPriority(THREAD_PRIORITY_LOWEST);
+
+    // Make this thread recognisable as the mining thread
+    RenameThread("pow-miner");
+
+    // Each thread has its own key and counter
+    CReserveKey 
+        reservekey(pwallet);
+
+    unsigned int 
+        nExtraNonce = 0;
+
+    while ( fGenerateBitcoins )
+    {
+        if (fShutdown)
+            return;
+        while (vNodes.empty() || IsInitialBlockDownload())
+        {
+            //printf("vNodes.size() == %d, IsInitialBlockDownload() == %d\n", vNodes.size(), IsInitialBlockDownload());
+            Sleep(nMillisecondsPerSecond);
+            if (fShutdown)
+                return;
+            if (!fGenerateBitcoins)        // someone shut off the miner
+                return;
+        }
+
+        while (pwallet->IsLocked())
+        {
+            strMintWarning = strMintMessage;
+            Sleep(nMillisecondsPerSecond);
+        }
+        strMintWarning = "";
+
+        //
+        // Create new block
+        //
+        unsigned int 
+            nTransactionsUpdatedLast = nTransactionsUpdated;
+
+        CBlockIndex
+            * pindexPrev = pindexBest;
+
+        auto_ptr<CBlock> 
+            pblock(CreateNewBlock(pwallet, false));
+
+        if (!pblock.get())      // means what, I wonder?
+            return;
+        IncrementExtraNonce(pblock.get(), pindexPrev, nExtraNonce);
+
+        printf(
+                "Running BitcoinMiner with %"PRIszu" transactions in block (%u bytes)"
+                "\n"
+                "", 
+                pblock->vtx.size(),
+                ::GetSerializeSize(*pblock, SER_NETWORK, PROTOCOL_VERSION)
+              );
+
+        //
+        // Pre-build hash buffers
+        //
+        char pmidstatebuf[32+16]; char* pmidstate = alignup<16>(pmidstatebuf);
+        char pdatabuf[128+16];    char* pdata     = alignup<16>(pdatabuf);
+        char phash1buf[64+16];    char* phash1    = alignup<16>(phash1buf);
+
+        FormatHashBuffers(pblock.get(), pmidstate, pdata, phash1);
+
+        unsigned int
+            & nBlockTime = *(unsigned int*)(pdata + 64 + 4);
+        unsigned int
+            & nBlockNonce = *(unsigned int*)(pdata + 64 + 12);
+
+
+        //
+        // Search
+        //
+        ::int64_t
+            nStart = GetTime();
+
+        uint256 
+            hashTarget = CBigNum().SetCompact(pblock->nBits).getuint256();
+        // PoW hashTarget
+
+        unsigned int 
+            //max_nonce = 0xffff0000;
+            //max_nonce = 0xfffffffe;
+            max_nonce = UINT_MAX;   // 0xffffffff;
+            //max_nonce = 0x00000fff;
+
+        block_header 
+            res_header;
+
+        uint256 
+            result;
+
+        while( true )        //loop
+        {
+            unsigned int nHashesDone = 0;
+            unsigned int nNonceFound;
+
+            nNonceFound = scanhash_scrypt(
+                                            (block_header *)&pblock->nVersion,
+                                            max_nonce,
+                                            nHashesDone,
+                                            UBEGIN(result),
+                                            &res_header,
+                                            GetNfactor(pblock->nTime)
+                                            , pindexPrev
+                                            , &hashTarget
+                                         );
+            // Check if something found
+            if ( UINT_MAX != nNonceFound )
+            {
+                if (result <= hashTarget)
+                {   // Found a solution
+                    pblock->nNonce = nNonceFound;
+#ifdef _MSC_VER
+    #ifdef NDEBUG
+                    bool
+                        fTest = (result == pblock->GetHash());
+
+                    if( !fTest )
+                        releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
+    #else
+                    assert(result == pblock->GetHash());
+    #endif
+#else
+                    assert(result == pblock->GetHash());
+#endif
+                    if (!pblock->SignBlock(*pwalletMain))   // wallet is locked
+                    {
+                        strMintWarning = strMintMessage;
+                        break;
+                    }
+                    strMintWarning = "";
+
+                    SetThreadPriority(THREAD_PRIORITY_NORMAL);
+                    if( CheckWork(pblock.get(), *pwalletMain, reservekey) )
+                    {
+                        printf(
+                                "CPUMiner : proof-of-work block found %s"
+                                "\n"
+                                "", 
+                                pblock->GetHash().ToString().c_str()
+                              ); 
+                    }
+                    SetThreadPriority(THREAD_PRIORITY_LOWEST);
+                    break;
+                }
+            }
+
+            // Meter hashes/sec
+            static ::int64_t 
+                nHashCounter;
+
+            if (nHPSTimerStart == 0)
+            {
+                nHPSTimerStart = GetTimeMillis();
+                nHashCounter = 0;
+            }
+            else
+                nHashCounter += nHashesDone;
+                
+            if (GetTimeMillis() - nHPSTimerStart > 30000)   // 30 seconds
+            {
+                static CCriticalSection cs;
+                {
+                    LOCK(cs);
+                    if (GetTimeMillis() - nHPSTimerStart > 30000)
+                    {
+                        dHashesPerSec = 1000.0 * nHashCounter / (GetTimeMillis() - nHPSTimerStart);
+                        nHPSTimerStart = GetTimeMillis();
+                        nHashCounter = 0;
+                        static ::int64_t nLogTime;
+                        //if (GetTime() - nLogTime > 30 * 60)
+                        if (GetTime() - nLogTime > 30 ) // 30 seconds
+                        {
+                            nLogTime = GetTime();
+                            printf(
+                                    "\n"
+                                    "hashmeter %3d CPU%s %.0f hash/s"
+                                    "\n"
+                                    "\n"
+                                    "",
+                                    vnThreadsRunning[THREAD_MINER], 
+                                    (vnThreadsRunning[THREAD_MINER] > 1)? "s": "", 
+                                    dHashesPerSec 
+                                  );
+                        }
+                    }
+                }
+            }
+
+            // Check for stop or if block needs to be rebuilt
+            if (pindexPrev != pindexBest)
+                break;
+
+            if (!fGenerateBitcoins)
+                break;
+                //return;
+
+            if (fShutdown)
+                break;
+                //return;
+
+            if (fLimitProcessors && vnThreadsRunning[THREAD_MINER] > nLimitProcessors)
+                return;
+
+            if (vNodes.empty())
+                break;
+
+            //if (nBlockNonce >= 0xffff0000)
+            //    break;
+
+            //if (nTransactionsUpdated != nTransactionsUpdatedLast && GetTime() - nStart > 60)
+            //   break;
+
+            // Update nTime every few seconds
+            pblock->nTime = max(pindexPrev->GetMedianTimePast()+1, pblock->GetMaxTransactionTime());
+            pblock->nTime = max(pblock->GetBlockTime(), pindexPrev->GetBlockTime() - nMaxClockDrift);
+            pblock->UpdateTime(pindexPrev);
+            nBlockTime = ByteReverse(pblock->nTime);
+
+            if (pblock->GetBlockTime() >= ((::int64_t)pblock->vtx[0].nTime + nMaxClockDrift))
+                break;  // need to update coinbase timestamp
+        }
+        if (!fGenerateBitcoins) //<<<<<<<<<<< test
+            break;
+    }   
+    scrypt_buffer_free(scratchbuf);
+}
+//_____________________________________________________________________________
+
+void static ThreadYacoinMiner(void* parg)
+{
+    CWallet* pwallet = (CWallet*)parg;
+    try
+    {
+        ++vnThreadsRunning[THREAD_MINER];
+        YacoinMiner(pwallet);
+        --vnThreadsRunning[THREAD_MINER];
+    }
+    catch (std::exception& e) 
+    {
+        --vnThreadsRunning[THREAD_MINER];
+        PrintException(&e, "ThreadBitcoinMiner()");
+    } catch (...) 
+    {
+        --vnThreadsRunning[THREAD_MINER];
+        PrintException(NULL, "ThreadBitcoinMiner()");
+    }
+    nHPSTimerStart = 0;
+    if (0 == vnThreadsRunning[THREAD_MINER] )
+        dHashesPerSec = 0;
+    printf("ThreadYaoinMiner exiting, %d threads remaining\n", vnThreadsRunning[THREAD_MINER]);
+}
+//_____________________________________________________________________________
+
+// here we add the missing PoW mining code from 0.4.4
+void GenerateYacoins(bool fGenerate, CWallet* pwallet)
+{
+    fGenerateBitcoins = fGenerate;
+    nLimitProcessors = GetArg("-genproclimit", -1);
+    if (nLimitProcessors == 0)
+        fGenerateBitcoins = false;
+    fLimitProcessors = (nLimitProcessors != -1);
+
+    if (fGenerate)
+    {
+        int 
+            nProcessors = boost::thread::hardware_concurrency();
+
+        printf("%d processors\n", nProcessors);
+        if (nProcessors < 1)
+            nProcessors = 1;
+        if (
+            fLimitProcessors && 
+            (nProcessors > nLimitProcessors)
+           )
+            nProcessors = nLimitProcessors;
+        int 
+            nAddThreads = nProcessors - vnThreadsRunning[THREAD_MINER];
+
+        printf("Starting %d YacoinMiner threads\n", nAddThreads);
+        for (int i = 0; i < nAddThreads; ++i)
+        {
+            if (!NewThread(ThreadYacoinMiner, pwallet))
+                printf("Error: NewThread(ThreadBitcoinMiner) failed\n");
+            Sleep( nTenMilliseconds );
+        }
+    }
+}
+//_____________________________________________________________________________
+//_____________________________________________________________________________

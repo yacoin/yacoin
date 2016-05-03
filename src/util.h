@@ -168,6 +168,10 @@ extern bool fNoListen;
 extern bool fLogTimestamps;
 extern bool fReopenDebugLog;
 
+#ifdef WIN32
+extern void DoProgress( int nCount, int nTotalToScan, ::int64_t n64MsStartTime );
+#endif
+
 //static void RandAddSeed();
 void RandAddSeedPerfmon();
 int ATTR_WARN_PRINTF(1,2) OutputDebugStringF(const char* pszFormat, ...);
@@ -249,7 +253,6 @@ std::string FormatFullVersion();
 std::string FormatSubVersion(const std::string& name, int nClientVersion, const std::vector<std::string>& comments);
 void AddTimeData(const CNetAddr& ip, ::int64_t nTime);
 void runCommand(std::string strCommand);
-
 
 
 

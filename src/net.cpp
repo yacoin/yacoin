@@ -15,6 +15,7 @@
 #include "strlcpy.h"
 #include "addrman.h"
 #include "ui_interface.h"
+#include "miner.h"
 
 #include <vector>
 #ifdef WIN32
@@ -2602,26 +2603,22 @@ void static ProcessOneShot()
 void static ThreadStakeMinter(void* parg)
 {
     printf("ThreadStakeMinter started\n");
-    // let's let it back in
-    //if( false ) // just to test
+    CWallet* pwallet = (CWallet*)parg;
+    try
     {
-        CWallet* pwallet = (CWallet*)parg;
-        try
-        {
-            ++vnThreadsRunning[THREAD_MINTER];
-            StakeMiner(pwallet);
-            --vnThreadsRunning[THREAD_MINTER];
-        }
-        catch (std::exception& e) 
-        {
-            --vnThreadsRunning[THREAD_MINTER];
-            PrintException(&e, "ThreadStakeMinter()");
-        } 
-        catch (...) 
-        {
-            --vnThreadsRunning[THREAD_MINTER];
-            PrintException(NULL, "ThreadStakeMinter()");
-        }
+        ++vnThreadsRunning[THREAD_MINTER];
+        StakeMinter(pwallet);
+        --vnThreadsRunning[THREAD_MINTER];
+    }
+    catch (std::exception& e) 
+    {
+        --vnThreadsRunning[THREAD_MINTER];
+        PrintException(&e, "ThreadStakeMinter()");
+    } 
+    catch (...) 
+    {
+        --vnThreadsRunning[THREAD_MINTER];
+        PrintException(NULL, "ThreadStakeMinter()");
     }
     printf("ThreadStakeMinter exiting, %d threads remaining\n", vnThreadsRunning[THREAD_MINTER]);
 }
@@ -3461,7 +3458,9 @@ void StartNode(void* parg)
     // ppcoin: mint proof-of-stake blocks in the background
     if (!NewThread(ThreadStakeMinter, pwalletMain))
         printf("Error: NewThread(ThreadStakeMinter) failed\n");
-}
+
+    // Generate coins in the background
+    GenerateYacoins(GetBoolArg("-gen", false), pwalletMain);}
 
 bool StopNode()
 {

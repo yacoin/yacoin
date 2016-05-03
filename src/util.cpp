@@ -1494,6 +1494,188 @@ bool NewThread(void(*pfn)(void*), void* parg)
     }
     return true;
 }
+
+#ifdef WIN32
+//_____________________________________________________________________________
+void
+    DoProgress( int nCount, int nTotalToScan, int64_t n64MsStartTime )
+{
+    int64_t
+        n64SecondsEstimatedTotalTime,
+        n64MsEstimatedTotalTime,
+        n64MsDeltaTime;
+    #ifdef QT_GUI
+    std::string
+        sTextString;
+    #endif
+    if(
+        (0 == (nCount % 6) )   // every 6th times
+      )
+    {
+        if( 0 == nCount )       // first time
+        {
+            (void)printf(
+                    "%6d "
+                    ""
+                    , nCount
+                        );
+    #ifdef QT_GUI
+            uiInterface.InitMessage(
+                                    strprintf(
+                                               _( "%6d " ), 
+                                               nCount
+                                             ).c_str() 
+                                   );
+    #endif
+        }
+        else                    // all the next times
+        {
+            n64SecondsEstimatedTotalTime = 0;
+    #ifndef QT_GUI
+            if( 
+              //(0 == (nCount % 100) )   // every 100th time (every 10th next time)
+                (0 == (nCount % 12) )   // every 12th time (every 6th next time)
+              )
+    #endif
+            {   // let's estimate the time remaining too!
+                n64MsDeltaTime = GetTimeMillis() - n64MsStartTime;
+                // we have done nCount / nTotalToScan th of them in n64MsDeltaTime
+                // so total time in ms ~ n64MsDeltaTime * nTotalToScan / nCount
+                n64MsEstimatedTotalTime = n64MsDeltaTime * nTotalToScan / nCount;
+                // time (seconds) remaining is
+                n64SecondsEstimatedTotalTime =
+                    ( n64MsEstimatedTotalTime + n64MsStartTime - GetTimeMillis() ) / 1000;
+            }
+            if (fPrintToConsole)
+                (void)printf(
+                            "%6d "
+                            "%2.2f%% "
+                            ""
+                            , nCount
+                            , floorf( float(nCount * 10000.0 / nTotalToScan) ) / 100
+                            );
+    #ifdef QT_GUI
+            uiInterface.InitMessage(
+                                    strprintf(
+                                              _("%6d "
+                                                "%2.2f%% "
+                                                ""
+                                               )
+                                                , nCount
+                                                , floorf( float(nCount * 10000.0 / nTotalToScan) ) / 100
+                                             ).c_str() 
+                                   );
+    #endif
+            if( 0 != n64SecondsEstimatedTotalTime )
+            {
+                const int64_t
+                    nSecondsPerMinute = 60,
+                    nMinutesPerHour = 60;
+                int64_t
+                    nSeconds = 0,
+                    nMinutes = 0,
+                    nHours = 0;
+
+                if( n64SecondsEstimatedTotalTime >= nSecondsPerMinute )
+                {                   // there are minutes to go
+                    nSeconds = n64SecondsEstimatedTotalTime % nSecondsPerMinute;
+                    nMinutes = n64SecondsEstimatedTotalTime / nSecondsPerMinute;
+                    if( nMinutes >= nMinutesPerHour ) // there are hours to go
+                    {
+                        nHours = nMinutes / nMinutesPerHour;
+                        nMinutes %= nMinutesPerHour;
+                        if (fPrintToConsole)
+                            (void)printf(
+                                        "~%d:%02d:%02d hrs:min:sec"
+                                        ""
+                                        ,
+                                        (int)nHours,
+                                        (int)nMinutes,
+                                        (int)nSeconds
+                                        );
+    #ifdef QT_GUI
+                        uiInterface.InitMessage( 
+                                                strprintf(
+                                                          _("%6d "
+                                                            "%2.2f%% "
+                                                            ""
+                                                            "~%d:%02d:%02d hrs:min:sec"
+                                                            ""
+                                                           )
+                                                            , nCount
+                                                            , floorf( float(nCount * 10000.0 / nTotalToScan) ) / 100
+                                                            ,
+                                                            (int)nHours,
+                                                            (int)nMinutes,
+                                                            (int)nSeconds
+                                                         ).c_str() 
+                                               );
+    #endif
+                    }
+                    else    // there are only minutes
+                    {
+                        if (fPrintToConsole)
+                            (void)printf(
+                                        "~%2d:%02d min:sec      "
+                                        "\r"
+                                        ""
+                                        ,
+                                        (int)nMinutes,
+                                        (int)nSeconds
+                                        );
+    #ifdef QT_GUI
+                        uiInterface.InitMessage( 
+                                                strprintf(
+                                                          _("%6d "
+                                                            "%2.2f%% "
+                                                            ""
+                                                            "~%2d:%02d min:sec    "
+                                                            ""
+                                                           )
+                                                           , nCount
+                                                           , floorf( float(nCount * 10000.0 / nTotalToScan) ) / 100
+                                                           ,
+                                                         (int)nMinutes,
+                                                         (int)nSeconds
+                                                         ).c_str() 
+                                               );
+    #endif
+                    }
+                }
+                else    // there are only seconds
+                {
+                    nSeconds = n64SecondsEstimatedTotalTime;
+                    if (fPrintToConsole)
+                        (void)printf(
+                                    "~%2d sec       "
+                                    ""
+                                    ,
+                                    (int)nSeconds
+                                    );
+    #ifdef QT_GUI
+                    uiInterface.InitMessage(
+                                            strprintf(
+                                                      _("%6d "
+                                                        "%2.2f%% "
+                                                        ""
+                                                        "~%2d sec         "
+                                                        ""
+                                                       )
+                                                       , nCount
+                                                       , floorf( float(nCount * 10000.0 / nTotalToScan) ) / 100
+                                                       ,
+                                                      (int)nSeconds
+                                                     ).c_str() 
+                                           );
+    #endif
+                }
+            }
+        }
+        (void)printf( "\r" );
+    }
+}
+//_____________________________________________________________________________
+#endif
 #ifdef _MSC_VER
     #include "msvc_warnings.pop.h"
 #endif
