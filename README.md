@@ -10,6 +10,9 @@ N increases over time to increase memory requirements.
 10 minute PoS block targets.
 The PoW subsidy decreases as difficulty increases.
 Maximum PoW reward is 100 coins.
+
+Ports: Connection port default: 7688 or testnet: 17688 RPC port default: 8344 or testnet: 18344
+
 Development process
 Developers work in their own trees, then submit pull requests when they think their feature or bug fix is ready. For new features or enhancements to YACoin, please submit pull requests to YACoin testing. Please refer to: https://help.github.com/articles/using-pull-requests if you need any help.
 
