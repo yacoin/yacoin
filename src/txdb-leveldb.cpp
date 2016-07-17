@@ -8,11 +8,9 @@
 
     #include "msvc_warnings.push.h"
 #endif
+
 #include "kernel.h"
 #include "checkpoints.h"
-#include "txdb.h"
-#include "util.h"
-#include "main.h"
 #include "txdb.h"
 
 #include <map>
@@ -26,14 +24,15 @@
 #include <leveldb/filter_policy.h>
 #include <memenv/memenv.h>
 
-//#include "kernel.h"
-//#include "checkpoints.h"
-//#include "txdb.h"
-//#include "util.h"
-//#include "main.h"
-
-using namespace std;
 using namespace boost;
+
+//using namespace std;
+using std::string;
+using std::runtime_error;
+using std::make_pair;
+using std::map;
+using std::pair;
+using std::vector;
 
 leveldb::DB *txdb; // global pointer for LevelDB object instance
 
@@ -535,12 +534,12 @@ bool CTxDB::LoadBlockIndex()
         // Construct block index object
         CBlockIndex
             * pindexNew    = InsertBlockIndex(blockHash);
-        // what if null???
-        if( NULL == pindexNew ) // ???
-        {
-            iterator->Next();        
-            continue;
-        }
+        // what if null? Can't be, since blockhash is known to be != 0
+        //if( NULL == pindexNew ) // ???
+        //{
+        //    iterator->Next();        
+        //    continue;
+        //}
         pindexNew->pprev          = InsertBlockIndex(diskindex.hashPrev);
         pindexNew->pnext          = InsertBlockIndex(diskindex.hashNext);
 
@@ -567,14 +566,12 @@ bool CTxDB::LoadBlockIndex()
             (0 == diskindex.nHeight)
            )
         {
-#ifdef WIN32
             if (fPrintToConsole)
                 (void)printf( 
                         "Error? an extra null block???"
                         "\n"
                         ""
                             );
-#endif
         }
         if (
             (NULL == pindexGenesisBlock) && 
@@ -587,6 +584,7 @@ bool CTxDB::LoadBlockIndex()
 #endif
             {
                 pindexGenesisBlock = pindexNew;
+                /*************
 #ifdef WIN32
                 if (fPrintToConsole)
                     (void)printf( 
@@ -596,6 +594,7 @@ bool CTxDB::LoadBlockIndex()
                             nCounter
                                 );
 #endif
+                *************/
             }
             else
             {
@@ -627,12 +626,11 @@ bool CTxDB::LoadBlockIndex()
 #endif
             }
         }
-
-        if (!pindexNew->CheckIndex()) // as it stands, this never fails???
-        {
-            delete iterator;
-            return error("LoadBlockIndex() : CheckIndex failed at %d", pindexNew->nHeight);
-        }
+        //if (!pindexNew->CheckIndex()) // as it stands, this never fails??? So why bother?????
+        //{
+        //    delete iterator;
+        //    return error("LoadBlockIndex() : CheckIndex failed at %d", pindexNew->nHeight);
+        //}
 
         // NovaCoin: build setStakeSeen
         if (pindexNew->IsProofOfStake())
@@ -663,9 +661,7 @@ bool CTxDB::LoadBlockIndex()
                             "",
                             sGutsNoise.c_str()
                             );
-    //#ifdef _DEBUG
                 DoProgress( nCounter, nMaxHeightGuess, n64MsStartTime );
-    //#endif
                 (void)printf( 
                             "\r"
                             );
@@ -797,10 +793,14 @@ bool CTxDB::LoadBlockIndex()
       DateTimeStrFormat("%x %H:%M:%S", pindexBest->GetBlockTime()).c_str());
 
     // NovaCoin: load hashSyncCheckpoint
-    if (!ReadSyncCheckpoint(Checkpoints::hashSyncCheckpoint))
-        return error("CTxDB::LoadBlockIndex() : hashSyncCheckpoint not loaded");
-    printf("LoadBlockIndex(): synchronized checkpoint %s\n", Checkpoints::hashSyncCheckpoint.ToString().c_str());
-
+    if( !fTestNet )
+    {
+        if (!ReadSyncCheckpoint(Checkpoints::hashSyncCheckpoint))
+            return error("CTxDB::LoadBlockIndex() : hashSyncCheckpoint not loaded");
+        printf("LoadBlockIndex(): synchronized checkpoint %s\n", 
+               Checkpoints::hashSyncCheckpoint.ToString().c_str()
+              );
+    }
     // Load bnBestInvalidTrust, OK if it doesn't exist
     ReadBestInvalidTrust(bnBestInvalidTrust);
 

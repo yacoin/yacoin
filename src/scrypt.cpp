@@ -69,11 +69,20 @@ uint256 scrypt_nosalt(const void* input, size_t inputlen, void *scratchpad)
 }
 
 
-uint256 scrypt(const void* data, size_t datalen, const void* salt, size_t saltlen, void *scratchpad)
+uint256 scrypt(
+               const void* data, 
+               size_t datalen, 
+               const void* salt,
+               size_t saltlen, 
+               void *scratchpad
+              )
 {
-    unsigned int *V;
-    unsigned int X[32];
-    uint256 result = 0;
+    unsigned int 
+        *V;
+    unsigned int 
+        X[ 32 ];
+    uint256 
+        result = 0;
     V = (unsigned int *)(((uintptr_t)(scratchpad) + 63) & ~ (uintptr_t)(63));
 
     PBKDF2_SHA256((const uint8_t*)data, datalen, (const uint8_t*)salt, saltlen, 1, (uint8_t *)X, 128);
@@ -163,7 +172,6 @@ unsigned int scanhash_scrypt(
         *hashc = (unsigned char *) &hash;
     ::uint32_t  // really any random uint32_t
         n = (::uint32_t)GetRand( (::uint64_t)UINT_MAX );
-
     while (true) 
     {
         if( UINT_MAX == n ) // not allowed as a nonce
@@ -184,19 +192,21 @@ unsigned int scanhash_scrypt(
                32
               );
         ++hash_count;
-
         if (
-            (0 == hashc[31]) && 
-            (0 == hashc[30])
+            (0 == hashc[31])
+            && (0 == ( 0xfc & hashc[30]))
            ) 
         {
             memcpy(result, hash, 32);
             return data.nonce;
         }
-        if (hash_count >= nArbitraryHashCount) 
+        if( 0 == (hash_count % nArbitraryHashCount) )
         {   // really we should hash for a while, then check
-            if (pindexPrev != pindexBest)
-                break;            break;
+            if (
+                (pindexPrev != pindexBest) ||
+                fShutdown
+               )
+                break;
         }
         ++n;
     }

@@ -29,19 +29,34 @@
 #include <miniupnpc/upnperrors.h>
 #endif
 
-using namespace std;
 using namespace boost;
 
+//using namespace std;
+using std::map;
+using std::string;
+using std::runtime_error;
+using std::vector;
+using std::deque;
+using std::max;
+using std::min;
+using std::pair;
+using std::list;
+using std::set;
+
+const unsigned int 
+    nStakeMaxAge = 90 * nSecondsPerDay,             //60 * 60 * 24 * 90; // 90 days as full weight
+    nOnedayOfAverageBlocks = nSecondsPerDay / nStakeTargetSpacing;  // should be 144 if it's BTC!
 unsigned int 
     nStakeMinAge = 30 * nSecondsPerDay,             //60 * 60 * 24 * 30; // 30 days as zero time weight
-    nStakeMaxAge = 90 * nSecondsPerDay,             //60 * 60 * 24 * 90; // 90 days as full weight
     nStakeTargetSpacing = 1 * nSecondsperMinute,    //1 * 60; // 1-minute stake spacing
-    nOnedayOfAverageBlocks = nSecondsPerDay / nStakeTargetSpacing,  // should be 144 if it's BTC!
+// MODIFIER_INTERVAL: time to elapse before new modifier is computed
+//extern unsigned int nModifierInterval;
     nModifierInterval = 6 * nSecondsPerHour;        //6 * 60 * 60; 
                         // time (in seconds????)to elapse before new modifier is computed
                         // i.e 6 hours?????
                         // or is the INTENT 360 blocks??????????????????
                         // another way to put it is, WHAT ARE THE UNITS, seconds or blocks??????????
+                        // so I guess it IS seconds, actually 6 hours.
 
 static const int 
 #ifdef WIN32

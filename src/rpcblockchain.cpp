@@ -10,7 +10,12 @@
 #include "bitcoinrpc.h"
 
 using namespace json_spirit;
-using namespace std;
+
+//using namespace std;  // testing this change
+using std::max;
+using std::string;
+using std::runtime_error;
+using std::vector;
 
 extern void TxToJSON(const CTransaction& tx, const uint256 hashBlock, json_spirit::Object& entry);
 extern enum Checkpoints::CPMode CheckpointsMode;
@@ -423,7 +428,6 @@ Value getcurrentblockandtime(const Array& params, bool fHelp)
             "\n"
             ""
             , pbuff );
-
     strS = strprintf(
                      "%d %s (local %s)"
                      "\n"

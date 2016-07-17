@@ -60,16 +60,20 @@ namespace Checkpoints
 // YACOIN TODO CHANGE
     static MapCheckpoints mapCheckpointsTestnet =
         boost::assign::map_list_of
-        ( 0, std::make_pair(hashGenesisBlockTestNet, 1360105017) )
+        ( 0, std::make_pair(hashGenesisBlockTestNet, nChainStartTimeTestNet + 20) )
         ;
 
     bool CheckHardened(int nHeight, const uint256& hash)
     {
-        MapCheckpoints& checkpoints = (fTestNet ? mapCheckpointsTestnet : mapCheckpoints);
+        MapCheckpoints
+            & checkpoints = (fTestNet ? mapCheckpointsTestnet : mapCheckpoints);
 
-        MapCheckpoints::const_iterator i = checkpoints.find(nHeight);
-        if (i == checkpoints.end()) return true;
-        return hash == i->second.first;
+        MapCheckpoints::const_iterator 
+            i = checkpoints.find(nHeight);
+
+        if (i == checkpoints.end()) 
+            return true;
+        return (hash == i->second.first);
     }
 
     int GetTotalBlocksEstimate()
@@ -339,7 +343,12 @@ namespace Checkpoints
     void AskForPendingSyncCheckpoint(CNode* pfrom)
     {
         LOCK(cs_hashSyncCheckpoint);
-        if (pfrom && hashPendingCheckpoint != 0 && (!mapBlockIndex.count(hashPendingCheckpoint)) && (!mapOrphanBlocks.count(hashPendingCheckpoint)))
+        if (
+            pfrom && 
+            hashPendingCheckpoint != 0 && 
+            (!mapBlockIndex.count(hashPendingCheckpoint)) && 
+            (!mapOrphanBlocks.count(hashPendingCheckpoint))
+           )
             pfrom->AskFor(CInv(MSG_BLOCK, hashPendingCheckpoint));
     }
 

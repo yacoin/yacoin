@@ -54,13 +54,13 @@ const ::uint32_t
     nHoursPerDay = 24,
     nSecondsPerDay = nHoursPerDay * nSecondsPerHour;
 
-extern unsigned int 
-    nStakeMinAge,
+extern const unsigned int 
     nStakeMaxAge,
+    nOnedayOfAverageBlocks;
+extern unsigned int     // not const because of fTestNet
+    nStakeMinAge,
     nStakeTargetSpacing,
-    nOnedayOfAverageBlocks,
     nModifierInterval;
-   
 
 inline ::uint64_t ReceiveBufferSize() { return 1000*GetArg("-maxreceivebuffer", 5*1000); }
 inline ::uint64_t SendBufferSize() { return 1000*GetArg("-maxsendbuffer", 1*1000); }

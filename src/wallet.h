@@ -18,7 +18,7 @@
 #include "util.h"
 #include "walletdb.h"
 
-extern unsigned int nStakeMaxAge;
+//extern unsigned int nStakeMaxAge;
 extern bool fWalletUnlockMintOnly;
 extern bool fConfChange;
 class CAccountingEntry;

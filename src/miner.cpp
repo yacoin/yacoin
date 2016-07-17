@@ -16,7 +16,14 @@
 #include "init.h"
 #include "scrypt.h"
 
-using namespace std;
+//using namespace std;
+using std::vector;
+using std::set;
+using std::list;
+using std::map;
+using std::auto_ptr;
+using std::max;
+using std::string;
 
 //////////////////////////////////////////////////////////////////////////////
 //
@@ -50,14 +57,14 @@ void SHA256Transform(void* pstate, void* pinput, const void* pinit)
 
     SHA256_Init(&ctx);
 
-    for (int i = 0; i < 16; i++)
+    for (int i = 0; i < 16; ++i)
         ((uint32_t*)data)[i] = ByteReverse(((uint32_t*)pinput)[i]);
 
-    for (int i = 0; i < 8; i++)
+    for (int i = 0; i < 8; ++i)
         ctx.h[i] = ((uint32_t*)pinit)[i];
 
     SHA256_Update(&ctx, data, sizeof(data));
-    for (int i = 0; i < 8; i++)
+    for (int i = 0; i < 8; ++i)
         ((uint32_t*)pstate)[i] = ctx.h[i];
 }
 
@@ -122,7 +129,10 @@ CBlock* CreateNewBlock(CWallet* pwallet, bool fProofOfStake)
     if (!pblock.get())
         return NULL;
 
-    if( pindexBest->nTime < YACOIN_2016_SWITCH_TIME)
+    if(
+        //true || // test to see if one can mint in TestNet
+        ((pindexBest->nTime < YACOIN_2016_SWITCH_TIME) && !fTestNet )
+      )
     {
         pblock->nVersion = CBlock::CURRENT_VERSION_previous;
     }
@@ -137,13 +147,14 @@ CBlock* CreateNewBlock(CWallet* pwallet, bool fProofOfStake)
 
     if (!fProofOfStake)
     {
-        txNew.vout[0].scriptPubKey.SetDestination(reservekey.GetReservedKey().GetID());
+        //txNew.vout[0].scriptPubKey.SetDestination(reservekey.GetReservedKey().GetID());
     }
     else
     {
         txNew.vout[0].SetEmpty();
-        txNew.vout[0].scriptPubKey << reservekey.GetReservedKey() << OP_CHECKSIG; // seems to be missing?
+      //txNew.vout[0].scriptPubKey << reservekey.GetReservedKey() << OP_CHECKSIG; // seems to be missing?
     }
+    txNew.vout[0].scriptPubKey << reservekey.GetReservedKey() << OP_CHECKSIG; // seems to be missing?
 
     // Add our coinbase tx as first transaction
     pblock->vtx.push_back(txNew);
@@ -195,7 +206,10 @@ CBlock* CreateNewBlock(CWallet* pwallet, bool fProofOfStake)
 
             bool
                 fCreatedCoinStake;
-            if( pindexBest->nTime < YACOIN_2016_SWITCH_TIME)
+            if(
+                //true || // test to see if one can mint in TestNet
+                ((pindexBest->nTime < YACOIN_2016_SWITCH_TIME) && !fTestNet)
+              )
             {
                 fCreatedCoinStake = pwallet->CreateCoinStake(
                                                              *pwallet, 
@@ -237,7 +251,10 @@ CBlock* CreateNewBlock(CWallet* pwallet, bool fProofOfStake)
 
     pblock->nBits = GetNextTargetRequired(pindexPrev, fProofOfStake);
 
-    if( pindexBest->nTime < YACOIN_2016_SWITCH_TIME)
+    if(
+       //true || // test to see if one can mint in TestNet
+       ((pindexBest->nTime < YACOIN_2016_SWITCH_TIME) && !fTestNet)
+      )
     {
         // Collect memory pool transactions into the block
         ::int64_t nFees = 0;
@@ -591,8 +608,13 @@ CBlock* CreateNewBlock(CWallet* pwallet, bool fProofOfStake)
 
             // Prioritize by fee once past the priority size or we run out of high-priority
             // transactions:
-            if (!fSortedByFee &&
-                ((nBlockSize + nTxSize >= nBlockPrioritySize) || (dPriority < COIN * 144 / 250)))
+            if (
+                !fSortedByFee &&
+                (
+                 ((nBlockSize + nTxSize) >= nBlockPrioritySize) || 
+                 (dPriority < (COIN * 144 / 250))
+                )               // what is this double < some int64 / mean?
+               )
             {
                 fSortedByFee = true;
                 comparer = TxPriorityCompare(fSortedByFee);
@@ -660,7 +682,7 @@ CBlock* CreateNewBlock(CWallet* pwallet, bool fProofOfStake)
             pblock->vtx[0].vout[0].nValue = GetProofOfWorkReward(pblock->nBits, nFees);
 
             if (fDebug)
-                printf("CreateNewBlock(): reward %" PRIu64 "\n", pblock->vtx[0].vout[0].nValue);
+                printf("PoW CreateNewBlock(): reward %" PRIu64 "\n", pblock->vtx[0].vout[0].nValue);
         }
 
         if (fDebug && GetBoolArg("-printpriority"))
@@ -744,9 +766,13 @@ void FormatHashBuffers(CBlock* pblock, char* pmidstate, char* pdata, char* phash
     FormatHashBlocks(&tmp.hash1, sizeof(tmp.hash1));
 
     // Byte swap all the input buffer
-    for (unsigned int i = 0; i < sizeof(tmp)/4; i++)
-        ((unsigned int*)&tmp)[i] = ByteReverse(((unsigned int*)&tmp)[i]);
-
+    for (uint32_t i = 0; i < sizeof(tmp)/sizeof(uint32_t); ++i)
+  //for (unsigned int i = 0; i < sizeof(tmp)/4; ++i)    // this is only true
+    {                                                   // if an unsigned int 
+                                                        // is 32 bits!!?? What 
+                                                        // if it is 64 bits???????
+        ((uint32_t *)&tmp)[i] = ByteReverse(((uint32_t *)&tmp)[i]);
+    }
     // Precalc the first half of the first hash, which stays constant
     SHA256Transform(pmidstate, &tmp.block, pSHA256InitState);
 
@@ -863,7 +889,11 @@ void StakeMinter(CWallet *pwallet)
                 return;
         }
 
-        while (vNodes.empty() || IsInitialBlockDownload())
+        while (
+               IsInitialBlockDownload() ||
+               vNodes.empty() ||
+               (fTestNet && (pindexBest->nHeight < nCoinbaseMaturity))
+              )
         {
             Sleep(1000);
             if (fShutdown)
@@ -875,7 +905,9 @@ void StakeMinter(CWallet *pwallet)
         CBlockIndex
             * pindexPrev = pindexBest;
 
-        if( pindexPrev->nTime < YACOIN_2016_SWITCH_TIME )   // before the new PoW/PoS rules
+        if(
+           (pindexPrev->nTime < YACOIN_2016_SWITCH_TIME) && !fTestNet // before the new PoW/PoS rules
+          )
         {                                                   // behave as previously
             if (
                 //fProofOfStake && 
@@ -929,7 +961,7 @@ double dHashesPerSec;
 static void YacoinMiner(CWallet *pwallet)  // here fProofOfStake is always false
 {
     void 
-        *scratchbuf = scrypt_buffer_alloc();
+        *scratchbuf = scrypt_buffer_alloc();    // unused!!! So why is it here???
 
     printf("CPUMiner started for proof-of-work\n");
     SetThreadPriority(THREAD_PRIORITY_LOWEST);
@@ -948,7 +980,10 @@ static void YacoinMiner(CWallet *pwallet)  // here fProofOfStake is always false
     {
         if (fShutdown)
             return;
-        while (vNodes.empty() || IsInitialBlockDownload())
+        while (
+               IsInitialBlockDownload() || 
+               vNodes.empty()
+              )
         {
             //printf("vNodes.size() == %d, IsInitialBlockDownload() == %d\n", vNodes.size(), IsInitialBlockDownload());
             Sleep(nMillisecondsPerSecond);
@@ -982,7 +1017,7 @@ static void YacoinMiner(CWallet *pwallet)  // here fProofOfStake is always false
         IncrementExtraNonce(pblock.get(), pindexPrev, nExtraNonce);
 
         printf(
-                "Running BitcoinMiner with %"PRIszu" transactions in block (%u bytes)"
+                "Running YACoinMiner with %"PRIszu" transactions in block (%u bytes)"
                 "\n"
                 "", 
                 pblock->vtx.size(),
@@ -1011,8 +1046,7 @@ static void YacoinMiner(CWallet *pwallet)  // here fProofOfStake is always false
             nStart = GetTime();
 
         uint256 
-            hashTarget = CBigNum().SetCompact(pblock->nBits).getuint256();
-        // PoW hashTarget
+            hashTarget = (CBigNum().SetCompact(pblock->nBits)).getuint256(); // PoW hashTarget
 
         unsigned int 
             //max_nonce = 0xffff0000;
@@ -1026,6 +1060,11 @@ static void YacoinMiner(CWallet *pwallet)  // here fProofOfStake is always false
         uint256 
             result;
 
+#ifndef _MSC_VER
+        (void)printf(
+                     "Starting mining loop\n"
+                    );
+#endif
         while( true )        //loop
         {
             unsigned int nHashesDone = 0;
@@ -1049,36 +1088,54 @@ static void YacoinMiner(CWallet *pwallet)  // here fProofOfStake is always false
                     pblock->nNonce = nNonceFound;
 #ifdef _MSC_VER
     #ifdef NDEBUG
+                    (void)printf(
+                        "target:      %s\n", hashTarget.ToString().c_str()
+                                );
+                    (void)printf(
+                        "result:      %s\n", result.ToString().c_str()
+                                );
+    #endif
+#endif
                     bool
                         fTest = (result == pblock->GetHash());
-
-                    if( !fTest )
-                        releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
+                    if( fTest )
+                    {
+#ifdef _MSC_VER
+    #ifdef NDEBUG
+                        if( !fTest )
+                            releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
     #else
-                    assert(result == pblock->GetHash());
+                        assert(fTest);
     #endif
 #else
-                    assert(result == pblock->GetHash());
+                        assert(result == pblock->GetHash());
 #endif
-                    if (!pblock->SignBlock(*pwalletMain))   // wallet is locked
-                    {
-                        strMintWarning = strMintMessage;
+                        if (!pblock->SignBlock(*pwalletMain))   // wallet is locked
+                        {
+                            strMintWarning = strMintMessage;
+                            break;
+                        }
+                        strMintWarning = "";
+
+                        SetThreadPriority(THREAD_PRIORITY_NORMAL);
+                        if( CheckWork(pblock.get(), *pwalletMain, reservekey) )
+                        {
+                            printf(
+                                    "CPUMiner : proof-of-work block found %s"
+                                    "\n\a\a"
+                                    "", 
+                                    pblock->GetHash().ToString().c_str()
+                                  ); 
+                        }
+                     SetThreadPriority(THREAD_PRIORITY_LOWEST);
                         break;
                     }
-                    strMintWarning = "";
-
-                    SetThreadPriority(THREAD_PRIORITY_NORMAL);
-                    if( CheckWork(pblock.get(), *pwalletMain, reservekey) )
+                    else
                     {
-                        printf(
-                                "CPUMiner : proof-of-work block found %s"
-                                "\n"
-                                "", 
-                                pblock->GetHash().ToString().c_str()
-                              ); 
+                        (void)printf(
+                                    "->GetHash(): %s\n", pblock->GetHash().ToString().c_str()
+                                    );
                     }
-                    SetThreadPriority(THREAD_PRIORITY_LOWEST);
-                    break;
                 }
             }
 
@@ -1094,12 +1151,12 @@ static void YacoinMiner(CWallet *pwallet)  // here fProofOfStake is always false
             else
                 nHashCounter += nHashesDone;
                 
-            if (GetTimeMillis() - nHPSTimerStart > 30000)   // 30 seconds
+            if ((GetTimeMillis() - nHPSTimerStart) > (30 * nMillisecondsPerSecond))   // no comment needed!
             {
                 static CCriticalSection cs;
                 {
                     LOCK(cs);
-                    if (GetTimeMillis() - nHPSTimerStart > 30000)
+                    if ((GetTimeMillis() - nHPSTimerStart) > (30 * nMillisecondsPerSecond))
                     {
                         dHashesPerSec = 1000.0 * nHashCounter / (GetTimeMillis() - nHPSTimerStart);
                         nHPSTimerStart = GetTimeMillis();
@@ -1125,22 +1182,19 @@ static void YacoinMiner(CWallet *pwallet)  // here fProofOfStake is always false
             }
 
             // Check for stop or if block needs to be rebuilt
-            if (pindexPrev != pindexBest)
+            if (
+                (pindexPrev != pindexBest) ||
+                (!fGenerateBitcoins) ||
+                fShutdown ||
+                (vNodes.empty() && !fTestNet)
+               )
                 break;
 
-            if (!fGenerateBitcoins)
-                break;
-                //return;
-
-            if (fShutdown)
-                break;
-                //return;
-
-            if (fLimitProcessors && vnThreadsRunning[THREAD_MINER] > nLimitProcessors)
+            if (
+                fLimitProcessors && 
+                (vnThreadsRunning[THREAD_MINER] > nLimitProcessors)
+               )
                 return;
-
-            if (vNodes.empty())
-                break;
 
             //if (nBlockNonce >= 0xffff0000)
             //    break;
@@ -1185,7 +1239,12 @@ void static ThreadYacoinMiner(void* parg)
     nHPSTimerStart = 0;
     if (0 == vnThreadsRunning[THREAD_MINER] )
         dHashesPerSec = 0;
-    printf("ThreadYaoinMiner exiting, %d threads remaining\n", vnThreadsRunning[THREAD_MINER]);
+    printf("ThreadYaoinMiner exiting, %d thread%s remaining\n", 
+           vnThreadsRunning[THREAD_MINER],
+           (0 < vnThreadsRunning[THREAD_MINER])? 
+           ((1 < vnThreadsRunning[THREAD_MINER])? "s" : "" ):
+           "s"
+          );
 }
 //_____________________________________________________________________________
 
@@ -1214,7 +1273,10 @@ void GenerateYacoins(bool fGenerate, CWallet* pwallet)
         int 
             nAddThreads = nProcessors - vnThreadsRunning[THREAD_MINER];
 
-        printf("Starting %d YacoinMiner threads\n", nAddThreads);
+        printf( "Starting %d YacoinMiner thread%s\n", 
+                nAddThreads,
+                (1 < nAddThreads)? "s": "" 
+              );
         for (int i = 0; i < nAddThreads; ++i)
         {
             if (!NewThread(ThreadYacoinMiner, pwallet))

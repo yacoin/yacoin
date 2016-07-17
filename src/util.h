@@ -565,9 +565,12 @@ inline void ExitThread(size_t nExitCode)
 
 void RenameThread(const char* name);
 
+// interestingly, here, 32 bits is explicitly mentioned!!
 inline ::uint32_t ByteReverse(::uint32_t value)
 {
     value = ((value & 0xFF00FF00) >> 8) | ((value & 0x00FF00FF) << 8);
+            // swap each byte in the 32 bit unsigned integer
+            // then swap the two resulting words in the 32 bit unsigned integer
     return (value<<16) | (value>>16);
 }
 

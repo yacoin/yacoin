@@ -32,8 +32,11 @@
 bool fNewerOpenSSL = false; // for key.cpp's benefit
 
 
-using namespace std;
 using namespace boost;
+//using namespace std;  // testing this change
+using std::string;
+using std::max;
+using std::map;
 
 CWallet* pwalletMain;
 CClientUIInterface uiInterface;
@@ -114,7 +117,12 @@ void Shutdown(void* parg)
                 pwalletMain->SetBestChain(CBlockLocator(pindexBest));
         }
         bitdb.Flush(true);
+#if !defined(WIN32) && !defined(QT_GUI)
+    if (fDaemon)
+    {
         boost::filesystem::remove(GetPidFile());
+    }
+#endif
         UnregisterWallet(pwalletMain);
         delete pwalletMain;
         NewThread(ExitTimeout, NULL);
@@ -414,7 +422,7 @@ std::string HelpMessage()
 #endif
         "  -rpcuser=<user>        " + _("Username for JSON-RPC connections") + "\n" +
         "  -rpcpassword=<pw>      " + _("Password for JSON-RPC connections") + "\n" +
-        "  -rpcport=<port>        " + _("Listen for JSON-RPC connections on <port> (default: 8332 or testnet: 18332)") + "\n" +
+        "  -rpcport=<port>        " + _("Listen for JSON-RPC connections on <port> (default: 7687 or testnet: 17687)") + "\n" +
         "  -rpcallowip=<ip>       " + _("Allow JSON-RPC connections from specified IP address") + "\n" +
         "  -rpcconnect=<ip>       " + _("Send commands to node running on <ip> (default: 127.0.0.1)") + "\n" +
         "  -blocknotify=<cmd>     " + _("Execute command when the best block changes (%s in cmd is replaced by block hash)") + "\n" +
@@ -1268,7 +1276,7 @@ bool AppInit2()
 
 #ifdef _MSC_VER
     #ifdef _DEBUG
-        printf("\a\a" );    // just to call me back after a long debug startup!
+        printf("\a" );    // just to call me back after a long debug startup!
     #endif
 #endif
      // Add wallet transactions that aren't already in a block to mapTransactions

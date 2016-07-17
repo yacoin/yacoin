@@ -24,8 +24,15 @@
 #include "sys/stat.h"
 #endif
 
-using namespace std;
 using namespace boost;
+
+//using namespace std;
+using std::string;
+using std::runtime_error;
+using std::make_pair;
+using std::map;
+using std::pair;
+using std::vector;
 
 void MakeMockTXDB() {
     // In practice this won't do anything because the test framework always initializes

@@ -14,10 +14,13 @@
 #include "txdb.h"
 #include "timestamps.h"
 
-extern unsigned int nStakeMaxAge;
-extern unsigned int nStakeTargetSpacing;
-
-using namespace std;
+//using namespace std;
+using std::min;
+using std::vector;
+using std::pair;
+using std::map;
+using std::make_pair;
+using std::string;
 
 // Note: user must upgrade before the protocol switch deadline, otherwise it's required to
 //   re-download the blockchain. The timestamp of upgrade is recorded in the blockchain 
@@ -357,11 +360,22 @@ uint8_t GetStakeNfactor (uint64_t nTime, uint64_t nCoinDayWeight)
 }
 
 // yacoin2015
-uint256 GetProofOfStakeHash ( uint64_t nStakeModifier, uint32_t nTimeBlockFrom, uint32_t nTxPrevOffset, uint32_t nTxPrevTime, uint32_t nPrevoutn, uint32_t nTimeTx, uint64_t nCoinDayWeight )
+uint256 GetProofOfStakeHash( 
+                            uint64_t nStakeModifier, 
+                            uint32_t nTimeBlockFrom, 
+                            uint32_t nTxPrevOffset, 
+                            uint32_t nTxPrevTime, 
+                            uint32_t nPrevoutn, 
+                            uint32_t nTimeTx, 
+                            uint64_t nCoinDayWeight 
+                           )
 {
     uint256 thash;
 
-    if ( nTimeTx >= YACOIN_2016_SWITCH_TIME )
+    if (
+        (nTimeTx >= YACOIN_2016_SWITCH_TIME) 
+    //    || fTestNet
+       )
     {
         // scrypt-jane used for hashProofOfStake from now on
         // valid stakeNfactor depends on transaction time and kernel Coin Day Weight
@@ -534,7 +548,11 @@ bool CheckStakeKernelHash(
 
     uint256 hashBlockFrom = blockFrom.GetHash();
 
-    CBigNum bnCoinDayWeight = CBigNum(nValueIn) * GetWeight((int64_t)txPrev.nTime, (int64_t)nTimeTx) / COIN / (24 * 60 * 60);
+    CBigNum 
+        bnCoinDayWeight = CBigNum(nValueIn) * GetWeight(
+                                                        (int64_t)txPrev.nTime, 
+                                                        (int64_t)nTimeTx
+                                                       ) / COIN / (24 * 60 * 60);
     targetProofOfStake = (bnCoinDayWeight * bnTargetPerCoinDay).getuint256();
 
     // Calculate hash
@@ -554,7 +572,15 @@ bool CheckStakeKernelHash(
         return false;
 
     // yacoin2015: scrypt-jane hash for stake kernel
-    hashProofOfStake = GetProofOfStakeHash( nStakeModifier, nTimeBlockFrom, nTxPrevOffset, txPrev.nTime, prevout.n, nTimeTx, bnCoinDayWeight.getuint64() );
+    hashProofOfStake = GetProofOfStakeHash( 
+                                           nStakeModifier, 
+                                           nTimeBlockFrom, 
+                                           nTxPrevOffset, 
+                                           txPrev.nTime, 
+                                           prevout.n, 
+                                           nTimeTx, 
+                                           bnCoinDayWeight.getuint64() 
+                                          );
 
     if (fPrintProofOfStake)
     {
@@ -628,11 +654,24 @@ bool ScanForStakeKernelHash(MetaMap &mapMeta, uint32_t nBits, uint32_t nTime, ui
         for (unsigned int n=0; n<nCurrentSearchInterval && fCoinsDataActual && !fShutdown; n++)
         {
             nTimeTx = nTime - n;
-            CBigNum bnCoinDayWeight = CBigNum(nValueIn) * GetWeight((int64_t)pcoin.first->nTime, (int64_t)nTimeTx) / COIN / (24 * 60 * 60);
-            CBigNum bnTargetProofOfStake = bnCoinDayWeight * bnTargetPerCoinDay;
+            CBigNum 
+                bnCoinDayWeight = CBigNum(nValueIn) * GetWeight(
+                                                                (int64_t)pcoin.first->nTime, 
+                                                                (int64_t)nTimeTx
+                                                               ) / COIN / (24 * 60 * 60);
+            CBigNum 
+                bnTargetProofOfStake = bnCoinDayWeight * bnTargetPerCoinDay;
 
             // yacoin2015: scrypt-jane hash for stake kernel
-            hashProofOfStake = GetProofOfStakeHash( nStakeModifier, nBlockTime, nTxOffset, pcoin.first->nTime, pcoin.second, nTimeTx, bnCoinDayWeight.getuint64() );
+            hashProofOfStake = GetProofOfStakeHash( 
+                                                   nStakeModifier, 
+                                                   nBlockTime, 
+                                                   nTxOffset, 
+                                                   pcoin.first->nTime, 
+                                                   pcoin.second, 
+                                                   nTimeTx, 
+                                                   bnCoinDayWeight.getuint64() 
+                                                  );
 
             // Update statistics
             nKernelsTried += 1;

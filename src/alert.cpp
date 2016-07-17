@@ -18,7 +18,9 @@
 #include "sync.h"
 #include "ui_interface.h"
 
-using namespace std;
+//using namespace std;
+using std::make_pair;
+using std::map;
 
 map<uint256, CAlert> mapAlerts;
 CCriticalSection cs_mapAlerts;

@@ -20,9 +20,14 @@
 #include "sys/stat.h"
 #endif
 
-using namespace std;
 using namespace boost;
 
+//using namespace std;
+using std::runtime_error;
+using std::stringstream;
+using std::string;
+using std::map;
+using std::vector;
 
 unsigned int nWalletDBUpdated;
 extern bool fUseMemoryLog;

@@ -1,4 +1,4 @@
-// Copyright (c) 2009-2012 Bitcoin Developers
+    // Copyright (c) 2009-2012 Bitcoin Developers
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 #ifdef _MSC_VER
@@ -13,7 +13,10 @@
 #define printf OutputDebugStringF
 
 using namespace json_spirit;
-using namespace std;
+
+//using namespace std;
+using std::runtime_error;
+using std::string;
 
 void EnsureWalletIsUnlocked();
 

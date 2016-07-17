@@ -29,7 +29,7 @@ typedef SSIZE_T ssize_t;
 #include "strlcpy.h"
 #include <boost/algorithm/string/case_conv.hpp> // for to_lower()
 
-using namespace std;
+//using namespace std;
 
 // Settings
 static proxyType proxyInfo[NET_MAX];
@@ -181,17 +181,28 @@ bool Lookup(const char *pszName, std::vector<CService>& vAddr, int portDefault, 
 {
     if (pszName[0] == 0)
         return false;
-    int port = portDefault;
-    std::string hostname = "";
+    int 
+        port = portDefault;
+
+    std::string 
+        hostname = "";
+
     SplitHostPort(std::string(pszName), port, hostname);
 
-    std::vector<CNetAddr> vIP;
-    bool fRet = LookupIntern(hostname.c_str(), vIP, nMaxSolutions, fAllowLookup);
+    std::vector<CNetAddr> 
+        vIP;
+
+    bool 
+        fRet = LookupIntern(hostname.c_str(), vIP, nMaxSolutions, fAllowLookup);
+
     if (!fRet)
         return false;
     vAddr.resize(vIP.size());
-    for (unsigned int i = 0; i < vIP.size(); i++)
-        vAddr[i] = CService(vIP[i], port);
+    for (unsigned int i = 0; i < vIP.size(); ++i)
+    {
+      //vAddr[i] = CService(vIP[i], port);
+        vAddr[i] = CService(vIP[i], portDefault);
+    }
     return true;
 }
 
@@ -254,7 +265,7 @@ bool static Socks4(const CService &addrDest, SOCKET& hSocket)
     return true;
 }
 
-bool static Socks5(string strDest, int port, SOCKET& hSocket)
+bool static Socks5(std::string strDest, int port, SOCKET& hSocket)
 {
     printf("SOCKS5 connecting %s\n", strDest.c_str());
     if (strDest.size() > 255)
@@ -283,7 +294,7 @@ bool static Socks5(string strDest, int port, SOCKET& hSocket)
         closesocket(hSocket);
         return error("Proxy failed to initialize");
     }
-    string strSocks5("\5\1");
+    std::string strSocks5("\5\1");
     strSocks5 += '\000'; strSocks5 += '\003';
     strSocks5 += static_cast<char>(std::min((int)strDest.size(), 255));
     strSocks5 += strDest;
@@ -555,7 +566,7 @@ bool static ConnectSocketDirectly(const CService &addrConnect, SOCKET& hSocketRe
 #ifdef WIN32
         int
             nErr = WSAGetLastError();
-        string
+        std::string
             strError = iGetLastErrorText( nErr );
         printf( "ioctlsocket error: %s\n", strError.c_str() );
         switch( nErr )
@@ -700,9 +711,9 @@ bool ConnectSocket(const CService &addrDest, SOCKET& hSocketRet, int nTimeout)
 
 bool ConnectSocketByName(CService &addr, SOCKET& hSocketRet, const char *pszDest, int portDefault, int nTimeout)
 {
-    string strDest;
+    std::string strDest;
     int port = portDefault;
-    SplitHostPort(string(pszDest), port, strDest);
+    SplitHostPort(std::string(pszDest), port, strDest);
 
     SOCKET hSocket = INVALID_SOCKET;
 

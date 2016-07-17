@@ -109,18 +109,25 @@ static INLINE void xor_salsa8(uint32_t B[16], const uint32_t Bx[16])
 
 void scrypt_core(uint32_t *X, uint32_t *V)
 {
-    uint16_t i, j, k;
+    uint16_t 
+        i,      // looks like Fortran! :)
+        j, 
+        k;
 
-    for (i = 0; i < 1024; i++) {
-        memcpy(&V[i * 32], X, 128);
-        xor_salsa8(&X[0], &X[16]);
-        xor_salsa8(&X[16], &X[0]);
+    for (i = 0; i < 1024; ++i) 
+    {
+        memcpy( &V[ i * 32 ], X, 128 );
+        xor_salsa8( &X[ 0 ], &X[ 16 ] );
+        xor_salsa8( &X[ 16 ], &X[ 0 ] );
     }
-    for (i = 0; i < 1024; i++) {
-        j = 32 * (X[16] & 1023);
-        for (k = 0; k < 32; k++)
-            X[k] ^= V[j + k];
-        xor_salsa8(&X[0], &X[16]);
-        xor_salsa8(&X[16], &X[0]);
+    for (i = 0; i < 1024; ++i) 
+    {
+        j = 32 * (X[ 16 ] & 1023);
+        for (k = 0; k < 32; ++k)
+        {
+            X[ k ] ^= V[ j + k ];
+        }
+        xor_salsa8( &X[ 0 ], &X[ 16 ] );
+        xor_salsa8( &X[ 16 ], &X[ 0 ] );
     }
-}
+}   // Have you ever seen so many undocumented MAGIC #s!!
