@@ -18,10 +18,16 @@
 #include "net.h"
 #include "wallet.h"
 
-using namespace std;
 using namespace boost;
 using namespace boost::assign;
 using namespace json_spirit;
+
+//using namespace std;
+using std::vector;
+using std::runtime_error;
+using std::map;
+using std::string;
+using std::set;
 
 void ScriptPubKeyToJSON(const CScript& scriptPubKey, Object& out, bool fIncludeHex)
 {

@@ -12,16 +12,20 @@
 #include <boost/foreach.hpp>
 #include <boost/tuple/tuple.hpp>
 
-using namespace std;
-using namespace boost;
-
 #include "script.h"
-#include "keystore.h"
-#include "bignum.h"
-#include "key.h"
+//#include "keystore.h"
+//#include "bignum.h"
+//#include "key.h"
 #include "main.h"
-#include "sync.h"
-#include "util.h"
+//#include "sync.h"
+//#include "util.h"
+
+using namespace boost;
+//using namespace std;
+using std::vector;
+using std::runtime_error;
+using std::map;
+using std::set;
 
 bool CheckSig(vector<unsigned char> vchSig, const vector<unsigned char> &vchPubKey, const CScript &scriptCode, const CTransaction& txTo, unsigned int nIn, int nHashType, int flags);
 
@@ -1502,6 +1506,12 @@ bool IsStandard(const CScript& scriptPubKey, txnouttype& whichType)
 
     if (whichType == TX_MULTISIG)
     {
+#ifdef _MSC_VER
+        if( vSolutions.empty() )
+            {       // one can't technically access vSolutions[ 0 ]
+            return false;
+            }
+#endif
         unsigned char m = vSolutions.front()[0];
         unsigned char n = vSolutions.back()[0];
         // Support up to x-of-3 multisig txns as standard

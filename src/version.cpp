@@ -5,6 +5,23 @@
 
 #include "version.h"
 
+
+#define DISPLAY_VERSION_MAJOR       0
+#define DISPLAY_VERSION_MINOR       4
+#define DISPLAY_VERSION_REVISION    6
+#define DISPLAY_VERSION_BUILD       22
+#define DISPLAY_VERSION_TESTING     1
+
+const int
+    DISPLAY_VERSION_MAJOR_for_Qt    = DISPLAY_VERSION_MAJOR   ,
+    DISPLAY_VERSION_MINOR_for_Qt    = DISPLAY_VERSION_MINOR   ,
+    DISPLAY_VERSION_REVISION_for_Qt = DISPLAY_VERSION_REVISION,
+    DISPLAY_VERSION_BUILD_for_Qt    = DISPLAY_VERSION_BUILD   ,
+    DISPLAY_VERSION_TESTING_for_Qt  = DISPLAY_VERSION_TESTING ;
+
+//Set to 1 for Testing Version  But it is set to 1?
+//#define DISPLAY_VERSION_TESTING     1
+
 // Name of client reported in the 'version' message. Report the same name
 // for both yacoind and yacoin-qt, to make it harder for attackers to
 // target servers or GUI users specifically.
@@ -27,8 +44,17 @@ const std::string
 #    include "build.h"
 #endif
 
+//#define BUILD_DESC_INFO(maj,min,rev) \
+//  "YAC-v" DO_STRINGIZE(maj) "." DO_STRINGIZE(min) "." DO_STRINGIZE(rev)
+//    DO_STRINGIZE(maj) \
+
 #define BUILD_DESC_INFO(maj,min,rev) \
-    "YAC-v" DO_STRINGIZE(maj) "." DO_STRINGIZE(min) "." DO_STRINGIZE(rev)
+    "YAC-v" \
+    DO_STRINGIZE(maj) \
+    "." \
+    DO_STRINGIZE(min) \
+    "." \
+    DO_STRINGIZE(rev)
 
 #ifndef BUILD_DESC
 #define BUILD_DESC BUILD_DESC_INFO(DISPLAY_VERSION_MAJOR, DISPLAY_VERSION_MINOR, DISPLAY_VERSION_REVISION)

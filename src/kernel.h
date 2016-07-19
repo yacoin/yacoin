@@ -10,9 +10,6 @@
 // ChainDB upgrade time
 extern unsigned int nModifierUpgradeTime;
 
-// MODIFIER_INTERVAL: time to elapse before new modifier is computed
-extern unsigned int nModifierInterval;
-
 extern bool fCoinsDataActual;
 
 struct PosMiningStuff {
@@ -49,6 +46,9 @@ bool CheckStakeKernelHash(
 
 // The stake modifier used to hash for a stake kernel is chosen as the stake
 // modifier about a selection interval later than the coin generating the kernel
+
+// you can't think that the above is an intelligible sentence!  I can't figure out
+// what it is saying, so it is pretty useless
 bool GetKernelStakeModifier(uint256 hashBlockFrom, ::uint64_t& nStakeModifier);
 
 // Check whether stake kernel meets hash target

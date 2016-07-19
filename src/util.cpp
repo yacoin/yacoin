@@ -63,8 +63,13 @@ namespace boost {
 #include <execinfo.h>
 #endif
 
+//using namespace std;  // testing this change
+using std::map;
+using std::string;
+using std::vector;
+using std::ofstream;
+using std::set;
 
-using namespace std;
 namespace bt = boost::posix_time;
 
 map<string, string> mapArgs;

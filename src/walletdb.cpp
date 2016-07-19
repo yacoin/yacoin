@@ -23,9 +23,18 @@
 #include <boost/variant/get.hpp>
 #include <boost/algorithm/string.hpp>
 
-using namespace std;
 using namespace boost;
 
+//using namespace std;
+using std::list;
+using std::string;
+using std::pair;
+using std::runtime_error;
+using std::multimap;
+using std::map;
+using std::vector;
+using std::ofstream;
+using std::ifstream;
 
 static ::uint64_t nAccountingEntryNumber = 0;
 extern bool fWalletUnlockMintOnly;

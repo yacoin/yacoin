@@ -11,7 +11,10 @@
 #include "addrman.h"
 #include "hash.h"
 
-using namespace std;
+#include "net.h"
+
+//using namespace std;
+using std::max;
 
 int CAddrInfo::GetTriedBucket(const std::vector<unsigned char> &nKey) const
 {
@@ -49,13 +52,18 @@ bool CAddrInfo::IsTerrible(int64_t nNow) const
     if (nTime > nNow + 10*60) // came in a flying DeLorean
         return true;
 
-    if (nTime==0 || nNow-nTime > ADDRMAN_HORIZON_DAYS*86400) // not seen in over a month
+    if (
+        (nTime == 0) || 
+        ((nNow - nTime) > (ADDRMAN_HORIZON_DAYS * nSecondsPerDay))
+       ) // not seen in over a month
         return true;
 
     if (nLastSuccess==0 && nAttempts>=ADDRMAN_RETRIES) // tried three times and never a success
         return true;
 
-    if (nNow-nLastSuccess > ADDRMAN_MIN_FAIL_DAYS*86400 && nAttempts>=ADDRMAN_MAX_FAILURES) // 10 successive failures in the last week
+    if (nNow-nLastSuccess > (ADDRMAN_MIN_FAIL_DAYS * nSecondsPerDay) && 
+        nAttempts>=ADDRMAN_MAX_FAILURES
+       ) // 10 successive failures in the last week
         return true;
 
     return false;

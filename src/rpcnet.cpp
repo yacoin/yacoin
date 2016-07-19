@@ -16,7 +16,14 @@
 #include "net.h"
 
 using namespace json_spirit;
-using namespace std;
+
+//using namespace std;
+using std::runtime_error;
+using std::vector;
+using std::list;
+using std::pair;
+using std::string;
+using std::map;
 
 Value getconnectioncount(const Array& params, bool fHelp)
 {

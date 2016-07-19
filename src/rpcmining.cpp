@@ -16,7 +16,13 @@
 #include "bitcoinrpc.h"
 
 using namespace json_spirit;
-using namespace std;
+
+//using namespace std;
+using std::vector;
+using std::runtime_error;
+using std::map;
+using std::pair;
+using std::max;
 
 Value gethashespersec(const Array& params, bool fHelp)
 {
@@ -249,8 +255,9 @@ Value getworkex(const Array& params, bool fHelp)
         CBlock* pdata = (CBlock*)&vchData[0];
 
         // Byte reverse
-        for (int i = 0; i < 128/4; i++)
-            ((unsigned int*)pdata)[i] = ByteReverse(((unsigned int*)pdata)[i]);
+        for (int i = 0; i < 128/sizeof( uint32_t ); ++i)     // fix this awful magic# code
+      //for (int i = 0; i < 128/4; ++i)     // fix this awful magic# code
+            ((uint32_t *)pdata)[i] = ByteReverse(((uint32_t *)pdata)[i]);
 
         // Get saved block
         if (!mapNewBlock.count(pdata->hashMerkleRoot))
@@ -361,14 +368,17 @@ Value getwork(const Array& params, bool fHelp)
     else
     {
         // Parse parameters
-        vector<unsigned char> vchData = ParseHex(params[0].get_str());
+        vector<unsigned char> 
+            vchData = ParseHex(params[0].get_str());
+
         if (vchData.size() != 128)
             throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid parameter");
         CBlock* pdata = (CBlock*)&vchData[0];
 
         // Byte reverse
-        for (int i = 0; i < 128/4; i++)
-            ((unsigned int*)pdata)[i] = ByteReverse(((unsigned int*)pdata)[i]);
+        for (int i = 0; i < sizeof( pdata )/sizeof( uint32_t ); ++i)
+      //for (int i = 0; i < 128/4; i++) //really, the limit is sizeof( pdata ) / sizeof( uint32_t
+            ((uint32_t *)pdata)[i] = ByteReverse(((uint32_t *)pdata)[i]);
 
         // Get saved block
         if (!mapNewBlock.count(pdata->hashMerkleRoot))

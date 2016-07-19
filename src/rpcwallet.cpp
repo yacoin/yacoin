@@ -15,7 +15,17 @@
 #include "base58.h"
 
 using namespace json_spirit;
-using namespace std;
+
+//using namespace std;
+using std::runtime_error;
+using std::string;
+using std::map;
+using std::list;
+using std::vector;
+using std::set;
+using std::pair;
+using std::max;
+using std::min;
 
 int64_t nWalletUnlockTime;
 static CCriticalSection cs_nWalletUnlockTime;

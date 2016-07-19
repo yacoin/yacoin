@@ -13,8 +13,11 @@
 #include "base58.h"
 #include "net.h"
 
-using namespace std;
 using namespace boost;
+
+//using namespace std;
+using std::string;
+using std::vector;
 
 int nGotIRCAddresses = 0;
 

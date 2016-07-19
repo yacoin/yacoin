@@ -10,6 +10,13 @@
 //
 // client versioning
 //
+extern const int
+    DISPLAY_VERSION_MAJOR_for_Qt,   
+    DISPLAY_VERSION_MINOR_for_Qt,   
+    DISPLAY_VERSION_REVISION_for_Qt,
+    DISPLAY_VERSION_BUILD_for_Qt,
+    DISPLAY_VERSION_TESTING_for_Qt;   
+
 
 static const int CLIENT_VERSION =
                            1000000 * CLIENT_VERSION_MAJOR
@@ -51,13 +58,5 @@ static const int BIP0031_VERSION = 60000;
 
 // "mempool" command, enhanced "getdata" behavior starts with this version:
 static const int MEMPOOL_GD_VERSION = 60002;
-
-#define DISPLAY_VERSION_MAJOR       0
-#define DISPLAY_VERSION_MINOR       4
-#define DISPLAY_VERSION_REVISION    5
-#define DISPLAY_VERSION_BUILD       2
-
-//Set to 1 for Testing Version
-#define DISPLAY_VERSION_TESTING     1
 
 #endif

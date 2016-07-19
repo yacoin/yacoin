@@ -9,11 +9,10 @@
 #include "wallet.h"
 #include "base58.h"
 
-#ifdef _MSC_VER
-#pragma warning( disable : 4345)
-#endif
-
-using namespace std;
+//using namespace std;  // testing this change
+using std::vector;
+using std::max;
+using std::min;
 
 bool KernelRecord::showTransaction(const CWalletTx &wtx)
 {

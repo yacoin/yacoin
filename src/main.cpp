@@ -32,10 +32,31 @@
 #ifdef WIN32
     #include "checkpoints.h"
 #endif
-using namespace std;
+
 using namespace boost;
 
-::int64_t nChainStartTime = 1367991200;     // unix time???? ~ Wed May 08 2013 05:33:20
+//using namespace std;
+using std::set;
+using std::string;
+using std::vector;
+using std::runtime_error;
+using std::map;
+using std::pair;
+using std::make_pair;
+using std::max;
+using std::min;
+using std::multimap;
+
+const ::int64_t 
+    nChainStartTime = 1367991200,           // unix time???? ~ Wed May 08 2013 05:33:20
+    nChainStartTimeTestNet = 1464123328;    //Tue, 24 May 2016 20:55:28 GMT
+                                            // 1464373956  Fri, 27 May 2016 18:32:36 GMT
+const uint256 
+  //hashGenesisBlockTestNet("0xfe20c2c2fc02b36d2473e1f51dba1fb123d41ff42966e2a4edabb98fdd7107e6");
+    // change here           ^^^^^^^^^^^^^
+    hashGenesisBlockTestNet( "0x0000fb514c55539c42aed840fb46fedf49ce9c8a81f2ab29bd8e5b0e7134467f" );
+
+
 CCriticalSection cs_setpwalletRegistered;
 set<CWallet*> setpwalletRegistered;
 
@@ -55,7 +76,9 @@ CBigNum bnProofOfStakeHardLimit(~uint256(0) >> 30); // fix minimal proof of stak
 uint256 nPoWBase = uint256("0x00000000ffff0000000000000000000000000000000000000000000000000000"); // difficulty-1 target
 
 CBigNum bnProofOfWorkLimitTestNet(~uint256(0) >> 16);
+//CBigNum bnProofOfWorkLimitTestNet(~uint256(0) >> 33);
 //YACOIN TODO
+
 static CBigNum bnInitialHashTarget(~uint256(0) >> 20);
 
 int
@@ -317,7 +340,7 @@ bool CTransaction::ReadFromDisk(COutPoint prevout)
     return ReadFromDisk(txdb, prevout, txindex);
 }
 
-bool CTransaction::IsStandard(string& strReason) const
+bool CTransaction::oldIsStandard(string& strReason) const
 {
     if (nVersion > CTransaction::CURRENT_VERSION_of_Tx)
     {
@@ -377,6 +400,53 @@ bool CTransaction::IsStandard(string& strReason) const
     }
 
     return true;
+}
+
+bool CTransaction::IsStandard044( string& strReason ) const
+{
+    if (nVersion > CTransaction::CURRENT_VERSION_of_Tx) // same as in 0.4.4!?
+    {                                                   // if we test differently,
+        strReason = "version(in 0.4.4)";                // then shouldn't 0.4.5 be 
+        return false;                                   // different?
+    }
+
+    BOOST_FOREACH(const CTxIn& txin, vin)
+    {
+        // Biggest 'standard' txin is a 3-signature 3-of-3 CHECKMULTISIG
+        // pay-to-script-hash, which is 3 ~80-byte signatures, 3
+        // ~65-byte public keys, plus a few script ops.
+        if (txin.scriptSig.size() > 500)
+        {
+            return false;
+        }
+        if (!txin.scriptSig.IsPushOnly())
+            return false;
+    }
+    txnouttype whichType;
+    BOOST_FOREACH(const CTxOut& txout, vout) 
+    {
+      //if (!::IsStandard(txout.scriptPubKey))
+        if (!::IsStandard(txout.scriptPubKey, whichType)) 
+        {
+            strReason = "scriptpubkey0.4.4";
+            return false;
+        }
+        if (txout.nValue == 0)
+            return false;
+    }
+    return true;
+}
+
+bool CTransaction::IsStandard(string& strReason) const
+{
+    bool
+        fIsStandard = oldIsStandard( strReason );
+
+    if( !fIsStandard )
+    {
+        fIsStandard = IsStandard044( strReason ); 
+    }
+    return fIsStandard;
 }
 
 //
@@ -888,7 +958,12 @@ int CMerkleTx::GetBlocksToMaturity() const
 {
     if (!(IsCoinBase() || IsCoinStake()))
         return 0;
-    return max(0, (nCoinbaseMaturity+20) - GetDepthInMainChain());
+    return max(
+                0, 
+                fTestNet?
+                (nCoinbaseMaturity + 0 ) - GetDepthInMainChain():
+                (nCoinbaseMaturity + 20) - GetDepthInMainChain()    // why is this 20?
+              );                                                    // what is this 20 from? For?
 }
 
 
@@ -1052,11 +1127,14 @@ unsigned char GetNfactor(::int64_t nTimestamp)
     int 
         nBitCount = 0;
 
-    if (nTimestamp <= nChainStartTime)
+    if (
+        ( nTimestamp <= (fTestNet? nChainStartTimeTestNet: nChainStartTime) ) ||
+        fTestNet
+       )    //nChainStartTime)
         return 4;
 
     ::int64_t 
-        nAgeOfBlockOrTxInSeconds = nTimestamp - nChainStartTime,
+        nAgeOfBlockOrTxInSeconds = nTimestamp - (fTestNet? nChainStartTimeTestNet: nChainStartTime),  //nChainStartTime,
         nSavedAgeOfBlockOrTxInSeconds = nAgeOfBlockOrTxInSeconds;
 
     while ((nAgeOfBlockOrTxInSeconds >> 1) > 3)     // nAgeOfBlockOrTxInSeconds / 2 is 4 or more
@@ -1086,7 +1164,7 @@ unsigned char GetNfactor(::int64_t nTimestamp)
     {
         printf(
                 "GetNfactor: %"PRI64d" -> %d %"PRI64d" : %d / %d\n", 
-                nTimestamp - nChainStartTime,   // 64 bit int
+                nTimestamp - (fTestNet? nChainStartTimeTestNet: nChainStartTime), //nChainStartTime,   // 64 bit int
                 nBitCount, 
                 nAgeOfBlockOrTxInSeconds, 
                 n, 
@@ -1110,7 +1188,9 @@ unsigned int GetProofOfWorkMA(const CBlockIndex* pIndexLast)
     CBigNum wma(0);    // Weighted Moving Average of PoW target
     unsigned int nCount = 0;
 
-    if ( pIndexLast->nTime < YACOIN_2016_SWITCH_TIME )
+    if ( 
+        (pIndexLast->nTime < YACOIN_2016_SWITCH_TIME) && !fTestNet
+       )
         return 0;
 
     if ( pIndexLast->IsProofOfStake() )
@@ -1254,7 +1334,7 @@ CBigNum inline GetProofOfStakeLimit(int nHeight, unsigned int nTime)
 
     if(
         fTestNet || 
-        nTime > STAKE_SWITCH_TIME
+        ((::uint64_t)nTime > (::uint64_t)STAKE_SWITCH_TIME)
         // is this the same as
         //(::uint64_t)nTime > (::uint64_t)STAKE_SWITCH_TIME
         // ?.  It seems not??
@@ -1502,7 +1582,9 @@ static unsigned int GetNextTargetRequired044(const CBlockIndex* pindexLast, bool
 // requires adjusted PoW-PoS ratio (GetSpacingThreshold), PoW target moving average (nBitsMA)
 unsigned int GetNextTargetRequired(const CBlockIndex* pindexLast, bool fProofOfStake)
 {
-    if( pindexLast->nTime < YACOIN_2016_SWITCH_TIME )
+    if(
+       (pindexLast->nTime < YACOIN_2016_SWITCH_TIME) && !fTestNet
+      )
     {
         return GetNextTargetRequired044( pindexLast, fProofOfStake );
     }
@@ -1511,41 +1593,54 @@ unsigned int GetNextTargetRequired(const CBlockIndex* pindexLast, bool fProofOfS
 
     bool fCheckPreviousPoWBlockOverstep(false); // flag, used for check and ignore overstepped PoW block difficulty
 
-    if ( !fProofOfStake && pindexLast->nTime >= YACOIN_2016_SWITCH_TIME )
+    if ( 
+        !fProofOfStake && 
+        ((pindexLast->nTime >= YACOIN_2016_SWITCH_TIME) || fTestNet)
+       )
     {
         if ( pindexLast->IsProofOfWork() )  // PoW after PoW
         {
             CBigNum bnOverstepNew;
-            const CBlockIndex* ppos = GetLastBlockIndex( pindexLast->pprev, true ); // get last PoS block preceeding
-            int overstep = ( pindexLast->nHeight - ppos->nHeight ) - ppos->GetSpacingThreshold();    // distanceToPoS - AdjPowPosRatio
 
-            if ( overstep == 0 && ppos->nBitsMA > 0 )    // if true, we generate target for next (1st) overstepped block
+            const CBlockIndex
+                * ppos = GetLastBlockIndex( pindexLast->pprev, true ); // get last PoS block preceeding
+
+            if( ppos )  // we are NOT on genesis block
             {
-                bnOverstepNew.SetCompact( ppos->nBitsMA );
-                const CBlockIndex* pindex = pindexLast;
+                int 
+                    overstep = ( pindexLast->nHeight - ppos->nHeight ) - ppos->GetSpacingThreshold();    // distanceToPoS - AdjPowPosRatio
 
-                while ( pindex->IsProofOfWork() )
+                if ( overstep == 0 && ppos->nBitsMA > 0 )    // if true, we generate target for next (1st) overstepped block
                 {
-                    CBigNum powTarget;
-                    powTarget.SetCompact( pindex->nBits );
+                    bnOverstepNew.SetCompact( ppos->nBitsMA );
+                    const CBlockIndex* pindex = pindexLast;
 
-                    // if any recent PoW block target is lower than MA, we use that one to maximize difficulty
-                    if ( powTarget < bnOverstepNew )
-                        bnOverstepNew = powTarget;
+                    while ( pindex->IsProofOfWork() )
+                    {
+                        CBigNum powTarget;
+                        powTarget.SetCompact( pindex->nBits );
 
-                    pindex = pindex->pprev;
+                        // if any recent PoW block target is lower than MA, we use that one to maximize difficulty
+                        if ( powTarget < bnOverstepNew )
+                            bnOverstepNew = powTarget;
+
+                        pindex = pindex->pprev;
+                    }
+
+                    bnOverstepNew = bnOverstepNew >> 1; // cut that target in half, consequently double difficulty
+                    return bnOverstepNew.GetCompact();  // now it should take twice the time ...
                 }
-
-                bnOverstepNew = bnOverstepNew >> 1; // cut that target in half, consequently double difficulty
-                return bnOverstepNew.GetCompact();  // now it should take twice the time ...
+                else if ( overstep > 0 )
+                {
+                    bnOverstepNew.SetCompact( pindexLast->nBits );
+                    bnOverstepNew = bnOverstepNew >> 1; // for each overstepped block, make difficulty double
+                    return bnOverstepNew.GetCompact();  // good luck ignoring PoS blocks for long ...
+                }
+                else {} // we let old rules down below do the work
             }
-            else if ( overstep > 0 )
+            else  // we are on genesis block, so what to do???, let 0.4.4 run????
             {
-                bnOverstepNew.SetCompact( pindexLast->nBits );
-                bnOverstepNew = bnOverstepNew >> 1; // for each overstepped block, make difficulty double
-                return bnOverstepNew.GetCompact();  // good luck ignoring PoS blocks for long ...
             }
-            else {} // we let old rules down below do the work
         }
         else    // PoW after PoS
             fCheckPreviousPoWBlockOverstep = true;
@@ -1632,6 +1727,12 @@ bool IsInitialBlockDownload()
        )
         return true;
 
+    if( 
+        (0 == nBestHeight) ||
+        fTestNet 
+      )
+        return false;
+
     ::int64_t
         nTimeOfBestBlockInSeconds = pindexBest->GetBlockTime(),
         nCurrentTime = GetTime();
@@ -1646,7 +1747,10 @@ bool IsInitialBlockDownload()
 
     if( !fIsBestBlockOldEnough ) // being old enough means still "catching up"
     {                           // i.e. in the "initial download"
-        fIsBestBlockOldEnough = (nTimeOfBestBlockInSeconds < n12MinutesAgo)? true: false;
+        fIsBestBlockOldEnough = 
+            (nTimeOfBestBlockInSeconds < n12MinutesAgo)? 
+            true: 
+            false;
     }
     return fIsBestBlockOldEnough;
 }
@@ -2605,13 +2709,17 @@ bool CBlock::AddToBlockIndex(unsigned int nFile, unsigned int nBlockPos)
     if (!pindexNew)
         return error("AddToBlockIndex() : new CBlockIndex failed");
     pindexNew->phashBlock = &hash;
-    map<uint256, CBlockIndex*>::iterator miPrev = mapBlockIndex.find(hashPrevBlock);
+    map<uint256, CBlockIndex*>::iterator 
+        miPrev = mapBlockIndex.find(hashPrevBlock);
+
     if (miPrev != mapBlockIndex.end())
     {
         pindexNew->pprev = (*miPrev).second;
         pindexNew->nHeight = pindexNew->pprev->nHeight + 1;
-        pindexNew->nPosBlockCount = pindexNew->pprev->nPosBlockCount + ( pindexNew->IsProofOfStake() ? 1 : 0 );
-        pindexNew->nBitsMA = pindexNew->IsProofOfStake() ? GetProofOfWorkMA(pindexNew->pprev) : 0;
+        pindexNew->nPosBlockCount = pindexNew->pprev->nPosBlockCount + 
+                                    ( pindexNew->IsProofOfStake() ? 1 : 0 );
+        pindexNew->nBitsMA = pindexNew->IsProofOfStake()? 
+                             GetProofOfWorkMA(pindexNew->pprev): 0;
     }
 
     // ppcoin: compute chain trust score
@@ -2753,8 +2861,11 @@ bool CBlock::CheckBlock(bool fCheckPOW, bool fCheckMerkleRoot, bool fCheckSig) c
     }
     else
     {
-        // yacoin2015, nNonce must be greater than zero for proof-of-work blocks
-        if (nTime >= YACOIN_2016_SWITCH_TIME && nNonce == 0)
+        // yacoin2015, nNonce must be greater than zero for proof-of-work blocks WHY????
+        if (
+            ((nTime >= YACOIN_2016_SWITCH_TIME) || fTestNet) && 
+            (nNonce == 0)
+           )
             return DoS(50, error("CheckBlock() : zero nonce in proof-of-work block"));
 
         // Check proof of work matches claimed amount
@@ -2909,7 +3020,11 @@ double CBlockIndex::GetPoWPoSRatio() const
 ::int32_t CBlockIndex::GetSpacingThreshold() const
 {
     // always force lower spacing to encourage ProofOfStake block inclusion
-    ::int32_t spacing =  (::int32_t) ( boost::math::round( GetPoWPoSRatio() - 0.75 ) );
+
+    ::int32_t 
+        spacing =  (0 < nPosBlockCount)?
+                   (::int32_t)( boost::math::round( GetPoWPoSRatio() - 0.75 ) ):
+                   0;
     return std::max( spacing, 1 );
 }
 
@@ -2923,8 +3038,8 @@ CBigNum CBlockIndex::GetBlockTrust() const
 
     // is (nTime >= YACOIN_2016_SWITCH_TIME) actually true for blocks before 12/13/2015
     if (
-       // false &&    // temporary block
-        (nTime >= YACOIN_2016_SWITCH_TIME)
+        (0 < nPosBlockCount) &&
+        ( (nTime >= YACOIN_2016_SWITCH_TIME) || ( fTestNet && pprev ) )
        )
     {
         ::int32_t iratio =  (::int32_t)boost::math::round( GetPoWPoSRatio() );
@@ -3115,19 +3230,41 @@ bool ProcessBlock(CNode* pfrom, CBlock* pblock)
             mapProofOfStake.insert(make_pair(hash, hashProofOfStake));
     }
 
-    CBlockIndex* pcheckpoint = Checkpoints::GetLastSyncCheckpoint();
-    if (pcheckpoint && pblock->hashPrevBlock != hashBestChain && !Checkpoints::WantedByPendingSyncCheckpoint(hash))
+    CBlockIndex
+        * pcheckpoint = Checkpoints::GetLastSyncCheckpoint();
+
+    if (
+        pcheckpoint && 
+        pblock->hashPrevBlock != hashBestChain && 
+        !Checkpoints::WantedByPendingSyncCheckpoint(hash)
+       )
     {
         // Extra checks to prevent "fill up memory by spamming with bogus blocks"
-        ::int64_t deltaTime = pblock->GetBlockTime() - pcheckpoint->nTime;
-        CBigNum bnNewBlock;
+        ::int64_t 
+            deltaTime = pblock->GetBlockTime() - pcheckpoint->nTime;
+
+        CBigNum 
+            bnNewBlock;
+
         bnNewBlock.SetCompact(pblock->nBits);
-        CBigNum bnRequired;
+
+        CBigNum 
+            bnRequired;
 
         if (pblock->IsProofOfStake()) // <<<<<<<<<<<<<<<<<<<<<<<< this part is different
-            bnRequired.SetCompact(ComputeMinStake(GetLastBlockIndex(pcheckpoint, true)->nBits, deltaTime, pblock->nTime));
+            bnRequired.SetCompact(
+                                  ComputeMinStake(
+                                                  GetLastBlockIndex(pcheckpoint, true)->nBits, 
+                                                  deltaTime, 
+                                                  pblock->nTime                                                 
+                                                 )
+                                 );
         else
-            bnRequired.SetCompact(ComputeMinWork(GetLastBlockIndex(pcheckpoint, false)->nBits, deltaTime));
+            bnRequired.SetCompact(
+                                  ComputeMinWork(GetLastBlockIndex(pcheckpoint, false)->nBits, 
+                                                 deltaTime
+                                                )
+                                 );
 
         if (bnNewBlock > bnRequired)
         {
@@ -3279,7 +3416,11 @@ bool CBlock::SignBlock044(const CKeyStore& keystore)
 bool CBlock::SignBlock(CWallet& wallet)
 {
     // if we are doing 0.4.4 blocks, let's check using 0.4.4 code
-    if( CURRENT_VERSION_previous == nVersion )
+    if( 
+       (CURRENT_VERSION_previous == nVersion)
+       ||
+       !IsProofOfStake()
+      )
     {
         bool
             fOldVersion = SignBlock044( wallet );
@@ -3287,7 +3428,9 @@ bool CBlock::SignBlock(CWallet& wallet)
     }
     // if we are trying to sign
     //    something except proof-of-stake block template
-    if (!vtx[0].vout[0].IsEmpty())
+    if (
+        !vtx[0].vout[0].IsEmpty()
+       )
         return false;
 
     // if we are trying to sign
@@ -3540,9 +3683,11 @@ bool LoadBlockIndex(bool fAllowNew)
 
         // MainNet:
 
-        // CBlock(hash=000000000019d6, ver=1, hashPrevBlock=00000000000000, hashMerkleRoot=4a5e1e, nTime=1231006505, nBits=1d00ffff, nNonce=2083236893, vtx=1)
+        // CBlock(hash=000000000019d6, ver=1, hashPrevBlock=00000000000000, hashMerkleRoot=4a5e1e, 
+        //        nTime=1231006505, nBits=1d00ffff, nNonce=2083236893, vtx=1)
         //   CTransaction(hash=4a5e1e, ver=1, vin.size=1, vout.size=1, nLockTime=0)
-        //     CTxIn(COutPoint(000000, -1), coinbase 04ffff001d0104455468652054696d65732030332f4a616e2f32303039204368616e63656c6c6f72206f6e206272696e6b206f66207365636f6e64206261696c6f757420666f722062616e6b73)
+        //     CTxIn(COutPoint(000000, -1), 
+        //          coinbase 04ffff001d0104455468652054696d65732030332f4a616e2f32303039204368616e63656c6c6f72206f6e206272696e6b206f66207365636f6e64206261696c6f757420666f722062616e6b73)
         //     CTxOut(nValue=50.00000000, scriptPubKey=0x5F1DF16B2B704C8A578D0B)
         //   vMerkleTree: 4a5e1e
         
@@ -3550,33 +3695,68 @@ bool LoadBlockIndex(bool fAllowNew)
         
         // TestNet:
 
-        //CBlock(hash=0000c763e402f2436da9ed36c7286f62c3f6e5dbafce9ff289bd43d7459327eb, ver=1, hashPrevBlock=0000000000000000000000000000000000000000000000000000000000000000, hashMerkleRoot=4cb33b3b6a861dcbc685d3e614a9cafb945738d6833f182855679f2fad02057b, nTime=1360105017, nBits=1f00ffff, nNonce=46534, vtx=1, vchBlockSig=)
-        //  Coinbase(hash=4cb33b3b6a, nTime=1360105017, ver=1, vin.size=1, vout.size=1, nLockTime=0)
-        //    CTxIn(COutPoint(0000000000, 4294967295), coinbase 04ffff001d020f274468747470733a2f2f626974636f696e74616c6b2e6f72672f696e6465782e7068703f746f7069633d3133343137392e6d736731353032313936236d736731353032313936)
+        //CBlock(hash=0000c763e402f2436da9ed36c7286f62c3f6e5dbafce9ff289bd43d7459327eb, 
+        //       ver=1, 
+        //       hashPrevBlock=0000000000000000000000000000000000000000000000000000000000000000, 
+        //       hashMerkleRoot=4cb33b3b6a861dcbc685d3e614a9cafb945738d6833f182855679f2fad02057b, 
+        //       nTime=1360105017, nBits=1f00ffff, nNonce=46534, vtx=1, vchBlockSig=)
+        //  Coinbase(
+        //       hash=4cb33b3b6a, nTime=1360105017, ver=1, vin.size=1, vout.size=1, nLockTime=0)
+        //    CTxIn(COutPoint(0000000000, 4294967295), 
+        //          coinbase 04ffff001d020f274468747470733a2f2f626974636f696e74616c6b2e6f72672f696e6465782e7068703f746f7069633d3133343137392e6d736731353032313936236d736731353032313936)
         //    CTxOut(empty)
         //  vMerkleTree: 4cb33b3b6a
 
-        const char* pszTimestamp = "https://bitcointalk.org/index.php?topic=196196";
-        CTransaction txNew;
-        txNew.nTime = nChainStartTime;
+        const char* 
+            pszTimestamp = "https://bitcointalk.org/index.php?topic=196196";
+        CTransaction 
+            txNew;
+
+        txNew.nTime = (::uint32_t)( fTestNet? nChainStartTimeTestNet: nChainStartTime );
         txNew.vin.resize(1);
         txNew.vout.resize(1);
-        txNew.vin[0].scriptSig = CScript() << 486604799 << CBigNum(9999) << vector<unsigned char>((const unsigned char*)pszTimestamp, (const unsigned char*)pszTimestamp + strlen(pszTimestamp));
+        txNew.vin[0].scriptSig = 
+            CScript()           // what is being constructed here?????
+          //<< 486604799        // is this a time? 1985?
+            << 1464032600       // how about a more current time????  If it is a time???????
+            << CBigNum(9999)    // what is this??
+            << vector<unsigned char>((const unsigned char*)pszTimestamp, (const unsigned char*)pszTimestamp + strlen(pszTimestamp));
         txNew.vout[0].SetEmpty();
-        CBlock block;
+
+        CBlock 
+            block;
+
         block.vtx.push_back(txNew);
         block.hashPrevBlock = 0;
         block.hashMerkleRoot = block.BuildMerkleTree();
         block.nVersion = 1;
-        block.nTime    = nChainStartTime + 20;
+        block.nTime    = (::uint32_t)( fTestNet? nChainStartTimeTestNet + 20: nChainStartTime + 20 );   // why + 20??
         block.nBits    = bnProofOfWorkLimit.GetCompact();
-        block.nNonce   = 127357;
-        //block.nNonce   = !fTestNet ? 127357 : 12345; //TODO
+      //block.nNonce   = 127357;
+        block.nNonce   = !fTestNet ? 127357 : 0x1F64C;  //    13D93;    //67103;
 
-        //// debug print
+        CBigNum 
+            bnTarget;
+
+        bnTarget.SetCompact( block.nBits );
+
+        uint256
+            the_target = bnTarget.getuint256();
+    
+        uint256
+                the_hash = block.GetHash();
+
+        // debug print
+        printf("block.GetHash() ==\n%s\n", the_hash.ToString().c_str());
+        printf("block.nBits ==\n%s\n", the_target.ToString().c_str());
+        printf("block.hashMerkleRoot ==\n%s\n", block.hashMerkleRoot.ToString().c_str());
+
 #ifdef _MSC_VER
         bool
-            fTest = (block.hashMerkleRoot == uint256("0x678b76419ff06676a591d3fa9d57d7f7b26d8021b7cc69dde925f39d4cf2244f"));
+            fTest = (
+                     block.hashMerkleRoot == 
+                     uint256("0x29c97b046f12638bb31918e42ee10a16ca7d325a2af255e8a503248a1f04e2d2")
+                    );
     #ifdef _DEBUG
         assert(fTest);
     #else
@@ -3584,7 +3764,7 @@ bool LoadBlockIndex(bool fAllowNew)
             releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
     #endif
 #else
-        assert(block.hashMerkleRoot == uint256("0x678b76419ff06676a591d3fa9d57d7f7b26d8021b7cc69dde925f39d4cf2244f"));
+        assert(block.hashMerkleRoot == uint256("0x29c97b046f12638bb31918e42ee10a16ca7d325a2af255e8a503248a1f04e2d2"));
 #endif
         block.print();
 #ifdef _MSC_VER
@@ -3751,21 +3931,35 @@ bool LoadExternalBlockFile(FILE* fileIn)
     int nLoaded = 0;
     {
         LOCK(cs_main);
-        try {
+        try 
+        {
             CAutoFile blkdat(fileIn, SER_DISK, CLIENT_VERSION);
             unsigned int nPos = 0;
-            while (nPos != (unsigned int)-1 && blkdat.good() && !fRequestShutdown)
+            while (
+                  //(nPos != (unsigned int)-1) && 
+                    (nPos != UINT_MAX) && 
+                    blkdat.good() && 
+                    !fRequestShutdown
+                  )
             {
-                unsigned char pchData[65536];
-                do {
-                    fseek(blkdat, nPos, SEEK_SET);
-                    int nRead = fread(pchData, 1, sizeof(pchData), blkdat);
+              //unsigned char pchData[65536];   // is there anything special about this #??
+                unsigned char pchData[ (int)1 << 16 ];   
+                do 
+                {
+                    (void)fseek(blkdat, nPos, SEEK_SET);    // who cares if it fails!  What silly code!!
+                    int 
+                        nRead = fread(pchData, 1, sizeof(pchData), blkdat);
                     if (nRead <= 8)
                     {
-                        nPos = (unsigned int)-1;
+                        nPos = UINT_MAX;
                         break;
                     }
-                    void* nFind = memchr(pchData, pchMessageStart[0], nRead+1-sizeof(pchMessageStart));
+                    void
+                        * nFind = memchr(
+                                         pchData, 
+                                         pchMessageStart[ 0 ], 
+                                         nRead + 1 - sizeof( pchMessageStart )
+                                        );
                     if (nFind)
                     {
                         if (memcmp(nFind, pchMessageStart, sizeof(pchMessageStart))==0)
@@ -3777,13 +3971,16 @@ bool LoadExternalBlockFile(FILE* fileIn)
                     }
                     else
                         nPos += sizeof(pchData) - sizeof(pchMessageStart) + 1;
-                } while(!fRequestShutdown);
-                if (nPos == (unsigned int)-1)
+                } 
+                while(!fRequestShutdown);
+                if (nPos == UINT_MAX)
                     break;
-                fseek(blkdat, nPos, SEEK_SET);
+                (void)fseek(blkdat, nPos, SEEK_SET);  // again, what seek error!
                 unsigned int nSize;
                 blkdat >> nSize;
-                if (nSize > 0 && nSize <= MAX_BLOCK_SIZE)
+                if (
+                    (nSize > 0) && (nSize <= MAX_BLOCK_SIZE)
+                   )
                 {
                     CBlock block;
                     blkdat >> block;
@@ -3795,7 +3992,8 @@ bool LoadExternalBlockFile(FILE* fileIn)
                 }
             }
         }
-        catch (std::exception &e) {
+        catch (std::exception &e) 
+        {
             printf("%s() : Deserialize or I/O error caught during load\n",
                    BOOST_CURRENT_FUNCTION);
         }

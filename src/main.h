@@ -59,20 +59,27 @@ static const int fHaveUPnP = true;
 static const int fHaveUPnP = false;
 #endif
 
-static const uint256 hashGenesisBlock("0x0000060fc90618113cde415ead019a1052a9abc43afcccff38608ff8751353e5");
-static const uint256 hashGenesisBlockTestNet("0xfe20c2c2fc02b36d2473e1f51dba1fb123d41ff42966e2a4edabb98fdd7107e6");
+static const uint256 
+    hashGenesisBlock("0x0000060fc90618113cde415ead019a1052a9abc43afcccff38608ff8751353e5");
+extern const uint256 
+  //hashGenesisBlockTestNet("0xfe20c2c2fc02b36d2473e1f51dba1fb123d41ff42966e2a4edabb98fdd7107e6");
+    // change here           ^^^^^^^^^^^^^
+    hashGenesisBlockTestNet;
 
 static const ::int64_t nMaxClockDrift = 2 * 60 * 60;        // two hours
 inline ::int64_t PastDrift(::int64_t nTime)   { return nTime - 2 * 60 * 60; } // up to 2 hours from the past
 inline ::int64_t FutureDrift(::int64_t nTime) { return nTime + 2 * 60 * 60; } // up to 2 hours from the future
 
+extern const ::int64_t 
+    nChainStartTime,
+    nChainStartTimeTestNet;
 extern CScript COINBASE_FLAGS;
 extern CCriticalSection cs_main;
 extern std::map<uint256, CBlockIndex*> mapBlockIndex;
 extern std::set<std::pair<COutPoint, unsigned int> > setStakeSeen;
 extern CBlockIndex* pindexGenesisBlock;
 extern unsigned int nNodeLifespan;
-extern unsigned int nStakeMinAge;
+//extern unsigned int nStakeMinAge;
 extern int nCoinbaseMaturity;
 extern int nBestHeight;
 extern CBigNum bnBestChainTrust;
@@ -565,12 +572,14 @@ public:
     /** Check for standard transaction types
         @return True if all outputs (scriptPubKeys) use only standard transaction forms
     */
+    bool IsStandard044(std::string& strReason) const;
+    bool oldIsStandard(std::string& strReason) const;
     bool IsStandard(std::string& strReason) const;
-    bool IsStandard() const
-    {
-        std::string strReason;
-        return IsStandard(strReason);
-    }
+    //bool IsStandard() const
+    //{
+    //    std::string strReason;
+    //    return IsStandard(strReason);
+    //}
 
     /** Check for standard transaction types
         @param[in] mapInputs	Map of previous transactions that have outputs we're spending
@@ -969,26 +978,68 @@ public:
     // yacoin2015 update
     uint256 GetHash() const
     {
-	    unsigned char nfactor;
+        const ::uint32_t
+            nSpanOf4  = 1368515488 - nChainStartTime,
+            nSpanOf5  = 1368777632 - nChainStartTime,
+            nSpanOf6  = 1369039776 - nChainStartTime,
+            nSpanOf7  = 1369826208 - nChainStartTime,
+            nSpanOf8  = 1370088352 - nChainStartTime,
+            nSpanOf9  = 1372185504 - nChainStartTime,
+            nSpanOf10 = 1373234080 - nChainStartTime,
+            nSpanOf11 = 1376379808 - nChainStartTime,
+            nSpanOf12 = 1380574112 - nChainStartTime,
+            nSpanOf13 = 1384768416 - nChainStartTime,
+            nSpanOf14 = 1401545632 - nChainStartTime,
+            nSpanOf15 = 1409934240 - nChainStartTime,
+            nSpanOf16 = 1435100064 - nChainStartTime,
+            nSpanOf17 = 1468654496 - nChainStartTime,
+            nSpanOf18 = 1502208928 - nChainStartTime;   // 8/8/17 16:15GMT
 
-			 if ( nTime < 1368515488 ) nfactor = 4;
-		else if ( nTime < 1368777632 ) nfactor = 5;
-		else if ( nTime < 1369039776 ) nfactor = 6;
-		else if ( nTime < 1369826208 ) nfactor = 7;
-		else if ( nTime < 1370088352 ) nfactor = 8;
-		else if ( nTime < 1372185504 ) nfactor = 9;
-		else if ( nTime < 1373234080 ) nfactor = 10;
-		else if ( nTime < 1376379808 ) nfactor = 11;
-		else if ( nTime < 1380574112 ) nfactor = 12;
-		else if ( nTime < 1384768416 ) nfactor = 13;
-		else if ( nTime < 1401545632 ) nfactor = 14;
-		else if ( nTime < 1409934240 ) nfactor = 15;
-		else if ( nTime < 1435100064 ) nfactor = 16;
-	  //else if ( nTime < YACOIN_2016_SWITCH_TIME ) nfactor = 17;	// as soon as possible
-		else if ( nTime < 1468654496 ) nfactor = 17;	// as soon as possible
-		else
-          nfactor = 4;
-
+        unsigned char 
+            nfactor;
+        if( !fTestNet )
+        {     // nChainStartTime = 1367991200 is start
+		    if ( nTime < (nChainStartTime + nSpanOf4 ) ) nfactor = 4;
+            else if ( nTime < (nChainStartTime + nSpanOf5 ) ) nfactor = 5;
+            else if ( nTime < (nChainStartTime + nSpanOf6 ) ) nfactor = 6;
+            else if ( nTime < (nChainStartTime + nSpanOf7 ) ) nfactor = 7;
+            else if ( nTime < (nChainStartTime + nSpanOf8 ) ) nfactor = 8;
+            else if ( nTime < (nChainStartTime + nSpanOf9 ) ) nfactor = 9;
+            else if ( nTime < (nChainStartTime + nSpanOf10) ) nfactor = 10;
+            else if ( nTime < (nChainStartTime + nSpanOf11) ) nfactor = 11;
+            else if ( nTime < (nChainStartTime + nSpanOf12) ) nfactor = 12;
+            else if ( nTime < (nChainStartTime + nSpanOf13) ) nfactor = 13;
+            else if ( nTime < (nChainStartTime + nSpanOf14) ) nfactor = 14;
+            else if ( nTime < (nChainStartTime + nSpanOf15) ) nfactor = 15;
+            else if ( nTime < (nChainStartTime + nSpanOf16) ) nfactor = 16;
+          //else if ( nTime < YACOIN_2016_SWITCH_TIME ) nfactor = 17;    // as soon as possible
+            else if ( nTime < (nChainStartTime + nSpanOf17) ) nfactor = 17;
+            else if ( nTime < (nChainStartTime + nSpanOf18) ) nfactor = 18;
+/***********************************
+            if ( nTime < 1368515488 ) nfactor = 4;
+    		else if ( nTime < 1368777632 ) nfactor = 5;
+	    	else if ( nTime < 1369039776 ) nfactor = 6;
+		    else if ( nTime < 1369826208 ) nfactor = 7;
+    		else if ( nTime < 1370088352 ) nfactor = 8;
+	    	else if ( nTime < 1372185504 ) nfactor = 9;
+		    else if ( nTime < 1373234080 ) nfactor = 10;
+    		else if ( nTime < 1376379808 ) nfactor = 11;
+	    	else if ( nTime < 1380574112 ) nfactor = 12;
+		    else if ( nTime < 1384768416 ) nfactor = 13;
+    		else if ( nTime < 1401545632 ) nfactor = 14;
+	    	else if ( nTime < 1409934240 ) nfactor = 15;
+		    else if ( nTime < 1435100064 ) nfactor = 16;
+    	  //else if ( nTime < YACOIN_2016_SWITCH_TIME ) nfactor = 17;	// as soon as possible
+		    else if ( nTime < 1468654496 ) nfactor = 17;	// as soon as possible
+**************************************/
+    		else
+              //nfactor = 4;
+                nfactor = 19;
+        }
+        else
+        {
+            nfactor = 4;
+        }
         uint256 thash;
 		scrypt_hash(CVOIDBEGIN(nVersion), sizeof(block_header), UINTBEGIN(thash), nfactor);
 		return thash;

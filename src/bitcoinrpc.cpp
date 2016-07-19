@@ -58,10 +58,19 @@
 //#define printf OutputDebugStringF
 #endif
 
-using namespace std;
 using namespace boost;
 using namespace boost::asio;
 using namespace json_spirit;
+
+//using namespace std;
+using std::string;
+using std::list;
+using std::runtime_error;
+using std::map;
+using std::vector;
+using std::set;
+using std::ostringstream;
+using std::invalid_argument;
 
 void ThreadRPCServer2(void* parg);
 
@@ -73,7 +82,7 @@ void ThreadRPCServer3(void* parg);
 
 static inline unsigned short GetDefaultRPCPort()
 {
-    return GetBoolArg("-testnet", false) ? 18332 : 8332;
+    return GetBoolArg("-testnet", false)?7687 :17687;  // these are btc $s 18332 : 8332;
 }
 
 Object JSONRPCError(int code, const string& message)
