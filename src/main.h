@@ -992,9 +992,11 @@ public:
             nSpanOf14 = 1401545632 - nChainStartTime,
             nSpanOf15 = 1409934240 - nChainStartTime,
             nSpanOf16 = 1435100064 - nChainStartTime,
-            nSpanOf17 = 1468654496 - nChainStartTime;
+            nSpanOf17 = 1468654496 - nChainStartTime,
+            nSpanOf18 = 1502208928 - nChainStartTime;   // 8/8/17 16:15GMT
 
-        unsigned char nfactor;
+        unsigned char 
+            nfactor;
         if( !fTestNet )
         {     // nChainStartTime = 1367991200 is start
 		    if ( nTime < (nChainStartTime + nSpanOf4 ) ) nfactor = 4;
@@ -1011,7 +1013,8 @@ public:
             else if ( nTime < (nChainStartTime + nSpanOf15) ) nfactor = 15;
             else if ( nTime < (nChainStartTime + nSpanOf16) ) nfactor = 16;
           //else if ( nTime < YACOIN_2016_SWITCH_TIME ) nfactor = 17;    // as soon as possible
-            else if ( nTime < (nChainStartTime + nSpanOf17) ) nfactor = 17;    // as soon as possible
+            else if ( nTime < (nChainStartTime + nSpanOf17) ) nfactor = 17;
+            else if ( nTime < (nChainStartTime + nSpanOf18) ) nfactor = 18;
 /***********************************
             if ( nTime < 1368515488 ) nfactor = 4;
     		else if ( nTime < 1368777632 ) nfactor = 5;
@@ -1030,7 +1033,8 @@ public:
 		    else if ( nTime < 1468654496 ) nfactor = 17;	// as soon as possible
 **************************************/
     		else
-                nfactor = 4;
+              //nfactor = 4;
+                nfactor = 19;
         }
         else
         {
