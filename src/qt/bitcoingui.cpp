@@ -97,15 +97,15 @@ BitcoinGUI::BitcoinGUI(QWidget *parent):
     setStyleSheet("selection-color: #000066;");
     resize(850, 550);
 
-    int y = (DISPLAY_VERSION_MAJOR);
-    int a = (DISPLAY_VERSION_MINOR);
-    int c = (DISPLAY_VERSION_REVISION);
+    int y = (DISPLAY_VERSION_MAJOR_for_Qt);
+    int a = DISPLAY_VERSION_MINOR_for_Qt;
+    int c = (DISPLAY_VERSION_REVISION_for_Qt);
 
     QString titVersion = QString::number(y)+ "." +
                   QString::number(a) + "." +
                   QString::number(c);
 
-    int isTest = (DISPLAY_VERSION_TESTING);
+    int isTest = (DISPLAY_VERSION_TESTING_for_Qt);
 
     if(isTest == 1 && fTestNet)
     {
