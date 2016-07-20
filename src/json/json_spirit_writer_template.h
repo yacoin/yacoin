@@ -8,7 +8,11 @@
 
 #include "json_spirit_value.h"
 
-#include "..\util.h"
+#ifndef _MSC_VER
+    #include "util.h"
+#else
+    #include "..\util.h"
+#endif
 //extern const int COINdecimalPower;
 
 #include <cassert>
