@@ -40,12 +40,12 @@ class CMessageHeader
         bool IsValid() const;
 
         IMPLEMENT_SERIALIZE
-            (
+        (
              READWRITE(FLATDATA(pchMessageStart));
              READWRITE(FLATDATA(pchCommand));
              READWRITE(nMessageSize);
              READWRITE(nChecksum);
-            )
+        )
 
     // TODO: make private (improves encapsulation)
     public:
@@ -75,12 +75,12 @@ class CAddress : public CService
 {
     public:
         CAddress();
-        explicit CAddress(CService ipIn, uint64 nServicesIn=NODE_NETWORK);
+        explicit CAddress(CService ipIn, ::uint64_t nServicesIn=NODE_NETWORK);
 
         void Init();
 
         IMPLEMENT_SERIALIZE
-            (
+        (
              CAddress* pthis = const_cast<CAddress*>(this);
              CService* pip = (CService*)pthis;
              if (fRead)
@@ -92,19 +92,19 @@ class CAddress : public CService
                  READWRITE(nTime);
              READWRITE(nServices);
              READWRITE(*pip);
-            )
+        )
 
         void print() const;
 
     // TODO: make private (improves encapsulation)
     public:
-        uint64 nServices;
+        ::uint64_t nServices;
 
         // disk and network only
         unsigned int nTime;
 
         // memory only
-        int64 nLastTry;
+        ::int64_t nLastTry;
 };
 
 /** inv message data */

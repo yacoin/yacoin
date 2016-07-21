@@ -8,6 +8,13 @@
 
 #include "json_spirit_value.h"
 
+#ifndef _MSC_VER
+    #include "util.h"
+#else
+    #include "..\util.h"
+#endif
+//extern const int COINdecimalPower;
+
 #include <cassert>
 #include <sstream>
 #include <iomanip>
@@ -16,8 +23,18 @@ namespace json_spirit
 {
     inline char to_hex_char( unsigned int c )
     {
+#ifdef _MSC_VER
+        bool
+            fTest = ( c <= 0xF );
+    #ifdef _DEBUG
+        assert(fTest);
+    #else
+        if( !fTest )
+            releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
+    #endif
+#else
         assert( c <= 0xF );
-
+#endif
         const char ch = static_cast< char >( c );
 
         if( ch < 10 ) return '0' + ch;
@@ -126,11 +143,28 @@ namespace json_spirit
                 case int_type:   output_int( value );         break;
 
                 /// Bitcoin: Added std::fixed and changed precision from 16 to 8
-                case real_type:  os_ << std::showpoint << std::fixed << std::setprecision(8)
-                                     << value.get_real();     break;
+                               //std::setprecision(8) << //<<<<<<<<<<<<<<<<<< NO!!!
+                case real_type:  os_ << 
+                                 std::showpoint << 
+                                 std::fixed << 
+                                 std::setprecision( COINdecimalPower ) << 
+                                 value.get_real();            break;
 
                 case null_type:  os_ << "null";               break;
-                default: assert( false );
+                default: 
+#ifdef _MSC_VER
+                    bool
+                        fTest = ( false );
+    #ifdef _DEBUG
+                    assert(fTest);
+    #else
+                    if( !fTest )
+                        releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
+    #endif
+#else
+                    assert( false );
+#endif
+                    break;
             }
         }
 

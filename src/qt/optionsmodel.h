@@ -25,20 +25,22 @@ public:
         ProxyIP,           // QString
         ProxyPort,         // int
         ProxySocksVersion, // int
+        TorUse,            // bool
+        TorIP,             // QString
+        TorPort,           // int
+        TorOnly,           // bool
+        TorName,           // QString
         Fee,               // qint64
         DisplayUnit,       // BitcoinUnits::Unit
         DisplayAddresses,  // bool
+        ThirdPartyTxUrls,  // QString
         DetachDatabases,   // bool
-        CPUMining,         // bool
         Language,          // QString
         CoinControlFeatures, // bool
         OptionIDRowCount,
     };
 
     void Init();
-
-    /* Migrate settings from wallet.dat after app initialization */
-    bool Upgrade(); /* returns true if settings upgraded */
 
     int rowCount(const QModelIndex & parent = QModelIndex()) const;
     QVariant data(const QModelIndex & index, int role = Qt::DisplayRole) const;
@@ -50,16 +52,18 @@ public:
     bool getMinimizeOnClose();
     int getDisplayUnit();
     bool getDisplayAddresses();
-    QString getLanguage() { return language; }
     bool getCoinControlFeatures();
+    QString getThirdPartyTxUrls() { return strThirdPartyTxUrls; }
+    QString getLanguage() { return language; }
 
 private:
     int nDisplayUnit;
     bool bDisplayAddresses;
     bool fMinimizeToTray;
     bool fMinimizeOnClose;
-    QString language;
     bool fCoinControlFeatures;
+    QString language;
+    QString strThirdPartyTxUrls;
 
 signals:
     void displayUnitChanged(int unit);

@@ -1,7 +1,8 @@
-//
-// Alert system
-//
-
+// Copyright (c) 2010 Satoshi Nakamoto
+// Copyright (c) 2009-2014 The Bitcoin developers
+// Copyright (c) 2013-2014 The Yacoin developers
+// Distributed under the MIT/X11 software license, see the accompanying
+// file COPYING or http://www.opensource.org/licenses/mit-license.php.
 #ifdef _MSC_VER
     #include <stdint.h>
 
@@ -17,7 +18,9 @@
 #include "sync.h"
 #include "ui_interface.h"
 
-using namespace std;
+//using namespace std;
+using std::make_pair;
+using std::map;
 
 map<uint256, CAlert> mapAlerts;
 CCriticalSection cs_mapAlerts;
@@ -58,8 +61,8 @@ std::string CUnsignedAlert::ToString() const
     return strprintf(
         "CAlert(\n"
         "    nVersion     = %d\n"
-        "    nRelayUntil  = %"PRI64d"\n"
-        "    nExpiration  = %"PRI64d"\n"
+        "    nRelayUntil  = %" PRId64 "\n"
+        "    nExpiration  = %" PRId64 "\n"
         "    nID          = %d\n"
         "    nCancel      = %d\n"
         "    setCancel    = %s\n"
@@ -134,6 +137,9 @@ bool CAlert::AppliesToMe() const
 bool CAlert::RelayTo(CNode* pnode) const
 {
     if (!IsInEffect())
+        return false;
+    // don't relay to nodes which haven't sent their version message
+    if (pnode->nVersion == 0)
         return false;
     // returns true if wasn't already contained in the set
     if (pnode->setKnown.insert(GetHash()).second)
@@ -247,6 +253,3 @@ bool CAlert::ProcessAlert()
     printf("accepted alert %d, AppliesToMe()=%d\n", nID, AppliesToMe());
     return true;
 }
-#ifdef _MSC_VER
-    #include "msvc_warnings.pop.h"
-#endif

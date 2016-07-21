@@ -3,6 +3,8 @@
 
 #include <QObject>
 
+#include <stdint.h>
+
 class OptionsModel;
 class AddressTableModel;
 class TransactionTableModel;
@@ -12,6 +14,13 @@ QT_BEGIN_NAMESPACE
 class QDateTime;
 class QTimer;
 QT_END_NAMESPACE
+
+enum NumConnections {
+    CONNECTIONS_NONE = 0,
+    CONNECTIONS_IN = (1U << 0),
+    CONNECTIONS_OUT = (1U << 1),
+    CONNECTIONS_ALL = (CONNECTIONS_IN | CONNECTIONS_OUT),
+};
 
 /** Model for Bitcoin network client. */
 class ClientModel : public QObject
@@ -23,10 +32,16 @@ public:
 
     OptionsModel *getOptionsModel();
 
-    int getNumConnections() const;
+    double getPoSKernelPS();
+    double getDifficulty(bool fProofofStake);
+
+    //! Return number of connections, default is in- and outbound (total)
+    int getNumConnections(uint8_t flags = CONNECTIONS_ALL) const;
     int getNumBlocks() const;
     int getNumBlocksAtStartup();
-    int getNumScanned() const;
+
+    quint64 getTotalBytesRecv() const;
+    quint64 getTotalBytesSent() const;
 
     QDateTime getLastBlockDate() const;
 
@@ -38,6 +53,8 @@ public:
     int getNumBlocksOfPeers() const;
     //! Return warnings to be displayed in status bar
     QString getStatusBarWarnings() const;
+    //! Return NFactor
+    int getNFactor() const;
 
     QString formatFullVersion() const;
     QString formatBuildDate() const;
@@ -49,7 +66,6 @@ private:
 
     int cachedNumBlocks;
     int cachedNumBlocksOfPeers;
-    int cachedNumScanned;
 
     int numBlocksAtStartup;
 
@@ -59,7 +75,10 @@ private:
     void unsubscribeFromCoreSignals();
 signals:
     void numConnectionsChanged(int count);
-    void numBlocksChanged(int count, int countOfPeers, int countOfScanned);
+    void numBlocksChanged(int count, int countOfPeers);
+    void bytesChanged(quint64 totalBytesIn, quint64 totalBytesOut);
+    void nFactorChanged(int value);
+
 
     //! Asynchronous error notification
     void error(const QString &title, const QString &message, bool modal);
