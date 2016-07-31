@@ -1295,10 +1295,10 @@ void CNode::CloseSocketDisconnect()
                 default:
                     break;
             }
+#endif
         }
         printf( "\n" );
         clearLocalSocketError( hSocket );
-#endif
         hSocket = INVALID_SOCKET;
         vRecv.clear();
     }
