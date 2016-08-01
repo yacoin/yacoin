@@ -3717,8 +3717,8 @@ bool LoadBlockIndex(bool fAllowNew)
         txNew.vout.resize(1);
         txNew.vin[0].scriptSig = 
             CScript()           // what is being constructed here?????
-          //<< 486604799        // is this a time? 1985?
-            << 1464032600       // how about a more current time????  If it is a time???????
+            << (!fTestNet?  486604799:      // is this a time? 1985?
+                           1464032600)      // how about a more current time????  If it is a time???????
             << CBigNum(9999)    // what is this??
             << vector<unsigned char>((const unsigned char*)pszTimestamp, (const unsigned char*)pszTimestamp + strlen(pszTimestamp));
         txNew.vout[0].SetEmpty();
