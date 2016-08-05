@@ -2586,8 +2586,7 @@ bool LoadBlockIndex(bool fAllowNew)
         pchMessageStart[3] = 0xef;
 
         bnProofOfWorkLimit = bnProofOfWorkLimitTestNet; // 16 bits PoW target limit for testnet
-        nStakeMinAge = 1 * 60 * 60; // test net min age is 1 hour
-        nStakeMaxAge = 3 * 60 * 60; // stake age of full weight
+        nStakeMinAge = 2 * 60 * 60; // test net min age is 1 hour
         nModifierInterval = 10 * 60; // test modifier interval is 10 minutes
         nCoinbaseMaturity = 6; // test maturity is 6 blocks + nCoinbaseMaturity(20) = 26
         nStakeTargetSpacing = 1 * 60; // test block spacing is 1 minutes        
