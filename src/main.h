@@ -32,9 +32,9 @@ class CInv;
 class CRequestTracker;
 class CNode;
 
-// saironiq: block height where "no consecutive PoS blocks" rule activates
-// (around February 11 2014)
-static const int nConsecutiveStakeSwitchHeight = 420000;
+// saironiq: block height 420,000 where "no consecutive PoS blocks" rule activates
+static const int nConsecutiveStakeSwitchHeight = (fTestNet ? 42 : 420000);
+
 
 static const unsigned int MAX_BLOCK_SIZE = 1000000;
 static const unsigned int MAX_BLOCK_SIZE_GEN = MAX_BLOCK_SIZE/2;
@@ -57,7 +57,8 @@ static const int fHaveUPnP = false;
 #endif
 
 static const uint256 hashGenesisBlockOfficial("0x0000060fc90618113cde415ead019a1052a9abc43afcccff38608ff8751353e5");
-static const uint256 hashGenesisBlockTestNet("0xfe20c2c2fc02b36d2473e1f51dba1fb455d41ff42966e2a4edabb98fdd7107e6");
+static const uint256 hashGenesisBlockTestNet("0x0000fb514c55539c42aed840fb46fedf49ce9c8a81f2ab29bd8e5b0e7134467f");
+
 
 static const int64 nMaxClockDrift = 2 * 60 * 60;        // two hours
 

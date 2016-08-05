@@ -42,11 +42,14 @@ uint256 hashGenesisBlock = hashGenesisBlockOfficial;
 static CBigNum bnProofOfWorkLimit(~uint256(0) >> 20);
 static CBigNum bnProofOfStakeLimit(~uint256(0) >> 24);
 static CBigNum bnProofOfStakeHardLimit(~uint256(0) >> 30);
+static CBigNum bnProofOfWorkLimitTestNet(~uint256(0) >> 16);
+static CBigNum bnProofOfStakeTestnetLimit(~uint256(0) >> 20);
 static CBigNum bnInitialHashTarget(~uint256(0) >> 20);
 unsigned int nStakeMinAge = 60 * 60 * 24 * 30; // minimum age for coin age
 unsigned int nStakeMaxAge = 60 * 60 * 24 * 90; // stake age of full weight
 unsigned int nStakeTargetSpacing = 1 * 60; // DIFF: 1-minute block spacing
 int64 nChainStartTime = 1367991200;
+int64 nChainStartTimeTestNet = 1464123328; 
 int nCoinbaseMaturity = 500;
 CBlockIndex* pindexGenesisBlock = NULL;
 int nBestHeight = -1;
@@ -964,7 +967,7 @@ const unsigned char maxNfactor = 30;
 unsigned char GetNfactor(int64 nTimestamp) {
     int l = 0;
 
-    if (nTimestamp <= nChainStartTime)
+    if (nTimestamp <= nChainStartTime || fTestNet)
         return 4;
 
     int64 s = nTimestamp - nChainStartTime;
@@ -1811,7 +1814,7 @@ bool CBlock::SetBestChain(CTxDB& txdb, CBlockIndex* pindexNew)
     if (!txdb.TxnBegin())
         return error("SetBestChain() : TxnBegin failed");
 
-    if (pindexGenesisBlock == NULL && hash == hashGenesisBlock)
+    if (pindexGenesisBlock == NULL && hash == (!fTestNet ? hashGenesisBlock : hashGenesisBlockTestNet))
     {
         txdb.WriteHashBestChain(hash);
         if (!txdb.TxnCommit())
@@ -2230,8 +2233,8 @@ CBigNum CBlockIndex::GetBlockTrust() const
     if (bnTarget <= 0)
         return 0;
 
-    // saironiq: new trust rules (since specific block on mainnet and always on testnet)
-    if (nHeight >= nConsecutiveStakeSwitchHeight || fTestNet) {
+    // saironiq: new trust rules (since block 420,000 on mainnet and 42 on testnet)
+    if (nHeight >= nConsecutiveStakeSwitchHeight) {
         // first block trust - for future compatibility (i.e., forks :P)
         if (pprev == NULL)
             return 1;
@@ -2457,7 +2460,7 @@ bool CBlock::SignBlock(const CKeyStore& keystore)
 // ppcoin: check block signature
 bool CBlock::CheckBlockSignature() const
 {
-    if (GetHash() == hashGenesisBlock)
+    if (GetHash() == hashGenesisBlock || GetHash() == hashGenesisBlockTestNet)
         return vchBlockSig.empty();
 
     vector<valtype> vSolutions;
@@ -2582,10 +2585,12 @@ bool LoadBlockIndex(bool fAllowNew)
         pchMessageStart[2] = 0xc0;
         pchMessageStart[3] = 0xef;
 
+        bnProofOfWorkLimit = bnProofOfWorkLimitTestNet; // 16 bits PoW target limit for testnet
+        nStakeMinAge = 1 * 60 * 60; // test net min age is 1 hour
+        nModifierInterval = 10 * 60; // test modifier interval is 10 minutes
+        nCoinbaseMaturity = 6; // test maturity is 6 blocks
+        nStakeTargetSpacing = 1 * 60; // test block spacing is 1 minutes        
 
-        hashGenesisBlock = hashGenesisBlockTestNet;
-        nStakeMinAge = 60 * 60 * 24; // test net min age is 1 day
-        nCoinbaseMaturity = 60;
     }
 
     //
@@ -2604,29 +2609,57 @@ bool LoadBlockIndex(bool fAllowNew)
         if (!fAllowNew)
             return false;
 
-        // Genesis Block:
-        // CBlock(hash=000000000019d6, ver=1, hashPrevBlock=00000000000000, hashMerkleRoot=4a5e1e, nTime=1231006505, nBits=1d00ffff, nNonce=2083236893, vtx=1)
-        //   CTransaction(hash=4a5e1e, ver=1, vin.size=1, vout.size=1, nLockTime=0)
-        //     CTxIn(COutPoint(000000, -1), coinbase 04ffff001d0104455468652054696d65732030332f4a616e2f32303039204368616e63656c6c6f72206f6e206272696e6b206f66207365636f6e64206261696c6f757420666f722062616e6b73)
-        //     CTxOut(nValue=50.00000000, scriptPubKey=0x5F1DF16B2B704C8A578D0B)
-        //   vMerkleTree: 4a5e1e
+        /********************************GENESIS BLOCKS******************************************
+        // MAINNET:
+        // CBlock(hash=0000060fc90618113cde415ead019a1052a9abc43afcccff38608ff8751353e5,
+        //       ver=1,
+        //       hashPrevBlock=0000000000000000000000000000000000000000000000000000000000000000,
+        //       hashMerkleRoot=678b76419ff06676a591d3fa9d57d7f7b26d8021b7cc69dde925f39d4cf2244f,
+        //       nTime=1367991220, nBits=1e0fffff, nNonce=127357, vtx=1, vchBlockSig=)
+        // Coinbase(
+        //       hash=678b76419f, nTime=1367991200, ver=1, vin.size=1, vout.size=1, nLockTime=0)
+        // CTxIn(COutPoint(0000000000, 4294967295),
+        // coinbase 04ffff001d020f272e68747470733a2f2f626974636f696e74616c6b2e6f72672f696e6465782e7068703f746f7069633d313936313936)
+        // CTxOut(empty)
+        // vMerkleTree: 678b76419f
+        
+        // TESTNET:
+        // CBlock(hash=0000fb514c55539c42aed840fb46fedf49ce9c8a81f2ab29bd8e5b0e7134467f,
+        //       ver=1, 
+        //       hashPrevBlock=0000000000000000000000000000000000000000000000000000000000000000, 
+        //       hashMerkleRoot=29c97b046f12638bb31918e42ee10a16ca7d325a2af255e8a503248a1f04e2d2,
+        //       nTime=1464123348, nBits=1f00ffff, nNonce=128588, vtx=1, vchBlockSig=)
+        // Coinbase(
+        //       hash=29c97b046f, nTime=1464123328, ver=1, vin.size=1, vout.size=1, nLockTime=0)
+        // CTxIn(COutPoint(0000000000, 4294967295),
+        // coinbase 04585d4357020f272e68747470733a2f2f626974636f696e74616c6b2e6f72672f696e6465782e7068703f746f7069633d313936313936)
+        // CTxOut(empty)
+        // vMerkleTree: 29c97b046f
+        *****************************************************************************************/
 
         // Genesis block
         const char* pszTimestamp = "https://bitcointalk.org/index.php?topic=196196";
         CTransaction txNew;
-        txNew.nTime = nChainStartTime;
+        txNew.nTime = (fTestNet ? nChainStartTimeTestNet: nChainStartTime);
         txNew.vin.resize(1);
         txNew.vout.resize(1);
-        txNew.vin[0].scriptSig = CScript() << 486604799 << CBigNum(9999) << vector<unsigned char>((const unsigned char*)pszTimestamp, (const unsigned char*)pszTimestamp + strlen(pszTimestamp));
+
+        txNew.vin[0].scriptSig =
+            CScript()           // what is being constructed here?????
+            << (!fTestNet?  486604799:      // is this a time? 1985?
+                           1464032600)      // how about a more current time????  If it is a time???????
+            << CBigNum(9999)    // what is this??
+            << vector<unsigned char>((const unsigned char*)pszTimestamp, (const unsigned char*)pszTimestamp + strlen(pszTimestamp));
+
         txNew.vout[0].SetEmpty();
         CBlock block;
         block.vtx.push_back(txNew);
         block.hashPrevBlock = 0;
         block.hashMerkleRoot = block.BuildMerkleTree();
         block.nVersion = 1;
-        block.nTime    = nChainStartTime + 20;
+        block.nTime    = (fTestNet ? nChainStartTimeTestNet + 20: nChainStartTime + 20 );
         block.nBits    = bnProofOfWorkLimit.GetCompact();
-        block.nNonce   = 127357;
+        block.nNonce   = !fTestNet ? 127357 : 128588;
 
         //// debug print
         printf("block.GetHash() == %s\n", block.GetHash().ToString().c_str());
@@ -2641,12 +2674,20 @@ bool LoadBlockIndex(bool fAllowNew)
             releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
     #endif
 #else
-        assert(block.hashMerkleRoot == uint256("0x678b76419ff06676a591d3fa9d57d7f7b26d8021b7cc69dde925f39d4cf2244f"));
+
+       if (fTestNet)
+       {
+       assert(block.hashMerkleRoot == uint256("0x29c97b046f12638bb31918e42ee10a16ca7d325a2af255e8a503248a1f04e2d2"));                                                  
+       }
+       else
+       {
+       assert(block.hashMerkleRoot == uint256("0x678b76419ff06676a591d3fa9d57d7f7b26d8021b7cc69dde925f39d4cf2244f"));
+       }
 #endif
         block.print();
 
 #ifdef _MSC_VER
-        fTest = (block.GetHash() == hashGenesisBlock);
+        fTest = (block.GetHash() == (!fTestNet ? hashGenesisBlock : hashGenesisBlockTestNet));
     #ifdef _DEBUG
         assert(fTest);
     #else
@@ -2654,7 +2695,7 @@ bool LoadBlockIndex(bool fAllowNew)
             releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
     #endif
 #else
-        assert(block.GetHash() == hashGenesisBlock);
+        assert(block.GetHash() == (!fTestNet ? hashGenesisBlock : hashGenesisBlockTestNet));
 #endif
 
 #ifdef _MSC_VER
@@ -2677,8 +2718,8 @@ bool LoadBlockIndex(bool fAllowNew)
         if (!block.AddToBlockIndex(nFile, nBlockPos))
             return error("LoadBlockIndex() : genesis block not accepted");
 
-        // ppcoin: initialize synchronized checkpoint
-        if (!Checkpoints::WriteSyncCheckpoint(hashGenesisBlock))
+        // initialize synchronized checkpoint
+        if (!Checkpoints::WriteSyncCheckpoint((!fTestNet ? hashGenesisBlock : hashGenesisBlockTestNet)))
             return error("LoadBlockIndex() : failed to init sync checkpoint");
     }
 
