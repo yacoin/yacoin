@@ -2233,8 +2233,13 @@ CBigNum CBlockIndex::GetBlockTrust() const
     if (bnTarget <= 0)
         return 0;
 
-    // saironiq: new trust rules (since block 420,000 on mainnet and 42 on testnet)
-    if (nHeight >= nConsecutiveStakeSwitchHeight) {
+    int nConsecutiveStakeSwitchHeight = 0;
+    // saironiq : block height where "no consecutive PoS blocks" rule activates
+    nConsecutiveStakeSwitchHeight = (fTestNet ? 4200 : 420000);
+
+    // saironiq: new trust rules from block 420,000 to YACOIN_045_SWITCH_TIME
+    if (nHeight < nConsecutiveStakeSwitchHeight)
+    {
         // first block trust - for future compatibility (i.e., forks :P)
         if (pprev == NULL)
             return 1;

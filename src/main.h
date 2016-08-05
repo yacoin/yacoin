@@ -32,10 +32,6 @@ class CInv;
 class CRequestTracker;
 class CNode;
 
-// saironiq: block height 420,000 where "no consecutive PoS blocks" rule activates
-static const int nConsecutiveStakeSwitchHeight = (fTestNet ? 42 : 420000);
-
-
 static const unsigned int MAX_BLOCK_SIZE = 1000000;
 static const unsigned int MAX_BLOCK_SIZE_GEN = MAX_BLOCK_SIZE/2;
 static const unsigned int MAX_BLOCK_SIGOPS = MAX_BLOCK_SIZE/50;
