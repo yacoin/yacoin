@@ -1076,9 +1076,9 @@ unsigned int static GetNextTargetRequired(const CBlockIndex* pindexLast, bool fP
 
     if(fProofOfStake)
     {
-        // Proof-of-Stake blocks has own target limit since nVersion=3 supermajority on mainNet and always on testNet
+        // Proof-of-Stake block limits
         if(fTestNet)
-            bnTargetLimit = bnProofOfStakeHardLimit;
+            bnTargetLimit = bnProofOfStakeTestnetLimit;
         else
         {
 /*            if(fTestNet || (pindexLast->nHeight + 1 > 15000))
