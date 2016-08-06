@@ -2238,7 +2238,7 @@ CBigNum CBlockIndex::GetBlockTrust() const
     nConsecutiveStakeSwitchHeight = (fTestNet ? 4200 : 420000);
 
     // saironiq: new trust rules from block 420,000 to YACOIN_045_SWITCH_TIME
-    if (nHeight < nConsecutiveStakeSwitchHeight)
+    if (nHeight >= nConsecutiveStakeSwitchHeight)
     {
         // first block trust - for future compatibility (i.e., forks :P)
         if (pprev == NULL)
