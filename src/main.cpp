@@ -48,6 +48,7 @@ static CBigNum bnInitialHashTarget(~uint256(0) >> 20);
 unsigned int nStakeMinAge = 60 * 60 * 24 * 30; // minimum age for coin age
 unsigned int nStakeMaxAge = 60 * 60 * 24 * 90; // stake age of full weight
 unsigned int nStakeTargetSpacing = 1 * 60; // DIFF: 1-minute block spacing
+unsigned int nStakeTargetSpacingTestnet = 1 * 60; // 1-minute stake spacing for testnet
 int64 nChainStartTime = 1367991200;
 int64 nChainStartTimeTestNet = 1464123328; 
 int nCoinbaseMaturity = 500;
@@ -2591,10 +2592,10 @@ bool LoadBlockIndex(bool fAllowNew)
         pchMessageStart[3] = 0xef;
 
         bnProofOfWorkLimit = bnProofOfWorkLimitTestNet; // 16 bits PoW target limit for testnet
-        nStakeMinAge = 2 * 60 * 60; // test net min age is 1 hour
+        nStakeMinAge = 2 * 60 * 60; // test net min age is 2 hours
         nModifierInterval = 10 * 60; // test modifier interval is 10 minutes
-        nCoinbaseMaturity = 6; // test maturity is 6 blocks + nCoinbaseMaturity(20) = 26
-        nStakeTargetSpacing = 1 * 60; // test block spacing is 1 minutes        
+        nCoinbaseMaturity = 32; // test maturity is 32 blocks + nCoinbaseMaturity(20) = 52
+        nStakeTargetSpacing = nStakeTargetSpacingTestnet; // test block spacing is 1 minute        
 
     }
 
