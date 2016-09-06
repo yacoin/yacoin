@@ -1,4 +1,4 @@
-TOR SUPPORT IN NOVACOIN
+TOR SUPPORT IN YACOIN
 ======================
 
 It is possible to run Yacoin as a Tor hidden service, and connect to such services.
