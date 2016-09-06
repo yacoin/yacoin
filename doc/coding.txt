@@ -90,7 +90,7 @@ in 500ms.
 ThreadRPCServer : Remote procedure call handler, listens on port 8344
 for connections and services them.
 
-ThreadYacoinMiner : Generates bitcoins
+ThreadYacoinMiner : Generates yacoins
 
 ThreadMapPort : Universal plug-and-play startup/shutdown
 
