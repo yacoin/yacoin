@@ -6,8 +6,8 @@ SetCompressor /SOLID lzma
 # General Symbol Definitions
 !define REGKEY "SOFTWARE\$(^Name)"
 !define VERSION 0.3.0
-!define COMPANY "Yet Another Coin (YaCoin) project"
-!define URL http://www.TODO: .ru/
+!define COMPANY "Your Alternative Currency (YaCoin) project"
+!define URL http://www.yacoin.org/
 
 # MUI Symbol Definitions
 !define MUI_ICON "../share/pixmaps/yacoin.ico"
@@ -131,8 +131,8 @@ SectionEnd
 Section -un.post UNSEC0001
     DeleteRegKey HKCU "SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\$(^Name)"
     Delete /REBOOTOK "$SMPROGRAMS\$StartMenuGroup\Uninstall YaCoin.lnk"
-    #Delete /REBOOTOK "$SMPROGRAMS\$StartMenuGroup\Bitcoin.lnk"
-    #Delete /REBOOTOK "$SMSTARTUP\Bitcoin.lnk"
+    #Delete /REBOOTOK "$SMPROGRAMS\$StartMenuGroup\YaCoin.lnk"
+    #Delete /REBOOTOK "$SMSTARTUP\YaCoin.lnk"
     Delete /REBOOTOK $INSTDIR\uninstall.exe
     Delete /REBOOTOK $INSTDIR\debug.log
     Delete /REBOOTOK $INSTDIR\db.log

@@ -1,0 +1,11 @@
+[Unit]
+Description=Yacoin daemon serivce
+After=network.target
+
+[Service]
+Type=simple
+User=yacoin
+ExecStart=/opt/yacoin/yacoind
+
+[Install]
+WantedBy=multi-user.target

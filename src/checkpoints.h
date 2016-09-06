@@ -5,14 +5,17 @@
 #define  BITCOIN_CHECKPOINT_H
 
 #include <map>
-#include "net.h"
-#ifdef _MSC_VER
-    #include "sync.h"
-#else
 #include "util.h"
-#endif
+#include "net.h"
 
-#define CHECKPOINT_MAX_SPAN (60 * 60 * 4) // max 4 hours before latest block
+// max 1 hour before latest block
+static const int64_t CHECKPOINT_MAX_SPAN = nOneHour;
+
+#ifdef WIN32
+#undef STRICT
+#undef PERMISSIVE
+#undef ADVISORY
+#endif
 
 class uint256;
 class CBlockIndex;
@@ -23,14 +26,31 @@ class CSyncCheckpoint;
  */
 namespace Checkpoints
 {
+    /** Checkpointing mode */
+    enum CPMode
+    {
+        // Scrict checkpoints policy, perform conflicts verification and resolve conflicts
+        STRICT = 0,
+        // Advisory checkpoints policy, perform conflicts verification but don't try to resolve them
+        ADVISORY = 1,
+        // Permissive checkpoints policy, don't perform any checking
+        PERMISSIVE = 2
+    };
+
     // Returns true if block passes checkpoint checks
     bool CheckHardened(int nHeight, const uint256& hash);
+
+    // Returns true if block passes banlist checks
+    bool CheckBanned(const uint256 &nHash);
 
     // Return conservative estimate of total number of blocks, 0 if unknown
     int GetTotalBlocksEstimate();
 
     // Returns last CBlockIndex* in mapBlockIndex that is a checkpoint
     CBlockIndex* GetLastCheckpoint(const std::map<uint256, CBlockIndex*>& mapBlockIndex);
+
+    // Returns last checkpoint timestamp
+    unsigned int GetLastCheckpointTime();
 
     extern uint256 hashSyncCheckpoint;
     extern CSyncCheckpoint checkpointMessage;
@@ -48,7 +68,6 @@ namespace Checkpoints
     bool SetCheckpointPrivKey(std::string strPrivKey);
     bool SendSyncCheckpoint(uint256 hashCheckpoint);
     bool IsMatureSyncCheckpoint();
-    bool IsSyncCheckpointTooOld(unsigned int nSeconds);
 }
 
 // ppcoin: synchronized checkpoint
@@ -80,11 +99,6 @@ public:
                 ")\n",
             nVersion,
             hashCheckpoint.ToString().c_str());
-    }
-
-    void print() const
-    {
-        printf("%s", ToString().c_str());
     }
 };
 

@@ -1,9 +1,9 @@
-Building YACoin
+Building Yacoin
 
-See doc/readme-qt.rst for instructions on building YACoin QT,
+See doc/readme-qt.rst for instructions on building Yacoin Qt,
 the intended-for-end-users, nice-graphical-interface, reference
-implementation of Bitcoin.
+implementation of Yacoin.
 
 See doc/build-*.txt for instructions on building yacoind,
 the intended-for-services, no-graphical-interface, reference
-implementation of Bitcoin.
+implementation of Yacoin.

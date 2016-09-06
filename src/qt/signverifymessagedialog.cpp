@@ -4,6 +4,7 @@
 #include "addressbookpage.h"
 #include "base58.h"
 #include "guiutil.h"
+#include "dialogwindowflags.h"
 #include "init.h"
 #include "main.h"
 #include "optionsmodel.h"
@@ -14,9 +15,10 @@
 #include <vector>
 
 #include <QClipboard>
+#include <QKeyEvent>
 
 SignVerifyMessageDialog::SignVerifyMessageDialog(QWidget *parent) :
-    QDialog(parent),
+    QWidget(parent, DIALOGWINDOWHINTS),
     ui(new Ui::SignVerifyMessageDialog),
     model(0)
 {
@@ -24,11 +26,11 @@ SignVerifyMessageDialog::SignVerifyMessageDialog(QWidget *parent) :
 
 #if (QT_VERSION >= 0x040700)
     /* Do not move this to the XML file, Qt before 4.7 will choke on it */
-    ui->addressIn_SM->setPlaceholderText(tr("Enter a YACoin address (e.g. Y9H3tANhMroxU4rCre4bkoeDRhHKRSGwsi)"));
+    ui->addressIn_SM->setPlaceholderText(tr("Enter a Yacoin address (e.g. Y9H3tANhMroxU4rCre4bkoeDRhHKRSGwsi)"));
     ui->signatureOut_SM->setPlaceholderText(tr("Click \"Sign Message\" to generate signature"));
 
-    ui->addressIn_VM->setPlaceholderText(tr("Enter a YACoin address (e.g. Y9H3tANhMroxU4rCre4bkoeDRhHKRSGwsi)"));
-    ui->signatureIn_VM->setPlaceholderText(tr("Enter YACoin signature"));
+    ui->addressIn_VM->setPlaceholderText(tr("Enter a Yacoin address (e.g. Y9H3tANhMroxU4rCre4bkoeDRhHKRSGwsi)"));
+    ui->signatureIn_VM->setPlaceholderText(tr("Enter Yacoin signature"));
 #endif
 
     GUIUtil::setupAddressWidget(ui->addressIn_SM, this);
@@ -218,7 +220,7 @@ void SignVerifyMessageDialog::on_verifyMessageButton_VM_clicked()
     ss << strMessageMagic;
     ss << ui->messageIn_VM->document()->toPlainText().toStdString();
 
-    CKey key;
+    CPubKey key;
     if (!key.SetCompactSignature(Hash(ss.begin(), ss.end()), vchSig))
     {
         ui->signatureIn_VM->setValid(false);
@@ -227,7 +229,7 @@ void SignVerifyMessageDialog::on_verifyMessageButton_VM_clicked()
         return;
     }
 
-    if (!(CBitcoinAddress(key.GetPubKey().GetID()) == addr))
+    if (!(CBitcoinAddress(key.GetID()) == addr))
     {
         ui->statusLabel_VM->setStyleSheet("QLabel { color: red; }");
         ui->statusLabel_VM->setText(QString("<nobr>") + tr("Message verification failed.") + QString("</nobr>"));
@@ -270,5 +272,20 @@ bool SignVerifyMessageDialog::eventFilter(QObject *object, QEvent *event)
             ui->statusLabel_VM->clear();
         }
     }
-    return QDialog::eventFilter(object, event);
+    return QWidget::eventFilter(object, event);
+}
+
+void SignVerifyMessageDialog::keyPressEvent(QKeyEvent *event)
+{
+#ifdef ANDROID
+    if(event->key() == Qt::Key_Back)
+    {
+        close();
+    }
+#else
+    if(event->key() == Qt::Key_Escape)
+    {
+        close();
+    }
+#endif
 }

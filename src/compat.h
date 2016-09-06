@@ -11,21 +11,32 @@
 #ifndef NOMINMAX
 #define NOMINMAX
 #endif
+#ifndef _MSC_VER
+#ifdef FD_SETSIZE
+#undef FD_SETSIZE
+#endif
+#define FD_SETSIZE 1024 // max number of fds in fd_set
+#endif
 #include <winsock2.h>
 #include <mswsock.h>
 #include <ws2tcpip.h>
 #else
 #include <sys/types.h>
 #include <sys/socket.h>
+#ifdef ANDROID
+#include <fcntl.h>
+#else
 #include <sys/fcntl.h>
+#endif
 #include <arpa/inet.h>
 #include <netdb.h>
 #include <net/if.h>
 #include <netinet/in.h>
 #include <ifaddrs.h>
-#endif
 
 typedef u_int SOCKET;
+#endif
+
 #ifdef WIN32
 #define MSG_NOSIGNAL        0
 #define MSG_DONTWAIT        0
@@ -44,20 +55,5 @@ typedef int socklen_t;
 #define INVALID_SOCKET      (SOCKET)(~0)
 #define SOCKET_ERROR        -1
 #endif
-
-inline int myclosesocket(SOCKET& hSocket)
-{
-    if (hSocket == INVALID_SOCKET)
-        return WSAENOTSOCK;
-#ifdef WIN32
-    int ret = closesocket(hSocket);
-#else
-    int ret = close(hSocket);
-#endif
-    hSocket = INVALID_SOCKET;
-    return ret;
-}
-#define closesocket(s)      myclosesocket(s)
-
 
 #endif

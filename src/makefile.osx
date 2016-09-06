@@ -6,6 +6,7 @@
 # Mac OS X makefile for bitcoin
 # Originally by Laszlo Hanyecz (solar@heliacal.net)
 
+CC=llvm-gcc
 CXX=llvm-g++
 DEPSDIR=/opt/local
 
@@ -19,17 +20,13 @@ LIBPATHS= \
  -L"$(DEPSDIR)/lib" \
  -L"$(DEPSDIR)/lib/db48"
 
-USE_UPNP:=1
-USE_IPV6:=1
+USE_LEVELDB:=0
+USE_IPV6:=0
 
 LIBS= -dead_strip
 
-TESTDEFS = -DTEST_DATA_DIR=$(abspath test/data)
-
 ifdef STATIC
 # Build STATIC if you are redistributing the bitcoind binary
-TESTLIBS += \
- $(DEPSDIR)/lib/libboost_unit_test_framework-mt.a
 LIBS += \
  $(DEPSDIR)/lib/db48/libdb_cxx-4.8.a \
  $(DEPSDIR)/lib/libboost_system-mt.a \
@@ -40,8 +37,6 @@ LIBS += \
  $(DEPSDIR)/lib/libcrypto.a \
  -lz
 else
-TESTLIBS += \
- -lboost_unit_test_framework-mt
 LIBS += \
  -ldb_cxx-4.8 \
  -lboost_system-mt \
@@ -51,22 +46,21 @@ LIBS += \
  -lssl \
  -lcrypto \
  -lz
-TESTDEFS += -DBOOST_TEST_DYN_LINK
 endif
 
-DEFS=-DMAC_OSX -DMSG_NOSIGNAL=0 -DBOOST_SPIRIT_THREADSAFE
+DEFS=-DMAC_OSX -DMSG_NOSIGNAL=0 -DBOOST_SPIRIT_THREADSAFE -D__STDC_FORMAT_MACROS -D__STDC_LIMIT_MACROS
 
 ifdef RELEASE
 # Compile for maximum compatibility and smallest size.
 # This requires that dependencies are compiled
 # the same way.
-CFLAGS = -mmacosx-version-min=10.5 -arch i386 -O3 -msse2
+CFLAGS = -O2 -msse2
 else
 CFLAGS = -g -msse2
 endif
 
 # ppc doesn't work because we don't support big-endian
-CFLAGS += -Wall -Wextra -Wformat -Wformat-security -Wno-unused-parameter \
+CFLAGS += -Wall -Wextra -Wformat -Wno-ignored-qualifiers -Wformat-security -Wno-unused-parameter \
     $(DEBUGFLAGS) $(DEFS) $(INCLUDEPATHS)
 
 OBJS= \
@@ -76,15 +70,20 @@ OBJS= \
     obj/netbase.o \
     obj/addrman.o \
     obj/crypter.o \
+    obj/base58.o \
     obj/key.o \
     obj/db.o \
     obj/init.o \
     obj/irc.o \
     obj/keystore.o \
     obj/main.o \
+    obj/miner.o \
     obj/net.o \
+    obj/ntp.o \
+    obj/stun.o \
     obj/protocol.o \
     obj/bitcoinrpc.o \
+    obj/rpccrypt.o \
     obj/rpcdump.o \
     obj/rpcnet.o \
     obj/rpcmining.o \
@@ -99,34 +98,69 @@ OBJS= \
     obj/noui.o \
     obj/pbkdf2.o \
     obj/kernel.o \
-    obj/scrypt_mine.o \
-    obj/scrypt-x86.o \
-    obj/scrypt-x86_64.o
-
-ifndef USE_UPNP
-	override USE_UPNP = -
-endif
-ifneq (${USE_UPNP}, -)
-	DEFS += -DUSE_UPNP=$(USE_UPNP)
-ifdef STATIC
-	LIBS += $(DEPSDIR)/lib/libminiupnpc.a
-else
-	LIBS += -lminiupnpc
-endif
-endif
+    obj/version.o \
+    obj/kernel_worker.o \
+    obj/ecies.o \
+    obj/cryptogram.o \
+    obj/ipcollector.o \
+    crypto/scrypt-jane/obj/scrypt-jane.o
 
 ifneq (${USE_IPV6}, -)
 	DEFS += -DUSE_IPV6=$(USE_IPV6)
 endif
 
-all: yacoind
+all: novacoind
 
-test check: test_yacoin FORCE
-	./test_yacoin
+#
+# LevelDB support
+#
+ifdef USE_LEVELDB
+LIBS += $(CURDIR)/leveldb/libleveldb.a $(CURDIR)/leveldb/libmemenv.a
+DEFS += $(addprefix -I,$(CURDIR)/leveldb/include) -DUSE_LEVELDB
+DEFS += $(addprefix -I,$(CURDIR)/leveldb/helpers)
+OBJS += obj/txdb-leveldb.o
+leveldb/libleveldb.a:
+	@echo "Building LevelDB ..."; cd leveldb; CC=$(CC) CXX=$(CXX) make; cd ..
+obj/txdb-leveldb.o: leveldb/libleveldb.a
+else
+OBJS += obj/txdb-bdb.o
+endif
+
+ifeq (${USE_ASM}, 1)
+# Assembler implementation
+OBJS += crypto/scrypt/asm/obj/scrypt-x86.o crypto/scrypt/asm/obj/scrypt-x86_64.o crypto/scrypt/asm/obj/asm-wrapper.o
+
+crypto/scrypt/asm/obj/scrypt-x86.o: crypto/scrypt/asm/scrypt-x86.S
+	$(CXX) -c $(CFLAGS) -MMD -o $@ $<
+
+crypto/scrypt/asm/obj/scrypt-x86_64.o: crypto/scrypt/asm/scrypt-x86_64.S
+	$(CXX) -c $(CFLAGS) -MMD -o $@ $<
+
+crypto/scrypt/asm/obj/asm-wrapper.o: crypto/scrypt/asm/asm-wrapper.cpp
+	$(CXX) -c $(CFLAGS) -MMD -o $@ $<
+
+DEFS += -DUSE_ASM
+
+else
+ifeq  (${USE_SSE2}, 1)
+# Intrinsic implementation
+DEFS += -DUSE_SSE2
+OBJS += crypto/scrypt/intrin/obj/scrypt-sse2.o
+
+crypto/scrypt/intrin/obj/scrypt-sse2.o: crypto/scrypt/intrin/scrypt-sse2.cpp
+	$(CXX) -c $(CFLAGS) -MMD -o $@ $<
+else
+# Generic implementation
+OBJS += crypto/scrypt/generic/obj/scrypt-generic.o
+
+crypto/scrypt/generic/obj/scrypt-generic.o: crypto/scrypt/generic/scrypt-generic.cpp
+	$(CXX) -c $(CFLAGS) -MMD -o $@ $<
+endif
+endif
+
 
 # auto-generated dependencies:
 -include obj/*.P
--include obj-test/*.P
 
 obj/build.h: FORCE
 	/bin/sh ../share/genbuild.sh obj/build.h
@@ -140,33 +174,23 @@ obj/%.o: %.cpp
 	      -e '/^$$/ d' -e 's/$$/ :/' < $(@:%.o=%.d) >> $(@:%.o=%.P); \
 	  rm -f $(@:%.o=%.d)
 
-obj/scrypt-x86.o: scrypt-x86.S
-	$(CXX) -c $(xCXXFLAGS) -MMD -o $@ $<
-
-obj/scrypt-x86_64.o: scrypt-x86_64.S
-	$(CXX) -c $(xCXXFLAGS) -MMD -o $@ $<
-
 yacoind: $(OBJS:obj/%=obj/%)
 	$(CXX) $(CFLAGS) -o $@ $(LIBPATHS) $^ $(LIBS)
 
-TESTOBJS := $(patsubst test/%.cpp,obj-test/%.o,$(wildcard test/*.cpp))
-
-obj-test/%.o: test/%.cpp
-	$(CXX) -c $(TESTDEFS) $(CFLAGS) -MMD -MF $(@:%.o=%.d) -o $@ $<
-	@cp $(@:%.o=%.d) $(@:%.o=%.P); \
-	  sed -e 's/#.*//' -e 's/^[^:]*: *//' -e 's/ *\\$$//' \
-	      -e '/^$$/ d' -e 's/$$/ :/' < $(@:%.o=%.d) >> $(@:%.o=%.P); \
-	  rm -f $(@:%.o=%.d)
-
-test_yacoin: $(TESTOBJS) $(filter-out obj/init.o,$(OBJS:obj/%=obj/%))
-	$(CXX) $(CFLAGS) -o $@ $(LIBPATHS) $^ $(LIBS) $(TESTLIBS)
-
 clean:
-	-rm -f yacoind test_yacoin
+	-rm -f yacoind
 	-rm -f obj/*.o
-	-rm -f obj-test/*.o
 	-rm -f obj/*.P
-	-rm -f obj-test/*.P
+	-rm -f obj/*.d
+	-rm -f crypto/scrypt/asm/obj/*.o
+	-rm -f crypto/scrypt/asm/obj/*.P
+	-rm -f crypto/scrypt/asm/obj/*.d
+	-rm -f crypto/scrypt/intrin/obj/*.o
+	-rm -f crypto/scrypt/intrin/obj/*.P
+	-rm -f crypto/scrypt/intrin/obj/*.d
+	-rm -f crypto/scrypt/generic/obj/*.o
+	-rm -f crypto/scrypt/generic/obj/*.P
+	-rm -f crypto/scrypt/generic/obj/*.d
 	-rm -f obj/build.h
 
 FORCE:

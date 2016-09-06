@@ -6,6 +6,7 @@
 #pragma warning( push )
 #pragma warning(disable:4101)   // local variable is never used     
 #pragma warning(disable:4146)   // unary minus operator applied to unsigned type, result still unsigned
+#pragma warning(disable:4200)   // nonstandard extension used : zero-sized array in struct/union Cannot generate copy-ctor or copy-assignment operator when UDT contains a zero-sized array
 #pragma warning(disable:4244)   // floating point type to an integer type. A possible loss of data
 #pragma warning(disable:4267)   // size_t' to 'type', possible loss of data     
 #pragma warning(disable:4288)   // loop control variable declared in the for-loop is used outside the for-loop scope     

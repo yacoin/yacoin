@@ -1,0 +1,21 @@
+YACOIN TESTNET
+
+> getnewaddress
+myxft8h7D4d4fc8997F3bjm1QtbUiRs6Le
+> validateaddress myxft8h7D4d4fc8997F3bjm1QtbUiRs6Le
+{
+"isvalid" : true,
+"address" : "myxft8h7D4d4fc8997F3bjm1QtbUiRs6Le",
+"ismine" : true,
+"watchonly" : false,
+"isscript" : false,
+"pubkey" : "02bdb5d6c65c3a7d1d96e30f38ac161f63a9d74c6ab200736ac73bf60a33de15c9",
+"iscompressed" : true,
+"account" : ""
+}
+
+> encryptmessage 02bdb5d6c65c3a7d1d96e30f38ac161f63a9d74c6ab200736ac73bf60a33de15c9 "Hello world!"
+FYcmANai1dmGRG1XuewoMgDWVCEF9niPgFmXvfSVaohJmxWX951tZJW8HbsEWBrjga74XfboSuZiYY6ETocj84ibWTZtbeK4h5b
+
+> decryptmessage myxft8h7D4d4fc8997F3bjm1QtbUiRs6Le FYcmANai1dmGRG1XuewoMgDWVCEF9niPgFmXvfSVaohJmxWX951tZJW8HbsEWBrjga74XfboSuZiYY6ETocj84ibWTZtbeK4h5b
+Hello world!

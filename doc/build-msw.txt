@@ -1,156 +1,71 @@
 Copyright (c) 2009-2012 Bitcoin Developers
+Copyright (c) 2013 NovaCoin Developers
 Distributed under the MIT/X11 software license, see the accompanying
 file license.txt or http://www.opensource.org/licenses/mit-license.php.
 This product includes software developed by the OpenSSL Project for use in
 the OpenSSL Toolkit (http://www.openssl.org/).  This product includes
-cryptographic software written by Eric Young (eay@cryptsoft.com) and UPnP
-software written by Thomas Bernard.
+cryptographic software written by Eric Young (eay@cryptsoft.com).
 
+
+See readme-qt.rst for instructions on building YaCoin QT, the
+graphical user interface.
 
 WINDOWS BUILD NOTES
 ===================
-Instructions are for compiling yacoind and yacoin-qt under Windows.
+
+Compilers Supported
+-------------------
+TODO: What works?
+Note: releases are cross-compiled using mingw running on Linux.
+
 
 Dependencies
 ------------
 Libraries you need to download separately and build:
 
-MinGW        MinGW-gcc4.6.2-msys  http://www.mingw.org/
-OpenSSL      openssl-1.0.1g       http://www.openssl.org
-Berkeley DB  db-4.8.30.NC-mgw     http://www.oracle.com/technetwork/database/database-technologies/berkeleydb/overview/index.html
-Boost        boost_1_54_0         http://www.boost.org
-miniupnpc    miniupnpc-1.6        http://miniupnp.tuxfamily.org
+                default path               download
+OpenSSL         \openssl-1.0.1j-mgw        http://www.openssl.org/source/
+Berkeley DB     \db-6.0.20.NC-mgw          http://www.oracle.com/technology/software/products/berkeley-db/index.html
+Boost           \boost-1.57.0-mgw          http://www.boost.org/users/download/
 
-1) Download & install 7zip from http://www.7-zip.org
+Their licenses:
+OpenSSL        Old BSD license with the problematic advertising requirement
+Berkeley DB    New BSD license with additional requirement that linked software must be free open source
+Boost          MIT-like license
 
-2) Download and extract MinGW to C:\mingw
-http://gccforgo.googlecode.com/files/MinGW-gcc4.6.2-msys.7z
+Versions used in this release:
+OpenSSL      1.0.1j
+Berkeley DB  6.0.20.NC
+Boost        1.57.0
 
-3) Create shortcut to C:\mingw\msys\1.0\msys.bat on your desktop
 
-4) Right click My Computer, select Properties->Advanced tab->Environment Variables->select "Path"->click "Edit"->append ";C:\MinGW\bin" at the end of variable value
+OpenSSL
+-------
+MSYS shell:
+un-tar sources with MSYS 'tar xfz' to avoid issue with symlinks (OpenSSL ticket 2377)
+change 'MAKE' env. variable from 'C:\MinGW32\bin\mingw32-make.exe' to '/c/MinGW32/bin/mingw32-make.exe'
 
-5) Download openssl and place the file in C:\deps\
-http://www.openssl.org/source/openssl-1.0.1g.tar.gz
-
-6) Double-click the msys.bat shortcut, a terminal window pops up.
-
-7) Type:
-cd /c/deps
-md5sum openssl-1.0.1g.tar.gz  # make sure you get de62b43dfcd858e66a74bee1c834e959
-tar xvzf openssl-1.0.1g.tar.gz
-cd openssl-1.0.1g
+cd /c/openssl-1.0.1j-mgw
 ./config
 make
 
-8) Download berkeley-db lib and place it in C:\deps\
-http://download.oracle.com/berkeley-db/db-4.8.30.NC.tar.gz
-
-9) Back in the term, type:
-cd /c/deps
-md5sum db-4.8.30.NC.tar.gz   # make sure you get a14a5486d6b4891d2434039a0ed4c5b7
-tar xvzf db-4.8.30.NC.tar.gz
-cd db-4.8.30.NC/build_unix
-../dist/configure --disable-replication --enable-mingw --enable-cxx
-sed 's/typedef pthread_t db_threadid_t/typedef u_int32_t db_threadid_t/' -i db.h
+Berkeley DB
+-----------
+MSYS shell:
+cd /c/db-6.0.20.NC-mgw/build_unix
+sh ../dist/configure --enable-mingw --enable-cxx
 make
 
-10) Download boost and place it in C:\deps\
-http://sourceforge.net/projects/boost/files/boost/1.54.0/boost_1_54_0.tar.gz/download
+Boost
+-----
+DOS prompt:
+downloaded boost jam 3.1.18
+cd \boost-1.57.0-mgw
+bjam toolset=gcc --build-type=complete stage
 
-11) Type this into the terminal:
-cd /c/deps
-md5sum boost_1_54_0.tar.gz   # make sure you get efbfbff5a85a9330951f243d0a46e4b9
-tar xvzf boost_1_54_0.tar.gz # It's a big one
-
-12) Open Windows command prompt (Start->Run->Type "cmd.exe"->Enter)
-
-13) Type this into cmd.exe window (the last step will take a LONG time):
-cd C:\deps\boost_1_54_0\
-bootstrap.bat mingw
-b2 --build-type=complete --with-chrono --with-filesystem --with-program_options --with-system --with-thread --with-test toolset=gcc stage
-
-14) Use GIT to get a copy of the yacoin source.
-Download and install git from http://git-scm.com/download/win
-Open "Git->Git Bash" from the Windows start menu and type:
-cd /c/
-git clone https://github.com/yacoin/yacoin
-cd yacoin
-
-15) Back in the MinGW shell, type:
-cd /c/yacoin/src
+YaCoin
+-------
+DOS prompt:
+cd \yacoin\src
 mingw32-make -f makefile.mingw
 strip yacoind.exe
-
-16) Congrats! You now have yacoind.exe binary ready to be used. 
-Before running yacoind.exe be sure to back up your wallet.dat file.
-cp $APPDATA/YaCoin/wallet.dat $APPDATA/YaCoin/walletSave1.dat 
-
-16.5) Optional: make the tests
-rm test/Checkpoints_tests.cpp  # because it doesn't compile
-rm test/miner_tests.cpp        # because it doesn't compile
-rm test/wallet_tests.cpp       # because it doesn't compile
-mingw32-make -f makefile.mingw test_yacoin.exe
-test_yacoin.exe                # to run the tests. Ouch! The tests crash! Now is your 
-                                 chance to contribute to YACoin by fixing the broken tests.
-
-Now onto the Qt client...
-17) Download and install Qt (unsupported MinGW version is OK, accept it) and place it in C:\deps
-http://download.qt-project.org/official_releases/qt/4.8/4.8.5/qt-win-opensource-4.8.5-mingw.exe
-cd /c/deps                                # In MinGW shell:
-md5sum qt-win-opensource-4.8.5-mingw.exe  # make sure you get 0f4f4db0f8b89fff8160a7e9d8e796e1
-
-18) Download upnp lib to C:\deps
-http://miniupnp.free.fr/files/download.php?file=miniupnpc-1.8.tar.gz
-
-19) In MinGW shell:
-cd /c/deps
-md5sum miniupnpc-1.8.tar.gz    # make sure you get 065bf20a20ebe605c675b7a5aaef340a
-tar xvzf miniupnpc-1.8.tar.gz
-mv miniupnpc-1.8 miniupnpc
-
-20) Double-click on mingw32make.bat inside C:\deps\miniupnpc and wait for it to finish (it will automatically close)
-
-NOTE: the folowing steps marked [TODO] do not work and are not necessary to build yacoin-qt.exe.
-Continue at step 26.
-
-21) [TODO] Download zlib, place it in C:\deps
-http://zlib.net/zlib-1.2.8.tar.gz
-
-22) [TODO] MinGW:
-cd /c/deps
-tar xvzf zlib-1.2.8.tar.gz
-cd zlib-1.2.8/
-make -f win32/Makefile.gcc
-
-23) [TODO] Download libpng lib, extract it to C:\deps\libpng-1.2.37\
-http://sourceforge.net/projects/gnuwin32/files/libpng/1.2.37/libpng-1.2.37-lib.zip/download
-
-24) [TODO] Download qrencode lib into C:\deps
-http://fukuchi.org/works/qrencode/qrencode-3.4.3.tar.gz
-
-25) [TODO] In MinGW shell:
-cd /c/deps
-tar xvzf qrencode-3.4.3.tar.gz
-LIBS="-lpthread" LDFLAGS="-L/c/MinGW/lib" png_CFLAGS="-L../libpng-1.2.37/lib -I../libpng-1.2.37/include -L../zlib-1.2.8/ -I../zlib-1.2.8/ -lpng" png_LIBS=" " ./configure
-make
-
-26) Open the newly installed Qt command prompt and type:
-cd C:\yacoin\
-qmake "USE_UPNP=1" yacoin-qt.pro
-mingw32-make -f Makefile.Release
-
-27) Copy DLLs into release directory
-copy "C:\Qt\4.8.5\bin\QtCore4.dll" release
-copy "C:\Qt\4.8.5\bin\QtGui4.dll" release
-copy "C:\MinGW462\bin\libgcc_s_dw2-1.dll" release
-copy "C:\MinGW462\bin\libstdc++-6.dll" release
-copy "C:\MinGW462\bin\mingwm10.dll" release
-
-28) Before running yacoin-qt.exe be sure to back up your wallet.dat file
-copy %HOMEPATH%\AppData\Roaming\YaCoin\wallet.dat %HOMEPATH%\AppData\Roaming\YaCoin\walletSave2.dat 
-
-29) Run yacoin-qt.exe
-Use Windows to navigate to C:\yacoin\release 
-double click on yacoin-qt.exe
-

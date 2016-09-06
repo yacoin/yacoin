@@ -1,13 +1,15 @@
 Format: http://svn.debian.org/wsvn/dep/web/deps/dep5.mdwn?rev=174
-Upstream-Name: Bitcoin
-Upstream-Contact: Satoshi Nakamoto <satoshin@gmx.com>
- irc://#bitcoin@freenode.net
-Source: http://sourceforge.net/projects/bitcoin/files/
- https://github.com/bitcoin/bitcoin
+Upstream-Name: Yacoin
+Upstream-Contact: https://github.com/yacoin/
+
+ https://github.com/yacoin/yacoin
 
 Files: *
-Copyright: 2009-2012, Bitcoin Developers
-           2013-2014, Yacoin Developers
+Copyright: 2012-2016, Yacoin Developers
+License: Expat
+
+Files: *
+Copyright: 2009-2015, Bitcoin Developers
 License: Expat
 Comment: The Bitcoin Developers encompasses the current developers listed on bitcoin.org,
          as well as the numerous contributors to the project.
@@ -23,7 +25,6 @@ License: ISC
 Files: debian/*
 Copyright: 2010-2011, Jonas Smedegaard <dr@jones.dk>
            2011, Matt Corallo <matt@bluematt.me>
-           2013-2014, Sampo Harjula <sahtor@sahtor.net>
 License: GPL-2+
 
 Files: debian/manpages/*

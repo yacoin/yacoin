@@ -11,14 +11,18 @@
 #include "init.h"
 #include "ui_interface.h"
 #include "qtipcserver.h"
+#include "intro.h"
 
 #include <QApplication>
 #include <QMessageBox>
+#if QT_VERSION < 0x050000
 #include <QTextCodec>
+#endif
 #include <QLocale>
 #include <QTranslator>
 #include <QSplashScreen>
 #include <QLibraryInfo>
+#include <QSettings>
 
 #if defined(BITCOIN_NEED_QT_PLUGINS) && !defined(_BITCOIN_QT_PLUGINS_INCLUDED)
 #define _BITCOIN_QT_PLUGINS_INCLUDED
@@ -34,6 +38,39 @@ Q_IMPORT_PLUGIN(qtaccessiblewidgets)
 // Need a global reference for the notifications to find the GUI
 static BitcoinGUI *guiref;
 static QSplashScreen *splashref;
+
+/** Set up translations */
+static void initTranslations(QTranslator &qtTranslatorBase, QTranslator &qtTranslator, QTranslator &translatorBase, QTranslator &translator)
+{
+    QSettings settings;
+    // Get desired locale (e.g. "de_DE")
+    // 1) System default language
+    QString lang_territory = QLocale::system().name();
+    // 2) Language from QSettings
+    QString lang_territory_qsettings = settings.value("language", "").toString();
+    if(!lang_territory_qsettings.isEmpty())
+        lang_territory = lang_territory_qsettings;
+    // 3) -lang command line argument
+    lang_territory = QString::fromStdString(GetArg("-lang", lang_territory.toStdString()));
+    // Convert to "de" only by truncating "_DE"
+    QString lang = lang_territory;
+    lang.truncate(lang_territory.lastIndexOf('_'));
+    // Load language files for configured locale:
+    // - First load the translator for the base language, without territory
+    // - Then load the more specific locale translator
+    // Load e.g. qt_de.qm
+    if (qtTranslatorBase.load("qt_" + lang, QLibraryInfo::location(QLibraryInfo::TranslationsPath)))
+        QApplication::installTranslator(&qtTranslatorBase);
+    // Load e.g. qt_de_DE.qm
+    if (qtTranslator.load("qt_" + lang_territory, QLibraryInfo::location(QLibraryInfo::TranslationsPath)))
+        QApplication::installTranslator(&qtTranslator);
+    // Load e.g. bitcoin_de.qm (shortcut "de" needs to be defined in bitcoin.qrc)
+    if (translatorBase.load(lang, ":/translations/"))
+        QApplication::installTranslator(&translatorBase);
+    // Load e.g. bitcoin_de_DE.qm (shortcut "de_DE" needs to be defined in bitcoin.qrc)
+    if (translator.load(lang_territory, ":/translations/"))
+        QApplication::installTranslator(&translator);
+}
 
 static void ThreadSafeMessageBox(const std::string& message, const std::string& caption, int style)
 {
@@ -55,7 +92,7 @@ static void ThreadSafeMessageBox(const std::string& message, const std::string& 
     }
 }
 
-static bool ThreadSafeAskFee(int64 nFeeRequired, const std::string& strCaption)
+static bool ThreadSafeAskFee(int64_t nFeeRequired, const std::string& strCaption)
 {
     if(!guiref)
         return false;
@@ -83,11 +120,7 @@ static void InitMessage(const std::string &message)
 {
     if(splashref)
     {
-#ifdef WIN32
-        splashref->showMessage(QString::fromStdString(message), Qt::AlignBottom|Qt::AlignHCenter, Qt::black);
-#else
         splashref->showMessage(QString::fromStdString(message), Qt::AlignBottom|Qt::AlignHCenter, QColor(255,255,200));
-#endif
         QApplication::instance()->processEvents();
     }
 }
@@ -110,7 +143,7 @@ static std::string Translate(const char* psz)
 static void handleRunawayException(std::exception *e)
 {
     PrintExceptionContinue(e, "Runaway exception");
-    QMessageBox::critical(0, "Runaway exception", BitcoinGUI::tr("A fatal error occurred. YACoin can no longer continue safely and will quit.") + QString("\n\n") + QString::fromStdString(strMiscWarning));
+    QMessageBox::critical(0, "Runaway exception", BitcoinGUI::tr("A fatal error occurred. YaCoin can no longer continue safely and will quit.") + QString("\n\n") + QString::fromStdString(strMiscWarning));
     exit(1);
 }
 
@@ -119,69 +152,46 @@ int main(int argc, char *argv[])
 {
     // Do this early as we don't want to bother initializing if we are just calling IPC
     ipcScanRelay(argc, argv);
-
+#if QT_VERSION < 0x050000
     // Internal string conversion is all UTF-8
     QTextCodec::setCodecForTr(QTextCodec::codecForName("UTF-8"));
     QTextCodec::setCodecForCStrings(QTextCodec::codecForTr());
-
+#endif
     Q_INIT_RESOURCE(bitcoin);
     QApplication app(argc, argv);
 
-    // Install global event filter that makes sure that long tooltips can be word-wrapped
-    app.installEventFilter(new GUIUtil::ToolTipToRichTextFilter(TOOLTIP_WRAP_THRESHOLD, &app));
+    // Application identification (must be set before OptionsModel is initialized,
+    // as it is used to locate QSettings)
+    app.setOrganizationName("YaCoin");
+    app.setOrganizationDomain("yacoin.org");
+    if(GetBoolArg("-testnet")) // Separate UI settings for testnet
+        app.setApplicationName("YaCoin-Qt-testnet");
+    else
+        app.setApplicationName("YaCoin-Qt");
+    // Now that QSettings are accessible, initialize translations
+    QTranslator qtTranslatorBase, qtTranslator, translatorBase, translator;
+    initTranslations(qtTranslatorBase, qtTranslator, translatorBase, translator);
 
     // Command-line options take precedence:
     ParseParameters(argc, argv);
 
+    // User language is set up: pick a data directory
+    Intro::pickDataDirectory();
+
+    // Install global event filter that makes sure that long tooltips can be word-wrapped
+    app.installEventFilter(new GUIUtil::ToolTipToRichTextFilter(TOOLTIP_WRAP_THRESHOLD, &app));
+
     // ... then bitcoin.conf:
     if (!boost::filesystem::is_directory(GetDataDir(false)))
     {
-        // This message can not be translated, as translation is not initialized yet
-        // (which not yet possible because lang=XX can be overridden in bitcoin.conf in the data directory)
-        QMessageBox::critical(0, "YACoin",
-                              QString("Error: Specified data directory \"%1\" does not exist.").arg(QString::fromStdString(mapArgs["-datadir"])));
+        QMessageBox::critical(0, "YaCoin",
+                              QObject::tr("Error: Specified data directory \"%1\" does not exist.").arg(QString::fromStdString(mapArgs["-datadir"])));
         return 1;
     }
     ReadConfigFile(mapArgs, mapMultiArgs);
 
-    // Application identification (must be set before OptionsModel is initialized,
-    // as it is used to locate QSettings)
-    app.setOrganizationName("YACoin");
-    app.setOrganizationDomain("TODO: replace");
-    if(GetBoolArg("-testnet")) // Separate UI settings for testnet
-        app.setApplicationName("YACoin-Qt-testnet");
-    else
-        app.setApplicationName("YACoin-Qt");
-
     // ... then GUI settings:
     OptionsModel optionsModel;
-
-    // Get desired locale (e.g. "de_DE") from command line or use system locale
-    QString lang_territory = QString::fromStdString(GetArg("-lang", QLocale::system().name().toStdString()));
-    QString lang = lang_territory;
-    // Convert to "de" only by truncating "_DE"
-    lang.truncate(lang_territory.lastIndexOf('_'));
-
-    QTranslator qtTranslatorBase, qtTranslator, translatorBase, translator;
-    // Load language files for configured locale:
-    // - First load the translator for the base language, without territory
-    // - Then load the more specific locale translator
-
-    // Load e.g. qt_de.qm
-    if (qtTranslatorBase.load("qt_" + lang, QLibraryInfo::location(QLibraryInfo::TranslationsPath)))
-        app.installTranslator(&qtTranslatorBase);
-
-    // Load e.g. qt_de_DE.qm
-    if (qtTranslator.load("qt_" + lang_territory, QLibraryInfo::location(QLibraryInfo::TranslationsPath)))
-        app.installTranslator(&qtTranslator);
-
-    // Load e.g. bitcoin_de.qm (shortcut "de" needs to be defined in bitcoin.qrc)
-    if (translatorBase.load(lang, ":/translations/"))
-        app.installTranslator(&translatorBase);
-
-    // Load e.g. bitcoin_de_DE.qm (shortcut "de_DE" needs to be defined in bitcoin.qrc)
-    if (translator.load(lang_territory, ":/translations/"))
-        app.installTranslator(&translator);
 
     // Subscribe to global signals from core
     uiInterface.ThreadSafeMessageBox.connect(ThreadSafeMessageBox);
@@ -193,18 +203,15 @@ int main(int argc, char *argv[])
 
     // Show help message immediately after parsing command-line options (for "-lang") and setting locale,
     // but before showing splash screen.
-    if (mapArgs.count("-?") || mapArgs.count("--h") || mapArgs.count("--help"))
+    if (mapArgs.count("-?") || mapArgs.count("--help"))
     {
         GUIUtil::HelpMessageBox help;
         help.showOrPrint();
         return 1;
     }
 
-#if defined(WIN32)
-    QSplashScreen splash(QPixmap(":/images/splash"), Qt::WindowStaysOnTopHint);
-#else
-    QSplashScreen splash(QPixmap(":/images/splash"), 0);
-#endif
+//    QSplashScreen splash(QPixmap(":/images/splash"), 0);
+    QSplashScreen splash(QPixmap(":/images/splash"), Qt::WindowStaysOnTopHint );	
     if (GetBoolArg("-splash", true) && !GetBoolArg("-min"))
     {
         splash.show();
@@ -229,8 +236,6 @@ int main(int argc, char *argv[])
             {
                 // Put this in a block, so that the Model objects are cleaned up before
                 // calling Shutdown().
-
-                optionsModel.Upgrade(); // Must be done after AppInit2
 
                 if (splashref)
                     splash.finish(&window);
@@ -261,7 +266,7 @@ int main(int argc, char *argv[])
                 window.setWalletModel(0);
                 guiref = 0;
             }
-            // Shutdown the core and its threads, but don't exit yacoin-qt here
+            // Shutdown the core and its threads, but don't exit Bitcoin-Qt here
             Shutdown(NULL);
         }
         else

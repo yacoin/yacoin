@@ -1,0 +1,11 @@
+[Desktop Entry]
+Encoding=UTF-8
+Name=YaCoin
+Comment=YaCoin P2P Cryptocurrency
+Exec=/usr/bin/yacoin-qt
+Terminal=false
+Type=Application
+Icon=/usr/share/pixmaps/yacoin80.xpm
+MimeType=x-scheme-handler/yacoin;
+Categories=Office;
+Name[en_US]=yacoin-qt.desktop

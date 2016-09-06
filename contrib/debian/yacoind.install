@@ -1,1 +1,2 @@
-src/yacoind usr/bin
+debian/bin/yacoind usr/bin
+src/yacoind usr/lib/yacoin

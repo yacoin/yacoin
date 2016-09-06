@@ -2,6 +2,7 @@
 #define TRANSACTIONRECORD_H
 
 #include "uint256.h"
+#include "main.h"
 
 #include <QList>
 
@@ -46,8 +47,8 @@ public:
     /** @name Reported status
        @{*/
     Status status;
-    int64 depth;
-    int64 open_for; /**< Timestamp if status==OpenUntilDate, otherwise number of blocks */
+    int64_t depth;
+    int64_t open_for; /**< Timestamp if status==OpenUntilDate, otherwise number of blocks */
     /**@}*/
 
     /** Current number of blocks (to know whether cached status is still valid) */
@@ -57,60 +58,60 @@ public:
 /** UI model for a transaction. A core transaction can be represented by multiple UI transactions if it has
     multiple outputs.
  */
+
+
+
 class TransactionRecord
 {
 public:
     enum Type
     {
         Other,
-        Generated,
+        Generated,          // minted
+        Mined,
         SendToAddress,
         SendToOther,
         RecvWithAddress,
         RecvFromOther,
-        SendToSelf,
-	StakeInterest
+        SendToSelf
     };
 
     /** Number of confirmation needed for transaction */
-    static const int NumConfirmations = 6;
+    static const int NumConfirmations = 30;
 
     TransactionRecord():
-            hash(), time(0), type(Other), address(""), debit(0), credit(0), balance(0), idx(0)
+            hash(), time(0), type(Other), address(""), debit(0), credit(0), idx(0)
     {
     }
 
-    TransactionRecord(uint256 hash, int64 time):
+    TransactionRecord(uint256 hash, int64_t time):
             hash(hash), time(time), type(Other), address(""), debit(0),
-            credit(0), balance(0), idx(0)
+            credit(0), idx(0)
     {
     }
 
-    TransactionRecord(uint256 hash, int64 time,
+    TransactionRecord(uint256 hash, int64_t time,
                 Type type, const std::string &address,
-                int64 debit, int64 credit):
-            hash(hash), time(time), type(type), address(address), debit(debit), credit(credit), balance(0),
+                int64_t debit, int64_t credit):
+            hash(hash), time(time), type(type), address(address), debit(debit), credit(credit),
             idx(0)
     {
     }
 
     /** Decompose CWallet transaction to model transaction records.
      */
-    static bool showTransaction(const CWalletTx &wtx, bool testStake=1);
+    static bool showTransaction(const CWalletTx &wtx);
     static QList<TransactionRecord> decomposeTransaction(const CWallet *wallet, const CWalletTx &wtx);
 
     /** @name Immutable transaction attributes
       @{*/
     uint256 hash;
-    int64 time;
+    int64_t time;
     Type type;
     std::string address;
-    int64 debit;
-    int64 credit;
+    int64_t debit;
+    int64_t credit;
     /**@}*/
-
-    int64 balance;
-    int presort_i; // position in QList
 
     /** Subtransaction index, for sort key */
     int idx;
@@ -123,7 +124,7 @@ public:
 
     /** Update status from core wallet tx.
      */
-    bool updateStatus(const CWalletTx &wtx);
+    void updateStatus(const CWalletTx &wtx);
 
     /** Return whether a status update is needed.
      */

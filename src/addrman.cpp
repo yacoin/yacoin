@@ -1,14 +1,15 @@
 // Copyright (c) 2012 Pieter Wuille
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
-
 #ifdef _MSC_VER
     #include <stdint.h>
 
     #include "msvc_warnings.push.h"
+    #include "JustInCase.h"
 #endif
 
 #include "addrman.h"
+#include "hash.h"
 
 using namespace std;
 
@@ -17,12 +18,12 @@ int CAddrInfo::GetTriedBucket(const std::vector<unsigned char> &nKey) const
     CDataStream ss1(SER_GETHASH, 0);
     std::vector<unsigned char> vchKey = GetKey();
     ss1 << nKey << vchKey;
-    uint64 hash1 = Hash(ss1.begin(), ss1.end()).Get64();
+    uint64_t hash1 = Hash(ss1.begin(), ss1.end()).Get64();
 
     CDataStream ss2(SER_GETHASH, 0);
     std::vector<unsigned char> vchGroupKey = GetGroup();
     ss2 << nKey << vchGroupKey << (hash1 % ADDRMAN_TRIED_BUCKETS_PER_GROUP);
-    uint64 hash2 = Hash(ss2.begin(), ss2.end()).Get64();
+    uint64_t hash2 = Hash(ss2.begin(), ss2.end()).Get64();
     return hash2 % ADDRMAN_TRIED_BUCKET_COUNT;
 }
 
@@ -32,15 +33,15 @@ int CAddrInfo::GetNewBucket(const std::vector<unsigned char> &nKey, const CNetAd
     std::vector<unsigned char> vchGroupKey = GetGroup();
     std::vector<unsigned char> vchSourceGroupKey = src.GetGroup();
     ss1 << nKey << vchGroupKey << vchSourceGroupKey;
-    uint64 hash1 = Hash(ss1.begin(), ss1.end()).Get64();
+    uint64_t hash1 = Hash(ss1.begin(), ss1.end()).Get64();
 
     CDataStream ss2(SER_GETHASH, 0);
     ss2 << nKey << vchSourceGroupKey << (hash1 % ADDRMAN_NEW_BUCKETS_PER_SOURCE_GROUP);
-    uint64 hash2 = Hash(ss2.begin(), ss2.end()).Get64();
+    uint64_t hash2 = Hash(ss2.begin(), ss2.end()).Get64();
     return hash2 % ADDRMAN_NEW_BUCKET_COUNT;
 }
 
-bool CAddrInfo::IsTerrible(int64 nNow) const
+bool CAddrInfo::IsTerrible(int64_t nNow) const
 {
     if (nLastTry && nLastTry >= nNow-60) // never remove things tried the last minute
         return false;
@@ -48,24 +49,24 @@ bool CAddrInfo::IsTerrible(int64 nNow) const
     if (nTime > nNow + 10*60) // came in a flying DeLorean
         return true;
 
-    if (nTime==0 || nNow-nTime > ADDRMAN_HORIZON_DAYS*86400) // not seen in over a month
+    if (nTime==0 || nNow-nTime > ADDRMAN_HORIZON_DAYS*nOneDay) // not seen in over a month
         return true;
 
     if (nLastSuccess==0 && nAttempts>=ADDRMAN_RETRIES) // tried three times and never a success
         return true;
 
-    if (nNow-nLastSuccess > ADDRMAN_MIN_FAIL_DAYS*86400 && nAttempts>=ADDRMAN_MAX_FAILURES) // 10 successive failures in the last week
+    if (nNow-nLastSuccess > ADDRMAN_MIN_FAIL_DAYS*nOneDay && nAttempts>=ADDRMAN_MAX_FAILURES) // 10 successive failures in the last week
         return true;
 
     return false;
 }
 
-double CAddrInfo::GetChance(int64 nNow) const
+double CAddrInfo::GetChance(int64_t nNow) const
 {
     double fChance = 1.0;
 
-    int64 nSinceLastSeen = nNow - nTime;
-    int64 nSinceLastTry = nNow - nLastTry;
+    int64_t nSinceLastSeen = nNow - nTime;
+    int64_t nSinceLastTry = nNow - nLastTry;
 
     if (nSinceLastSeen < 0) nSinceLastSeen = 0;
     if (nSinceLastTry < 0) nSinceLastTry = 0;
@@ -113,45 +114,13 @@ void CAddrMan::SwapRandom(unsigned int nRndPos1, unsigned int nRndPos2)
     if (nRndPos1 == nRndPos2)
         return;
 
-#ifdef _MSC_VER
-    bool
-        fTest = ((nRndPos1 < vRandom.size()) && (nRndPos2 < vRandom.size()));
-    #ifdef _DEBUG
-    assert(fTest);
-    #else
-    if( !fTest )
-        releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
-    #endif
-#else
     assert(nRndPos1 < vRandom.size() && nRndPos2 < vRandom.size());
-#endif
 
     int nId1 = vRandom[nRndPos1];
     int nId2 = vRandom[nRndPos2];
 
-#ifdef _MSC_VER
-    fTest = (mapInfo.count(nId1) == 1);
-    #ifdef _DEBUG
-    assert(fTest);
-    #else
-    if( !fTest )
-        releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
-    #endif
-#else
     assert(mapInfo.count(nId1) == 1);
-#endif
-
-#ifdef _MSC_VER
-    fTest = (mapInfo.count(nId2) == 1);
-    #ifdef _DEBUG
-    assert(fTest);
-    #else
-    if( !fTest )
-        releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
-    #endif
-#else
     assert(mapInfo.count(nId2) == 1);
-#endif
 
     mapInfo[nId1].nRandomPos = nRndPos2;
     mapInfo[nId2].nRandomPos = nRndPos1;
@@ -166,7 +135,7 @@ int CAddrMan::SelectTried(int nKBucket)
 
     // random shuffle the first few elements (using the entire list)
     // find the least recently tried among them
-    int64 nOldest = -1;
+    int64_t nOldest = -1;
     int nOldestPos = -1;
     for (unsigned int i = 0; i < ADDRMAN_TRIED_ENTRIES_INSPECT_ON_EVICT && i < vTried.size(); i++)
     {
@@ -174,18 +143,7 @@ int CAddrMan::SelectTried(int nKBucket)
         int nTemp = vTried[nPos];
         vTried[nPos] = vTried[i];
         vTried[i] = nTemp;
-#ifdef _MSC_VER
-        bool
-            fTest = ((nOldest == -1) || (mapInfo.count(nTemp) == 1));
-    #ifdef _DEBUG
-        assert(fTest);
-    #else
-        if( !fTest )
-            releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
-    #endif
-#else
         assert(nOldest == -1 || mapInfo.count(nTemp) == 1);
-#endif
         if (nOldest == -1 || mapInfo[nTemp].nLastSuccess < mapInfo[nOldest].nLastSuccess) {
            nOldest = nTemp;
            nOldestPos = nPos;
@@ -197,34 +155,13 @@ int CAddrMan::SelectTried(int nKBucket)
 
 int CAddrMan::ShrinkNew(int nUBucket)
 {
-#ifdef _MSC_VER
-    bool
-        fTest = ((nUBucket >= 0) && ((unsigned int)nUBucket < vvNew.size()));
-    #ifdef _DEBUG
-    assert(fTest);
-    #else
-    if( !fTest )
-        releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
-    #endif
-#else
     assert(nUBucket >= 0 && (unsigned int)nUBucket < vvNew.size());
-#endif
     std::set<int> &vNew = vvNew[nUBucket];
 
     // first look for deletable items
     for (std::set<int>::iterator it = vNew.begin(); it != vNew.end(); it++)
     {
-#ifdef _MSC_VER
-        fTest = (mapInfo.count(*it));
-    #ifdef _DEBUG
-        assert(fTest);
-    #else
-        if( !fTest )
-            releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
-    #endif
-#else
         assert(mapInfo.count(*it));
-#endif
         CAddrInfo &info = mapInfo[*it];
         if (info.IsTerrible())
         {
@@ -249,34 +186,13 @@ int CAddrMan::ShrinkNew(int nUBucket)
     {
         if (nI == n[0] || nI == n[1] || nI == n[2] || nI == n[3])
         {
-#ifdef _MSC_VER
-            fTest = ((nOldest == -1) || (1 == mapInfo.count(*it)));
-    #ifdef _DEBUG
-            assert(fTest);
-    #else
-            if( !fTest )
-                releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
-    #endif
-#else
             assert(nOldest == -1 || mapInfo.count(*it) == 1);
-#endif
             if (nOldest == -1 || mapInfo[*it].nTime < mapInfo[nOldest].nTime)
                 nOldest = *it;
         }
         nI++;
     }
-
-#ifdef _MSC_VER
-    fTest = (1 == mapInfo.count(nOldest));
-    #ifdef _DEBUG
-    assert(fTest);
-    #else
-    if( !fTest )
-        releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
-    #endif
-#else
     assert(mapInfo.count(nOldest) == 1);
-#endif
     CAddrInfo &info = mapInfo[nOldest];
     if (--info.nRefCount == 0)
     {
@@ -293,18 +209,7 @@ int CAddrMan::ShrinkNew(int nUBucket)
 
 void CAddrMan::MakeTried(CAddrInfo& info, int nId, int nOrigin)
 {
-#ifdef _MSC_VER
-    bool
-        fTest = (1 == vvNew[nOrigin].count(nId));
-    #ifdef _DEBUG
-    assert(fTest);
-    #else
-    if( !fTest )
-        releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
-    #endif
-#else
     assert(vvNew[nOrigin].count(nId) == 1);
-#endif
 
     // remove the entry from all new buckets
     for (std::vector<std::set<int> >::iterator it = vvNew.begin(); it != vvNew.end(); it++)
@@ -314,17 +219,7 @@ void CAddrMan::MakeTried(CAddrInfo& info, int nId, int nOrigin)
     }
     nNew--;
 
-#ifdef _MSC_VER
-    fTest = (0 == info.nRefCount);
-    #ifdef _DEBUG
-    assert(fTest);
-    #else
-    if( !fTest )
-        releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
-    #endif
-#else
     assert(info.nRefCount == 0);
-#endif
 
     // what tried bucket to move the entry to
     int nKBucket = info.GetTriedBucket(nKey);
@@ -343,17 +238,7 @@ void CAddrMan::MakeTried(CAddrInfo& info, int nId, int nOrigin)
     int nPos = SelectTried(nKBucket);
 
     // find which new bucket it belongs to
-#ifdef _MSC_VER
-    fTest = (1 == mapInfo.count(vTried[nPos]));
-    #ifdef _DEBUG
-    assert(fTest);
-    #else
-    if( !fTest )
-        releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
-    #endif
-#else
     assert(mapInfo.count(vTried[nPos]) == 1);
-#endif
     int nUBucket = mapInfo[vTried[nPos]].GetNewBucket(nKey);
     std::set<int> &vNew = vvNew[nUBucket];
 
@@ -380,7 +265,7 @@ void CAddrMan::MakeTried(CAddrInfo& info, int nId, int nOrigin)
     return;
 }
 
-void CAddrMan::Good_(const CService &addr, int64 nTime)
+void CAddrMan::Good_(const CService &addr, int64_t nTime)
 {
 //    printf("Good: addr=%s\n", addr.ToString().c_str());
 
@@ -431,7 +316,7 @@ void CAddrMan::Good_(const CService &addr, int64 nTime)
     MakeTried(info, nId, nUBucket);
 }
 
-bool CAddrMan::Add_(const CAddress &addr, const CNetAddr& source, int64 nTimePenalty)
+bool CAddrMan::Add_(const CAddress &addr, const CNetAddr& source, int64_t nTimePenalty)
 {
     if (!addr.IsRoutable())
         return false;
@@ -443,10 +328,10 @@ bool CAddrMan::Add_(const CAddress &addr, const CNetAddr& source, int64 nTimePen
     if (pinfo)
     {
         // periodically update nTime
-        bool fCurrentlyOnline = (GetAdjustedTime() - addr.nTime < 24 * 60 * 60);
-        int64 nUpdateInterval = (fCurrentlyOnline ? 60 * 60 : 24 * 60 * 60);
+        bool fCurrentlyOnline = (GetAdjustedTime() - addr.nTime < nOneDay);
+        int64_t nUpdateInterval = (fCurrentlyOnline ? nOneHour : nOneDay);
         if (addr.nTime && (!pinfo->nTime || pinfo->nTime < addr.nTime - nUpdateInterval - nTimePenalty))
-            pinfo->nTime = max((int64)0, addr.nTime - nTimePenalty);
+            pinfo->nTime = max((int64_t)0, addr.nTime - nTimePenalty);
 
         // add services
         pinfo->nServices |= addr.nServices;
@@ -471,7 +356,7 @@ bool CAddrMan::Add_(const CAddress &addr, const CNetAddr& source, int64 nTimePen
             return false;
     } else {
         pinfo = Create(addr, source, &nId);
-        pinfo->nTime = max((int64)0, (int64)pinfo->nTime - nTimePenalty);
+        pinfo->nTime = max((int64_t)0, (int64_t)pinfo->nTime - nTimePenalty);
 //        printf("Added %s [nTime=%fhr]\n", pinfo->ToString().c_str(), (GetAdjustedTime() - pinfo->nTime) / 3600.0);
         nNew++;
         fNew = true;
@@ -489,7 +374,7 @@ bool CAddrMan::Add_(const CAddress &addr, const CNetAddr& source, int64 nTimePen
     return fNew;
 }
 
-void CAddrMan::Attempt_(const CService &addr, int64 nTime)
+void CAddrMan::Attempt_(const CService &addr, int64_t nTime)
 {
     CAddrInfo *pinfo = Find(addr);
 
@@ -513,36 +398,19 @@ CAddress CAddrMan::Select_(int nUnkBias)
     if (size() == 0)
         return CAddress();
 
-#ifdef _MSC_VER
-    double 
-        nCorTried = sqrt( double(nTried) ) * (100.0 - nUnkBias),
-        nCorNew = sqrt( double(nNew) )* nUnkBias;
-#else
     double nCorTried = sqrt(nTried) * (100.0 - nUnkBias);
     double nCorNew = sqrt(nNew) * nUnkBias;
-#endif
     if ((nCorTried + nCorNew)*GetRandInt(1<<30)/(1<<30) < nCorTried)
     {
         // use a tried node
         double fChanceFactor = 1.0;
-        while(1)        // ah, forever
+        for ( ; ; )
         {
             int nKBucket = GetRandInt(vvTried.size());
             std::vector<int> &vTried = vvTried[nKBucket];
             if (vTried.size() == 0) continue;
             int nPos = GetRandInt(vTried.size());
-#ifdef _MSC_VER
-            bool
-                fTest = (1 == mapInfo.count(vTried[nPos]));
-    #ifdef _DEBUG
-            assert(fTest);
-    #else
-            if( !fTest )
-                releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
-    #endif
-#else
             assert(mapInfo.count(vTried[nPos]) == 1);
-#endif
             CAddrInfo &info = mapInfo[vTried[nPos]];
             if (GetRandInt(1<<30) < fChanceFactor*info.GetChance()*(1<<30))
                 return info;
@@ -551,7 +419,7 @@ CAddress CAddrMan::Select_(int nUnkBias)
     } else {
         // use a new node
         double fChanceFactor = 1.0;
-        while(1)
+        for ( ; ; )
         {
             int nUBucket = GetRandInt(vvNew.size());
             std::set<int> &vNew = vvNew[nUBucket];
@@ -560,18 +428,7 @@ CAddress CAddrMan::Select_(int nUnkBias)
             std::set<int>::iterator it = vNew.begin();
             while (nPos--)
                 it++;
-#ifdef _MSC_VER
-            bool
-                fTest = (1 == mapInfo.count(*it));
-    #ifdef _DEBUG
-            assert(fTest);
-    #else
-            if( !fTest )
-                releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
-    #endif
-#else
             assert(mapInfo.count(*it) == 1);
-#endif
             CAddrInfo &info = mapInfo[*it];
             if (GetRandInt(1<<30) < fChanceFactor*info.GetChance()*(1<<30))
                 return info;
@@ -642,32 +499,32 @@ int CAddrMan::Check_()
 
 void CAddrMan::GetAddr_(std::vector<CAddress> &vAddr)
 {
-    int nNodes = ADDRMAN_GETADDR_MAX_PCT*vRandom.size()/100;
+    size_t nNodes = ADDRMAN_GETADDR_MAX_PCT*vRandom.size()/100;
     if (nNodes > ADDRMAN_GETADDR_MAX)
         nNodes = ADDRMAN_GETADDR_MAX;
 
     // perform a random shuffle over the first nNodes elements of vRandom (selecting from all)
-    for (int n = 0; n<nNodes; n++)
+    for (unsigned int n = 0; n<nNodes; n++)
     {
         int nRndPos = GetRandInt(vRandom.size() - n) + n;
         SwapRandom(n, nRndPos);
-#ifdef _MSC_VER
-        bool
-            fTest = (1 == mapInfo.count(vRandom[n]));
-    #ifdef _DEBUG
-        assert(fTest);
-    #else
-        if( !fTest )
-            releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
-    #endif
-#else
         assert(mapInfo.count(vRandom[n]) == 1);
-#endif
         vAddr.push_back(mapInfo[vRandom[n]]);
     }
 }
 
-void CAddrMan::Connected_(const CService &addr, int64 nTime)
+void CAddrMan::GetOnlineAddr_(std::vector<CAddrInfo> &vAddr)
+{
+    for (std::map<int, CAddrInfo>::const_iterator it = mapInfo.begin(); it != mapInfo.end(); it++)
+    {
+        CAddrInfo addr = it->second;
+        bool fCurrentlyOnline = (GetAdjustedTime() - addr.nTime < nOneDay);
+        if (fCurrentlyOnline)
+            vAddr.push_back(addr);
+    }
+}
+
+void CAddrMan::Connected_(const CService &addr, int64_t nTime)
 {
     CAddrInfo *pinfo = Find(addr);
 
@@ -682,10 +539,7 @@ void CAddrMan::Connected_(const CService &addr, int64 nTime)
         return;
 
     // update info
-    int64 nUpdateInterval = 20 * 60;
+    int64_t nUpdateInterval = nOneHour / 3;
     if (nTime - info.nTime > nUpdateInterval)
         info.nTime = nTime;
 }
-#ifdef _MSC_VER
-    #include "msvc_warnings.pop.h"
-#endif

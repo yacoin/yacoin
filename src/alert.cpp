@@ -1,7 +1,8 @@
-//
-// Alert system
-//
-
+// Copyright (c) 2010 Satoshi Nakamoto
+// Copyright (c) 2009-2014 The Bitcoin developers
+// Copyright (c) 2013-2016 The Yacoin developers
+// Distributed under the MIT/X11 software license, see the accompanying
+// file COPYING or http://www.opensource.org/licenses/mit-license.php.
 #ifdef _MSC_VER
     #include <stdint.h>
 
@@ -22,12 +23,10 @@ using namespace std;
 map<uint256, CAlert> mapAlerts;
 CCriticalSection cs_mapAlerts;
 
-static const char* pszMainKey = "04434f8f64499c03a13cdc928882b8b6c03009a7c672fb34de0a394b484b737ef26e0723e62e3787d8e3f2cd2cd44209531b59fcd6c428903ae139460973189cb4";
-// TestNet alerts pubKey
-static const char* pszTestKey = "0471dc165db490094d35cde15b1f5d755fa6ad6f2b5ed0f340e3f17f57389c3c2af113a8cbcc885bde73305a553b5640c83021128008ddf882e856336269080496";
+static const char* pszMainKey = "04fc5a4a4a1e900769bab4daebd3ce0eaef761048d2e50a8ddc085a1fde1e9782742f645a04eec949d3ad9f530598292328de3fbddaed6edcbc0d3893207602b9a";
 
-// TestNet alerts private key
-// "308201130201010420b665cff1884e53da26376fd1b433812c9a5a8a4d5221533b15b9629789bb7e42a081a53081a2020101302c06072a8648ce3d0101022100fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f300604010004010704410479be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8022100fffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141020101a1440342000471dc165db490094d35cde15b1f5d755fa6ad6f2b5ed0f340e3f17f57389c3c2af113a8cbcc885bde73305a553b5640c83021128008ddf882e856336269080496"
+// TestNet alerts pubKey 
+static const char* pszTestKey = "0465dca89530bd5f94a355e1bcc5a50f814a336be56a1f1eabd0448da2f6a10a1d7d3e824adb9015ae25fbf60f4e91415cdab06420b76d93d4c77062d68073701f";
 
 void CUnsignedAlert::SetNull()
 {
@@ -58,8 +57,8 @@ std::string CUnsignedAlert::ToString() const
     return strprintf(
         "CAlert(\n"
         "    nVersion     = %d\n"
-        "    nRelayUntil  = %"PRI64d"\n"
-        "    nExpiration  = %"PRI64d"\n"
+        "    nRelayUntil  = %" PRId64 "\n"
+        "    nExpiration  = %" PRId64 "\n"
         "    nID          = %d\n"
         "    nCancel      = %d\n"
         "    setCancel    = %s\n"
@@ -82,11 +81,6 @@ std::string CUnsignedAlert::ToString() const
         nPriority,
         strComment.c_str(),
         strStatusBar.c_str());
-}
-
-void CUnsignedAlert::print() const
-{
-    printf("%s", ToString().c_str());
 }
 
 void CAlert::SetNull()
@@ -135,6 +129,9 @@ bool CAlert::RelayTo(CNode* pnode) const
 {
     if (!IsInEffect())
         return false;
+    // don't relay to nodes which haven't sent their version message
+    if (pnode->nVersion == 0)
+        return false;
     // returns true if wasn't already contained in the set
     if (pnode->setKnown.insert(GetHash()).second)
     {
@@ -151,9 +148,8 @@ bool CAlert::RelayTo(CNode* pnode) const
 
 bool CAlert::CheckSignature() const
 {
-    CKey key;
-    if (!key.SetPubKey(ParseHex(fTestNet ? pszTestKey : pszMainKey)))
-        return error("CAlert::CheckSignature() : SetPubKey failed");
+    CPubKey key;
+    key.Set(ParseHex(fTestNet ? pszTestKey : pszMainKey));
     if (!key.Verify(Hash(vchMsg.begin(), vchMsg.end()), vchSig))
         return error("CAlert::CheckSignature() : verify signature failed");
 
@@ -247,6 +243,3 @@ bool CAlert::ProcessAlert()
     printf("accepted alert %d, AppliesToMe()=%d\n", nID, AppliesToMe());
     return true;
 }
-#ifdef _MSC_VER
-    #include "msvc_warnings.pop.h"
-#endif

@@ -1,4 +1,4 @@
-YACoin Official Development Tree.
+YACoin Official Development Tree. The ORIGINAL scrypt-jane sha3 coin
 
 Many thanks to WindMaster for initially setting up this repository to continue development and promotion of YACoin after the original developer, GitHub user pocopoco, went paka paka. Due to community feedback and the need for an updated and stable client, this is now the official YACoin Development Tree.
 
@@ -11,7 +11,8 @@ N increases over time to increase memory requirements.
 The PoW subsidy decreases as difficulty increases.
 Maximum PoW reward is 100 coins.
 
-Ports: Connection port default: 7688 or testnet: 17688 RPC port default: 8344 or testnet: 18344
+Ports:  Connection port default: 7688 or testnet: 17688 
+	RPC port default: 8344 or testnet: 18344
 
 Development process
 Developers work in their own trees, then submit pull requests when they think their feature or bug fix is ready. For new features or enhancements to YACoin, please submit pull requests to YACoin testing. Please refer to: https://help.github.com/articles/using-pull-requests if you need any help.
@@ -25,3 +26,4 @@ The testing distribution contains code and features that haven't yet been accept
 From time to time a pull request will become outdated. If this occurs, and the pull is no longer automatically mergeable; a comment on the pull will be used to issue a warning of closure. The pull will be closed 15 days after the warning if action is not taken by the author. Pull requests closed in this manner will have their corresponding issue labeled 'stagnant'.
 
 Issues with no commits will be given a similar warning, and closed after 15 days from their last activity. Issues closed in this manner will be labeled 'stale'.
+

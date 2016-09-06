@@ -1,0 +1,36 @@
+YACOIN TESTNET
+
+Encryption RPC api allows you to encrypt an arbitrary data bytes with some public key. Only owner of corresponding private key will be able to recover the original data stream.
+
+Example
+
+1. Let's generate new yacoin address first.
+
+> getnewaddress
+mibZSyRz7CFTNCRKC4YqBg4oByNDMLvWzs
+
+2. Then run validateaddress to dump its public key
+
+> validateaddress mibZSyRz7CFTNCRKC4YqBg4oByNDMLvWzs
+{
+"isvalid" : true,
+"address" : "mibZSyRz7CFTNCRKC4YqBg4oByNDMLvWzs",
+"ismine" : true,
+"watchonly" : false,
+"isscript" : false,
+"pubkey" : "02e070d4bc1048391a119b87eef5bcaee4ef50a5b0fa699f00ec676c20941c501e",
+"iscompressed" : true,
+"account" : ""
+}
+
+3. Trying to encrypt hex representation of "Hello world!" string using this public key.
+
+> encryptdata 02e070d4bc1048391a119b87eef5bcaee4ef50a5b0fa699f00ec676c20941c501e 48656c6c6f20776f726c6421
+
+02e55165adb75f8206233cea08f4263ba42a67ac01b226c8ff8f621e29aedfdbf20dd5e7c2199198076933009b2ef67e94137edb2c8eed528383e9cf7a4a6faacc1f8a740d
+
+4. Now we should be able to decrypt that cryptogram into original byte stream.
+
+> decryptdata mibZSyRz7CFTNCRKC4YqBg4oByNDMLvWzs 02e55165adb75f8206233cea08f4263ba42a67ac01b226c8ff8f621e29aedfdbf20dd5e7c2199198076933009b2ef67e94137edb2c8eed528383e9cf7a4a6faacc1f8a740d
+
+48656c6c6f20776f726c6421

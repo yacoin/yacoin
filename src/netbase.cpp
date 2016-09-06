@@ -3,27 +3,26 @@
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-#ifdef _MSC_VER
-    #include <stdint.h>
-
-    #include "msvc_warnings.push.h"
-
-    #include "netbase.h"
-    //#include "util.h"
-    //#include "sync.h"
-    #include "db.h"     // for ssize_t
-#else    
 #include "netbase.h"
 #include "util.h"
 #include "sync.h"
-#endif
+#include "hash.h"
 
 #ifndef WIN32
+#ifdef ANDROID
+#include <fcntl.h>
+#else
 #include <sys/fcntl.h>
 #endif
+#endif
 
-#include "strlcpy.h"
+#ifdef _MSC_VER
+#include <BaseTsd.h>
+typedef SSIZE_T ssize_t;
+#endif
+
 #include <boost/algorithm/string/case_conv.hpp> // for to_lower()
+#include <boost/algorithm/string/predicate.hpp> // for startswith() and endswith()
 
 using namespace std;
 
@@ -40,12 +39,12 @@ enum Network ParseNetwork(std::string net) {
     boost::to_lower(net);
     if (net == "ipv4") return NET_IPV4;
     if (net == "ipv6") return NET_IPV6;
-    if (net == "tor")  return NET_TOR;
+    if (net == "tor" || net == "onion")  return NET_TOR;
     if (net == "i2p")  return NET_I2P;
     return NET_UNROUTABLE;
 }
 
-void SplitHostPort(std::string in, int &portOut, std::string &hostOut) {
+void SplitHostPort(std::string in, uint16_t &portOut, std::string &hostOut) {
     size_t colon = in.find_last_of(':');
     // if a : is found, and it either follows a [...], or no other : is in the string, treat it as port separator
     bool fHaveColon = colon != in.npos;
@@ -83,19 +82,14 @@ bool static LookupIntern(const char *pszName, std::vector<CNetAddr>& vIP, unsign
 
     aiHint.ai_socktype = SOCK_STREAM;
     aiHint.ai_protocol = IPPROTO_TCP;
-#ifdef WIN32
-#  ifdef USE_IPV6
+#ifdef USE_IPV6
     aiHint.ai_family = AF_UNSPEC;
-#  else
+#else
     aiHint.ai_family = AF_INET;
-#  endif
+#endif
+#ifdef WIN32
     aiHint.ai_flags = fAllowLookup ? 0 : AI_NUMERICHOST;
 #else
-#  ifdef USE_IPV6
-    aiHint.ai_family = AF_UNSPEC;
-#  else
-    aiHint.ai_family = AF_INET;
-#  endif
     aiHint.ai_flags = fAllowLookup ? AI_ADDRCONFIG : AI_NUMERICHOST;
 #endif
     struct addrinfo *aiRes = NULL;
@@ -106,41 +100,20 @@ bool static LookupIntern(const char *pszName, std::vector<CNetAddr>& vIP, unsign
     struct addrinfo *aiTrav = aiRes;
     while (aiTrav != NULL && (nMaxSolutions == 0 || vIP.size() < nMaxSolutions))
     {
-        if (aiTrav->ai_family == AF_INET)
+        switch (aiTrav->ai_family)
         {
-#ifdef _MSC_VER
-            bool
-                fTest = (aiTrav->ai_addrlen >= sizeof(sockaddr_in));
-    #ifdef _DEBUG
-            assert(fTest);
-    #else
-            if( !fTest )
-                releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
-    #endif
-#else
-            assert(aiTrav->ai_addrlen >= sizeof(sockaddr_in));
-#endif
-            vIP.push_back(CNetAddr(((struct sockaddr_in*)(aiTrav->ai_addr))->sin_addr));
-        }
+            case (AF_INET):
+                assert(aiTrav->ai_addrlen >= sizeof(sockaddr_in));
+                vIP.push_back(CNetAddr(((struct sockaddr_in*)(aiTrav->ai_addr))->sin_addr));
+            break;
 
 #ifdef USE_IPV6
-        if (aiTrav->ai_family == AF_INET6)
-        {
-#ifdef _MSC_VER
-            bool
-                fTest = (aiTrav->ai_addrlen >= sizeof(sockaddr_in6));
-    #ifdef _DEBUG
-            assert(fTest);
-    #else
-            if( !fTest )
-                releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
-    #endif
-#else
-            assert(aiTrav->ai_addrlen >= sizeof(sockaddr_in6));
+            case (AF_INET6):
+                assert(aiTrav->ai_addrlen >= sizeof(sockaddr_in6));
+                vIP.push_back(CNetAddr(((struct sockaddr_in6*)(aiTrav->ai_addr))->sin6_addr));
+            break;
 #endif
-            vIP.push_back(CNetAddr(((struct sockaddr_in6*)(aiTrav->ai_addr))->sin6_addr));
         }
-#endif
 
         aiTrav = aiTrav->ai_next;
     }
@@ -152,30 +125,22 @@ bool static LookupIntern(const char *pszName, std::vector<CNetAddr>& vIP, unsign
 
 bool LookupHost(const char *pszName, std::vector<CNetAddr>& vIP, unsigned int nMaxSolutions, bool fAllowLookup)
 {
-    if (pszName[0] == 0)
+    std::string strHost(pszName);
+    if (strHost.empty())
         return false;
-    char psz[256];
-    char *pszHost = psz;
-    strlcpy(psz, pszName, sizeof(psz));
-    if (psz[0] == '[' && psz[strlen(psz)-1] == ']')
+    if (boost::algorithm::starts_with(strHost, "[") && boost::algorithm::ends_with(strHost, "]"))
     {
-        pszHost = psz+1;
-        psz[strlen(psz)-1] = 0;
+        strHost = strHost.substr(1, strHost.size() - 2);
     }
 
-    return LookupIntern(pszHost, vIP, nMaxSolutions, fAllowLookup);
+    return LookupIntern(strHost.c_str(), vIP, nMaxSolutions, fAllowLookup);
 }
 
-bool LookupHostNumeric(const char *pszName, std::vector<CNetAddr>& vIP, unsigned int nMaxSolutions)
-{
-    return LookupHost(pszName, vIP, nMaxSolutions, false);
-}
-
-bool Lookup(const char *pszName, std::vector<CService>& vAddr, int portDefault, bool fAllowLookup, unsigned int nMaxSolutions)
+bool Lookup(const char *pszName, std::vector<CService>& vAddr, uint16_t portDefault, bool fAllowLookup, unsigned int nMaxSolutions)
 {
     if (pszName[0] == 0)
         return false;
-    int port = portDefault;
+    uint16_t port = portDefault;
     std::string hostname = "";
     SplitHostPort(std::string(pszName), port, hostname);
 
@@ -189,7 +154,7 @@ bool Lookup(const char *pszName, std::vector<CService>& vAddr, int portDefault, 
     return true;
 }
 
-bool Lookup(const char *pszName, CService& addr, int portDefault, bool fAllowLookup)
+bool Lookup(const char *pszName, CService& addr, uint16_t portDefault, bool fAllowLookup)
 {
     std::vector<CService> vService;
     bool fRet = Lookup(pszName, vService, portDefault, fAllowLookup, 1);
@@ -199,7 +164,7 @@ bool Lookup(const char *pszName, CService& addr, int portDefault, bool fAllowLoo
     return true;
 }
 
-bool LookupNumeric(const char *pszName, CService& addr, int portDefault)
+bool LookupNumeric(const char *pszName, CService& addr, uint16_t portDefault)
 {
     return Lookup(pszName, addr, portDefault, false);
 }
@@ -209,7 +174,7 @@ bool static Socks4(const CService &addrDest, SOCKET& hSocket)
     printf("SOCKS4 connecting %s\n", addrDest.ToString().c_str());
     if (!addrDest.IsIPv4())
     {
-        closesocket(hSocket);
+        CloseSocket(hSocket);
         return error("Proxy destination is not IPv4");
     }
     char pszSocks4IP[] = "\4\1\0\0\0\0\0\0user";
@@ -217,7 +182,7 @@ bool static Socks4(const CService &addrDest, SOCKET& hSocket)
     socklen_t len = sizeof(addr);
     if (!addrDest.GetSockAddr((struct sockaddr*)&addr, &len) || addr.sin_family != AF_INET)
     {
-        closesocket(hSocket);
+        CloseSocket(hSocket);
         return error("Cannot get proxy destination address");
     }
     memcpy(pszSocks4IP + 2, &addr.sin_port, 2);
@@ -228,18 +193,18 @@ bool static Socks4(const CService &addrDest, SOCKET& hSocket)
     int ret = send(hSocket, pszSocks4, nSize, MSG_NOSIGNAL);
     if (ret != nSize)
     {
-        closesocket(hSocket);
+        CloseSocket(hSocket);
         return error("Error sending to proxy");
     }
     char pchRet[8];
     if (recv(hSocket, pchRet, 8, 0) != 8)
     {
-        closesocket(hSocket);
+        CloseSocket(hSocket);
         return error("Error reading proxy response");
     }
     if (pchRet[1] != 0x5a)
     {
-        closesocket(hSocket);
+        CloseSocket(hSocket);
         if (pchRet[1] != 0x5b)
             printf("ERROR: Proxy returned error %d\n", pchRet[1]);
         return false;
@@ -248,33 +213,30 @@ bool static Socks4(const CService &addrDest, SOCKET& hSocket)
     return true;
 }
 
-bool static Socks5(string strDest, int port, SOCKET& hSocket)
+bool static Socks5(string strDest, uint16_t port, SOCKET& hSocket)
 {
     printf("SOCKS5 connecting %s\n", strDest.c_str());
     if (strDest.size() > 255)
     {
-        closesocket(hSocket);
+        CloseSocket(hSocket);
         return error("Hostname too long");
     }
-    char pszSocks5Init[] = "\5\1\0";
-    char *pszSocks5 = pszSocks5Init;
-    ssize_t nSize = sizeof(pszSocks5Init) - 1;
-
-    ssize_t ret = send(hSocket, pszSocks5, nSize, MSG_NOSIGNAL);
-    if (ret != nSize)
+    const char pszSocks5Init[] = "\5\1\0";
+        ssize_t ret = send(hSocket, pszSocks5Init, 3, MSG_NOSIGNAL);
+    if (ret != 3)
     {
-        closesocket(hSocket);
+        CloseSocket(hSocket);
         return error("Error sending to proxy");
     }
     char pchRet1[2];
     if (recv(hSocket, pchRet1, 2, 0) != 2)
     {
-        closesocket(hSocket);
+        CloseSocket(hSocket);
         return error("Error reading proxy response");
     }
     if (pchRet1[0] != 0x05 || pchRet1[1] != 0x00)
     {
-        closesocket(hSocket);
+        CloseSocket(hSocket);
         return error("Proxy failed to initialize");
     }
     string strSocks5("\5\1");
@@ -283,26 +245,26 @@ bool static Socks5(string strDest, int port, SOCKET& hSocket)
     strSocks5 += strDest;
     strSocks5 += static_cast<char>((port >> 8) & 0xFF);
     strSocks5 += static_cast<char>((port >> 0) & 0xFF);
-    ret = send(hSocket, strSocks5.c_str(), strSocks5.size(), MSG_NOSIGNAL);
+    ret = send(hSocket, strSocks5.data(), strSocks5.size(), MSG_NOSIGNAL);
     if (ret != (ssize_t)strSocks5.size())
     {
-        closesocket(hSocket);
+        CloseSocket(hSocket);
         return error("Error sending to proxy");
     }
     char pchRet2[4];
     if (recv(hSocket, pchRet2, 4, 0) != 4)
     {
-        closesocket(hSocket);
+        CloseSocket(hSocket);
         return error("Error reading proxy response");
     }
     if (pchRet2[0] != 0x05)
     {
-        closesocket(hSocket);
+        CloseSocket(hSocket);
         return error("Proxy failed to accept request");
     }
     if (pchRet2[1] != 0x00)
     {
-        closesocket(hSocket);
+        CloseSocket(hSocket);
         switch (pchRet2[1])
         {
             case 0x01: return error("Proxy error: general failure");
@@ -318,7 +280,7 @@ bool static Socks5(string strDest, int port, SOCKET& hSocket)
     }
     if (pchRet2[2] != 0x00)
     {
-        closesocket(hSocket);
+        CloseSocket(hSocket);
         return error("Error: malformed proxy response");
     }
     char pchRet3[256];
@@ -329,22 +291,24 @@ bool static Socks5(string strDest, int port, SOCKET& hSocket)
         case 0x03:
         {
             ret = recv(hSocket, pchRet3, 1, 0) != 1;
-            if (ret)
+            if (ret) {
+                CloseSocket(hSocket);
                 return error("Error reading from proxy");
+            }
             int nRecv = pchRet3[0];
             ret = recv(hSocket, pchRet3, nRecv, 0) != nRecv;
             break;
         }
-        default: closesocket(hSocket); return error("Error: malformed proxy response");
+        default: CloseSocket(hSocket); return error("Error: malformed proxy response");
     }
     if (ret)
     {
-        closesocket(hSocket);
+        CloseSocket(hSocket);
         return error("Error reading from proxy");
     }
     if (recv(hSocket, pchRet3, 2, 0) != 2)
     {
-        closesocket(hSocket);
+        CloseSocket(hSocket);
         return error("Error reading from proxy");
     }
     printf("SOCKS5 connected %s\n", strDest.c_str());
@@ -382,14 +346,15 @@ bool static ConnectSocketDirectly(const CService &addrConnect, SOCKET& hSocketRe
     if (fcntl(hSocket, F_SETFL, fFlags | O_NONBLOCK) == -1)
 #endif
     {
-        closesocket(hSocket);
+        CloseSocket(hSocket);
         return false;
     }
 
     if (connect(hSocket, (struct sockaddr*)&sockaddr, len) == SOCKET_ERROR)
     {
+        int nErr = WSAGetLastError();
         // WSAEINVAL is here because some legacy version of winsock uses it
-        if (WSAGetLastError() == WSAEINPROGRESS || WSAGetLastError() == WSAEWOULDBLOCK || WSAGetLastError() == WSAEINVAL)
+        if (nErr == WSAEINPROGRESS || nErr == WSAEWOULDBLOCK || nErr == WSAEINVAL)
         {
             struct timeval timeout;
             timeout.tv_sec  = nTimeout / 1000;
@@ -402,13 +367,13 @@ bool static ConnectSocketDirectly(const CService &addrConnect, SOCKET& hSocketRe
             if (nRet == 0)
             {
                 printf("connection timeout\n");
-                closesocket(hSocket);
+                CloseSocket(hSocket);
                 return false;
             }
             if (nRet == SOCKET_ERROR)
             {
                 printf("select() for connection failed: %i\n",WSAGetLastError());
-                closesocket(hSocket);
+                CloseSocket(hSocket);
                 return false;
             }
             socklen_t nRetSize = sizeof(nRet);
@@ -419,13 +384,13 @@ bool static ConnectSocketDirectly(const CService &addrConnect, SOCKET& hSocketRe
 #endif
             {
                 printf("getsockopt() for connection failed: %i\n",WSAGetLastError());
-                closesocket(hSocket);
+                CloseSocket(hSocket);
                 return false;
             }
             if (nRet != 0)
             {
                 printf("connect() failed after select(): %s\n",strerror(nRet));
-                closesocket(hSocket);
+                CloseSocket(hSocket);
                 return false;
             }
         }
@@ -436,7 +401,7 @@ bool static ConnectSocketDirectly(const CService &addrConnect, SOCKET& hSocketRe
 #endif
         {
             printf("connect() failed: %i\n",WSAGetLastError());
-            closesocket(hSocket);
+            CloseSocket(hSocket);
             return false;
         }
     }
@@ -449,10 +414,10 @@ bool static ConnectSocketDirectly(const CService &addrConnect, SOCKET& hSocketRe
     if (ioctlsocket(hSocket, FIONBIO, &fNonblock) == SOCKET_ERROR)
 #else
     fFlags = fcntl(hSocket, F_GETFL, 0);
-    if (fcntl(hSocket, F_SETFL, fFlags & !O_NONBLOCK) == SOCKET_ERROR)
+    if (fcntl(hSocket, F_SETFL, fFlags & ~O_NONBLOCK) == SOCKET_ERROR)
 #endif
     {
-        closesocket(hSocket);
+        CloseSocket(hSocket);
         return false;
     }
 
@@ -461,18 +426,7 @@ bool static ConnectSocketDirectly(const CService &addrConnect, SOCKET& hSocketRe
 }
 
 bool SetProxy(enum Network net, CService addrProxy, int nSocksVersion) {
-#ifdef _MSC_VER
-    bool
-        fTest = (net >= 0 && net < NET_MAX);
-    #ifdef _DEBUG
-    assert(fTest);
-    #else
-    if( !fTest )
-        releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
-    #endif
-#else
     assert(net >= 0 && net < NET_MAX);
-#endif
     if (nSocksVersion != 0 && nSocksVersion != 4 && nSocksVersion != 5)
         return false;
     if (nSocksVersion != 0 && !addrProxy.IsValid())
@@ -483,18 +437,7 @@ bool SetProxy(enum Network net, CService addrProxy, int nSocksVersion) {
 }
 
 bool GetProxy(enum Network net, proxyType &proxyInfoOut) {
-#ifdef _MSC_VER
-    bool
-        fTest = (net >= 0 && net < NET_MAX);
-    #ifdef _DEBUG
-    assert(fTest);
-    #else
-    if( !fTest )
-        releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
-    #endif
-#else
     assert(net >= 0 && net < NET_MAX);
-#endif
     LOCK(cs_proxyInfos);
     if (!proxyInfo[net].second)
         return false;
@@ -559,6 +502,7 @@ bool ConnectSocket(const CService &addrDest, SOCKET& hSocketRet, int nTimeout)
             return false;
         break;
     default:
+        CloseSocket(hSocket);
         return false;
     }
 
@@ -566,10 +510,10 @@ bool ConnectSocket(const CService &addrDest, SOCKET& hSocketRet, int nTimeout)
     return true;
 }
 
-bool ConnectSocketByName(CService &addr, SOCKET& hSocketRet, const char *pszDest, int portDefault, int nTimeout)
+bool ConnectSocketByName(CService &addr, SOCKET& hSocketRet, const char *pszDest, uint16_t portDefault, int nTimeout)
 {
     string strDest;
-    int port = portDefault;
+    uint16_t port = portDefault;
     SplitHostPort(string(pszDest), port, strDest);
 
     SOCKET hSocket = INVALID_SOCKET;
@@ -590,7 +534,9 @@ bool ConnectSocketByName(CService &addr, SOCKET& hSocketRet, const char *pszDest
 
     switch(nameproxy.second) {
         default:
-        case 4: return false;
+        case 4:
+            CloseSocket(hSocket);
+            return false;
         case 5:
             if (!Socks5(strDest, port, hSocket))
                 return false;
@@ -603,7 +549,7 @@ bool ConnectSocketByName(CService &addr, SOCKET& hSocketRet, const char *pszDest
 
 void CNetAddr::Init()
 {
-    memset(ip, 0, 16);
+    memset(ip, 0, sizeof(ip));
 }
 
 void CNetAddr::SetIP(const CNetAddr& ipIn)
@@ -671,7 +617,7 @@ CNetAddr::CNetAddr(const std::string &strIp, bool fAllowLookup)
         *this = vIP[0];
 }
 
-unsigned int CNetAddr::GetByte(int n) const
+uint8_t CNetAddr::GetByte(int n) const
 {
     return ip[15-n];
 }
@@ -836,7 +782,7 @@ std::string CNetAddr::ToStringIP() const
         return EncodeBase32(&ip[6], 10) + ".onion";
     if (IsI2P())
         return EncodeBase32(&ip[6], 10) + ".oc.b32.i2p";
-    CService serv(*this, 0);
+    CService serv(*this, (uint16_t)0);
 #ifdef USE_IPV6
     struct sockaddr_storage sockaddr;
 #else
@@ -899,7 +845,7 @@ bool CNetAddr::GetIn6Addr(struct in6_addr* pipv6Addr) const
 std::vector<unsigned char> CNetAddr::GetGroup() const
 {
     std::vector<unsigned char> vchRet;
-    int nClass = NET_IPV6;
+    uint8_t nClass = NET_IPV6;
     int nStartByte = 0;
     int nBits = 16;
 
@@ -950,7 +896,7 @@ std::vector<unsigned char> CNetAddr::GetGroup() const
         nBits = 4;
     }
     // for he.net, use /36 groups
-    else if (GetByte(15) == 0x20 && GetByte(14) == 0x11 && GetByte(13) == 0x04 && GetByte(12) == 0x70)
+    else if (GetByte(15) == 0x20 && GetByte(14) == 0x01 && GetByte(13) == 0x04 && GetByte(12) == 0x70)
         nBits = 36;
     // for the rest of the IPv6 network, use /32 groups
     else
@@ -969,17 +915,12 @@ std::vector<unsigned char> CNetAddr::GetGroup() const
     return vchRet;
 }
 
-uint64 CNetAddr::GetHash() const
+uint64_t CNetAddr::GetHash() const
 {
     uint256 hash = Hash(&ip[0], &ip[16]);
-    uint64 nRet;
+    uint64_t nRet;
     memcpy(&nRet, &hash, sizeof(nRet));
     return nRet;
-}
-
-void CNetAddr::print() const
-{
-    printf("CNetAddr(%s)\n", ToString().c_str());
 }
 
 // private extensions to enum Network, only returned by GetExtNetwork,
@@ -1070,51 +1011,29 @@ CService::CService()
     Init();
 }
 
-CService::CService(const CNetAddr& cip, unsigned short portIn) : CNetAddr(cip), port(portIn)
+CService::CService(const CNetAddr& cip, uint16_t portIn) : CNetAddr(cip), port(portIn)
 {
 }
 
-CService::CService(const struct in_addr& ipv4Addr, unsigned short portIn) : CNetAddr(ipv4Addr), port(portIn)
+CService::CService(const struct in_addr& ipv4Addr, uint16_t portIn) : CNetAddr(ipv4Addr), port(portIn)
 {
 }
 
 #ifdef USE_IPV6
-CService::CService(const struct in6_addr& ipv6Addr, unsigned short portIn) : CNetAddr(ipv6Addr), port(portIn)
+CService::CService(const struct in6_addr& ipv6Addr, uint16_t portIn) : CNetAddr(ipv6Addr), port(portIn)
 {
 }
 #endif
 
 CService::CService(const struct sockaddr_in& addr) : CNetAddr(addr.sin_addr), port(ntohs(addr.sin_port))
 {
-#ifdef _MSC_VER
-    bool
-        fTest = (addr.sin_family == AF_INET);
-    #ifdef _DEBUG
-    assert(fTest);
-    #else
-    if( !fTest )
-        releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
-    #endif
-#else
     assert(addr.sin_family == AF_INET);
-#endif
 }
 
 #ifdef USE_IPV6
 CService::CService(const struct sockaddr_in6 &addr) : CNetAddr(addr.sin6_addr), port(ntohs(addr.sin6_port))
 {
-#ifdef _MSC_VER
-    bool
-        fTest = (addr.sin6_family == AF_INET6);
-    #ifdef _DEBUG
-    assert(fTest);
-    #else
-    if( !fTest )
-        releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
-    #endif
-#else
-    assert(addr.sin6_family == AF_INET6);
-#endif
+   assert(addr.sin6_family == AF_INET6);
 }
 #endif
 
@@ -1142,7 +1061,7 @@ CService::CService(const char *pszIpPort, bool fAllowLookup)
         *this = ip;
 }
 
-CService::CService(const char *pszIpPort, int portDefault, bool fAllowLookup)
+CService::CService(const char *pszIpPort, uint16_t portDefault, bool fAllowLookup)
 {
     Init();
     CService ip;
@@ -1158,7 +1077,7 @@ CService::CService(const std::string &strIpPort, bool fAllowLookup)
         *this = ip;
 }
 
-CService::CService(const std::string &strIpPort, int portDefault, bool fAllowLookup)
+CService::CService(const std::string &strIpPort, uint16_t portDefault, bool fAllowLookup)
 {
     Init();
     CService ip;
@@ -1246,15 +1165,20 @@ std::string CService::ToString() const
     return ToStringIPPort();
 }
 
-void CService::print() const
-{
-    printf("CService(%s)\n", ToString().c_str());
-}
-
 void CService::SetPort(unsigned short portIn)
 {
     port = portIn;
 }
-#ifdef _MSC_VER
-    #include "msvc_warnings.pop.h"
+
+bool CloseSocket(SOCKET& hSocket)
+{
+    if (hSocket == INVALID_SOCKET)
+        return false;
+#ifdef WIN32
+    int ret = closesocket(hSocket);
+#else
+    int ret = close(hSocket);
 #endif
+    hSocket = INVALID_SOCKET;
+    return ret != SOCKET_ERROR;
+}

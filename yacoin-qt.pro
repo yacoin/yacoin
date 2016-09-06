@@ -1,10 +1,11 @@
 TEMPLATE = app
 TARGET = yacoin-qt
-VERSION = 0.4.4
+VERSION = 0.4.5
 INCLUDEPATH += src src/json src/qt
-QT += core gui network
+QT += core gui network  script
+# You will probably need to install qtscript5-dev for script
 greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
-DEFINES += QT_GUI BOOST_THREAD_USE_LIB BOOST_SPIRIT_THREADSAFE SCRYPT_CHACHA SCRYPT_KECCAK512 __STDC_FORMAT_MACROS __STDC_LIMIT_MACROS  
+DEFINES += QT_GUI BOOST_THREAD_USE_LIB BOOST_SPIRIT_THREADSAFE SCRYPT_CHACHA SCRYPT_KECCAK512 __STDC_FORMAT_MACROS __STDC_LIMIT_MACROS
 CONFIG += no_include_pwd
 CONFIG += thread
 CONFIG += static
@@ -90,16 +91,16 @@ contains(USE_DBUS, 1) {
     QT += dbus
 }
 
-# use: qmake "USE_IPV6=1" ( enabled by default; default)
+# use: qmake "USE_IPV6=1" (enabled by default)
 #  or: qmake "USE_IPV6=0" (disabled by default)
-#  or: qmake "USE_IPV6=-" (not supported)
-contains(USE_IPV6, -) {
-    message(Building without IPv6 support)
-} else {
+#  or: qmake "USE_IPV6=-" (not supported; default)
+contains(USE_IPV6, 1){
     count(USE_IPV6, 0) {
         USE_IPV6=1
     }
     DEFINES += USE_IPV6=$$USE_IPV6
+}else {
+     message(Building without IPv6 support)
 }
 
 contains(BITCOIN_NEED_QT_PLUGINS, 1) {
@@ -107,6 +108,64 @@ contains(BITCOIN_NEED_QT_PLUGINS, 1) {
     QTPLUGIN += qcncodecs qjpcodecs qtwcodecs qkrcodecs qtaccessiblewidgets
 }
 
+# YaCoin is now LevelDB by default
+contains(USE_LEVELDB, 0) {
+    message(Building with Berkeley DB transaction index)
+    SOURCES += src/txdb-bdb.cpp
+
+} else {
+    message(Building with LevelDB transaction index)
+    DEFINES += USE_LEVELDB
+
+    INCLUDEPATH += src/leveldb/include src/leveldb/helpers
+    LIBS += $$PWD/src/leveldb/libleveldb.a $$PWD/src/leveldb/libmemenv.a
+    SOURCES += src/txdb-leveldb.cpp
+    !win32 {
+        # we use QMAKE_CXXFLAGS_RELEASE even without RELEASE=1 because we use RELEASE to indicate linking preferences not -O preferences
+        genleveldb.commands = cd $$PWD/src/leveldb && CC=$$QMAKE_CC CXX=$$QMAKE_CXX $(MAKE) OPT=\"$$QMAKE_CXXFLAGS $$QMAKE_CXXFLAGS_RELEASE\" libleveldb.a libmemenv.a
+    } else {
+        # make an educated guess about what the ranlib command is called
+        isEmpty(QMAKE_RANLIB) {
+            QMAKE_RANLIB = $$replace(QMAKE_STRIP, strip, ranlib)
+        }
+        LIBS += -lshlwapi
+        genleveldb.commands = cd $$PWD/src/leveldb && CC=$$QMAKE_CC CXX=$$QMAKE_CXX TARGET_OS=OS_WINDOWS_CROSSCOMPILE $(MAKE) OPT=\"$$QMAKE_CXXFLAGS $$QMAKE_CXXFLAGS_RELEASE\" libleveldb.a libmemenv.a && $$QMAKE_RANLIB $$PWD/src/leveldb/libleveldb.a && $$QMAKE_RANLIB $$PWD/src/leveldb/libmemenv.a
+    }
+    genleveldb.target = $$PWD/src/leveldb/libleveldb.a
+    genleveldb.depends = FORCE
+    PRE_TARGETDEPS += $$PWD/src/leveldb/libleveldb.a
+    QMAKE_EXTRA_TARGETS += genleveldb
+    # Gross ugly hack that depends on qmake internals, unfortunately there is no other way to do it.
+    QMAKE_CLEAN += $$PWD/src/leveldb/libleveldb.a; cd $$PWD/src/leveldb ; $(MAKE) clean
+}
+
+
+# use: qmake "USE_ASM=1"
+contains(USE_ASM, 1) {
+    message(Using assembler scrypt implementations)
+    DEFINES += USE_ASM
+
+     contains(QMAKE_TARGET.arch, i386) | contains(QMAKE_TARGET.arch, i586) | contains(QMAKE_TARGET.arch, i686) {
+        message("x86 platform, setting -msse2 flag")
+
+        QMAKE_CXXFLAGS += -msse2
+        QMAKE_CFLAGS += -msse2
+    }
+
+    SOURCES += src/crypto/scrypt/asm/scrypt-arm.S src/crypto/scrypt/asm/scrypt-x86.S src/crypto/scrypt/asm/scrypt-x86_64.S src/crypto/scrypt/asm/asm-wrapper.cpp
+} else {
+    # use: qmake "USE_SSE2=1"
+    contains(USE_SSE2, 1) {
+        message(Using SSE2 intrinsic scrypt implementation & generic sha256 implementation)
+        SOURCES += src/crypto/scrypt/intrin/scrypt-sse2.cpp
+        DEFINES += USE_SSE2
+        QMAKE_CXXFLAGS += -msse2
+        QMAKE_CFLAGS += -msse2
+    } else {
+        message(Using generic scrypt implementations)
+        SOURCES += src/crypto/scrypt/generic/scrypt-generic.cpp
+    }
+}
 
 # regenerate src/build.h
 !windows|contains(USE_BUILD_INFO, 1) {
@@ -132,36 +191,47 @@ QMAKE_CXXFLAGS_WARN_ON = -fdiagnostics-show-option -Wall -Wextra -Wno-ignored-qu
 # Input
 DEPENDPATH += src src/json src/qt
 HEADERS += src/qt/bitcoingui.h \
+    src/qt/intro.h \
     src/qt/transactiontablemodel.h \
     src/qt/addresstablemodel.h \
     src/qt/optionsdialog.h \
-    src/qt/sendcoinsdialog.h \
     src/qt/coincontroldialog.h \
     src/qt/coincontroltreewidget.h \
+    src/qt/sendcoinsdialog.h \
     src/qt/addressbookpage.h \
     src/qt/signverifymessagedialog.h \
     src/qt/aboutdialog.h \
     src/qt/editaddressdialog.h \
     src/qt/bitcoinaddressvalidator.h \
+    src/qt/mintingfilterproxy.h \
+    src/qt/mintingtablemodel.h \
+    src/qt/mintingview.h \
+    src/kernelrecord.h \
     src/alert.h \
     src/addrman.h \
     src/base58.h \
     src/bignum.h \
     src/checkpoints.h \
-    src/coincontrol.h \
     src/compat.h \
+    src/coincontrol.h \
     src/sync.h \
     src/util.h \
+    src/timestamps.h \
+    src/hash.h \
     src/uint256.h \
     src/kernel.h \
-    src/scrypt_mine.h \
-    src/pbkdf2.h \
+    src/kernel_worker.h \
+    src/scrypt.h \
+    src/pbkdf2.h \	
     src/serialize.h \
     src/strlcpy.h \
     src/main.h \
+    src/miner.h \
     src/net.h \
+    src/ministun.h \
     src/key.h \
     src/db.h \
+    src/txdb.h \
     src/walletdb.h \
     src/script.h \
     src/init.h \
@@ -199,6 +269,7 @@ HEADERS += src/qt/bitcoingui.h \
     src/qt/bitcoinunits.h \
     src/qt/qvaluecombobox.h \
     src/qt/askpassphrasedialog.h \
+    src/qt/trafficgraphwidget.h \
     src/protocol.h \
     src/qt/notificator.h \
     src/qt/qtipcserver.h \
@@ -206,44 +277,21 @@ HEADERS += src/qt/bitcoingui.h \
     src/ui_interface.h \
     src/qt/rpcconsole.h \
     src/version.h \
+    src/ntp.h \
     src/netbase.h \
     src/clientversion.h \
-    src/scrypt-jane/scrypt-jane.h \
-    src/scrypt-jane/code/scrypt-jane-test-vectors.h \
-    src/scrypt-jane/code/scrypt-jane-salsa64.h \
-    src/scrypt-jane/code/scrypt-jane-salsa.h \
-    src/scrypt-jane/code/scrypt-jane-romix-template.h \
-    src/scrypt-jane/code/scrypt-jane-romix-basic.h \
-    src/scrypt-jane/code/scrypt-jane-romix.h \
-    src/scrypt-jane/code/scrypt-jane-portable-x86.h \
-    src/scrypt-jane/code/scrypt-jane-portable.h \
-    src/scrypt-jane/code/scrypt-jane-pbkdf2.h \
-    src/scrypt-jane/code/scrypt-jane-mix_salsa-xop.h \
-    src/scrypt-jane/code/scrypt-jane-mix_salsa-sse2.h \
-    src/scrypt-jane/code/scrypt-jane-mix_salsa-avx.h \
-    src/scrypt-jane/code/scrypt-jane-mix_salsa64-xop.h \
-    src/scrypt-jane/code/scrypt-jane-mix_salsa64-ssse3.h \
-    src/scrypt-jane/code/scrypt-jane-mix_salsa64-sse2.h \
-    src/scrypt-jane/code/scrypt-jane-mix_salsa64-avx2.h \
-    src/scrypt-jane/code/scrypt-jane-mix_salsa64-avx.h \
-    src/scrypt-jane/code/scrypt-jane-mix_salsa64.h \
-    src/scrypt-jane/code/scrypt-jane-mix_salsa.h \
-    src/scrypt-jane/code/scrypt-jane-mix_chacha-xop.h \
-    src/scrypt-jane/code/scrypt-jane-mix_chacha-ssse3.h \
-    src/scrypt-jane/code/scrypt-jane-mix_chacha-sse2.h \
-    src/scrypt-jane/code/scrypt-jane-mix_chacha-avx.h \
-    src/scrypt-jane/code/scrypt-jane-mix_chacha.h \
-    src/scrypt-jane/code/scrypt-jane-hash_skein512.h \
-    src/scrypt-jane/code/scrypt-jane-hash_sha512.h \
-    src/scrypt-jane/code/scrypt-jane-hash_sha256.h \
-    src/scrypt-jane/code/scrypt-jane-hash_keccak.h \
-    src/scrypt-jane/code/scrypt-jane-hash_blake512.h \
-    src/scrypt-jane/code/scrypt-jane-hash_blake256.h \
-    src/scrypt-jane/code/scrypt-jane-hash.h \
-    src/scrypt-jane/code/scrypt-jane-chacha.h \
-    src/scrypt-jane/code/scrypt-conf.h
+    src/qt/multisigaddressentry.h \
+    src/qt/multisiginputentry.h \
+    src/qt/multisigdialog.h \
+    src/qt/secondauthdialog.h \
+    src/ies.h \
+    src/ipcollector.h \
+    src/crypto/scrypt-jane/scrypt-jane.h \
+    src/qt/explorer.h \
+    src/price.h
 
 SOURCES += src/qt/bitcoin.cpp src/qt/bitcoingui.cpp \
+    src/qt/intro.cpp \
     src/qt/transactiontablemodel.cpp \
     src/qt/addresstablemodel.cpp \
     src/qt/optionsdialog.cpp \
@@ -255,16 +303,24 @@ SOURCES += src/qt/bitcoin.cpp src/qt/bitcoingui.cpp \
     src/qt/aboutdialog.cpp \
     src/qt/editaddressdialog.cpp \
     src/qt/bitcoinaddressvalidator.cpp \
+    src/qt/trafficgraphwidget.cpp \
+    src/qt/mintingfilterproxy.cpp \
+    src/qt/mintingtablemodel.cpp \
+    src/qt/mintingview.cpp \
+    src/kernelrecord.cpp \
     src/alert.cpp \
     src/version.cpp \
     src/sync.cpp \
     src/util.cpp \
     src/netbase.cpp \
+    src/ntp.cpp \
     src/key.cpp \
     src/script.cpp \
     src/main.cpp \
+    src/miner.cpp \
     src/init.cpp \
     src/net.cpp \
+    src/stun.cpp \
     src/irc.cpp \
     src/checkpoints.cpp \
     src/addrman.cpp \
@@ -285,6 +341,7 @@ SOURCES += src/qt/bitcoin.cpp src/qt/bitcoingui.cpp \
     src/qt/transactionview.cpp \
     src/qt/walletmodel.cpp \
     src/bitcoinrpc.cpp \
+    src/rpccrypt.cpp \
     src/rpcdump.cpp \
     src/rpcnet.cpp \
     src/rpcmining.cpp \
@@ -305,28 +362,44 @@ SOURCES += src/qt/bitcoin.cpp src/qt/bitcoingui.cpp \
     src/qt/rpcconsole.cpp \
     src/noui.cpp \
     src/kernel.cpp \
-    src/scrypt-x86.S \
-    src/scrypt-x86_64.S \
-    src/scrypt_mine.cpp \
-    src/pbkdf2.cpp \
-    src/scrypt-jane/scrypt-jane.c
+    src/kernel_worker.cpp \
+    src/qt/multisigaddressentry.cpp \
+    src/qt/multisiginputentry.cpp \
+    src/qt/multisigdialog.cpp \
+    src/qt/secondauthdialog.cpp \
+    src/base58.cpp \
+    src/cryptogram.cpp \
+    src/ecies.cpp \
+    src/ipcollector.cpp \
+    src/pbkdf2.cpp \	
+    src/crypto/scrypt-jane/scrypt-jane.c \
+    src/qt/explorer.cpp \
+    src/price.cpp
 
 RESOURCES += \
     src/qt/bitcoin.qrc
 
 FORMS += \
-    src/qt/forms/sendcoinsdialog.ui \
+    src/qt/forms/intro.ui \
     src/qt/forms/coincontroldialog.ui \
+    src/qt/forms/sendcoinsdialog.ui \
     src/qt/forms/addressbookpage.ui \
     src/qt/forms/signverifymessagedialog.ui \
     src/qt/forms/aboutdialog.ui \
     src/qt/forms/editaddressdialog.ui \
     src/qt/forms/transactiondescdialog.ui \
     src/qt/forms/overviewpage.ui \
+    src/qt/forms/explorer.ui \
+    src/qt/forms/explorerBlockPage.ui \
+    src/qt/forms/explorerTransactionPage.ui \
     src/qt/forms/sendcoinsentry.ui \
     src/qt/forms/askpassphrasedialog.ui \
     src/qt/forms/rpcconsole.ui \
-    src/qt/forms/optionsdialog.ui
+    src/qt/forms/optionsdialog.ui \
+    src/qt/forms/multisigaddressentry.ui \
+    src/qt/forms/multisiginputentry.ui \
+    src/qt/forms/multisigdialog.ui \
+    src/qt/forms/secondauthdialog.ui
 
 contains(USE_QRCODE, 1) {
     HEADERS += src/qt/qrcodedialog.h
@@ -355,12 +428,12 @@ QMAKE_EXTRA_COMPILERS += TSQM
 
 # "Other files" to show in Qt Creator
 OTHER_FILES += \
-    doc/*.rst doc/*.txt doc/README README.md res/yacoin-qt.rc src/test/*.cpp src/test/*.h src/qt/test/*.cpp src/qt/test/*.h
+    doc/*.rst doc/*.txt doc/README README.md res/yacoin-qt.rc
 
 # platform specific defaults, if not overridden on command line
 isEmpty(BOOST_LIB_SUFFIX) {
+    windows:BOOST_LIB_SUFFIX = -mgw44-mt-1_53
     macx:BOOST_LIB_SUFFIX = -mt
-    windows:BOOST_LIB_SUFFIX = -mgw48-mt-s-1_55
 }
 
 isEmpty(BOOST_THREAD_LIB_SUFFIX) {
@@ -421,7 +494,7 @@ macx:OBJECTIVE_SOURCES += src/qt/macdockiconhandler.mm \
 macx:LIBS += -framework Foundation -framework ApplicationServices -framework AppKit
 macx:DEFINES += MAC_OSX MSG_NOSIGNAL=0
 macx:ICON = src/qt/res/icons/bitcoin.icns
-macx:TARGET = "Yacoin-qt"
+macx:TARGET = "YaCoin-Qt"
 macx:QMAKE_CFLAGS_THREAD += -pthread
 macx:QMAKE_LFLAGS_THREAD += -pthread
 macx:QMAKE_CXXFLAGS_THREAD += -pthread

@@ -10,6 +10,13 @@
 //
 // client versioning
 //
+extern const int
+    DISPLAY_VERSION_MAJOR_for_Qt,   
+    DISPLAY_VERSION_MINOR_for_Qt,   
+    DISPLAY_VERSION_REVISION_for_Qt,
+    DISPLAY_VERSION_BUILD_for_Qt,
+    DISPLAY_VERSION_TESTING_for_Qt;   
+
 
 static const int CLIENT_VERSION =
                            1000000 * CLIENT_VERSION_MAJOR
@@ -22,10 +29,18 @@ extern const std::string CLIENT_BUILD;
 extern const std::string CLIENT_DATE;
 
 //
+// database format versioning
+//
+static const int DATABASE_VERSION = 70507;
+
+//
 // network protocol versioning
 //
 
-static const int PROTOCOL_VERSION = 60008;
+static const int PROTOCOL_VERSION = 60009;
+
+// Disconnect from node less than this version
+static const int MIN_BUGGY_VERSION = 60007;
 
 // earlier versions not supported as of Feb 2012, and are disconnected
 static const int MIN_PROTO_VERSION = 209;
@@ -36,21 +51,10 @@ static const int CADDR_TIME_VERSION = 31402;
 
 // only request blocks from nodes outside this range of versions
 static const int NOBLKS_VERSION_START = 60002;
-static const int NOBLKS_VERSION_END = 60005; //now youze have to upgrade...
-
-// BIP 0031, pong message, is enabled for all versions AFTER this one
-static const int BIP0031_VERSION = 60000;
-
-// "mempool" command, enhanced "getdata" behavior starts with this version:
-static const int MEMPOOL_GD_VERSION = 60002;
+static const int NOBLKS_VERSION_END = 60006;
 
 #define DISPLAY_VERSION_MAJOR       0
 #define DISPLAY_VERSION_MINOR       4
-#define DISPLAY_VERSION_REVISION    4
-#ifdef _MSC_VER
-    #define DISPLAY_VERSION_BUILD  05
-#else    
-#define DISPLAY_VERSION_BUILD       0
-#endif
+#define DISPLAY_VERSION_REVISION    5
 
 #endif
