@@ -335,8 +335,8 @@ bool CTransaction::IsStandard(string& strReason) const
         // future-proofing. That's also enough to spend a 20-of-20
         // CHECKMULTISIG scriptPubKey, though such a scriptPubKey is not
         // considered standard)
-        uint SigSize044 = 500;
-        uint SigSize045 = 1650;
+        u_int SigSize044 = 500;
+        u_int SigSize045 = 1650;
 
         if ( txin.scriptSig.size() > (IsYACOIN045 ? SigSize045 : SigSize044) )
         {
