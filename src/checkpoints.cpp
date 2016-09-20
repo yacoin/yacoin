@@ -1,9 +1,6 @@
 // Copyright (c) 2009-2012 The Bitcoin developers
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
-#ifdef _MSC_VER
-    #include "msvc_warnings.push.h"
-#endif
 
 #include <boost/assign/list_of.hpp> // for 'map_list_of()'
 #include <boost/foreach.hpp>
@@ -54,15 +51,16 @@ namespace Checkpoints
         ( 487658, std::make_pair(uint256("0x00000008dee4518a08084c5b65d647a57faf7ff28bc7d8786719ac13d21356d4"), 1396181452) )
         ( 550177, std::make_pair(uint256("0x000000087d507052cb66d5a3770cf62f8ff9196ab861ffec3452d939b818567b"), 1399962064) )
         ( 612177, std::make_pair(uint256("0x0000004bc02ebb045398fd8cdb249b790892a4fa3a8b03dbbbf5743c53f2a508"), 1404141665) )
-	( 712177, std::make_pair(uint256("0x000001881da9ee73de48a54ebae7d0dec3b453d795b6704d62414e4b581e3aea"), 1410900724) )
+        ( 712177, std::make_pair(uint256("0x000001881da9ee73de48a54ebae7d0dec3b453d795b6704d62414e4b581e3aea"), 1410900724) )
         ;
 
     static ListBannedBlocks listBanned =
         boost::assign::list_of
         // Invalid blocks functionality from NVC
-        ( uint256("") )
+       // ( uint256("0x") )
     ;
 
+    // TestNet has no checkpoints
     static MapCheckpoints mapCheckpointsTestnet =
         boost::assign::map_list_of
         ( 0, std::make_pair(hashGenesisBlockTestNet, nChainStartTimeTestNet + 20) )

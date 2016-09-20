@@ -2,11 +2,6 @@
 // Copyright (c) 2009-2012 The Bitcoin developers
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
-#ifdef _MSC_VER
-    #include <stdint.h>
-
-    #include "msvc_warnings.push.h"
-#endif
 
 #include "db.h"
 #include "net.h"
@@ -108,23 +103,7 @@ bool CDBEnv::Open(boost::filesystem::path pathEnv_)
                      S_IRUSR | S_IWUSR);
     if (ret != 0)
         return error("CDB() : error %s (%d) opening database environment", DbEnv::strerror(ret), ret);
-#ifdef _MSC_VER
-    (void)printf(
-        "\n"                // kind of important, so give it its own space
-        "CDBEnv::Open()'ed successfully) on dbenv.open() the BerkeleyDB DbEnv wallet code"
-        "\n"
-        "MainDir  =%s"
-        "\n"
-        "LogDir   =[MainDir]/%s"
-        "\n"
-        "ErrorFile=[MainDir]/%s"  // was kind of a misnomer (maybe it was never fixed?)
-        "\n"
-        "",
-        pathEnv.string().c_str(),
-        pathLogDir.filename().string().c_str(),     // a bit tricky since it's a directory!
-        pathErrorFile.filename().string().c_str()
-                );
-#endif
+
     fDbEnvInit = true;
     fMockDb = false;
 
