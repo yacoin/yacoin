@@ -57,7 +57,7 @@ namespace Checkpoints
     static ListBannedBlocks listBanned =
         boost::assign::list_of
         // Invalid blocks functionality from NVC
-       // ( uint256("0x") )
+        ( uint256("0x") )
     ;
 
     // TestNet has no checkpoints
