@@ -210,8 +210,8 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-//    QSplashScreen splash(QPixmap(":/images/splash"), 0);
-    QSplashScreen splash(QPixmap(":/images/splash"), Qt::WindowStaysOnTopHint );	
+    QSplashScreen splash(QPixmap(":/images/splash"), 0);
+//    QSplashScreen splash(QPixmap(":/images/splash"), Qt::WindowStaysOnTopHint );	
     if (GetBoolArg("-splash", true) && !GetBoolArg("-min"))
     {
         splash.show();
