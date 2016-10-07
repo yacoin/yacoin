@@ -214,6 +214,7 @@ SOURCES += src/qt/bitcoin.cpp src/qt/bitcoingui.cpp \
     src/miner.cpp \
     src/init.cpp \
     src/net.cpp \
+    src/price.cpp \
     src/stun.cpp \
     src/irc.cpp \
     src/checkpoints.cpp \

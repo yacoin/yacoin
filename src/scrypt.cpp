@@ -193,8 +193,9 @@ unsigned int scanhash_scrypt(
               );
         ++hash_count;
         if (
-            (0 == hashc[31])
-            && (0 == ( 0xfc & hashc[30]))
+            (   0 == (        hashc[31]))
+            && (0 == ( 0xfe & hashc[30]))
+            && (0 == ( 0xc0 & hashc[29]))
            ) 
         {
             memcpy(result, hash, 32);

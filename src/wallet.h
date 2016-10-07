@@ -681,10 +681,14 @@ public:
     ::int64_t GetCredit(const isminefilter& filter) const
     {
         // Must wait until coinbase is safely deep enough in the chain before valuing it
-        if ((IsCoinBase() || IsCoinStake()) && GetBlocksToMaturity() > 0)
+        if (
+            (IsCoinBase() || IsCoinStake()) && 
+            (GetBlocksToMaturity() > 0)
+           )
             return 0;
 
-        ::int64_t credit = 0;
+        ::int64_t 
+            credit = 0;
         if (filter & MINE_SPENDABLE)
         {
             // GetBalance can assume transactions in mapWallet won't change
@@ -713,7 +717,11 @@ public:
 
     ::int64_t GetImmatureCredit(bool fUseCache=true) const
     {
-        if (IsCoinBase() && GetBlocksToMaturity() > 0 && IsInMainChain())
+        if (
+            IsCoinBase() && 
+            (GetBlocksToMaturity() > 0) && 
+            IsInMainChain()
+           )
         {
             if (fUseCache && fImmatureCreditCached)
                 return nImmatureCreditCached;
@@ -727,7 +735,11 @@ public:
 
     ::int64_t GetImmatureWatchOnlyCredit(bool fUseCache=true) const
     {
-        if (IsCoinBase() && GetBlocksToMaturity() > 0 && IsInMainChain())
+        if (
+            IsCoinBase() && 
+            (GetBlocksToMaturity() > 0) && 
+            IsInMainChain()
+           )
         {
             if (fUseCache && fImmatureWatchCreditCached)
                 return nImmatureWatchCreditCached;
@@ -743,20 +755,26 @@ public:
     ::int64_t GetAvailableCredit(bool fUseCache=true) const
     {
         // Must wait until coinbase is safely deep enough in the chain before valuing it
-        if ((IsCoinBase() || IsCoinStake()) && GetBlocksToMaturity() > 0)
+        if (
+            (IsCoinBase() || IsCoinStake()) && 
+            (GetBlocksToMaturity() > 0)
+           )
             return 0;
 
-        if (fUseCache) {
+        if (fUseCache) 
+        {
             if (fAvailableCreditCached)
                 return nAvailableCreditCached;
         }
 
-        ::int64_t nCredit = 0;
-        for (unsigned int i = 0; i < vout.size(); i++)
+        ::int64_t 
+            nCredit = 0;
+        for (unsigned int i = 0; i < vout.size(); ++i)
         {
             if (!IsSpent(i))
             {
-                const CTxOut &txout = vout[i];
+                const CTxOut 
+                    &txout = vout[i];
                 nCredit += pwallet->GetCredit(txout, MINE_SPENDABLE);
                 if (!MoneyRange(nCredit))
                     throw std::runtime_error("CWalletTx::GetAvailableCredit() : value out of range");
@@ -772,20 +790,26 @@ public:
     ::int64_t GetAvailableWatchCredit(bool fUseCache=true) const
     {
         // Must wait until coinbase is safely deep enough in the chain before valuing it
-        if ((IsCoinBase() || IsCoinStake()) && GetBlocksToMaturity() > 0)
+        if (
+            (IsCoinBase() || IsCoinStake()) && 
+            (GetBlocksToMaturity() > 0)
+           )
             return 0;
 
-        if (fUseCache) {
+        if (fUseCache) 
+        {
             if (fAvailableWatchCreditCached)
                 return nAvailableWatchCreditCached;
         }
 
-        ::int64_t nCredit = 0;
-        for (unsigned int i = 0; i < vout.size(); i++)
+        ::int64_t 
+            nCredit = 0;
+        for (unsigned int i = 0; i < vout.size(); ++i)
         {
             if (!IsSpent(i))
             {
-                const CTxOut &txout = vout[i];
+                const CTxOut 
+                    &txout = vout[i];
                 nCredit += pwallet->GetCredit(txout, MINE_WATCH_ONLY);
                 if (!MoneyRange(nCredit))
                     throw std::runtime_error("CWalletTx::GetAvailableCredit() : value out of range");
@@ -807,11 +831,24 @@ public:
         return nChangeCached;
     }
 
-    void GetAmounts(::int64_t& nGeneratedImmature, ::int64_t& nGeneratedMature, std::list<std::pair<CTxDestination, ::int64_t> >& listReceived,
-                    std::list<std::pair<CTxDestination, ::int64_t> >& listSent, ::int64_t& nFee, std::string& strSentAccount, const isminefilter& filter) const;
+    void GetAmounts(
+                    ::int64_t& nGeneratedImmature, 
+                    ::int64_t& nGeneratedMature, 
+                    std::list<std::pair<CTxDestination, ::int64_t> >& listReceived,
+                    std::list<std::pair<CTxDestination, ::int64_t> >& listSent, 
+                    ::int64_t& nFee, 
+                    std::string& strSentAccount, 
+                    const isminefilter& filter
+                   ) const;
 
-    void GetAccountAmounts(const std::string& strAccount, ::int64_t& nGenerated, ::int64_t& nReceived,
-                           ::int64_t& nSent, ::int64_t& nFee, const isminefilter& filter) const;
+    void GetAccountAmounts(
+                           const std::string& strAccount, 
+                           ::int64_t& nGenerated, 
+                           ::int64_t& nReceived,
+                           ::int64_t& nSent, 
+                           ::int64_t& nFee, 
+                           const isminefilter& filter
+                          ) const;
 
     bool IsFromMe(const isminefilter& filter) const
     {

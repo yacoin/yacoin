@@ -137,3 +137,6 @@ void LeaveCritical()
 }
 
 #endif /* DEBUG_LOCKORDER */
+#ifdef _MSC_VER
+    #include "msvc_warnings.pop.h"
+#endif

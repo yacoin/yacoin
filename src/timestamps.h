@@ -15,10 +15,12 @@ static const unsigned int
 
 
 static const unsigned int 
-    nSep_01_2016 = 1472688000U,
+    nNov_01_2016 = 1477958400U,
+  //nOct_01_2016 = 1475280000U,
+  //nSep_01_2016 = 1472688000U,
   //nJul_16_2016 = 1468654496U,
-  //nApril_1_2016 = 1459468800U,
-    YACOIN_2016_SWITCH_TIME = nSep_01_2016;
+  //nApr_01_2016 = 1459468800U,
+    YACOIN_2016_SWITCH_TIME = nNov_01_2016;
 // we should set the above value as given to match the future time we expect 
 // all nodes will have upgraded and "caught up".  
 // I believe this will create various blocks, therefore branches, forks, that 

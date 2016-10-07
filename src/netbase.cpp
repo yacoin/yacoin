@@ -1398,3 +1398,6 @@ void CService::SetPort(unsigned short portIn)
 {
     port = portIn;
 }
+#ifdef _MSC_VER
+    #include "msvc_warnings.pop.h"
+#endif

@@ -107,7 +107,7 @@ void Shutdown(void* parg)
     {
         fShutdown = true;
         fRequestShutdown = true;
-        nTransactionsUpdated++;
+        ++nTransactionsUpdated;
 //        CTxDB().Close();
         bitdb.Flush(false);
         StopNode();
@@ -132,7 +132,7 @@ void Shutdown(void* parg)
 #ifndef QT_GUI
         // ensure non-UI client gets exited here, but let yacoin-qt reach 'return 0;' in bitcoin.cpp
     #ifdef _MSC_VER
-        return;  //ExitProcess(0);
+        return;
     #else
         exit(0);
     #endif        
@@ -517,7 +517,7 @@ bool AppInit2()
     nNodeLifespan = (unsigned int)(GetArg("-addrlifespan", 7));
     fUseFastIndex = GetBoolArg("-fastindex", true);
     fUseMemoryLog = GetBoolArg("-memorylog", true);
-    nMinerSleep = (unsigned int)(GetArg("-minersleep", 500));
+    nMinerSleep = (unsigned int)(GetArg("-minersleep", nOneHundredMilliseconds));
 
     // Ping and address broadcast intervals
     nPingInterval = max< ::int64_t>(10 * 60, GetArg("-keepalive", 30 * 60));

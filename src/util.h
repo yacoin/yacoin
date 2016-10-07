@@ -33,7 +33,7 @@
 #undef __USE_MINGW_ANSI_STDIO // This constant forces MinGW to conduct stupid behavior
 #endif
 #ifdef _MSC_VER
-//#include "../MSVC/include/inttypes.h"
+#include "../MSVC/include/inttypes.h"
 #else
 #include <inttypes.h>
 #endif
@@ -66,7 +66,6 @@ static const ::int64_t CENT = 10000;
 void LogStackTrace();
 #endif
 
-
 /* Format characters for (s)size_t and ptrdiff_t */
 #if defined(_MSC_VER) || defined(__MSVCRT__)
   /* (s)size_t and ptrdiff_t have the same size specifier in MSVC:
@@ -79,12 +78,17 @@ void LogStackTrace();
   #define PRIpdu    "Iu"
   #define PRIpdd    "Id"
 
-    #define PRI64d  "I64d"
+    #define PRI64_t "ld"
+    #define PRI64d  "lld"
+    #define PRI64u  "llu"
+    #define PRI64x  "llx"
+
     #define PRId64  "I64d"
     #define PRIu64  "I64u"
-    #define PRI64u  "I64u"
     #define PRIx64  "I64x"
-    #define PRI64x  "I64x"
+  //#define PRI64d  "I64d"
+  //#define PRI64u  "I64u"
+  //#define PRI64x  "I64x"
 #else /* C99 standard */
     // these seem to be missing?
     #define PRI64d  "lld"
@@ -164,6 +168,7 @@ extern bool fDaemon;
 extern bool fServer;
 extern std::string strMiscWarning;
 extern bool fTestNet;
+extern bool fUseOld044Rules;
 extern bool fNoListen;
 extern bool fLogTimestamps;
 extern bool fReopenDebugLog;
@@ -501,7 +506,7 @@ public:
         int size = vSorted.size();
 #ifdef _MSC_VER
         bool
-            fTest = (size>0);
+            fTest = (size > 0);
     #ifdef _DEBUG
         assert(fTest);
     #else
