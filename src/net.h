@@ -116,6 +116,8 @@ enum
     LOCAL_MAX
 };
 
+extern void clearLocalSocketError( SOCKET hSocket );
+
 void SetLimited(enum Network net, bool fLimited = true);
 bool IsLimited(enum Network net);
 bool IsLimited(const CNetAddr& addr);

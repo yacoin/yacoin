@@ -55,7 +55,8 @@ const uint256
   //hashGenesisBlockTestNet("0xfe20c2c2fc02b36d2473e1f51dba1fb123d41ff42966e2a4edabb98fdd7107e6");
     // change here           ^^^^^^^^^^^^^
     hashGenesisBlockTestNet( "0x0000fb514c55539c42aed840fb46fedf49ce9c8a81f2ab29bd8e5b0e7134467f" );
-
+int 
+    nConsecutiveStakeSwitchHeight = 420000;  // see timesamps.h
 
 CCriticalSection cs_setpwalletRegistered;
 set<CWallet*> setpwalletRegistered;
@@ -76,6 +77,7 @@ CBigNum bnProofOfStakeHardLimit(~uint256(0) >> 30); // fix minimal proof of stak
 uint256 nPoWBase = uint256("0x00000000ffff0000000000000000000000000000000000000000000000000000"); // difficulty-1 target
 
 CBigNum bnProofOfWorkLimitTestNet(~uint256(0) >> 16);
+static CBigNum bnProofOfStakeTestnetLimit(~uint256(0) >> 20);
 //CBigNum bnProofOfWorkLimitTestNet(~uint256(0) >> 33);
 //YACOIN TODO
 
@@ -961,7 +963,7 @@ int CMerkleTx::GetBlocksToMaturity() const
     return max(
                 0, 
                 fTestNet?
-                (nCoinbaseMaturity + 0 ) - GetDepthInMainChain():
+                (nCoinbaseMaturity +  0) - GetDepthInMainChain():   //<<<<<<<<<<< test
                 (nCoinbaseMaturity + 20) - GetDepthInMainChain()    // why is this 20?
               );                                                    // what is this 20 from? For?
 }
@@ -1128,10 +1130,10 @@ unsigned char GetNfactor(::int64_t nTimestamp)
         nBitCount = 0;
 
     if (
-        ( nTimestamp <= (fTestNet? nChainStartTimeTestNet: nChainStartTime) ) ||
-        fTestNet
-       )    //nChainStartTime)
-        return 4;
+        ( nTimestamp <= (fTestNet? nChainStartTimeTestNet: nChainStartTime) ) 
+        || fTestNet
+       )    //was just nTimestamp <= nChainStartTime)
+        return minNfactor;
 
     ::int64_t 
         nAgeOfBlockOrTxInSeconds = nTimestamp - (fTestNet? nChainStartTimeTestNet: nChainStartTime),  //nChainStartTime,
@@ -1188,8 +1190,9 @@ unsigned int GetProofOfWorkMA(const CBlockIndex* pIndexLast)
     CBigNum wma(0);    // Weighted Moving Average of PoW target
     unsigned int nCount = 0;
 
-    if ( 
-        (pIndexLast->nTime < YACOIN_2016_SWITCH_TIME) && !fTestNet
+    if (
+        fUseOld044Rules
+        //(pIndexLast->nTime < YACOIN_2016_SWITCH_TIME) && !fTestNet
        )
         return 0;
 
@@ -1269,7 +1272,7 @@ unsigned int GetProofOfWorkSMA(const CBlockIndex* pIndexLast)
 CBigNum inline GetProofOfStakeLimit(int nHeight, unsigned int nTime)
 {
     if(fTestNet) // separate proof of stake target limit for testnet
-        return bnProofOfStakeLimit;
+        return bnProofOfStakeTestnetLimit;  //bnProofOfStakeLimit;
     if(nTime > TARGETS_SWITCH_TIME)
         return bnProofOfStakeLimit; 
 
@@ -1505,33 +1508,37 @@ unsigned int ComputeMinStake(unsigned int nBase, ::int64_t nTime, unsigned int n
 }
 
 // ppcoin: find last block index up to pindex
+// Wouldn't this be a more correct comment?
+// ppcoin: find last block index of type fProofOfStake up to and including pindex?
 const CBlockIndex* GetLastBlockIndex(const CBlockIndex* pindex, bool fProofOfStake)
 {
-    while (pindex && pindex->pprev && (pindex->IsProofOfStake() != fProofOfStake))
-        pindex = pindex->pprev;
+    while (
+           pindex &&                                    // there is a block
+           pindex->pprev &&                             // there ia a previous block 
+           (pindex->IsProofOfStake() != fProofOfStake)  // the block is a !fProofOfStake
+          )
+        pindex = pindex->pprev;                         // go back
     return pindex;
+}
+const CBlockIndex* GetLastPoSBlockIndex( const CBlockIndex* pindex )
+{
+    return GetLastBlockIndex( pindex, true);
+}
+const CBlockIndex* GetLastPoWBlockIndex( const CBlockIndex* pindex )
+{
+    return GetLastBlockIndex( pindex, false);
 }
 
 //_____________________________________________________________________________
 static unsigned int GetNextTargetRequired044(const CBlockIndex* pindexLast, bool fProofOfStake)
 {
     CBigNum 
-        bnTargetLimit = bnProofOfWorkLimit;
-
-    if(fProofOfStake)
-    {
-        // Proof-of-Stake blocks has own target limit since nVersion=3 
-        // supermajority on mainNet and always on testNet
-        if(fTestNet)
-            bnTargetLimit = bnProofOfStakeHardLimit;
-        else
-        {
-/*            if(fTestNet || (pindexLast->nHeight + 1 > 15000))
-                bnTargetLimit = bnProofOfStakeLimit;
-            else if(pindexLast->nHeight + 1 > 14060)*/ // DIFF
-                bnTargetLimit = bnProofOfStakeHardLimit;
-        }
-    }
+        bnTargetLimit = fProofOfStake? 
+                            (fTestNet? 
+                            bnProofOfStakeTestnetLimit: //bnProofOfStakeHardLimit: // <<<< test
+                            bnProofOfStakeHardLimit
+                            ): 
+                            bnProofOfWorkLimit;
 
     if (pindexLast == NULL)
         return bnTargetLimit.GetCompact(); // genesis block
@@ -1582,14 +1589,14 @@ static unsigned int GetNextTargetRequired044(const CBlockIndex* pindexLast, bool
 // requires adjusted PoW-PoS ratio (GetSpacingThreshold), PoW target moving average (nBitsMA)
 unsigned int GetNextTargetRequired(const CBlockIndex* pindexLast, bool fProofOfStake)
 {
-    if(
-       (pindexLast->nTime < YACOIN_2016_SWITCH_TIME) && !fTestNet
-      )
+    if( fUseOld044Rules )
     {
         return GetNextTargetRequired044( pindexLast, fProofOfStake );
     }
     CBigNum 
-        bnTargetLimit = fProofOfStake ? bnProofOfStakeHardLimit : bnProofOfWorkLimit; // PoS(~uint256(0) >> 30), PoW(~uint256(0) >> 20)
+        bnTargetLimit = fProofOfStake ? 
+                        bnProofOfStakeHardLimit: 
+                        bnProofOfWorkLimit; // PoS(~uint256(0) >> 30), PoW(~uint256(0) >> 20)
 
     bool fCheckPreviousPoWBlockOverstep(false); // flag, used for check and ignore overstepped PoW block difficulty
 
@@ -1721,38 +1728,63 @@ int GetNumBlocksOfPeers()
 
 bool IsInitialBlockDownload()
 {
+    bool
+        fIsIBD = true;      // presume still downloading blocks
+
     if (
         pindexBest == NULL || 
         (nBestHeight < Checkpoints::GetTotalBlocksEstimate())
        )
-        return true;
+        return fIsIBD;
 
+    fIsIBD = false;         // presume downloading blocks is done
     if( 
-        (0 == nBestHeight) ||
-        fTestNet 
+        (0 == nBestHeight) 
       )
-        return false;
+        return fIsIBD;
 
     ::int64_t
         nTimeOfBestBlockInSeconds = pindexBest->GetBlockTime(),
         nCurrentTime = GetTime();
 
-    ::int64_t 
-        nTwoHoursAgoInSeconds = nCurrentTime - nTwoHoursInSeconds,
+    const ::int64_t 
         nOnedayAgoInSeconds = nCurrentTime - nOneDayInSeconds,
+        nTwoHoursAgoInSeconds = nCurrentTime - nTwoHoursInSeconds,
         n12MinutesAgo = nCurrentTime - (12 * nSecondsPerMinute);
 
     bool 
-        fIsBestBlockOldEnough = (nTimeOfBestBlockInSeconds < nOnedayAgoInSeconds)? true: false;
+        fIsBestBlockYoungEnough = (nTimeOfBestBlockInSeconds >= nOnedayAgoInSeconds)? true: false;
 
-    if( !fIsBestBlockOldEnough ) // being old enough means still "catching up"
-    {                           // i.e. in the "initial download"
-        fIsBestBlockOldEnough = 
-            (nTimeOfBestBlockInSeconds < n12MinutesAgo)? 
+    if( fIsBestBlockYoungEnough )   // being young enough means "caught up"
+    {                               // i.e. done with the "initial block download"
+        fIsBestBlockYoungEnough =   // it's within a day of now, so is it within 12 minutes
+            (nTimeOfBestBlockInSeconds >= n12MinutesAgo)? 
             true: 
             false;
     }
-    return fIsBestBlockOldEnough;
+
+    if( !fIsBestBlockYoungEnough )  // i.e. we think IBD is still happening
+    {                               // maybe it isn't, so let's try some trickery!
+        const ::int64_t
+            nTenSeconds = 10;
+        static ::int64_t
+            nLastUpdate;
+        static CBlockIndex
+            * pindexLastBest;
+        if (pindexBest != pindexLastBest)   // we just got a new block
+        {                           // first time through, we set the values
+            pindexLastBest = pindexBest;
+            nLastUpdate = GetTime();
+        }
+        //else  // nLastUpdate gets older & older
+        fIsBestBlockYoungEnough =
+              !(
+                ((GetTime() - nLastUpdate) < nTenSeconds) && // < 10 seconds between calls?
+                (pindexBest->GetBlockTime() < (GetTime() - nOneDayInSeconds)) // block is > 1 day old
+               );                                   // we take this to mean still IBD, I think???
+    }
+    //else  // fIsBestBlockYoungEnough is true, meaning done with IBD
+    return !fIsBestBlockYoungEnough;
 }
 
 void static InvalidChainFound(CBlockIndex* pindexNew)
@@ -2001,11 +2033,14 @@ bool CTransaction::ConnectInputs(
 
     if (!IsCoinBase())
     {
-        ::int64_t nValueIn = 0;
-        ::int64_t nFees = 0;
-        for (unsigned int i = 0; i < vin.size(); i++)
+        ::int64_t 
+            nValueIn = 0;
+        ::int64_t 
+            nFees = 0;
+        for (unsigned int i = 0; i < vin.size(); ++i)
         {
-            COutPoint prevout = vin[i].prevout;
+            COutPoint 
+                prevout = vin[i].prevout;
 #ifdef _MSC_VER
             bool
                 fTest = (inputs.count(prevout.hash) > 0);
@@ -2018,16 +2053,26 @@ bool CTransaction::ConnectInputs(
 #else
             assert(inputs.count(prevout.hash) > 0);
 #endif
-            CTxIndex& txindex = inputs[prevout.hash].first;
-            CTransaction& txPrev = inputs[prevout.hash].second;
+            CTxIndex
+                & txindex = inputs[prevout.hash].first;
+            CTransaction
+                & txPrev = inputs[prevout.hash].second;
 
             if (prevout.n >= txPrev.vout.size() || prevout.n >= txindex.vSpent.size())
                 return DoS(100, error("ConnectInputs() : %s prevout.n out of range %d %" PRIszu " %" PRIszu " prev tx %s\n%s", GetHash().ToString().substr(0,10).c_str(), prevout.n, txPrev.vout.size(), txindex.vSpent.size(), prevout.hash.ToString().substr(0,10).c_str(), txPrev.ToString().c_str()));
 
             // If prev is coinbase or coinstake, check that it's matured
             if (txPrev.IsCoinBase() || txPrev.IsCoinStake())
-                for (const CBlockIndex* pindex = pindexBlock; pindex && pindexBlock->nHeight - pindex->nHeight < nCoinbaseMaturity; pindex = pindex->pprev)
-                    if (pindex->nBlockPos == txindex.pos.nBlockPos && pindex->nFile == txindex.pos.nFile)
+                for (
+                     const CBlockIndex
+                        * pindex = pindexBlock; 
+                     pindex && ((pindexBlock->nHeight - pindex->nHeight) < nCoinbaseMaturity); 
+                     pindex = pindex->pprev
+                    )
+                    if (
+                        (pindex->nBlockPos == txindex.pos.nBlockPos) && 
+                        (pindex->nFile == txindex.pos.nFile)
+                       )
                         return error("ConnectInputs() : tried to spend %s at depth %d", txPrev.IsCoinBase() ? "coinbase" : "coinstake", pindexBlock->nHeight - pindex->nHeight);
 
             // ppcoin: check transaction timestamp
@@ -2047,9 +2092,10 @@ bool CTransaction::ConnectInputs(
         // The first loop above does all the inexpensive checks.
         // Only if ALL inputs pass do we perform expensive ECDSA signature checks.
         // Helps prevent CPU exhaustion attacks.
-        for (unsigned int i = 0; i < vin.size(); i++)
+        for (unsigned int i = 0; i < vin.size(); ++i)
         {
-            COutPoint prevout = vin[i].prevout;
+            COutPoint 
+                prevout = vin[i].prevout;
 #ifdef _MSC_VER
             bool
                 fTest = (inputs.count(prevout.hash) > 0);
@@ -2062,8 +2108,10 @@ bool CTransaction::ConnectInputs(
 #else
             assert(inputs.count(prevout.hash) > 0);
 #endif
-            CTxIndex& txindex = inputs[prevout.hash].first;
-            CTransaction& txPrev = inputs[prevout.hash].second;
+            CTxIndex
+                & txindex = inputs[prevout.hash].first;
+            CTransaction
+                & txPrev = inputs[prevout.hash].second;
 
             // Check for conflicts (double-spend)
             // This doesn't trigger the DoS code on purpose; if it did, it would make it easier
@@ -2109,14 +2157,28 @@ bool CTransaction::ConnectInputs(
         if (IsCoinStake())
         {
             // ppcoin: coin stake tx earns reward instead of paying fee
-            ::uint64_t nCoinAge;
+            ::uint64_t 
+                nCoinAge;
             if (!GetCoinAge(txdb, nCoinAge))
-                return error("ConnectInputs() : %s unable to get coin age for coinstake", GetHash().ToString().substr(0,10).c_str());
+                return error(
+                            "ConnectInputs() : %s unable to get coin age for coinstake", 
+                            GetHash().ToString().substr(0,10).c_str()
+                            );
 
-            unsigned int nTxSize = (nTime > VALIDATION_SWITCH_TIME || fTestNet) ? GetSerializeSize(SER_NETWORK, PROTOCOL_VERSION) : 0;
+            unsigned int 
+                nTxSize = (nTime > VALIDATION_SWITCH_TIME || fTestNet) ? 
+                          GetSerializeSize(SER_NETWORK, PROTOCOL_VERSION) : 0;
 
-            ::int64_t nReward = GetValueOut() - nValueIn;
-            ::int64_t nCalculatedReward = GetProofOfStakeReward(nCoinAge, pindexBlock->nBits, nTime) - GetMinFee(1, false, GMF_BLOCK, nTxSize) + CENT;
+            ::int64_t 
+                nReward = GetValueOut() - nValueIn;
+            ::int64_t 
+                nCalculatedReward = GetProofOfStakeReward(
+                                                            nCoinAge, 
+                                                            pindexBlock->nBits, 
+                                                            nTime
+                                                         ) - 
+                                    GetMinFee(1, false, GMF_BLOCK, nTxSize) + 
+                                    CENT;
 
             if (nReward > nCalculatedReward)
                 return DoS(100, error("ConnectInputs() : coinstake pays too much(actual=%" PRId64 " vs calculated=%" PRId64 ")", nReward, nCalculatedReward));
@@ -2533,7 +2595,10 @@ bool CBlock::SetBestChain(CTxDB& txdb, CBlockIndex* pindexNew)
 
         // Reorganize is costly in terms of db load, as it works in a single db transaction.
         // Try to limit how much needs to be done inside
-        while (pindexIntermediate->pprev && pindexIntermediate->pprev->bnChainTrust > pindexBest->bnChainTrust)
+        while (
+                pindexIntermediate->pprev && 
+                pindexIntermediate->pprev->bnChainTrust > pindexBest->bnChainTrust
+              )
         {
             vpindexSecondary.push_back(pindexIntermediate);
             pindexIntermediate = pindexIntermediate->pprev;
@@ -2766,7 +2831,10 @@ bool CBlock::AddToBlockIndex(unsigned int nFile, unsigned int nBlockPos)
         return false;
 
     // New best
-    if (pindexNew->bnChainTrust > bnBestChainTrust)
+    if (
+        (pindexNew->bnChainTrust > bnBestChainTrust)
+        || fTestNet     //<<<<<<<<<<<<<<<<<<<<<<<<<<
+       )
         if (!SetBestChain(txdb, pindexNew))
             return false;
 
@@ -2859,11 +2927,10 @@ bool CBlock::CheckBlock(bool fCheckPOW, bool fCheckMerkleRoot, bool fCheckSig) c
         uniqueTx.insert(vtx[1].GetHash());
         nSigOps += vtx[1].GetLegacySigOpCount();
     }
-    else
-    {
-        // yacoin2015, nNonce must be greater than zero for proof-of-work blocks WHY????
+    else    // is PoW block
+    {       // nNonce must be greater than zero for proof-of-work blocks, WHY????
         if (
-            ((nTime >= YACOIN_2016_SWITCH_TIME) || fTestNet) && 
+            (!fUseOld044Rules) && 
             (nNonce == 0)
            )
             return DoS(50, error("CheckBlock() : zero nonce in proof-of-work block"));
@@ -2944,9 +3011,23 @@ bool CBlock::AcceptBlock()
     if (nBits != GetNextTargetRequired(pindexPrev, IsProofOfStake()))
         return DoS(100, error("AcceptBlock() : incorrect %s", IsProofOfWork() ? "proof-of-work" : "proof-of-stake"));
 
-    // Check timestamp against prev
+    ::int64_t 
+        nMedianTimePast = pindexPrev->GetMedianTimePast();
+    int 
+        nMaxOffset = 12 * nSecondsPerHour; // 12 hours
+
+    if (fTestNet)   // || pindexPrev->nTime < 1450569600)
+        nMaxOffset = 7 * 7 * nSecondsPerDay; // One week (permanently on testNet
+
+// Check timestamp against prev
     if (GetBlockTime() <= pindexPrev->GetMedianTimePast() || FutureDrift(GetBlockTime()) < pindexPrev->GetBlockTime())
         return error("AcceptBlock() : block's timestamp is too early");
+
+    if (
+        (pindexPrev->nHeight > 1) && 
+        ( (nMedianTimePast + nMaxOffset) < GetBlockTime() )
+       )
+        return error("AcceptBlock() : block's timestamp is too far in the future");
 
     // Check that all transactions are finalized
     BOOST_FOREACH(const CTransaction& tx, vtx)
@@ -3251,21 +3332,35 @@ bool ProcessBlock(CNode* pfrom, CBlock* pblock)
         CBigNum 
             bnRequired;
 
-        if (pblock->IsProofOfStake()) // <<<<<<<<<<<<<<<<<<<<<<<< this part is different
-            bnRequired.SetCompact(
-                                  ComputeMinStake(
-                                                  GetLastBlockIndex(pcheckpoint, true)->nBits, 
-                                                  deltaTime, 
-                                                  pblock->nTime                                                 
-                                                 )
-                                 );
-        else
+        if(
+           (pblock->nTime < YACOIN_2016_SWITCH_TIME) 
+           //&& !fTestNet // new rules on Testnet
+           //|| fTestNet  // old rules on TestNet
+          )
+        {
             bnRequired.SetCompact(
                                   ComputeMinWork(GetLastBlockIndex(pcheckpoint, false)->nBits, 
                                                  deltaTime
                                                 )
                                  );
-
+        }
+        else
+        {
+            if (pblock->IsProofOfStake()) // <<<<<<<<<<<<<<<<<<<<<<<< this part is different
+                bnRequired.SetCompact(
+                                      ComputeMinStake(
+                                                      GetLastBlockIndex(pcheckpoint, true)->nBits, 
+                                                      deltaTime, 
+                                                      pblock->nTime                                                 
+                                                     )
+                                     );
+            else
+                bnRequired.SetCompact(
+                                      ComputeMinWork(GetLastBlockIndex(pcheckpoint, false)->nBits, 
+                                                     deltaTime
+                                                    )
+                                     );
+        }
         if (bnNewBlock > bnRequired)
         {
             if (pfrom)
@@ -3378,9 +3473,14 @@ bool CBlock::SignBlock044(const CKeyStore& keystore)
                     continue;
                 if (key.GetPubKey() != vchPubKey)
                     continue;
-                if(!key.Sign(GetHash(), vchBlockSig))
+                if(
+                    !key.Sign(
+                                GetYacoinHash(),    //<<<<<<<<<<<<<<< test
+                                //GetHash(), 
+                                vchBlockSig
+                             )
+                  )
                     continue;
-
                 return true;
             }
         }
@@ -3650,6 +3750,8 @@ void UnloadBlockIndex()
 
 bool LoadBlockIndex(bool fAllowNew)
 {
+    if (GetTime() < (::int64_t)YACOIN_2016_SWITCH_TIME)   // before the new PoW/PoS rules
+        fUseOld044Rules = true;         // this is a crude way of doing this
     if (fTestNet)
     {
         pchMessageStart[0] = 0xcd;
@@ -3658,10 +3760,11 @@ bool LoadBlockIndex(bool fAllowNew)
         pchMessageStart[3] = 0xef;
 
         bnProofOfWorkLimit = bnProofOfWorkLimitTestNet; // 16 bits PoW target limit for testnet
-        nStakeMinAge = 2 * 60 * 60; // test net min age is 2 hours
-        nModifierInterval = 20 * 60; // test modifier interval is 20 minutes
-        nCoinbaseMaturity = 10; // test maturity is 10 blocks
-        nStakeTargetSpacing = 5 * 60; // test block spacing is 5 minutes
+        nStakeMinAge = 2 * nSecondsPerHour;
+        nModifierInterval =  10 * nSecondsperMinute;
+        nCoinbaseMaturity = 6; // test maturity is 6 blocks + nCoinbaseMaturity(20) = 26
+        nStakeTargetSpacing = 1 * nSecondsperMinute;
+        nConsecutiveStakeSwitchHeight = 4200;
     }
 
     //
@@ -3720,7 +3823,9 @@ bool LoadBlockIndex(bool fAllowNew)
             << (!fTestNet?  486604799:      // is this a time? 1985?
                            1464032600)      // how about a more current time????  If it is a time???????
             << CBigNum(9999)    // what is this??
-            << vector<unsigned char>((const unsigned char*)pszTimestamp, (const unsigned char*)pszTimestamp + strlen(pszTimestamp));
+            << vector<unsigned char>((const unsigned char*)pszTimestamp, 
+                                     (const unsigned char*)pszTimestamp + strlen(pszTimestamp)
+                                    );
         txNew.vout[0].SetEmpty();
 
         CBlock 
@@ -3730,7 +3835,10 @@ bool LoadBlockIndex(bool fAllowNew)
         block.hashPrevBlock = 0;
         block.hashMerkleRoot = block.BuildMerkleTree();
         block.nVersion = 1;
-        block.nTime    = (::uint32_t)( fTestNet? nChainStartTimeTestNet + 20: nChainStartTime + 20 );   // why + 20??
+        block.nTime    = (::uint32_t)( fTestNet? 
+                                       nChainStartTimeTestNet + 20: 
+                                       nChainStartTime + 20 
+                                      );   // why + 20??
         block.nBits    = bnProofOfWorkLimit.GetCompact();
       //block.nNonce   = 127357;
         block.nNonce   = !fTestNet ? 127357 : 0x1F64C;  //    13D93;    //67103;
@@ -3744,7 +3852,7 @@ bool LoadBlockIndex(bool fAllowNew)
             the_target = bnTarget.getuint256();
     
         uint256
-                the_hash = block.GetHash();
+            the_hash = block.GetHash();
 
         // debug print
         printf("block.GetHash() ==\n%s\n", the_hash.ToString().c_str());

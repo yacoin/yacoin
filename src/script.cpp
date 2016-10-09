@@ -336,7 +336,14 @@ bool IsCanonicalSignature(const valtype &vchSig, unsigned int flags) {
     return true;
 }
 
-bool EvalScript(vector<vector<unsigned char> >& stack, const CScript& script, const CTransaction& txTo, unsigned int nIn, unsigned int flags, int nHashType)
+bool EvalScript(
+                vector<vector<unsigned char> >& stack, 
+                const CScript& script, 
+                const CTransaction& txTo, 
+                unsigned int nIn, 
+                unsigned int flags, 
+                int nHashType
+               )
 {
     CAutoBN_CTX pctx;
     CScript::const_iterator pc = script.begin();
@@ -975,7 +982,9 @@ bool EvalScript(vector<vector<unsigned char> >& stack, const CScript& script, co
                     // Drop the signature, since there's no way for a signature to sign itself
                     scriptCode.FindAndDelete(CScript(vchSig));
 
-                    bool fSuccess = IsCanonicalSignature(vchSig, flags) && IsCanonicalPubKey(vchPubKey, flags) &&
+                    bool fSuccess = 
+                        (fUseOld044Rules? true: IsCanonicalSignature(vchSig, flags)) && //<<<<<< test
+                        IsCanonicalPubKey(vchPubKey, flags) &&
                         CheckSig(vchSig, vchPubKey, scriptCode, txTo, nIn, nHashType, flags);
 
                     popstack(stack);
@@ -1036,10 +1045,19 @@ bool EvalScript(vector<vector<unsigned char> >& stack, const CScript& script, co
                         valtype& vchPubKey = stacktop(-ikey);
 
                         // Check signature
-                        bool fOk = IsCanonicalSignature(vchSig, flags) && IsCanonicalPubKey(vchPubKey, flags) &&
-                            CheckSig(vchSig, vchPubKey, scriptCode, txTo, nIn, nHashType, flags);
+                        bool 
+                            fOk = (
+                                   fUseOld044Rules?
+                                   true:
+                                   (
+                                    IsCanonicalSignature(vchSig, flags) && 
+                                    IsCanonicalPubKey(vchPubKey, flags)
+                                   )
+                                  ) &&
+                                  CheckSig(vchSig, vchPubKey, scriptCode, txTo, nIn, nHashType, flags);
 
-                        if (fOk) {
+                        if (fOk) 
+                        {
                             isig++;
                             nSigsCount--;
                         }
@@ -1052,21 +1070,23 @@ bool EvalScript(vector<vector<unsigned char> >& stack, const CScript& script, co
                             fSuccess = false;
                     }
 
-                    while (i-- > 1)
+                    while (i-- > (fUseOld044Rules? 0: 1))
                         popstack(stack);
 
-                    // A bug causes CHECKMULTISIG to consume one extra argument
-                    // whose contents were not checked in any way.
-                    //
-                    // Unfortunately this is a potential source of mutability,
-                    // so optionally verify it is exactly equal to zero prior
-                    // to removing it from the stack.
-                    if (stack.size() < 1)
-                        return false;
-                    if ((flags & SCRIPT_VERIFY_NULLDUMMY) && stacktop(-1).size())
-                        return error("CHECKMULTISIG dummy argument not null");
-                    popstack(stack);
-
+                    if( !fUseOld044Rules )  // i.e. new 0.4.5 rules
+                    {
+                        // A bug causes CHECKMULTISIG to consume one extra argument
+                        // whose contents were not checked in any way.
+                        //
+                        // Unfortunately this is a potential source of mutability,
+                        // so optionally verify it is exactly equal to zero prior
+                        // to removing it from the stack.
+                        if (stack.size() < 1)
+                            return false;
+                        if ((flags & SCRIPT_VERIFY_NULLDUMMY) && stacktop(-1).size())
+                            return error("CHECKMULTISIG dummy argument not null");
+                        popstack(stack);
+                    }
                     stack.push_back(fSuccess ? vchTrue : vchFalse);
 
                     if (opcode == OP_CHECKMULTISIGVERIFY)
@@ -1180,12 +1200,33 @@ class CSignatureCache
 private:
      // sigdata_type is (signature hash, signature, public key):
     typedef boost::tuple<uint256, std::vector<unsigned char>, CPubKey > sigdata_type;
+    typedef boost::tuple<uint256, std::vector<unsigned char>, std::vector<unsigned char> > sigdata_type044;
     std::set< sigdata_type> setValid;
     boost::shared_mutex cs_sigcache;
 
 public:
     bool
-    Get(const uint256 &hash, const std::vector<unsigned char>& vchSig, const CPubKey& pubKey)
+    Get(
+        uint256 hash, 
+        const std::vector<unsigned char>& vchSig, 
+        const std::vector<unsigned char>& pubKey
+       )
+    {
+        boost::shared_lock<boost::shared_mutex> lock(cs_sigcache);
+        //LOCK(cs_sigcache);
+
+        sigdata_type044 k(hash, vchSig, pubKey);
+        std::set<sigdata_type>::iterator mi = setValid.find(k);
+        if (mi != setValid.end())
+            return true;
+        return false;
+    }
+    bool
+    Get(
+        const uint256 &hash, 
+        const std::vector<unsigned char>& vchSig, 
+        const CPubKey& pubKey
+       )
     {
         boost::shared_lock<boost::shared_mutex> lock(cs_sigcache);
 
@@ -1196,7 +1237,46 @@ public:
         return false;
     }
 
-    void Set(const uint256 &hash, const std::vector<unsigned char>& vchSig, const CPubKey& pubKey)
+    void Set(
+             uint256 hash, 
+             const std::vector<unsigned char>& vchSig, 
+             const std::vector<unsigned char>& pubKey
+            )
+    {
+        // DoS prevention: limit cache size to less than 10MB
+        // (~200 bytes per cache entry times 50,000 entries)
+        // Since there are a maximum of 20,000 signature operations per block
+        // 50,000 is a reasonable default.
+        ::int64_t nMaxCacheSize = GetArg("-maxsigcachesize", 50000);
+        if (nMaxCacheSize <= 0) return;
+
+        boost::shared_lock<boost::shared_mutex> lock(cs_sigcache);
+        //LOCK(cs_sigcache);
+
+        while (static_cast< ::int64_t>(setValid.size()) > nMaxCacheSize)
+        {
+            // Evict a random entry. Random because that helps
+            // foil would-be DoS attackers who might try to pre-generate
+            // and re-use a set of valid signatures just-slightly-greater
+            // than our cache size.
+            uint256 randomHash = GetRandHash();
+            std::vector<unsigned char> unused;
+            std::set<sigdata_type>::iterator it =
+                setValid.lower_bound(sigdata_type(randomHash, unused, unused));
+            if (it == setValid.end())
+                it = setValid.begin();
+            setValid.erase(*it);
+        }
+
+        sigdata_type044 k(hash, vchSig, pubKey);
+        setValid.insert(k);
+    }
+
+    void Set(
+             const uint256 &hash, 
+             const std::vector<unsigned char>& vchSig, 
+             const CPubKey& pubKey
+            )
     {
         // DoS prevention: limit cache size to less than 10MB
         // (~200 bytes per cache entry times 50,000 entries)
@@ -1227,38 +1307,84 @@ public:
     }
 };
 
-bool CheckSig(vector<unsigned char> vchSig, const vector<unsigned char> &vchPubKey, const CScript &scriptCode,
-              const CTransaction& txTo, unsigned int nIn, int nHashType, int flags)
+bool CheckSig(
+              vector<unsigned char> vchSig, 
+              const vector<unsigned char> &vchPubKey, 
+              const CScript &scriptCode,
+              const CTransaction& txTo, 
+              unsigned int nIn, 
+              int nHashType, 
+              int flags
+             )
 {
-    static CSignatureCache signatureCache;
+    static CSignatureCache 
+        signatureCache;
 
-    CKey key;
-    if (!key.SetPubKey(vchPubKey))
-         return false;
-    CPubKey pubkey = key.GetPubKey();
-    if (!pubkey.IsValid())
-        return false;
+    if (fUseOld044Rules)
+    {
+        // Hash type is one byte tacked on to the end of the signature
+        if (vchSig.empty())
+            return false;
+        if (nHashType == 0)
+            nHashType = vchSig.back();
+        else if (nHashType != vchSig.back())
+            return false;
+        vchSig.pop_back();
 
-    // Hash type is one byte tacked on to the end of the signature
-    if (vchSig.empty())
-        return false;
-    if (nHashType == 0)
-        nHashType = vchSig.back();
-    else if (nHashType != vchSig.back())
-        return false;
-    vchSig.pop_back();
+        uint256 
+            sighash = SignatureHash(scriptCode, txTo, nIn, nHashType);
 
-    uint256 sighash = SignatureHash(scriptCode, txTo, nIn, nHashType);
+        if (signatureCache.Get(sighash, vchSig, vchPubKey))
+            return true;
 
-    if (signatureCache.Get(sighash, vchSig, pubkey))
-        return true;
+        CKey 
+            key;
 
-    if (!key.Verify(sighash, vchSig))
-        return false;
+        if (!key.SetPubKey(vchPubKey))
+            return false;
 
-    if (!(flags & SCRIPT_VERIFY_NOCACHE))
-        signatureCache.Set(sighash, vchSig, pubkey);
+        if (!key.Verify(sighash, vchSig))
+            return false;
 
+        signatureCache.Set(sighash, vchSig, vchPubKey);
+    }
+    else
+    {
+        CKey 
+            key;
+    
+        bool
+            fKey = key.SetPubKey(vchPubKey);
+
+        if (!fKey)
+            return false;
+
+        CPubKey 
+            pubkey = key.GetPubKey();
+
+        if (!pubkey.IsValid())
+            return false;
+        // Hash type is one byte tacked on to the end of the signature
+        if (vchSig.empty())
+            return false;
+        if (nHashType == 0)
+            nHashType = vchSig.back();
+        else if (nHashType != vchSig.back())
+            return false;
+        vchSig.pop_back();
+
+        uint256 
+            sighash = SignatureHash(scriptCode, txTo, nIn, nHashType);
+
+        if (signatureCache.Get(sighash, vchSig, pubkey))
+            return true;
+
+        if (!key.Verify(sighash, vchSig))
+            return false;
+
+        if ( !(flags & SCRIPT_VERIFY_NOCACHE) )
+            signatureCache.Set(sighash, vchSig, pubkey);
+    }
     return true;
 }
 
@@ -1272,7 +1398,11 @@ bool CheckSig(vector<unsigned char> vchSig, const vector<unsigned char> &vchPubK
 //
 // Return public keys or hashes from scriptPubKey, for 'standard' transaction types.
 //
-bool Solver(const CScript& scriptPubKey, txnouttype& typeRet, vector<vector<unsigned char> >& vSolutionsRet)
+bool Solver(
+            const CScript& scriptPubKey, 
+            txnouttype& typeRet, 
+            vector<vector<unsigned char> >& vSolutionsRet
+           )
 {
     // Templates
     static map<txnouttype, CScript> mTemplates;
@@ -1287,8 +1417,11 @@ bool Solver(const CScript& scriptPubKey, txnouttype& typeRet, vector<vector<unsi
         // Sender provides N pubkeys, receivers provides M signatures
         mTemplates.insert(make_pair(TX_MULTISIG, CScript() << OP_SMALLINTEGER << OP_PUBKEYS << OP_SMALLINTEGER << OP_CHECKMULTISIG));
 
-        // Empty, provably prunable, data-carrying output
-        mTemplates.insert(make_pair(TX_NULL_DATA, CScript() << OP_RETURN << OP_SMALLDATA));
+        if (!fUseOld044Rules)
+        {
+            // Empty, provably prunable, data-carrying output
+            mTemplates.insert(make_pair(TX_NULL_DATA, CScript() << OP_RETURN << OP_SMALLDATA));
+        }
     }
 
     // Shortcut for pay-to-script-hash, which are more constrained than the other types:
@@ -1322,18 +1455,18 @@ bool Solver(const CScript& scriptPubKey, txnouttype& typeRet, vector<vector<unsi
                 typeRet = tplate.first;
                 if (typeRet == TX_MULTISIG)
                 {
-                    // Additional checks for TX_MULTISIG:
-                    unsigned char m = vSolutionsRet.front()[0];
-                    unsigned char n = vSolutionsRet.back()[0];
 #ifdef WIN32
 //#ifdef _MSC_VER
                     if( vSolutionsRet.empty() ) // trouble!
                     {
-                        typeRet = TX_NONSTANDARD;
+                        //typeRet = TX_NONSTANDARD;
                         return false;
                     }
 //#endif                    
 #endif                    
+                    // Additional checks for TX_MULTISIG:
+                    unsigned char m = vSolutionsRet.front()[0];
+                    unsigned char n = vSolutionsRet.back()[0];
                     if (m < 1 || n < 1 || m > n || vSolutionsRet.size()-2 != n)
                         return false;
                 }
@@ -1384,9 +1517,12 @@ bool Solver(const CScript& scriptPubKey, txnouttype& typeRet, vector<vector<unsi
             }
             else if (opcode2 == OP_SMALLDATA)   // this is different from 0.4.4
             {
-                // small pushdata, <= 80 bytes
-                if (vch1.size() > 80)
-                    break;
+                if (!fUseOld044Rules)
+                {
+                    // small pushdata, <= 80 bytes
+                    if (vch1.size() > 80)
+                        break;
+                }
             }
             else if (opcode1 != opcode2 || vch1 != vch2)
             {
@@ -1417,11 +1553,26 @@ bool Sign1(const CKeyID& address, const CKeyStore& keystore, uint256 hash, int n
     return true;
 }
 
-bool SignN(const vector<valtype>& multisigdata, const CKeyStore& keystore, uint256 hash, int nHashType, CScript& scriptSigRet)
+bool SignN(
+           const vector<valtype>& multisigdata, 
+           const CKeyStore& keystore, 
+           uint256 hash, 
+           int nHashType, 
+           CScript& scriptSigRet
+          )
 {
     int nSigned = 0;
+#ifdef _MSC_VER
+    bool
+        fTest = false;
+    if( multisigdata.empty() )  //trouble
+        {
+        fTest = true;   // need a fix here!!!
+        return false;   //???
+        }
+#endif
     int nRequired = multisigdata.front()[0];
-    for (unsigned int i = 1; i < multisigdata.size()-1 && nSigned < nRequired; i++)
+    for (unsigned int i = 1; i < multisigdata.size()-1 && nSigned < nRequired; ++i)
     {
         const valtype& pubkey = multisigdata[i];
         CKeyID keyID = CPubKey(pubkey).GetID();
@@ -1437,8 +1588,13 @@ bool SignN(const vector<valtype>& multisigdata, const CKeyStore& keystore, uint2
 // unless whichTypeRet is TX_SCRIPTHASH, in which case scriptSigRet is the redemption script.
 // Returns false if scriptPubKey could not be completely satisfied.
 //
-bool Solver(const CKeyStore& keystore, const CScript& scriptPubKey, uint256 hash, int nHashType,
-                  CScript& scriptSigRet, txnouttype& whichTypeRet)
+bool Solver(
+            const CKeyStore& keystore, 
+            const CScript& scriptPubKey, 
+            uint256 hash, int nHashType,
+            CScript& scriptSigRet, 
+            txnouttype& whichTypeRet
+           )
 {
     scriptSigRet.clear();
 
@@ -1447,10 +1603,19 @@ bool Solver(const CKeyStore& keystore, const CScript& scriptPubKey, uint256 hash
         return false;
 
     CKeyID keyID;
+#ifdef _MSC_VER
+    bool
+        fTest = false;
+    if( vSolutions.empty() )
+        {       // one can't technically access vSolutions[ 0 ]
+        fTest = true;
+        return false;
+        }
+#endif
     switch (whichTypeRet)
     {
     case TX_NONSTANDARD:
-    case TX_NULL_DATA:
+    case TX_NULL_DATA:  // this is not in 0.4.4 code
         return false;
     case TX_PUBKEY:
         keyID = CPubKey(vSolutions[0]).GetID();
@@ -2103,3 +2268,6 @@ void CScript::SetMultisig(int nRequired, const std::vector<CKey>& keys)
         *this << key.GetPubKey();
     *this << EncodeOP_N((int)(keys.size())) << OP_CHECKMULTISIG;
 }
+#ifdef _MSC_VER
+    #include "msvc_warnings.pop.h"
+#endif

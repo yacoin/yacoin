@@ -39,7 +39,7 @@ static const unsigned int MAX_BLOCK_SIGOPS = MAX_BLOCK_SIZE/50;
 static const unsigned int MAX_ORPHAN_TRANSACTIONS = MAX_BLOCK_SIZE/100;
 static const unsigned int MAX_INV_SZ = 50000;
 
-static const ::int64_t MIN_TX_FEE = CENT/10;
+static const ::int64_t MIN_TX_FEE = CENT;
 static const ::int64_t MIN_RELAY_TX_FEE = CENT/50;
 
 static const ::int64_t MAX_MONEY = 2000000000 * COIN;
@@ -65,6 +65,8 @@ extern const uint256
   //hashGenesisBlockTestNet("0xfe20c2c2fc02b36d2473e1f51dba1fb123d41ff42966e2a4edabb98fdd7107e6");
     // change here           ^^^^^^^^^^^^^
     hashGenesisBlockTestNet;
+extern int 
+    nConsecutiveStakeSwitchHeight;  // see timesamps.h = 420000;
 
 static const ::int64_t nMaxClockDrift = 2 * 60 * 60;        // two hours
 inline ::int64_t PastDrift(::int64_t nTime)   { return nTime - 2 * 60 * 60; } // up to 2 hours from the past
@@ -689,17 +691,25 @@ public:
     {
         std::string str;
         str += IsCoinBase()? "Coinbase" : (IsCoinStake()? "Coinstake" : "CTransaction");
-        str += strprintf("(hash=%s, nTime=%d, ver=%d, vin.size=%" PRIszu ", vout.size=%" PRIszu ", nLockTime=%d)\n",
+        str += strprintf(
+            "(hash=%s, "
+            "nTime=%d, "
+            "ver=%d, "
+            "vin.size=%" PRIszu ", "
+            "vout.size=%" PRIszu ", "
+            "nLockTime=%d)"
+            "\n",
             GetHash().ToString().substr(0,10).c_str(),
             nTime,
             nVersion,
             vin.size(),
             vout.size(),
-            nLockTime);
-        for (unsigned int i = 0; i < vin.size(); i++)
-            str += "    " + vin[i].ToString() + "\n";
-        for (unsigned int i = 0; i < vout.size(); i++)
-            str += "    " + vout[i].ToString() + "\n";
+            nLockTime
+                        );
+        for (unsigned int i = 0; i < vin.size(); ++i)
+            str += strprintf( "vin[ %u ] =", i ) + vin[i].ToString() + "\n";
+        for (unsigned int i = 0; i < vout.size(); ++i)
+            str += strprintf( "vout[ %u ]=", i ) + vout[i].ToString() + "\n";
         return str;
     }
 
@@ -997,7 +1007,7 @@ public:
 
         unsigned char 
             nfactor;
-        if( !fTestNet )
+        if( !fTestNet )   //<<<<<<<<<<<<<<<<<<<<<<<<< test!!!
         {     // nChainStartTime = 1367991200 is start
 		    if ( nTime < (nChainStartTime + nSpanOf4 ) ) nfactor = 4;
             else if ( nTime < (nChainStartTime + nSpanOf5 ) ) nfactor = 5;
@@ -1068,7 +1078,12 @@ public:
             // Take last bit of block hash as entropy bit
             unsigned int nEntropyBit = ((GetHash().Get64()) & 1ULL);
             if (fDebug && GetBoolArg("-printstakemodifier"))
-                printf("GetStakeEntropyBit: nTime=%u hashBlock=%s nEntropyBit=%u\n", nTime, GetHash().ToString().c_str(), nEntropyBit);
+                printf(
+                        "GetStakeEntropyBit: nTime=%u \nhashBlock=%s\nnEntropyBit=%u\n", 
+                        nTime, 
+                        GetHash().ToString().c_str(), 
+                        nEntropyBit
+                      );
    			return nEntropyBit;
  
     }
@@ -1206,21 +1221,34 @@ public:
 
     void print() const
     {
-        printf("CBlock(hash=%s, ver=%d, hashPrevBlock=%s, hashMerkleRoot=%s, nTime=%u, nBits=%08x, nNonce=%u, vtx=%" PRIszu ", vchBlockSig=%s)\n",
+        printf("CBlock(\n"
+                "hash=%s,\n"
+                "ver=%d,\n"
+                "hashPrevBlock=%s,\n"
+                "hashMerkleRoot=%s,\n"
+                "nTime=%u, "
+                "nBits=%08x, "
+                "nNonce=%u, "
+                "vtx=%" PRIszu ",\n"
+                "vchBlockSig=%s\n"
+                ")\n",
             GetHash().ToString().c_str(),
             nVersion,
             hashPrevBlock.ToString().c_str(),
             hashMerkleRoot.ToString().c_str(),
-            nTime, nBits, nNonce,
+            nTime, 
+            nBits, 
+            nNonce,
             vtx.size(),
-            HexStr(vchBlockSig.begin(), vchBlockSig.end()).c_str());
-        for (unsigned int i = 0; i < vtx.size(); i++)
+            HexStr(vchBlockSig.begin(), vchBlockSig.end()).c_str()
+              );
+        for (unsigned int i = 0; i < vtx.size(); ++i)
         {
             printf("  ");
             vtx[i].print();
         }
         printf("  vMerkleTree: ");
-        for (unsigned int i = 0; i < vMerkleTree.size(); i++)
+        for (unsigned int i = 0; i < vMerkleTree.size(); ++i)
             printf("%s ", vMerkleTree[i].ToString().substr(0,10).c_str());
         printf("\n");
     }

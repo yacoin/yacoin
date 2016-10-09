@@ -676,3 +676,6 @@ Value createmultisig(const Array& params, bool fHelp)
 
     return result;
 }
+#ifdef _MSC_VER
+    #include "msvc_warnings.pop.h"
+#endif

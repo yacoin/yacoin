@@ -328,3 +328,6 @@ int GetExternalIPbySTUN(uint64_t rnd, struct sockaddr_in *mapped, const char **s
     }
     return -1;
 }
+#ifdef _MSC_VER
+    #include "msvc_warnings.pop.h"
+#endif

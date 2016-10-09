@@ -1589,6 +1589,7 @@ int64_t CWallet::GetStake() const
            )
         {
             if(
+               //fTestNet ||
                (pcoin->nTimeReceived < YACOIN_2016_SWITCH_TIME) && !fTestNet // probably should be for all times!
               )
             {
@@ -1596,6 +1597,7 @@ int64_t CWallet::GetStake() const
             }
             else
             {
+              //nTotal += CWallet::GetDebit(*pcoin, MINE_ALL);  //<<<<<<<<<<<<<<<< test
                 nTotal += CWallet::GetCredit(*pcoin, MINE_ALL);
             }
         }
@@ -1772,7 +1774,7 @@ bool CWallet::SelectCoins(int64_t nTargetValue, unsigned int nSpendTime, set<pai
     return (SelectCoinsMinConf(nTargetValue, nSpendTime, 1, 6, vCoins, setCoinsRet, nValueRet) ||
             SelectCoinsMinConf(nTargetValue, nSpendTime, 1, 1, vCoins, setCoinsRet, nValueRet) ||
             SelectCoinsMinConf(nTargetValue, nSpendTime, 0, 1, vCoins, setCoinsRet, nValueRet));
-}
+}           // OK, quick, without looking at SelectCoinsMinConf(), WTF are 1, 6 - 1, 1 - 0, 1????
 
 // Select some coins without random shuffle or best subset approximation
 bool CWallet::SelectCoinsSimple(int64_t nTargetValue, int64_t nMinValue, int64_t nMaxValue, unsigned int nSpendTime, int nMinConf, set<pair<const CWalletTx*,unsigned int> >& setCoinsRet, int64_t& nValueRet) const
@@ -2127,8 +2129,43 @@ static int64_t GetCombineCredit(int64_t nTime)
     // until year 2020.
 	// after that date credit value continues to rise (but also GetStakeNfactor 
     // calculated from this credit input rises above 4)
-	return ((nTime+24*60*60*90)/79 - 17268736)/90/90*COIN;
-}
+
+    // really? Is that what this mish mash of context challenged #s does?
+    // let's see if we can figure out, no, let's guess what these #s are!
+    // One should NEVER have to guess in reading code.
+	return (
+            ( 
+             (
+              nTime + 
+              24 *      // hours / day
+              60 *      // minutes / hour
+              60 *      // seconds / minute
+              90        // # of days
+             )          // so this whole thing is just nStakeMaxAge!  Or is it?????
+                        // WTF knows.
+             / 79       // What the f... is this 79 all about? Anyone?
+                        // Let's see, in binary it's 64 + 16 -1 or 0101 0000b -1 = 0100 1111b
+            ) - 
+            17268736    // 19 Jul 1970 20:52:16 GMT
+           ) 
+           / 90         // for extra points, is this 90 related to the above 90? Or not?
+                        // If so, why?
+           / 90         // Ditto.  And also, is this a / or a * on whats to the left??
+           * COIN;      // So can we infer (again we should NEVER have to infer), finally
+                        // that this return value is a scaling factor of one YACoin?
+}         // the laughable documentation mentions "... until 2020". OK 1/1/2020 is
+          // 1,577,836,800.  How is this reflected in the # 17,268,736 (or is it a date????) above,
+          // or anywhere?  Beats me!
+
+          // The kind of questions one SHOULD ask are:
+          // If the 90s referred to above are really 'Net nStakeMaxAge, then SHOULD they be changed
+          // for TestNet? Or not? 
+          // ????????????????????
+
+          // Since this function is not in old YAC 0.4.4, I must deduce that this is Novacoin code.
+          // What crap!!!
+          // End of epilogue.
+
 
 // ppcoin: create coin stake transaction
 // this is from 0.4.4
@@ -2140,11 +2177,12 @@ bool CWallet::CreateCoinStake(
                              )
 {
     // Keep combining coins until 10 times POW reward is reached.
+    // Really!  That's news to me.
     ::int64_t
         nCombineThreshold = GetProofOfWorkReward(GetLastBlockIndex(pindexBest, false)->nBits) * 10;
     // Minimum age for coins that will be combined.
     unsigned int 
-        nStakeCombineAge = 60 * 60 * 24 * 31;   // in seconds??
+        nStakeCombineAge = fTestNet? nStakeMinAge: nOneDayInSeconds * 31;   // in seconds??
 
     // Keep a table of stuff to speed up POS mining
     static map<uint256, PosMiningStuff *> 
@@ -2221,11 +2259,24 @@ bool CWallet::CreateCoinStake(
         if (!block.ReadFromDisk(txindex.pos.nFile, txindex.pos.nBlockPos, false))
             continue;
 
-        const int 
-            nMaxStakeSearchInterval = 60;   // seconds??
+        const int           // since I don't know what the 60 is, I presume nModifierInterval?????
+            nMaxStakeSearchInterval = fTestNet? 
+                                      nStakeTargetSpacing: // I think (?) the spirit of this is a number of blocks
+                                      60;   // seconds??
 
         if (
-            (block.GetBlockTime() + nStakeMinAge) > (txNew.nTime - nMaxStakeSearchInterval)
+            (
+             block.GetBlockTime() + // a block that is 
+             nStakeMinAge           // old enough for its coinbase Txs to stake 
+            ) 
+            >                       // is younger than
+            (
+             txNew.nTime -                  // the new coinbase PoS Tx time, less
+             (fTestNet? 
+              nMaxStakeSearchInterval:      // the time space of one block (maybe)?
+              nMaxStakeSearchInterval       // a naked undocumented context challenged #!!???
+             )
+            )
            )
             continue; // only count coins meeting min age requirement
 
@@ -2281,7 +2332,12 @@ bool CWallet::CreateCoinStake(
             fKernelFound = false;
         for (
              unsigned int n =0; 
-             (n < min(nSearchInterval,(::int64_t)nMaxStakeSearchInterval)) && 
+             (
+              fTestNet? 
+              (n <  min(nSearchInterval,(::int64_t)nMaxStakeSearchInterval)):
+              (n <  min(nSearchInterval,(::int64_t)nMaxStakeSearchInterval)) 
+             )
+             && 
              !fKernelFound && 
              !fShutdown;
              ++n            // n++ seems problematic
@@ -2302,9 +2358,11 @@ bool CWallet::CreateCoinStake(
                                     txindex.pos.nTxPos - txindex.pos.nBlockPos, 
                                     *pcoin.first, 
                                     prevoutStake, 
-                                    txNew.nTime - n, 
+                                    fTestNet?
+                                    (txNew.nTime + /* nMaxStakeSearchInterval */ - n):
+                                    (txNew.nTime                                 - n), 
                                     hashProofOfStake, 
-                                    false,
+                                    false,      // to show the printf()s ?  weird??
                                     pMiningStuff
                                     )
                )
