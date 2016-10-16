@@ -360,24 +360,7 @@ std::string HelpMessage()
         "  -rpcsslcertificatechainfile=<file.cert>  " + _("Server certificate file (default: server.cert)") + "\n" +
         "  -rpcsslprivatekeyfile=<file.pem>         " + _("Server private key (default: server.pem)") + "\n" +
         "  -rpcsslciphers=<ciphers>                 " + _("Acceptable ciphers (default: TLSv1+HIGH:!SSLv2:!aNULL:!eNULL:!AH:!3DES:@STRENGTH)") + "\n";     
-#ifdef WIN32
-        "  -printtodebugger       " + _("Send trace/debug info to debugger") + "\n" +
 
-        "  -btcyacprovider        " + _("Add a BTC to YAC price provider, entered as") + "\n" +
-     + ("                         domain,key,argument,offset") + "\n" +
-     + ("                         For example: where the url is") + "\n" +
-     + ("                         http://pubapi2.cryptsy.com/api.php?method=singlemarketdata&marketid=11") + "\n" +
-     + ("                         one would enter") + "\n" +
-     + ("                         pubapi2.cryptsy.com,lasttradeprice,/api.php?method=singlemarketdata&marketid=11,3") + "\n" +
-     + ("                         see https://www.cryptsy.com/pages/publicapi") + "\n" +
-        "  -usdbtcprovider        " + _("Add a USD to BTC price provider, entered as") + "\n" +
-     + ("                         domain,key,argument,offset") + "\n" +
-     + ("                         For example: where the url is") + "\n" +
-     + ("                         http://pubapi2.cryptsy.com/api.php?method=singlemarketdata&marketid=2") + "\n" +
-     + ("                         one would enter") + "\n" +
-     + ("                         pubapi2.cryptsy.com,lastdata,/api.php?method=singlemarketdata&marketid=2,3") + "\n" +
-     + ("                         see https://www.cryptsy.com/pages/publicapi") + "\n" +
-#endif
     return strUsage;
 }
 

@@ -468,11 +468,11 @@ CNode* ConnectNode(CAddress addrConnect, const char *pszDest, int64_t nTimeout)
     }
 
 
-    /// debug print
+    /* debug print
     printf("trying connection %s lastseen=%.1fhrs\n",
         pszDest ? pszDest : addrConnect.ToString().c_str(),
         pszDest ? 0 : (double)(GetAdjustedTime() - addrConnect.nTime)/3600.0);
-
+*/
     // Connect
     SOCKET hSocket;
     if (pszDest ? ConnectSocketByName(addrConnect, hSocket, pszDest, GetDefaultPort()) : ConnectSocket(addrConnect, hSocket))
@@ -547,40 +547,6 @@ void CNode::CloseSocketDisconnect()
     fDisconnect = true;
     if (hSocket != INVALID_SOCKET)
     {
-
-#ifdef WIN32
-            char
-                *pc = iGetLastErrorText( nErr );
-
-            switch( nErr )
-            {
-                case WSANOTINITIALISED:
-                    //A successful WSAStartup call must occur before using this function.
-
-                case WSAENETDOWN:
-                    //The network subsystem has failed.
-
-                case WSAENOTSOCK:
-                    //The descriptor is not a socket.
-
-                case WSAEINPROGRESS:
-                    //A blocking Windows Sockets 1.1 call is in progress, or 
-                    //the service provider is still processing a callback function.
-
-                case WSAEINTR:
-                    //The (blocking) Windows Socket 1.1 call was canceled through WSACancelBlockingCall.
-
-                case WSAEWOULDBLOCK:
-                    //The socket is marked as nonblocking, but the l_onoff
-                    //member of the linger structure is                     :
-
-                    printf( "(%s)", pc );
-                    break;
-                default:
-                    break;
-            }
-#endif
-
         printf("disconnecting node %s\n", addrName.c_str());
         CloseSocket(hSocket);
         vRecv.clear();
@@ -1134,17 +1100,6 @@ void ThreadDNSAddressSeed2(void* parg)
     printf("%d addresses found from DNS seeds\n", found);
 }
 
-
-
-
-
-
-
-
-
-
-
-
 uint32_t pnSeed[] =
 {
     0x9a7b3ead, 0x227d54c2, 0xd58ba47d, 0x0dd46759, 0x66dfe77a, 0x9cbee86d, 0x70826bd0, 0x5dcb0077,
@@ -1153,13 +1108,9 @@ uint32_t pnSeed[] =
     0x9a440455, 0x696a357b, 0x6b7aca75, 0x78731732, 0x48ab9959, 0x79426277, 0x2e7c0c6f, 0xb02a9c7a,
     0x8c25347b, 0x98d65070, 0xf53fba4d, 0x97264c90, 0x9e12554d, 0x1802b61f, 0xaf21e074, 0x032a5171,
     0x6be05d6d, 0x80472e5f, 0xea3788c6, 0xd4ed5d7b, 0x138adf02, 0xcfd438b7, 0x4f5b15b7, 0xe05e3bda,
-    0xbdc26cda, 0xe336b34c, 0xf70c2e1b, 0xa70e535b, 0x2500a56d, 0xee258932, 0x2f135e3b, 0x5dee3eda,
-    0x3dbdfc3a, 0x50a45a4e, 0x47d462bc, 0xde588753, 0x9e396399, 0x15c29b7b, 0xcdea856c, 0x29beba3d,
-    0x2a8703b9, 0xfa75ae52, 0xcefe4771, 0x026ea2dc, 0x02754e4d, 0x6a2dd53a, 0x5dabf2de, 0x0cb08dca,
-    0x99798459, 0x1d2e597c, 0xa430203b, 0x64c34b25, 0x237ab751, 0x2616a371, 0x4a41a17b, 0x7f954d5c,
-    0x803bbc71, 0x5cef293b, 0xe46ecb45, 0xde215771, 0xa6ed3fda, 0x692d65b6, 0x85c27254, 0x6ee32e53,
-    0xd4b121b2, 0xb4004ea6, 0xba67c454, 0x42779a42, 0xe58e19bc, 0x9bb8216e, 0x6eb54105, 0x1184e079,
-    0x759610b7, 0x8918597b, 0x2b6cadb4, 0x464717c6, 0xf6caa8b4, 0x54e4b2de, 0xbfe9b8b2, 0x5da925b7,
+    0xad02fddf,   0x0512cbb2,0x05bd9061,0x2571801f,0x32962c78,0x3d99b5fb,0x3ecda46b,0x42ac0ab7,
+    0x4e2f3c8d,  0x5fd0f8e2, 0x61471538, 0x7a959a24, 0x96fe71a3, 0xae38555f, 0xb91c6e23, 0xc14d2da1,
+    0xc16a5dea, 0xc18862b8, 0xc340954e, 0xc64ae75c, 0xc7cc26d2, 0x759610b7, 0x8918597b, 0x2b6cadb4,
     0xe34699bb, 0xde171fbc, 0xd6643074, 0x49a6b777, 0x4ec50ec3, 0x61704cde, 0xd09ffa76, 0x897f8932,
     0xc5ac9b6e, 0x0207d8ab, 0x9428dfb2, 0xdc7c47b7, 0x6450357b, 0x8ce677b0, 0xa769a75d, 0xa64a02b7,
     0x03dfd85e, 0xdc60a6df, 0x98167c40, 0x1cdbe77a, 0xcfd0a52e, 0xf4a2f17a, 0x9c1981b6, 0xc1cb10b7,
@@ -1171,7 +1122,7 @@ uint32_t pnSeed[] =
     0xa2cf11da, 0xd2888ab6, 0xe83a624e, 0xa7208c3d, 0xcacbbc56, 0x92275bdf, 0xfee3c07a, 0xbc934558,
     0xe5ce8777, 0x05d75971, 0x6edc512a, 0xc5070165, 0x26083905, 0x0ebd9f6e, 0x44a956d9, 0x7f5f930e,
     0x6ba694af, 0x7cf29773, 0x9b545378, 0x2a36b977, 0x24202477, 0x0151014d, 0x18534b3d, 0x5a54047a,
-    0x414ab776, 0x9619345c, 0x92065e71, 0x8e4ad5ab, 0xa95c735d, 0xabe4a93e, 0x04644e48, 0x2372a9b4,
+    0x414ab776, 0x9619345c, 0x92065e71, 0x8e4ad5ab, 0xa95c735d, 0xabe4a93e, 0x04644e48, 0x2372a9b4,    
 };
 
 const char* pchTorSeed[] = 

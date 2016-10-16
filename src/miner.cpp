@@ -908,9 +908,9 @@ void YacoinMiner(CWallet *pwallet)
                     assert(result == pblock->GetHash());
 
 
-                    if (!pblock->SignBlock(*pwalletMain))
+                    if ( (!IsYACOIN045) && (!pblock->SignBlock(*pwalletMain)) )
                     {
-                                printf("Noncefound, but unable to sign block");
+                                printf("Noncefound, but unable to sign 044 block");
                         break;
                     }
 

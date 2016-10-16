@@ -333,10 +333,6 @@ static const CRPCCommand vRPCCommands[] =
     { "walletlock",                 &walletlock,                  true,   false },
     { "walletpassphrase",           &walletpassphrase,            true,   false },
     { "walletpassphrasechange",     &walletpassphrasechange,      false,  false },
-#ifdef WIN32
-    { "getblockcountt",         &getcurrentblockandtime, true,   false },
-    { "getyacprice",            &getYACprice,            true,   false },
-#endif
 };
 
 CRPCTable::CRPCTable()

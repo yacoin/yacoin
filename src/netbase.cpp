@@ -389,7 +389,8 @@ bool static ConnectSocketDirectly(const CService &addrConnect, SOCKET& hSocketRe
             }
             if (nRet != 0)
             {
-                printf("connect() failed after select(): %s\n",strerror(nRet));
+              // DEBUG
+              //printf("connect() failed after select(): %s\n",strerror(nRet));
                 CloseSocket(hSocket);
                 return false;
             }

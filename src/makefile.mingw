@@ -2,27 +2,28 @@
 # Distributed under the MIT/X11 software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-USE_LEVELDB:=0
+CXX ?= g++
 CC=gcc
 
+USE_LEVELDB:=1
 
-USE_IPV6:=1
-USE_SSE2:=1
+USE_IPV6:=0
 
 BOOST_SUFFIX?=-mgw49-mt-s-1_57
 
 INCLUDEPATHS= \
  -I"$(CURDIR)" \
+ -I"$(CURDIR)/crypto/scrypt-jane" \
  -I"/c/deps/boost_1_57_0" \
  -I"/c/deps" \
- -I"/c/deps/db-6.0.20/build_unix" \
- -I"/c/deps/openssl-1.0.2/include"
- 
+ -I"/c/deps/db-4.8.30.NC/build_unix" \
+ -I"/c/deps/openssl-1.0.1t/include"
+
 LIBPATHS= \
  -L"$(CURDIR)/leveldb" \
  -L"/c/deps/boost_1_57_0/stage/lib" \
- -L"/c/deps/db-6.0.20/build_unix" \
- -L"/c/deps/openssl-1.0.2"
+ -L"/c/deps/db-4.8.30.NC/build_unix" \
+ -L"/c/deps/openssl-1.0.1t"
 
 LIBS= \
   -l leveldb \
@@ -41,16 +42,55 @@ ifeq (${USE_O3}, 1)
     xOPT_LEVEL=-O3
 endif
 
-DEFS=-DWIN32 -D_WINDOWS -DBOOST_THREAD_USE_LIB -DBOOST_SPIRIT_THREADSAFE -D__STDC_FORMAT_MACROS -D__STDC_LIMIT_MACROS
+DEFS= \
+	-DWIN32 \
+	-D_WINDOWS \
+	-DBOOST_THREAD_USE_LIB \
+	-DBOOST_SPIRIT_THREADSAFE \
+	-DSCRYPT_CHACHA \
+	-DSCRYPT_KECCAK512 \
+	-DSCRYPT_CHOOSE_COMPILETIME \
+	-D__STDC_FORMAT_MACROS \
+	-D__STDC_LIMIT_MACROS
+	
 DEBUGFLAGS=-g
-CFLAGS=-mthreads $(xOPT_LEVEL) -msse2 -w -Wall -Wextra -Wno-ignored-qualifiers -Wformat -Wformat-security -Wno-unused-parameter $(DEBUGFLAGS) $(DEFS) $(INCLUDEPATHS)
-LDFLAGS=-Wl,--dynamicbase -Wl,--nxcompat -Wl,--large-address-aware -static
+
+CFLAGS= \
+	-mthreads \
+	$(xOPT_LEVEL) \
+	-msse2 \
+	-w -Wall -Wextra -Wformat -Wformat-security -Wno-unused-parameter \
+	$(DEBUGFLAGS) \
+	$(DEFS) \
+	$(INCLUDEPATHS)
+
+LDFLAGS= \
+	-Wl,--dynamicbase \
+	-Wl,--nxcompat \
+	-Wl,--large-address-aware \
+	-static
 
 ifneq (${USE_IPV6}, -)
 	DEFS += -DUSE_IPV6=$(USE_IPV6)
 endif
 
-LIBS += -l kernel32 -l user32 -l gdi32 -l comdlg32 -l winspool -l winmm -l shell32 -l comctl32 -l ole32 -l oleaut32 -l uuid -l rpcrt4 -l advapi32 -l ws2_32 -l mswsock -l shlwapi
+LIBS += \
+	-l kernel32 \
+	-l user32 \
+	-l gdi32 \
+	-l comdlg32 \
+	-l winspool \
+	-l winmm \
+	-l shell32 \
+	-l comctl32 \
+	-l ole32 \
+	-l oleaut32 \
+	-l uuid \
+	-l rpcrt4 \
+	-l advapi32 \
+	-l ws2_32 \
+	-l mswsock \
+	-l shlwapi
 
 # TODO: make the mingw builds smarter about dependencies, like the linux/osx builds are
 HEADERS = $(wildcard *.h)
@@ -61,41 +101,44 @@ OBJS= \
     obj/version.o \
     obj/checkpoints.o \
     obj/netbase.o \
-    obj/addrman.o \
     obj/crypter.o \
     obj/base58.o \
     obj/key.o \
     obj/db.o \
     obj/init.o \
     obj/irc.o \
+    obj/kernel.o \
+    obj/key.o \
     obj/keystore.o \
     obj/main.o \
     obj/miner.o \
     obj/net.o \
     obj/ntp.o \
     obj/stun.o \
+    obj/netbase.o \
+    obj/noui.o \
+    obj/pbkdf2.o \
     obj/protocol.o \
     obj/bitcoinrpc.o \
-    obj/rpccrypt.o \
-    obj/rpcdump.o \
-    obj/rpcnet.o \
-    obj/rpcmining.o \
-    obj/rpcwallet.o \
     obj/rpcblockchain.o \
+    obj/rpcdump.o \
+    obj/rpcmining.o \
+    obj/rpccrypt.o \
+    obj/rpcnet.o \
     obj/rpcrawtransaction.o \
+    obj/rpcwallet.o \
     obj/script.o \
+    crypto/scrypt-jane/obj/scrypt-jane.o \
     obj/sync.o \
     obj/util.o \
     obj/version.o \
     obj/wallet.o \
     obj/walletdb.o \
-    obj/noui.o \
     obj/kernel.o \
     obj/kernel_worker.o \
     obj/ecies.o \
     obj/cryptogram.o \
-    obj/ipcollector.o \
-    crypto/scrypt-jane/obj/scrypt-jane.o
+    obj/ipcollector.o 
 
 all: yacoind.exe
 
@@ -113,6 +156,11 @@ obj/txdb-leveldb.o: leveldb/libleveldb.a
 else
 OBJS += obj/txdb-bdb.o
 endif
+
+#DEFS += $(addprefix -I,c:/deps/openssl-1.0.1t/include)
+
+crypto/scrypt-jane/obj/scrypt-jane.o: crypto/scrypt-jane/scrypt-jane.c 
+	g++ -c -frandom-seed=$@ $(CFLAGS) -MMD -o $@ $<
 
 ifdef USE_ASM
 # Assembler implementation
@@ -142,19 +190,22 @@ crypto/scrypt/intrin/obj/scrypt-sse2.o: crypto/scrypt/intrin/scrypt-sse2.cpp
 	$(CXX) -c $(CFLAGS) -MMD -o $@ $<
 else
 # Generic implementation
-OBJS += obj/scrypt-generic.o
+OBJS += crypto/scrypt/generic/obj/scrypt-generic.o
 
-crypto/scrypt/obj/scrypt-generic.o: crypto/scrypt/generic/scrypt-generic.cpp
+crypto/scrypt/generic/obj/scrypt-generic.o: crypto/scrypt/generic/scrypt-generic.cpp
 	$(CXX) -c $(CFLAGS) -MMD -o $@ $<
 endif
 endif
 
 
-obj/%.o: %.cpp $(HEADERS)
-	g++ -c $(CFLAGS) -o $@ $<
 
-novacoind.exe: $(OBJS:obj/%=obj/%)
+obj/%.o: %.cpp $(HEADERS)
+	g++ -c -frandom-seed=$@ $(CFLAGS) -o $@ $<
+
+
+yacoind.exe: $(OBJS:obj/%=obj/%)
 	g++ $(CFLAGS) $(LDFLAGS) -o $@ $(LIBPATHS) $^ $(LIBS)
+
 
 clean:
 	-del /Q yacoind.exe
