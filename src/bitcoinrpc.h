@@ -237,11 +237,6 @@ extern json_spirit::Value verifymessage(const json_spirit::Array& params, bool f
 extern json_spirit::Value walletlock(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value walletpassphrase(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value walletpassphrasechange(const json_spirit::Array& params, bool fHelp);
-#ifdef WIN32
-    extern bool isThisInGMT( time_t & tBlock, struct tm  &aTimeStruct );
-    extern json_spirit::Value getcurrentblockandtime(const json_spirit::Array& params, bool fHelp);
-    extern json_spirit::Value getYACprice(const json_spirit::Array& params, bool fHelp);
-    extern double doGetYACprice(void);
-#endif
+
 
 #endif

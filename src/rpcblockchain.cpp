@@ -10,10 +10,6 @@
 #include <boost/iostreams/stream.hpp>
 #include <ostream>
 
-#ifdef WIN32
-#include "price.h"
-#endif
-
 using namespace json_spirit;
 using namespace std;
 

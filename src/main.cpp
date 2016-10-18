@@ -1057,7 +1057,7 @@ unsigned char GetNfactor(::int64_t nTimestamp)
     if (n < 0) 
         n = 0;
     if (n > 255)
-        printf("GetNfactor(%"PRId64") - something wrong(n == %d)\n", nTimestamp, n); // for g++
+        printf("GetNfactor(% "PRId64") - something wrong(n == %d)\n", nTimestamp, n); // for g++
 
     // so n is between 0 and 0xff
     unsigned char N = (unsigned char)n;

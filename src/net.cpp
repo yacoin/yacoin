@@ -19,7 +19,6 @@
 
 #ifdef WIN32
 #include <string.h>
-#include "price.h"
 #endif
 
 using namespace std;
