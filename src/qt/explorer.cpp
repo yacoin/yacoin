@@ -1,5 +1,5 @@
 #ifndef EXPLORER_H
-    #include "explorer.h"
+    #include "qt/explorer.h"
 #endif
 #include "ui_explorer.h"
     #include "ui_explorerBlockPage.h"

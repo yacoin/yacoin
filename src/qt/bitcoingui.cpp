@@ -30,7 +30,7 @@
 #include "rpcconsole.h"
 #include "mintingview.h"
 #include "version.h"
-#include "explorer.h"
+#include "qt/explorer.h"
 
 #include "miner.h"
 #include "bitcoinrpc.h"

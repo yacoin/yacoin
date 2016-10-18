@@ -16,7 +16,7 @@
 #include "init.h"
 #include "ui_interface.h"
 #ifdef QT_GUI
-    #include "explorer.h"  
+    #include "qt/explorer.h"
 #endif
 #include "checkqueue.h"
 #include "kernel.h"

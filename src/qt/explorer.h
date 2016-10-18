@@ -1,6 +1,6 @@
 #ifndef EXPLORER_H
 #define EXPLORER_H
-    // this insures that explorer.h is included only once
+
 #include "uint256.h"
 
 //extern Object blockToJSON(const CBlock& block, const CBlockIndex* blockindex, bool fPrintTransactionDetail)
