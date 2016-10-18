@@ -445,11 +445,11 @@ bool AppInit2()
     // Ping and address broadcast intervals
     nPingInterval = max<int64_t>(10 * 60, GetArg("-keepalive", 30 * 60));
 
-    CheckpointsMode = Checkpoints::STRICT;
+    CheckpointsMode = Checkpoints::STRICTCP;
     std::string strCpMode = GetArg("-cppolicy", "strict");
 
     if(strCpMode == "strict") {
-        CheckpointsMode = Checkpoints::STRICT;
+        CheckpointsMode = Checkpoints::STRICTCP;
     }
 
     if(strCpMode == "advisory") {

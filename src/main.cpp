@@ -2679,7 +2679,7 @@ bool CBlock::AcceptBlock()
     bool cpSatisfies = Checkpoints::CheckSync(hash, pindexPrev);
 
     // Check that the block satisfies synchronized checkpoint
-    if (CheckpointsMode == Checkpoints::STRICT && !cpSatisfies)
+    if (CheckpointsMode == Checkpoints::STRICTCP && !cpSatisfies)
         return error("AcceptBlock() : rejected by synchronized checkpoint");
 
     if (CheckpointsMode == Checkpoints::ADVISORY && !cpSatisfies)

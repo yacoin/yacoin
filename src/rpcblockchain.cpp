@@ -405,7 +405,7 @@ Value getcheckpoint(const Array& params, bool fHelp)
     }
 
     // Check that the block satisfies synchronized checkpoint
-    if (CheckpointsMode == Checkpoints::STRICT)
+    if (CheckpointsMode == Checkpoints::STRICTCP)
         result.push_back(Pair("policy", "strict"));
 
     if (CheckpointsMode == Checkpoints::ADVISORY)
