@@ -63,7 +63,6 @@ QList<TransactionRecord> TransactionRecord::decomposeTransaction(const CWallet *
                     sub.address = mapValue["from"];
                 }
 
-                // YACOIN TODO
                 if (fCoinBase)
                 {
                     // Mined

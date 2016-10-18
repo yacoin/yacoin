@@ -416,7 +416,7 @@ Value getworkex(const Array& params, bool fHelp)
             CDataStream(coinbase, SER_NETWORK, PROTOCOL_VERSION) >> pblock->vtx[0]; // FIXME - HACK!
 
         pblock->hashMerkleRoot = pblock->BuildMerkleTree();
-    // YACOIN TODO
+
         if ((!IsYACOIN045) && (!pblock->SignBlock(*pwalletMain)))
             throw JSONRPCError(-100, "Unable to sign block, wallet locked?");
 
@@ -532,7 +532,7 @@ Value getwork(const Array& params, bool fHelp)
         pblock->nNonce = pdata->nNonce;
         pblock->vtx[0].vin[0].scriptSig = mapNewBlock[pdata->hashMerkleRoot].second;
         pblock->hashMerkleRoot = pblock->BuildMerkleTree();
-    // YACOIN TODO
+
         if ( (!IsYACOIN045) && (!pblock->SignBlock(*pwalletMain)) )
             throw JSONRPCError(-100, "Unable to sign block, wallet locked?");
 
@@ -716,7 +716,7 @@ Value submitblock(const Array& params, bool fHelp)
     catch (const std::exception&) {
         throw JSONRPCError(RPC_DESERIALIZATION_ERROR, "Block decode failed");
     }
-    // YACOIN TODO
+
     if ( (!IsYACOIN045) && (!block.SignBlock(*pwalletMain)) )
         throw JSONRPCError(-100, "Unable to sign block, wallet locked?");
 

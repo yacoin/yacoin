@@ -728,8 +728,7 @@ public:
     bool ConnectInputs(CTxDB& txdb, MapPrevTx inputs, std::map<uint256, CTxIndex>& mapTestPool, const CDiskTxPos& posThisTx, const CBlockIndex* pindexBlock, 
                      bool fBlock, bool fMiner, bool fScriptChecks=true, 
                      unsigned int flags=STRICT_FLAGS, std::vector<CScriptCheck> *pvChecks = NULL);
-// YACOIN TODO
-//  unsigned int flags=(!GetAdjustedTime() >= YACOIN_045_SWITCH_TIME ?  SOFT_FLAGS : STRICT_FLAGS)
+
     bool ClientConnectInputs();
     bool CheckTransaction() const;
     bool AcceptToMemoryPool(CTxDB& txdb, bool fCheckInputs=true, bool* pfMissingInputs=NULL);

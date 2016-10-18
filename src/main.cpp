@@ -3064,8 +3064,7 @@ bool CBlock::SignBlock(const CKeyStore& keystore)
 
             if (!Solver(txout.scriptPubKey, whichType, vSolutions))
                 continue;
-            // YACOIN TODO
-	    //if (whichType == TX_PUBKEY || TX_PUBKEYHASH)
+
             if (whichType == TX_PUBKEY)
             {
                 // Sign

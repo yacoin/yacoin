@@ -27,7 +27,7 @@ unsigned int nModifierTestSwitchTime = YACOIN_045_SWITCH_TIME;
 unsigned int nModifierUpgradeTime = 0;
 
 typedef std::map<int, unsigned int> MapModifierCheckpoints;
-// YACOIN TODO add checkpoints!
+
 // Hard checkpoints of stake modifiers to ensure they are deterministic
 static std::map<int, unsigned int> mapStakeModifierCheckpoints =
     boost::assign::map_list_of
@@ -57,6 +57,10 @@ static std::map<int, unsigned int> mapStakeModifierCheckpoints =
     (550177, 0x8a1e3994u )
     (612177, 0x949c4dc0u )
     (712177, 0xad692cc0u )
+    (712196, 0xb613b730u)
+    (815000, 0x1b7bc7f1u)
+    (1650000, 0xbaee3d93u)
+    (1664176, 0xbbb776d7u)
     ;
 
 // Hard checkpoints of stake modifiers to ensure they are deterministic (testNet)
