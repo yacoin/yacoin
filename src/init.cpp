@@ -56,7 +56,7 @@ void ExitTimeout(void* parg)
 void StartShutdown()
 {
 #ifdef QT_GUI
-    // ensure we leave the Qt main loop for a clean GUI exit (Shutdown() is called in bitcoin.cpp afterwards)
+    // ensure we leave the Qt main while(1) for a clean GUI exit (Shutdown() is called in bitcoin.cpp afterwards)
     uiInterface.QueueShutdown();
 #else
     // Without UI, Shutdown() can simply be started in a new thread
