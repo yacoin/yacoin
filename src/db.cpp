@@ -1136,7 +1136,7 @@ bool CTxDB::LoadBlockIndex()
     #endif        
         ++nCount;                
 #endif        
-    }           // the for loop
+    }           // the for while(1)
     if (pindexFork && !fRequestShutdown)
     {
         // Reorg back to the fork
@@ -1172,7 +1172,7 @@ bool CTxDB::LoadBlockIndexGuts()
 #endif
     // Load mapBlockIndex
     unsigned int fFlags = DB_SET_RANGE;
-    loop
+    while(1)
     {
         // Read next record
         CDataStream ssKey(SER_DISK, CLIENT_VERSION);
@@ -1247,9 +1247,9 @@ bool CTxDB::LoadBlockIndexGuts()
                 if (pindexNew->IsProofOfStake())
                     setStakeSeen.insert(make_pair(pindexNew->prevoutStake, pindexNew->nStakeTime));
 #ifdef WIN32
-                if( 0 == ( nCount % 10000 ) )  // every 10,000th time through the loop
+                if( 0 == ( nCount % 10000 ) )  // every 10,000th time through the while(1)
                 {
-                    // could "guess at the max nHeight & %age against the loop count
+                    // could "guess at the max nHeight & %age against the while(1) count
                     // to "hone in on" the %age done.  Towards the end it ought to be pretty accurate.
                     if( nMaxHeightGuess < pindexNew->nHeight )
                         nMaxHeightGuess = pindexNew->nHeight;

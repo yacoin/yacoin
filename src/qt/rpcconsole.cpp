@@ -400,13 +400,13 @@ void RPCConsole::startExecutor()
     connect(this, SIGNAL(cmdRequest(QString)), executor, SLOT(request(QString)));
     // On stopExecutor signal
     // - queue executor for deletion (in execution thread)
-    // - quit the Qt event loop in the execution thread
+    // - quit the Qt event while(1) in the execution thread
     connect(this, SIGNAL(stopExecutor()), executor, SLOT(deleteLater()));
     connect(this, SIGNAL(stopExecutor()), thread, SLOT(quit()));
     // Queue the thread for deletion (in this thread) when it is finished
     connect(thread, SIGNAL(finished()), thread, SLOT(deleteLater()));
 
-    // Default implementation of QThread::run() simply spins up an event loop in the thread,
+    // Default implementation of QThread::run() simply spins up an event while(1) in the thread,
     // which is what we want.
     thread->start();
 }
