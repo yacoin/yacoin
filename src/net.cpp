@@ -1472,22 +1472,26 @@ void static ProcessOneShot()
 // ppcoin: stake minter thread
 void static ThreadStakeMinter(void* parg)
 {
-    printf("ThreadStakeMinter started\n");
-    CWallet* pwallet = (CWallet*)parg;
-    try
-    {
-        vnThreadsRunning[THREAD_MINTER]++;
-        BitcoinMiner(pwallet, true);
-        vnThreadsRunning[THREAD_MINTER]--;
+    if (!mapArgs.count("-no-pos")) {
+        printf("ThreadStakeMinter started\n");
+        CWallet* pwallet = (CWallet*)parg;
+        try
+        {
+            vnThreadsRunning[THREAD_MINTER]++;
+            BitcoinMiner(pwallet, true);
+            vnThreadsRunning[THREAD_MINTER]--;
+        }
+        catch (std::exception& e) {
+            vnThreadsRunning[THREAD_MINTER]--;
+            PrintException(&e, "ThreadStakeMinter()");
+        } catch (...) {
+            vnThreadsRunning[THREAD_MINTER]--;
+            PrintException(NULL, "ThreadStakeMinter()");
+        }
+        printf("ThreadStakeMinter exiting, %d threads remaining\n", vnThreadsRunning[THREAD_MINTER]);
+    } else {
+        printf("Not starting Stake Minter.");
     }
-    catch (std::exception& e) {
-        vnThreadsRunning[THREAD_MINTER]--;
-        PrintException(&e, "ThreadStakeMinter()");
-    } catch (...) {
-        vnThreadsRunning[THREAD_MINTER]--;
-        PrintException(NULL, "ThreadStakeMinter()");
-    }
-    printf("ThreadStakeMinter exiting, %d threads remaining\n", vnThreadsRunning[THREAD_MINTER]);
 }
 
 void ThreadOpenConnections2(void* parg)

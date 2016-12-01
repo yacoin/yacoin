@@ -2170,6 +2170,10 @@ bool CBlock::AcceptBlock()
     CBlockIndex* pindexPrev = (*mi).second;
     int nHeight = pindexPrev->nHeight+1;
 
+    // saironiq: enforce "no consecutive PoS blocks" rule (from end of Jan 2014)
+    if (nHeight >= nConsecutiveStakeSwitchHeight && IsProofOfStake() && pindexPrev->IsProofOfStake())
+        return DoS(100, error("AcceptBlock() : two consecutive PoS blocks"));
+
     // Check proof-of-work or proof-of-stake
     if (nBits != GetNextTargetRequired(pindexPrev, IsProofOfStake()))
         return DoS(100, error("AcceptBlock() : incorrect %s", IsProofOfWork() ? "proof-of-work" : "proof-of-stake"));

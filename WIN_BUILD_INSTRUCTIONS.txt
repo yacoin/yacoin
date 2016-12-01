@@ -1,0 +1,100 @@
+Compiling yacoind && yacoin-qt under Windoze
+
+1) Download & install 7zip
+http://surfnet.dl.sourceforge.net/project/sevenzip/7-Zip/9.20/7z920.exe
+
+2) Download and extract MinGW to C:\mingw
+http://gccforgo.googlecode.com/files/MinGW-gcc4.6.2-msys.7z
+
+3) Create shortcut to C:\mingw\msys\1.0\msys.bat on your desktop
+
+4) Right click My Computer, select Properties->Advanced tab->Environment Variables->select "Path"->click "Edit"->append ";C:\MinGW\bin" at the end of variable value
+
+5) Download openssl and place the file in C:\deps\
+http://www.openssl.org/source/openssl-1.0.1e.tar.gz
+
+6) Double-click the msys.bat shortcut, a terminal window pops up.
+
+7) Type:
+cd /c/deps
+tar xzf openssl-1.0.1e.tar.gz
+cd openssl-1.0.1e
+./config
+make
+
+8) Download berkeley-db lib and place it in C:\deps\
+http://download.oracle.com/berkeley-db/db-4.8.30.NC.tar.gz
+
+9) Back in the term, type:
+cd /c/deps
+tar xzf db-4.8.30.NC.tar.gz
+cd db-4.8.30.NC/build_unix
+../dist/configure --disable-replication --enable-mingw --enable-cxx
+sed 's/typedef pthread_t db_threadid_t/typedef u_int32_t db_threadid_t/' -i db.h
+make
+
+10) Download boost and place it in C:\deps\
+http://sourceforge.net/projects/boost/files/boost/1.54.0/boost_1_54_0.tar.gz/download
+
+11) Type this into the terminal:
+cd /c/deps
+tar xzf boost_1_54_0.tar.gz
+cd boost_1_54_0
+
+12) Open Windows command prompt (Start->Run->Type "cmd.exe"->Enter)
+
+13) Type this into cmd.exe window (the last step will take a LONG time):
+cd C:\deps\boost_1_54_0\
+bootstrap.bat mingw
+b2 --build-type=complete --with-chrono --with-filesystem --with-program_options --with-system --with-thread toolset=gcc stage
+
+14) Download latest snapshot of yacoin, extract it to C:\ (so you have C:\yacoin-cc-master)
+https://github.com/saironiq/yacoin-cc/archive/master.zip
+
+15) Back in the MinGW shell, type:
+cd /c/yacoin-cc-master/src
+mingw32-make -f makefile.mingw
+strip yacoind.exe
+
+16) Congrats! You now have yacoind.exe binary ready to be used. Now onto the Qt client...
+
+17) Download and install Qt (unsupported MinGW version is OK, accept it)
+http://download.qt-project.org/official_releases/qt/4.8/4.8.5/qt-win-opensource-4.8.5-mingw.exe
+
+18) Download upnp lib to C:\deps
+http://miniupnp.free.fr/files/download.php?file=miniupnpc-1.8.tar.gz
+
+19) In MinGW shell:
+cd /c/deps
+tar xzf miniupnpc-1.8.tar.gz
+mv miniupnpc-1.8 miniupnpc
+
+20) Double-click on mingw32make.bat inside C:\deps\miniupnpc and wait for it to finish (it will automatically close)
+
+21) [TODO] Download zlib, place it in C:\deps
+http://zlib.net/zlib-1.2.8.tar.gz
+
+22) [TODO] MinGW:
+cd /c/deps
+tar xzf zlib-1.2.8.tar.gz
+cd zlib-1.2.8/
+make -f win32/Makefile.gcc
+
+23) [TODO] Download libpng lib, extract it to C:\deps\libpng-1.2.37\
+http://sourceforge.net/projects/gnuwin32/files/libpng/1.2.37/libpng-1.2.37-lib.zip/download
+
+24) [TODO] Download qrencode lib into C:\deps
+http://fukuchi.org/works/qrencode/qrencode-3.4.3.tar.gz
+
+25) [TODO] In MinGW shell:
+cd /c/deps
+tar xzf qrencode-3.4.3.tar.gz
+LIBS="-lpthread" LDFLAGS="-L/c/MinGW/lib" png_CFLAGS="-L../libpng-1.2.37/lib -I../libpng-1.2.37/include -L../zlib-1.2.8/ -I../zlib-1.2.8/ -lpng" png_LIBS=" " ./configure
+make
+
+26) Open the newly installed Qt command prompt and type:
+cd C:\yacoin-cc-master\
+qmake "USE_UPNP=1" yacoin-qt.pro
+mingw32-make -f Makefile.Release
+
+NOTE: all steps marked [TODO] currently do NOT work... anyway, who needs qr codes?
