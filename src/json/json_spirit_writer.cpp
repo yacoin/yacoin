@@ -98,3 +98,6 @@ std::wstring json_spirit::write_formatted( const wmValue&  value )
 }
 
 #endif
+#ifdef _MSC_VER
+    #include "msvc_warnings.pop.h"
+#endif

@@ -24,7 +24,6 @@ CCriticalSection
     cs_price;  // just want one call to getYACprice to not
                // interrupt another call to the same function.
 
-#ifdef WIN32
 static const int
     nDefaultCharacterOffset = 3,
     nUnusualCharacterOffset = 2;
@@ -267,6 +266,9 @@ private:
 public:
     explicit CdoSocket( SOCKET & Socket, const string & sDomain, const int & nPort = DEFAULT_HTTP_PORT )
     {
+        int
+            nResult;
+        SocketCopy = NULL;
         Socket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
         
         host = gethostbyname( sDomain.c_str() );
@@ -282,8 +284,7 @@ public:
 
             //cout << "Connecting...\n";
 
-            int
-                nResult = connect(Socket,(SOCKADDR*)(&SockAddr),sizeof(SockAddr) );
+            nResult = connect(Socket,(SOCKADDR*)(&SockAddr),sizeof(SockAddr) );
 
             if ( SOCKET_ERROR == nResult )
             {
@@ -293,20 +294,31 @@ public:
                                     "connect function failed with error: %d\n", 
                                     WSAGetLastError()
                                   );
+#ifdef WIN32
                 clearLocalSocketError( Socket );
+
                 nResult = closesocket(Socket);
-                if (nResult == SOCKET_ERROR)
+                if ( SOCKET_ERROR == nResult )
                     wprintf(L"closesocket function failed with error: %ld\n", WSAGetLastError());
                 //WSACleanup();
+#else
+                nResult = closesocket(Socket);  //I'm guessing here as I don't linux!
+#endif
+                Socket = NULL;
                 throw runtime_error(
                         "getYACprice\n"
                         "Could not connect?"
                                    );
             }
-            SocketCopy = Socket;
+            SocketCopy = Socket;        // success
         }
         else    // network is down?
         {
+            nResult = closesocket(Socket);
+            if ( SOCKET_ERROR == nResult )
+                wprintf(L"closesocket function failed with error: %ld\n", WSAGetLastError());
+            //WSACleanup();
+            Socket = NULL;
             throw runtime_error(
                                 "getYACprice\n"
                                 "Network is down?"
@@ -316,8 +328,11 @@ public:
 
     ~CdoSocket()
     {
-        clearLocalSocketError( SocketCopy );
-        closesocket( SocketCopy );
+        if (NULL != SocketCopy)
+        {
+            clearLocalSocketError( SocketCopy );
+            closesocket( SocketCopy );
+        }
     }    
 };
 //_____________________________________________________________________________
@@ -603,7 +618,6 @@ bool GetMyExternalWebPage2( int & nIndexUsdToBtc, string & strBuffer, double & d
     return true;
 }
 //_____________________________________________________________________________
-#endif
 #ifdef _MSC_VER
     #include "msvc_warnings.pop.h"
 #endif

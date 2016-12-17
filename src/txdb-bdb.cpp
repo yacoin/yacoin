@@ -26,7 +26,6 @@
 
 using namespace boost;
 
-//using namespace std;
 using std::string;
 using std::runtime_error;
 using std::make_pair;
@@ -510,5 +509,8 @@ bool CTxDB::LoadBlockIndexGuts()
 
     return true;
 }
+#ifdef _MSC_VER
+    #include "msvc_warnings.pop.h"
+#endif
 #endif
 

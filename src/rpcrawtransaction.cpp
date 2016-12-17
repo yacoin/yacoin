@@ -22,7 +22,6 @@ using namespace boost;
 using namespace boost::assign;
 using namespace json_spirit;
 
-//using namespace std;
 using std::vector;
 using std::runtime_error;
 using std::map;

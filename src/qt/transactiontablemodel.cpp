@@ -106,11 +106,21 @@ public:
             bool 
                 showTransaction;
             // Determine whether to show transaction or not
-            if( mi->second.nTimeReceived < YACOIN_2016_SWITCH_TIME )
-            {
-                showTransaction = (inWallet && TransactionRecord::showTransaction(mi->second, false));
-            }
-            else
+
+            // Again I don't understand what is the intent? Why is this needed for YAC??
+            // It seems to be the reverse of what it is calling?
+            // It seems the one call should be sufficient?  Or am I missing some 
+            // again undocumented (here) information???
+            // so shouldn't this be
+            //if( 
+            //   (mi->second.nTimeReceived < YACOIN_NEW_LOGIC_SWITCH_TIME) 
+            //   && 
+            //   !fTestNet 
+            //  )
+            //{
+            //    showTransaction = (inWallet && TransactionRecord::showTransaction(mi->second, false));
+            //}
+            //else
             {
                 showTransaction = (inWallet && TransactionRecord::showTransaction(mi->second));
             }
@@ -426,6 +436,7 @@ QString TransactionTableModel::formatTxToAddress(const TransactionRecord *wtx, b
     case TransactionRecord::RecvWithAddress:
     case TransactionRecord::SendToAddress:
     case TransactionRecord::Generated:
+    case TransactionRecord::Mined:          //<<<<<<<<<<<<<<test
         return lookupAddress(wtx->address, tooltip);
     case TransactionRecord::SendToOther:
         return QString::fromStdString(wtx->address);
@@ -442,6 +453,7 @@ QVariant TransactionTableModel::addressColor(const TransactionRecord *wtx) const
     {
     case TransactionRecord::RecvWithAddress:
     case TransactionRecord::SendToAddress:
+    case TransactionRecord::Mined:          //<<<<<<<<<<<<<<<test
     case TransactionRecord::Generated:
         {
         QString label = walletModel->getAddressTableModel()->labelForAddress(QString::fromStdString(wtx->address));
@@ -641,7 +653,11 @@ QVariant TransactionTableModel::data(const QModelIndex &index, int role) const
         // Return True if transaction counts for balance
         return rec->status.confirmed && 
                 !(
-                  (rec->type == TransactionRecord::Generated) && 
+                  (
+                   (rec->type == TransactionRecord::Generated)
+                   || (rec->type == TransactionRecord::Mined)   //<<<<<<<<<<<<<<<< test
+                   )
+                  && 
                   (rec->status.maturity != TransactionStatus::Mature)
                  );
     case FormattedAmountRole:

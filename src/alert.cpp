@@ -18,7 +18,6 @@
 #include "sync.h"
 #include "ui_interface.h"
 
-//using namespace std;
 using std::make_pair;
 using std::map;
 
@@ -253,3 +252,6 @@ bool CAlert::ProcessAlert()
     printf("accepted alert %d, AppliesToMe()=%d\n", nID, AppliesToMe());
     return true;
 }
+#ifdef _MSC_VER
+    #include "msvc_warnings.pop.h"
+#endif

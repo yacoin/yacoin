@@ -501,3 +501,6 @@ bool CSyncCheckpoint::ProcessSyncCheckpoint(CNode* pfrom)
     printf("ProcessSyncCheckpoint: sync-checkpoint at %s\n", hashCheckpoint.ToString().c_str());
     return true;
 }
+#ifdef _MSC_VER
+    #include "msvc_warnings.pop.h"
+#endif

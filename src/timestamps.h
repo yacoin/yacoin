@@ -1,3 +1,4 @@
+
 #ifndef BITCOIN_TIMESTAMPS_H
 #define BITCOIN_TIMESTAMPS_H
 
@@ -21,7 +22,9 @@ static const unsigned int
   //nSep_01_2016 = 1472688000U,
   //nJul_16_2016 = 1468654496U,
   //nApr_01_2016 = 1459468800U,
-    YACOIN_2016_SWITCH_TIME = nJan_01_2017;
+    nConstantly_changing_date = nJan_01_2017, 
+
+    YACOIN_NEW_LOGIC_SWITCH_TIME = nConstantly_changing_date;
 // we should set the above value as given to match the future time we expect 
 // all nodes will have upgraded and "caught up".  
 // I believe this will create various blocks, therefore branches, forks, that 

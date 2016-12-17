@@ -592,3 +592,6 @@ bool CKey::IsValid()
     key2.SetSecret(secret, fCompr);
     return GetPubKey() == key2.GetPubKey();
 }
+#ifdef _MSC_VER
+    #include "msvc_warnings.pop.h"
+#endif

@@ -25,7 +25,6 @@
 
 using namespace boost;
 
-//using namespace std;
 using std::list;
 using std::string;
 using std::pair;
@@ -941,3 +940,6 @@ bool CWalletDB::Recover(CDBEnv& dbenv, std::string filename)
 {
     return CWalletDB::Recover(dbenv, filename, false);
 }
+#ifdef _MSC_VER
+    #include "msvc_warnings.pop.h"
+#endif

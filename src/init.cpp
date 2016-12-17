@@ -33,7 +33,7 @@ bool fNewerOpenSSL = false; // for key.cpp's benefit
 
 
 using namespace boost;
-//using namespace std;  // testing this change
+
 using std::string;
 using std::max;
 using std::map;
@@ -397,6 +397,8 @@ std::string HelpMessage()
         "  -daemon                " + _("Run in the background as a daemon and accept commands") + "\n" +
 #endif
         "  -testnet               " + _("Use the test network") + "\n" +
+        "  -testnetNewLogic       " + _("Use the test network New Logic") + "\n" +
+        "  -testnetnewlogicblocknumber=<number> " + _("New Logic starting at block = <number>") + "\n" +
         "  -debug                 " + _("Output extra debugging information. Implies all other -debug* options") + "\n" +
         "  -debugnet              " + _("Output extra network debugging information") + "\n" +
         "  -logtimestamps         " + _("Prepend debug output with timestamp") + "\n" +
@@ -596,6 +598,8 @@ bool AppInit2()
     else
         fDebugNet = GetBoolArg("-debugnet");
 
+    fTestNetNewLogic = GetBoolArg("-testnetNewLogic");
+
     bitdb.SetDetach(GetBoolArg("-detachdb", false));
 
 #if !defined(WIN32) && !defined(QT_GUI)
@@ -649,20 +653,45 @@ bool AppInit2()
 
     // ********************************************************* Step 4: application initialization: dir lock, daemonize, pidfile, debug log
 
-    std::string strDataDir = GetDataDir().string();
+    std::string 
+        strDataDir = GetDataDir().string();
+
     strWalletFileName = GetArg("-wallet", "wallet.dat");
 
     // strWalletFileName must be a plain filename without a directory
-    if (strWalletFileName != boost::filesystem::basename(strWalletFileName) + boost::filesystem::extension(strWalletFileName))
-        return InitError(strprintf(_("Wallet %s resides outside data directory %s."), strWalletFileName.c_str(), strDataDir.c_str()));
+    if (
+        strWalletFileName != 
+        boost::filesystem::basename(strWalletFileName) + 
+        boost::filesystem::extension(strWalletFileName)
+       )
+        return InitError(
+                         strprintf(
+                            _("Wallet %s resides outside data directory %s."), 
+                            strWalletFileName.c_str(), 
+                            strDataDir.c_str()
+                                  )
+                        );
 
     // Make sure only a single Bitcoin process is using the data directory.
-    boost::filesystem::path pathLockFile = GetDataDir() / ".lock";
-    FILE* file = fopen(pathLockFile.string().c_str(), "a"); // empty lock file; created if it doesn't exist.
-    if (file) fclose(file);
-    static boost::interprocess::file_lock lock(pathLockFile.string().c_str());
+    boost::filesystem::path 
+        pathLockFile = GetDataDir() / ".lock";
+
+    FILE
+        * file = fopen(pathLockFile.string().c_str(), "a"); // empty lock file; created if it doesn't exist.
+
+    if (file)         
+        fclose(file);
+
+    static boost::interprocess::file_lock 
+        lock(pathLockFile.string().c_str());
+
     if (!lock.try_lock())
-        return InitError(strprintf(_("Cannot obtain a lock on data directory %s.  Yacoin is probably already running."), strDataDir.c_str()));
+        return InitError(
+                         strprintf(
+                            _("Cannot obtain a lock on data directory %s.  Yacoin is probably already running."), 
+                            strDataDir.c_str()
+                                  )
+                        );
 
 #if !defined(WIN32) && !defined(QT_GUI)
     if (fDaemon)
@@ -691,6 +720,10 @@ bool AppInit2()
     printf("\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n");
     printf("Yacoin version %s (%s)\n", FormatFullVersion().c_str(), CLIENT_DATE.c_str());
 
+    if (fDebug)
+    {
+        (void)printf( "new logic flag is %s\n", fTestNetNewLogic? "true": "false" );
+    }
     printf("\n" );
     printf("Using Boost version %1d.%d.%d\n",         // miiill (most, insignificant, least) digits
             BOOST_VERSION / 100000,
@@ -766,6 +799,19 @@ bool AppInit2()
     printf("\n");
 
     printf("Using OpenSSL version %s\n", SSLeay_version(SSLEAY_VERSION));
+
+    if (fDebug)
+    {
+    #ifdef WIN32
+        (void)printf(
+                     "\n"
+                     "wallet is \n"
+                     "\"%s\""
+                     "\n"
+                     , (strDataDir + "/" + strWalletFileName).c_str()
+                    );
+    #endif
+    }
 
     unsigned int
         nCutoffVersion = (unsigned int)((int)'j' - (int)'`'),
@@ -1042,7 +1088,8 @@ bool AppInit2()
 
     printf("Loading block index...\n");
     bool fLoaded = false;
-    while (!fLoaded) {
+    while (!fLoaded) 
+    {
         std::string strLoadError;
         // YACOIN TODO ADD SPINNER OR PROGRESS BAR
         uiInterface.InitMessage(_("<b>Loading block index, this may take several minutes...</b>"));
@@ -1052,11 +1099,13 @@ bool AppInit2()
             try {
                 UnloadBlockIndex();
 
-                if (!LoadBlockIndex()) {
+                if (!LoadBlockIndex()) 
+                {
                     strLoadError = _("Error loading block database");
                     break;
                 }
-            } catch(std::exception &e) {
+            } catch(std::exception &e) 
+            {
                 (void)e;
                 strLoadError = _("Error opening block database");
                 break;
@@ -1065,7 +1114,8 @@ bool AppInit2()
             fLoaded = true;
         } while(false);
 
-        if (!fLoaded) {
+        if (!fLoaded) 
+        {
             // TODO: suggest reindex here
             return InitError(strLoadError);
         }
@@ -1080,6 +1130,24 @@ bool AppInit2()
         return false;
     }
     printf(" block index %15" PRId64 "ms\n", GetTimeMillis() - nStart);
+
+    nTestNetNewLogicBlockNumber = GetArg("-testnetnewlogicblocknumber", 0);
+    if (0 == nTestNetNewLogicBlockNumber)
+        nTestNetNewLogicBlockNumber = pindexBest->nHeight;
+    if (fDebug)
+    {
+    #ifdef WIN32
+        (void)printf(
+                     "\n"
+                     "nTestNetNewLogicBlockNumber is \n"
+                     "%d"
+                     "\n"
+                     , nTestNetNewLogicBlockNumber
+                    );
+    #endif
+    }
+
+    (void)HaveWeSwitchedToNewLogicRules( fUseOld044Rules );
 
     if (GetBoolArg("-printblockindex") || GetBoolArg("-printblocktree"))
     {
@@ -1294,3 +1362,6 @@ bool AppInit2()
 #endif
     return true;
 }
+#ifdef _MSC_VER
+    #include "msvc_warnings.pop.h"
+#endif

@@ -35,7 +35,6 @@
 
 using namespace boost;
 
-//using namespace std;
 using std::set;
 using std::string;
 using std::vector;
@@ -1192,7 +1191,6 @@ unsigned int GetProofOfWorkMA(const CBlockIndex* pIndexLast)
 
     if (
         fUseOld044Rules
-        //(pIndexLast->nTime < YACOIN_2016_SWITCH_TIME) && !fTestNet
        )
         return 0;
 
@@ -1215,7 +1213,7 @@ unsigned int GetProofOfWorkMA(const CBlockIndex* pIndexLast)
             for ( int i = 0; i < overstep; i++ )
                 pindex = pindex->pprev;
         }
-        else    // ProofOfWork came after, last ProofOfStake block before YACOIN_2016_SWITCH_TIME
+        else    // ProofOfWork came after, last ProofOfStake block before YACOIN_NEW_LOGIC_SWITCH_TIME
         {
             return GetProofOfWorkSMA( pIndexLast );
         }
@@ -1530,6 +1528,41 @@ const CBlockIndex* GetLastPoWBlockIndex( const CBlockIndex* pindex )
 }
 
 //_____________________________________________________________________________
+bool HaveWeSwitchedToNewLogicRules( bool &fUsingOld044Rules )
+{
+    bool
+        fReturn = false;
+
+    if (true == fUsingOld044Rules)         // should we switch to new rules
+    {
+        if(
+           fTestNet &&    // may use new rules, ATM only in TestNet
+           (
+            fTestNetNewLogic &&
+            (nTestNetNewLogicBlockNumber >= nBestHeight)
+           )
+          )
+        {
+            fUsingOld044Rules = false;
+            fReturn = true;
+            if (fDebug)
+            {
+#ifdef WIN32
+                (void)printf(
+                     "\n"
+                     "fUseOld044Rules is "
+                     "%s"
+                     "\n"
+                     "\n"
+                     , fUsingOld044Rules? "true": "false"
+                            );
+#endif
+            }
+        }
+    }
+    return fReturn;
+}
+
 static unsigned int GetNextTargetRequired044(const CBlockIndex* pindexLast, bool fProofOfStake)
 {
     CBigNum 
@@ -1600,9 +1633,9 @@ unsigned int GetNextTargetRequired(const CBlockIndex* pindexLast, bool fProofOfS
 
     bool fCheckPreviousPoWBlockOverstep(false); // flag, used for check and ignore overstepped PoW block difficulty
 
-    if ( 
+    if (
         !fProofOfStake && 
-        ((pindexLast->nTime >= YACOIN_2016_SWITCH_TIME) || fTestNet)
+        !fUseOld044Rules     //((pindexLast->nTime >= YACOIN_NEW_LOGIC_SWITCH_TIME) || fTestNet)
        )
     {
         if ( pindexLast->IsProofOfWork() )  // PoW after PoW
@@ -2635,10 +2668,13 @@ bool CBlock::SetBestChain(CTxDB& txdb, CBlockIndex* pindexNew)
     }
 
     // Update best block in wallet (so we can detect restored wallets)
-    bool fIsInitialDownload = IsInitialBlockDownload();
+    bool 
+        fIsInitialDownload = IsInitialBlockDownload();
+
     if (!fIsInitialDownload)
     {
         const CBlockLocator locator(pindexNew);
+
         ::SetBestChain(locator);
     }
 
@@ -2647,6 +2683,10 @@ bool CBlock::SetBestChain(CTxDB& txdb, CBlockIndex* pindexNew)
     pindexBest = pindexNew;
     pblockindexFBBHLast = NULL;
     nBestHeight = pindexBest->nHeight;
+
+    // good place to test for new logic
+    (void)HaveWeSwitchedToNewLogicRules( fUseOld044Rules );
+
     bnBestChainTrust = pindexNew->bnChainTrust;
     nTimeBestReceived = GetTime();
     nTransactionsUpdated++;
@@ -3069,6 +3109,9 @@ bool CBlock::AcceptBlock()
     if (!AddToBlockIndex(nFile, nBlockPos))
         return error("AcceptBlock() : AddToBlockIndex failed");
 
+    // here would be a good place to check for new logic
+
+
     // Relay inventory, but don't relay old inventory during initial block download
     int nBlockEstimate = Checkpoints::GetTotalBlocksEstimate();
     if (hashBestChain == hash)
@@ -3117,10 +3160,19 @@ CBigNum CBlockIndex::GetBlockTrust() const
     if (bnTarget <= 0)
         return CBigNum(0);
 
-    // is (nTime >= YACOIN_2016_SWITCH_TIME) actually true for blocks before 12/13/2015
+    // is (nTime >= YACOIN_NEW_LOGIC_SWITCH_TIME) actually true for blocks before 12/13/2015
     if (
-        (0 < nPosBlockCount) &&
-        ( (nTime >= YACOIN_2016_SWITCH_TIME) || ( fTestNet && pprev ) )
+        (0 < nPosBlockCount) 
+        &&
+        ( 
+         (
+          fTestNet 
+          && 
+          pprev 
+         ) 
+         ||
+         !fUseOld044Rules         //(nTime >= YACOIN_NEW_LOGIC_SWITCH_TIME)
+        )
        )
     {
         ::int32_t iratio =  (::int32_t)boost::math::round( GetPoWPoSRatio() );
@@ -3184,7 +3236,7 @@ CBigNum CBlockIndex::GetBlockTrust() const
             else // IsProofOfWork() && pprev->IsProofOfWork()
             {
                 const CBlockIndex* ppos = GetLastBlockIndex( pprev->pprev, true ); // last ProofOfStake block preceding
-                if ( ppos->nBitsMA > 0 ) // this check is needed in case PoS block came before YACOIN_2016_SWITCH_TIME
+                if ( ppos->nBitsMA > 0 ) // this check is needed in case PoS block came before YACOIN_NEW_LOGIC_SWITCH_TIME
 
                 {
                     int overstep = ( this->nHeight - ppos->nHeight ) - ppos->GetSpacingThreshold();
@@ -3209,8 +3261,9 @@ CBigNum CBlockIndex::GetBlockTrust() const
 
     // saironiq: new trust rules (since CONSECUTIVE_STAKE_SWITCH_TIME on mainnet and always on testnet)
     if (
-        (GetBlockTime() >= CONSECUTIVE_STAKE_SWITCH_TIME) || 
         fTestNet
+        ||
+        (GetBlockTime() >= CONSECUTIVE_STAKE_SWITCH_TIME)
        ) 
     {
         // first block trust - for future compatibility (i.e., forks :P)
@@ -3333,7 +3386,8 @@ bool ProcessBlock(CNode* pfrom, CBlock* pblock)
             bnRequired;
 
         if(
-           (pblock->nTime < YACOIN_2016_SWITCH_TIME) 
+           fUseOld044Rules
+           //(pblock->nTime < YACOIN_NEW_LOGIC_SWITCH_TIME) 
            //&& !fTestNet // new rules on Testnet
            //|| fTestNet  // old rules on TestNet
           )
@@ -3749,9 +3803,20 @@ void UnloadBlockIndex()
 }
 
 bool LoadBlockIndex(bool fAllowNew)
-{
-    if (GetTime() < (::int64_t)YACOIN_2016_SWITCH_TIME)   // before the new PoW/PoS rules
-        fUseOld044Rules = true;         // this is a crude way of doing this
+{   // by default fUseOld044Rules are false, i.e new rules are true
+    if (
+        !fTestNet ||    // may use new rules, ATM only in TestNet
+        (
+         (GetTime() < (::int64_t)YACOIN_NEW_LOGIC_SWITCH_TIME)   // before the new PoW/PoS rules date-time
+         &&
+         !fTestNetNewLogic      // (0 == nTestNetNewLogicBlockNumber )  // if fTestNetNewLogic is true, we
+        )                                                               // will use it in TestNet
+       )
+        fUseOld044Rules = true;
+    // the implied else is that
+    // new rules if TestNet AND 
+
+
     if (fTestNet)
     {
         pchMessageStart[0] = 0xcd;

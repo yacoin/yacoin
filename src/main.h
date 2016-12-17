@@ -1022,7 +1022,6 @@ public:
             else if ( nTime < (nChainStartTime + nSpanOf14) ) nfactor = 14;
             else if ( nTime < (nChainStartTime + nSpanOf15) ) nfactor = 15;
             else if ( nTime < (nChainStartTime + nSpanOf16) ) nfactor = 16;
-          //else if ( nTime < YACOIN_2016_SWITCH_TIME ) nfactor = 17;    // as soon as possible
             else if ( nTime < (nChainStartTime + nSpanOf17) ) nfactor = 17;
             else if ( nTime < (nChainStartTime + nSpanOf18) ) nfactor = 18;
 /***********************************
@@ -1039,7 +1038,6 @@ public:
     		else if ( nTime < 1401545632 ) nfactor = 14;
 	    	else if ( nTime < 1409934240 ) nfactor = 15;
 		    else if ( nTime < 1435100064 ) nfactor = 16;
-    	  //else if ( nTime < YACOIN_2016_SWITCH_TIME ) nfactor = 17;	// as soon as possible
 		    else if ( nTime < 1468654496 ) nfactor = 17;	// as soon as possible
 **************************************/
     		else

@@ -160,6 +160,8 @@ extern std::map<std::string, std::string> mapArgs;
 extern std::map<std::string, std::vector<std::string> > mapMultiArgs;
 extern bool fDebug;
 extern bool fDebugNet;
+extern bool fTestNetNewLogic;
+extern ::int32_t nTestNetNewLogicBlockNumber;
 extern bool fPrintToConsole;
 extern bool fPrintToDebugger;
 extern bool fRequestShutdown;
@@ -259,11 +261,7 @@ std::string FormatSubVersion(const std::string& name, int nClientVersion, const 
 void AddTimeData(const CNetAddr& ip, ::int64_t nTime);
 void runCommand(std::string strCommand);
 
-
-
-
-
-
+extern bool HaveWeSwitchedToNewLogicRules( bool &fUsingOld044Rules );   // in main.cpp
 
 
 inline std::string i64tostr(::int64_t n)

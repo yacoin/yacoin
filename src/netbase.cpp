@@ -29,7 +29,6 @@ typedef SSIZE_T ssize_t;
 #include "strlcpy.h"
 #include <boost/algorithm/string/case_conv.hpp> // for to_lower()
 
-//using namespace std;
 
 // Settings
 static proxyType proxyInfo[NET_MAX];
@@ -49,6 +48,7 @@ enum Network ParseNetwork(std::string net) {
     if (net == "i2p")  return NET_I2P;
     return NET_UNROUTABLE;
 }
+//CCriticalSection cs_net;
 
 void SplitHostPort(std::string in, int &portOut, std::string &hostOut) {
     size_t colon = in.find_last_of(':');
@@ -368,8 +368,11 @@ bool static Socks5(std::string strDest, int port, SOCKET& hSocket)
     return true;
 }
 
+
 bool static ConnectSocketDirectly(const CService &addrConnect, SOCKET& hSocketRet, int nTimeout)
 {
+//    LOCK(cs_net);
+    {
     hSocketRet = INVALID_SOCKET;
 
 #ifdef USE_IPV6
@@ -395,7 +398,6 @@ bool static ConnectSocketDirectly(const CService &addrConnect, SOCKET& hSocketRe
 #endif
 
 #ifdef WIN32
-
 //___________________________________
     BOOL
         bOptVal = TRUE;
@@ -403,9 +405,8 @@ bool static ConnectSocketDirectly(const CService &addrConnect, SOCKET& hSocketRe
         iResult = 0;
     int 
         bOptLen = sizeof (BOOL);
-
     int 
-        iOptVal = 0;
+        iOptVal = 1;    //0;
     int 
         iOptLen = sizeof (int);
 
@@ -417,7 +418,8 @@ bool static ConnectSocketDirectly(const CService &addrConnect, SOCKET& hSocketRe
     //else
         //wprintf(L"SO_KEEPALIVE Value: %ld\n", iOptVal);
 
-    iResult = setsockopt(hSocket, SOL_SOCKET, SO_KEEPALIVE, (char *) &bOptVal, bOptLen);
+  //iResult = setsockopt(hSocket, SOL_SOCKET, SO_KEEPALIVE, (char *) &bOptVal, bOptLen);
+    iResult = setsockopt(hSocket, IPPROTO_TCP, TCP_NODELAY, (char *) &bOptVal, bOptLen);
     if (iResult == SOCKET_ERROR) 
     {
         wprintf(L"setsockopt for SO_KEEPALIVE failed with error: %u\n", WSAGetLastError());
@@ -433,10 +435,8 @@ bool static ConnectSocketDirectly(const CService &addrConnect, SOCKET& hSocketRe
     //else
         //wprintf(L"SO_KEEPALIVE Value: %ld\n", iOptVal);
 //___________________________________
-
-
     u_long 
-        fNonblock = 1;
+        fNonblock = 1;  //<<<<<<<<<<<< test
     int 
         nIoCtlSocketReturnValue = ioctlsocket(hSocket, FIONBIO, &fNonblock);
     if (SOCKET_ERROR == nIoCtlSocketReturnValue )
@@ -483,7 +483,9 @@ bool static ConnectSocketDirectly(const CService &addrConnect, SOCKET& hSocketRe
             timeout.tv_sec  = nTimeout / 1000;
             timeout.tv_usec = (nTimeout % 1000) * 1000;
 
-            fd_set fdset;
+            fd_set 
+                fdset;
+
             FD_ZERO(&fdset);
             FD_SET(hSocket, &fdset);
             int nRet = select(
@@ -556,7 +558,7 @@ bool static ConnectSocketDirectly(const CService &addrConnect, SOCKET& hSocketRe
     // CNode::ConnectNode immediately turns the socket back to non-blocking
     // but we'll turn it back to blocking just in case
 #ifdef WIN32
-    fNonblock = 1;
+    fNonblock = 1;  //<<<<<<<<<<<< test
     if (SOCKET_ERROR == ioctlsocket(hSocket, FIONBIO, &fNonblock) )
 #else
     fFlags = fcntl(hSocket, F_GETFL, 0);
@@ -593,6 +595,7 @@ bool static ConnectSocketDirectly(const CService &addrConnect, SOCKET& hSocketRe
 
     hSocketRet = hSocket;
     return true;
+    }
 }
 
 bool SetProxy(enum Network net, CService addrProxy, int nSocksVersion) 

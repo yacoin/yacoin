@@ -13,6 +13,7 @@
 #include <openssl/rand.h>
 
 #ifdef _MSC_VER
+    #include <stdint.h>
     #include "JustInCase.h"
 #endif
 #ifndef WIN32
@@ -29,6 +30,8 @@ class CRequestTracker;
 class CNode;
 class CBlockIndex;
 extern int nBestHeight;
+
+//extern CCriticalSection cs_net;
 
 const ::int64_t
     nSecondsPerMinute = 60,

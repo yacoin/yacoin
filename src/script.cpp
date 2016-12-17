@@ -21,7 +21,7 @@
 //#include "util.h"
 
 using namespace boost;
-//using namespace std;
+
 using std::vector;
 using std::runtime_error;
 using std::map;
@@ -1032,14 +1032,14 @@ bool EvalScript(
                     CScript scriptCode(pbegincodehash, pend);
 
                     // Drop the signatures, since there's no way for a signature to sign itself
-                    for (int k = 0; k < nSigsCount; k++)
+                    for (int k = 0; k < nSigsCount; ++k)
                     {
-                        valtype& vchSig = stacktop(-isig-k);
-                        scriptCode.FindAndDelete(CScript(vchSig));
+                        valtype& vchSig = stacktop(-isig - k);
+                        scriptCode.FindAndDelete( CScript( vchSig ) );
                     }
 
                     bool fSuccess = true;
-                    while (fSuccess && nSigsCount > 0)
+                    while (fSuccess && (nSigsCount > 0))
                     {
                         valtype& vchSig    = stacktop(-isig);
                         valtype& vchPubKey = stacktop(-ikey);
@@ -1058,11 +1058,11 @@ bool EvalScript(
 
                         if (fOk) 
                         {
-                            isig++;
-                            nSigsCount--;
+                            ++isig;
+                            --nSigsCount;
                         }
-                        ikey++;
-                        nKeysCount--;
+                        ++ikey;
+                        --nKeysCount;
 
                         // If there are more signatures left than keys left,
                         // then too many signatures have failed
@@ -1418,8 +1418,7 @@ bool Solver(
         mTemplates.insert(make_pair(TX_MULTISIG, CScript() << OP_SMALLINTEGER << OP_PUBKEYS << OP_SMALLINTEGER << OP_CHECKMULTISIG));
 
         if (!fUseOld044Rules)
-        {
-            // Empty, provably prunable, data-carrying output
+        {   // Empty, provably prunable, data-carrying output
             mTemplates.insert(make_pair(TX_NULL_DATA, CScript() << OP_RETURN << OP_SMALLDATA));
         }
     }
@@ -1518,15 +1517,13 @@ bool Solver(
             else if (opcode2 == OP_SMALLDATA)   // this is different from 0.4.4
             {
                 if (!fUseOld044Rules)
-                {
-                    // small pushdata, <= 80 bytes
+                {   // small pushdata, <= 80 bytes
                     if (vch1.size() > 80)
                         break;
                 }
             }
-            else if (opcode1 != opcode2 || vch1 != vch2)
-            {
-                // Others must match exactly
+            else if ((opcode1 != opcode2) || (vch1 != vch2))
+            {   // Others must match exactly
                 break;
             }
         }

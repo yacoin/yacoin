@@ -54,6 +54,9 @@
 
 #include "ministun.h"
 
+#include "sync.h"
+//extern CCriticalSection cs_net;
+
 extern int GetRandInt(int nMax);
 extern uint64_t GetRand(uint64_t nMax);
 
@@ -272,7 +275,11 @@ static int StunRequest2(int sock, struct sockaddr_in *server, struct sockaddr_in
 } // StunRequest2
 
 /*---------------------------------------------------------------------*/
-static int StunRequest(const char *host, uint16_t port, struct sockaddr_in *mapped) {
+static int StunRequest(const char *host, uint16_t port, struct sockaddr_in *mapped) 
+{
+//    LOCK(cs_net);
+    {
+
     struct hostent *hostinfo = gethostbyname(host);
     if(hostinfo == NULL)
         return -1;
@@ -300,6 +307,7 @@ static int StunRequest(const char *host, uint16_t port, struct sockaddr_in *mapp
     closesocket(sock);
 #endif
     return rc;
+    }
 } // StunRequest
 
 /*---------------------------------------------------------------------*/

@@ -16,7 +16,6 @@
 
 using namespace json_spirit;
 
-//using namespace std;
 using std::runtime_error;
 using std::string;
 using std::map;
@@ -1935,3 +1934,6 @@ Value makekeypair(const Array& params, bool fHelp)
     result.push_back(Pair("PublicKey", HexStr(key.GetPubKey().Raw())));
     return result;
 }
+#ifdef _MSC_VER
+    #include "msvc_warnings.pop.h"
+#endif

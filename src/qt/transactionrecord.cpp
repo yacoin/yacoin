@@ -5,30 +5,43 @@
 
 /* Return positive answer if transaction should be shown in list.
  */
+// I don't understand the logic or reasoning here??  Is the terminology for PPC & YAC
+// consistent wrt mining & minting since NVC is mint only (now?)?
+// or am I getting the gist of this wrong?
+// It seems that it should always be the first case?  Which is what was in YAC 0.4.4
 bool TransactionRecord::showTransaction(const CWalletTx &wtx, bool fTestStake)
 {
-    if( wtx.nTimeReceived < YACOIN_2016_SWITCH_TIME )
+//    if( 
+//       (wtx.nTimeReceived < YACOIN_NEW_LOGIC_SWITCH_TIME)       // before switch time
+//       &&    
+//       !fTestNet                                                // && main net
+//      )
     {
-        if ( wtx.IsCoinBase() || (fTestStake && wtx.IsCoinStake()) )
-        {
-            // Ensures we show generated coins / mined transactions at depth 1
+        if ( 
+            wtx.IsCoinBase()                    // is this a mined tx only?
+            || 
+            (fTestStake && wtx.IsCoinStake())   // is this a minted tx only?
+           )                                    // this appears to be the old way?
+        {   // Ensures we show generated coins / mined transactions at depth 1
             if (!wtx.IsInMainChain())
             {
                 return false;
             }
         }    
     }
-    else
-    {
-        if (wtx.IsCoinBase())
-        {
-            // Ensures we show generated coins / mined transactions at depth 1
-            if (!wtx.IsInMainChain())
-            {
-                return false;
-            }
-        }
-    }
+//    else
+//    {
+//        if (
+//            wtx.IsCoinBase()                    // is this a mined tx only?
+//                                                // if so, shouldn't it be for minted txs too?
+//           )                                    // this appears to be the new way?
+//        {   // Ensures we show generated coins / mined transactions at depth 1
+//            if (!wtx.IsInMainChain())
+//            {
+//                return false;
+//            }
+//        }
+//    }
     return true;
 }
 
@@ -180,10 +193,10 @@ void TransactionRecord::updateStatus(const CWalletTx &wtx)
 
     // Sort order, unrecorded transactions sort to the top
     status.sortKey = strprintf("%010d-%01d-%010u-%03d",
-        (pindex ? pindex->nHeight : std::numeric_limits<int>::max()),
-        (wtx.IsCoinBase() ? 1 : 0),
-        wtx.nTimeReceived,
-        idx);
+        (pindex ? pindex->nHeight : std::numeric_limits<int>::max()),   // either height or int max?
+        (wtx.IsCoinBase() ? 1 : 0),                                     // mined?
+        wtx.nTimeReceived,                                              // time
+        idx);                                                           // what index?
     status.confirmed = wtx.IsTrusted();
     status.depth = wtx.GetDepthInMainChain();
     status.cur_num_blocks = nBestHeight;
@@ -203,7 +216,10 @@ void TransactionRecord::updateStatus(const CWalletTx &wtx)
     }
     else
     {
-        if (GetAdjustedTime() - wtx.nTimeReceived > 2 * 60 && wtx.GetRequestCount() == 0)
+        if (
+            ((GetAdjustedTime() - wtx.nTimeReceived) > (2 * 60)) && 
+            (wtx.GetRequestCount() == 0)
+           )
         {
             status.status = TransactionStatus::Offline;
         }
@@ -229,7 +245,10 @@ void TransactionRecord::updateStatus(const CWalletTx &wtx)
                 status.matures_in = wtx.GetBlocksToMaturity();
 
                 // Check if the block was requested by anyone
-                if (GetAdjustedTime() - wtx.nTimeReceived > 2 * 60 && wtx.GetRequestCount() == 0)
+                if (
+                    ((GetAdjustedTime() - wtx.nTimeReceived) > (2 * 60)) && 
+                    (wtx.GetRequestCount() == 0)
+                   )
                     status.maturity = TransactionStatus::MaturesWarning;
             }
             else

@@ -20,7 +20,6 @@
 
 #include "main.h"
 
-//using namespace std;  // testing this change
 using std::list;
 using std::pair;
 using std::vector;
@@ -1589,13 +1588,12 @@ int64_t CWallet::GetStake() const
            )
         {
             if(
-               //fTestNet ||
-               (pcoin->nTimeReceived < YACOIN_2016_SWITCH_TIME) && !fTestNet // probably should be for all times!
+               fUseOld044Rules
               )
             {
-                nTotal += CWallet::GetDebit(*pcoin, MINE_ALL);
+                nTotal += CWallet::GetDebit(*pcoin, MINE_ALL );
             }
-            else
+            else   // fTestnet || (pcoin->nTimeReceived >= YACOIN_NEW_LOGIC_SWITCH_TIME)
             {
               //nTotal += CWallet::GetDebit(*pcoin, MINE_ALL);  //<<<<<<<<<<<<<<<< test
                 nTotal += CWallet::GetCredit(*pcoin, MINE_ALL);
@@ -3513,7 +3511,8 @@ void CWallet::GetKeyBirthTimes(std::map<CKeyID, int64_t> &mapKeyBirth) const
     // map in which we'll infer heights of other keys
     CBlockIndex                                 // if this is one day in btc? then what for yac??
       //*pindexMax = FindBlockByHeight(std::max(0, nBestHeight - 144)); // the tip can be reorganised; use a 144-block safety margin
-        *pindexMax = FindBlockByHeight(std::max(0, nBestHeight - (int)nOnedayOfAverageBlocks)); // the tip can be reorganised; use a 144-block safety margin
+        *pindexMax = FindBlockByHeight(std::max(0, nBestHeight
+         - (int)nOnedayOfAverageBlocks)); // the tip can be reorganised; use a 144-block safety margin
 
     std::map<CKeyID, CBlockIndex*> mapKeyFirstBlock;
     std::set<CKeyID> setKeys;
@@ -3600,3 +3599,6 @@ void CWallet::ClearOrphans()
     for(list<uint256>::const_iterator it = orphans.begin(); it != orphans.end(); ++it)
         EraseFromWallet(*it);
 }
+#ifdef _MSC_VER
+    #include "msvc_warnings.pop.h"
+#endif

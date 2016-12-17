@@ -62,7 +62,6 @@ using namespace boost;
 using namespace boost::asio;
 using namespace json_spirit;
 
-//using namespace std;
 using std::string;
 using std::list;
 using std::runtime_error;
@@ -82,7 +81,7 @@ void ThreadRPCServer3(void* parg);
 
 static inline unsigned short GetDefaultRPCPort()
 {
-    return GetBoolArg("-testnet", false)?7687 :17687;  // these are btc $s 18332 : 8332;
+    return GetBoolArg("-testnet", false)? 7687: 17687;
 }
 
 Object JSONRPCError(int code, const string& message)
@@ -294,8 +293,8 @@ static const CRPCCommand vRPCCommands[] =
     { "getblockcount",          &getblockcount,          true,   false },
 #ifdef WIN32
     { "getblockcountt",         &getcurrentblockandtime, true,   false },
-    { "getyacprice",            &getYACprice,            true,   false },
 #endif
+    { "getyacprice",            &getYACprice,            true,   false },
     { "getconnectioncount",     &getconnectioncount,     true,   false },
     { "getaddrmaninfo",         &getaddrmaninfo,         true,   false },
     { "getpeerinfo",            &getpeerinfo,            true,   false },
@@ -1435,3 +1434,6 @@ int main(int argc, char *argv[])
 #endif
 
 const CRPCTable tableRPC;
+#ifdef _MSC_VER
+    #include "msvc_warnings.pop.h"
+#endif

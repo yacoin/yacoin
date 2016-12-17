@@ -17,7 +17,6 @@
 
 using namespace json_spirit;
 
-//using namespace std;
 using std::vector;
 using std::runtime_error;
 using std::map;
@@ -577,4 +576,6 @@ Value submitblock(const Array& params, bool fHelp)
 
     return Value::null;
 }
-
+#ifdef _MSC_VER
+    #include "msvc_warnings.pop.h"
+#endif
