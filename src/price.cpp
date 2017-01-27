@@ -25,45 +25,67 @@ CCriticalSection
                // interrupt another call to the same function.
 
 static const int
+    nHttpsPort = 443,
+    nSpecialCharacterOffset = 4,
     nDefaultCharacterOffset = 3,
     nUnusualCharacterOffset = 2;
 CProvider aBTCtoYACProviders[] = 
     {    
+        {   //http://api.coinmarketcap.com/v1/ticker/yacoin/
+            "api.coinmarketcap.com",
+            "price_btc",    //"price_usd",
+            "/v1/ticker/yacoin/",
+            nSpecialCharacterOffset,
+            DEFAULT_HTTP_PORT
+        },
         {   
             "data.bter.com",            // sDomain
-            "last",                     // sPriceRatioKey
+            "avg",                     // sPriceRatioKey
             "/api/1/ticker/yac_btc",    // sApi
-            nDefaultCharacterOffset
+            nDefaultCharacterOffset,
+            DEFAULT_HTTP_PORT
         }
         ,
+        //{
+        //    "api.cryptonator.com", 
+        //    "price", 
+        //    "/api/ticker/yac-btc", 
+        //    nDefaultCharacterOffset,
+        //    nHttpsPort
+        //}
+        //,
         {   
             "pubapi2.cryptsy.com",      
             "lasttradeprice",   
             "/api.php?method=singlemarketdata&marketid=11", 
-            nDefaultCharacterOffset 
+            nDefaultCharacterOffset,
+            DEFAULT_HTTP_PORT
         }
     };
 CProvider aCurrencyToBTCProviders[] = 
     {
         {   
-            "btc.blockr.io",
-            "value",
-            "/api/v1/coin/info",
-            nUnusualCharacterOffset    
-        }
-        ,
-        {   
             "api.bitcoinvenezuela.com",
             "USD",
             "/",
-            nUnusualCharacterOffset
+            nUnusualCharacterOffset,
+            DEFAULT_HTTP_PORT
+        }
+        ,
+        {   
+            "btc.blockr.io",
+            "value",
+            "/api/v1/coin/info",
+            nUnusualCharacterOffset,
+            DEFAULT_HTTP_PORT
         }
         ,
         {   
             "pubapi2.cryptsy.com",
             "lastdata",
             "/api.php?method=singlemarketdata&marketid=2",
-            nDefaultCharacterOffset
+            nDefaultCharacterOffset,
+            DEFAULT_HTTP_PORT
         }
     };
 std::vector< CProvider > vBTCtoYACProviders;
@@ -137,6 +159,9 @@ static bool read_in_new_provider( std::string sKey, std::vector< CProvider > & v
 
     //fProviderAdded = IsProviderAdded( key, vProviders );
 
+/*************************
+*************************/
+
     std::string
         sProvider = GetArg( sKey, "" );
 
@@ -150,7 +175,7 @@ static bool read_in_new_provider( std::string sKey, std::vector< CProvider > & v
     if( "" != sProvider )
     {
         string
-            sTemp = "%200[^,],%200[^,],%200[^,],%d";
+            sTemp = "%200[^,],%200[^,],%200[^,],%d,%d";
 
         if( fPrintToConsole )
         {
@@ -174,6 +199,7 @@ static bool read_in_new_provider( std::string sKey, std::vector< CProvider > & v
             caKey[ nArbitrayUrlDomainLength + 1 ],
             caApi[ nArbitrayUrlArgumentLength + 1 ];
         int
+            nPortNumber,
             nOffset,
             nPort;
         int
@@ -183,14 +209,17 @@ static bool read_in_new_provider( std::string sKey, std::vector< CProvider > & v
                                 caDomain,
                                 caKey,
                                 caApi,
-                                &nOffset
+                                &nOffset,
+                                &nPortNumber
                                );
-        if( 4 == nConverted )
+        if( 5 == nConverted )
         {
             cNewProvider.sDomain        = caDomain;
             cNewProvider.sPriceRatioKey = caKey;
             cNewProvider.sApi           = caApi;
             cNewProvider.nOffset        = nOffset;
+            cNewProvider.nPort          = nPortNumber;
+
             vProviders.insert( vProviders.begin(), cNewProvider );
           //vBTCtoYACProviders.push_back( cNewProvider );
           //nIndexBtcToYac = 0;
@@ -198,12 +227,13 @@ static bool read_in_new_provider( std::string sKey, std::vector< CProvider > & v
             {
                 printf( "adding new provider:"
                         "\n"
-                        "%s\n%s\n%s\n%d"
+                        "%s\n%s\n%s\n%d\n%d"
                         "\n",
                         cNewProvider.sDomain.c_str(),
                         cNewProvider.sPriceRatioKey.c_str(),
                         cNewProvider.sApi.c_str(),
-                        cNewProvider.nOffset 
+                        cNewProvider.nOffset,
+                        cNewProvider.nPort 
                       );
             }
             return true;
@@ -508,8 +538,19 @@ static bool GetExternalWebPage(
     const string
         sLeadIn   = "GET ",
                     // here's where the api argument goes
-        sPrologue = " HTTP/1.1"
+        sPrologue = 
+                    (DEFAULT_HTTP_PORT == Cprovider.nPort)? 
+                    " HTTP/1.1"
+                    "\r\n" 
+                    "Content-Type: text/html"
                     "\r\n"
+                    "Accept: application/json, text/html"
+                    "\r\n"
+                    "Host: "
+                    // here's where the domain goes
+                    : 
+                    " HTTPS"
+                    "\r\n" 
                     "Content-Type: text/html"
                     "\r\n"
                     "Accept: application/json, text/html"
@@ -575,6 +616,18 @@ bool GetMyExternalWebPage1( int & nIndexBtcToYac, string & strBuffer, double & d
                               )
            )
         {
+            if( dPrice > 0.0 )
+            {
+                if( fPrintToConsole )
+                {
+                    printf(
+                            "\n"
+                            "y/b = %lf"
+                            "\n"
+                            , 1.0/dPrice
+                          );
+                }
+            }
             break;
         }
         //else  // failure, so try another provider

@@ -406,22 +406,21 @@ std::string HelpMessage()
         "  -printtoconsole        " + _("Send trace/debug info to console instead of debug.log file") + "\n" +
 #ifdef WIN32
         "  -printtodebugger       " + _("Send trace/debug info to debugger") + "\n" +
-
-        "  -btcyacprovider        " + _("Add a BTC to YAC price provider, entered as") + "\n" +
-     + ("                         domain,key,argument,offset") + "\n" +
-     + ("                         For example: where the url is") + "\n" +
-     + ("                         http://pubapi2.cryptsy.com/api.php?method=singlemarketdata&marketid=11") + "\n" +
-     + ("                         one would enter") + "\n" +
-     + ("                         pubapi2.cryptsy.com,lasttradeprice,/api.php?method=singlemarketdata&marketid=11,3") + "\n" +
-     + ("                         see https://www.cryptsy.com/pages/publicapi") + "\n" +
-        "  -usdbtcprovider        " + _("Add a USD to BTC price provider, entered as") + "\n" +
-     + ("                         domain,key,argument,offset") + "\n" +
-     + ("                         For example: where the url is") + "\n" +
-     + ("                         http://pubapi2.cryptsy.com/api.php?method=singlemarketdata&marketid=2") + "\n" +
-     + ("                         one would enter") + "\n" +
-     + ("                         pubapi2.cryptsy.com,lastdata,/api.php?method=singlemarketdata&marketid=2,3") + "\n" +
-     + ("                         see https://www.cryptsy.com/pages/publicapi") + "\n" +
 #endif
+        "  -btcyacprovider        " + _("Add a BTC to YAC price provider, entered as") + "\n" +
+        "                         domain,key,argument,offset,port" + "\n" 
+        "                         For example: where the url is" + "\n"
+        "                         http://pubapi2.cryptsy.com/api.php?method=singlemarketdata&marketid=11" + "\n"
+        "                         one would enter" + "\n"
+        "                         pubapi2.cryptsy.com,lasttradeprice,/api.php?method=singlemarketdata&marketid=11,3,80" + "\n"
+        "                         see https://www.cryptsy.com/pages/publicapi" + "\n" +
+        "  -usdbtcprovider        " + _("Add a USD to BTC price provider, entered as") + "\n" +
+        "                         domain,key,argument,offset" + "\n" +
+        "                         For example: where the url is" + "\n" +
+        "                         http://pubapi2.cryptsy.com/api.php?method=singlemarketdata&marketid=2" + "\n" +
+        "                         one would enter" + "\n" +
+        "                         pubapi2.cryptsy.com,lastdata,/api.php?method=singlemarketdata&marketid=2,3,80" + "\n" +
+        "                         see https://www.cryptsy.com/pages/publicapi" + "\n" +
         "  -rpcuser=<user>        " + _("Username for JSON-RPC connections") + "\n" +
         "  -rpcpassword=<pw>      " + _("Password for JSON-RPC connections") + "\n" +
         "  -rpcport=<port>        " + _("Listen for JSON-RPC connections on <port> (default: 7687 or testnet: 17687)") + "\n" +
@@ -1090,13 +1089,16 @@ bool AppInit2()
     bool fLoaded = false;
     while (!fLoaded) 
     {
-        std::string strLoadError;
+        std::string 
+            strLoadError;
         // YACOIN TODO ADD SPINNER OR PROGRESS BAR
         uiInterface.InitMessage(_("<b>Loading block index, this may take several minutes...</b>"));
 
         nStart = GetTimeMillis();
-        do {
-            try {
+        do 
+        {
+            try 
+            {
                 UnloadBlockIndex();
 
                 if (!LoadBlockIndex()) 
@@ -1104,19 +1106,19 @@ bool AppInit2()
                     strLoadError = _("Error loading block database");
                     break;
                 }
-            } catch(std::exception &e) 
+            } 
+            catch(std::exception &e) 
             {
                 (void)e;
                 strLoadError = _("Error opening block database");
                 break;
             }
-
             fLoaded = true;
-        } while(false);
+        }
+        while(false);
 
         if (!fLoaded) 
-        {
-            // TODO: suggest reindex here
+        {   // TODO: suggest reindex here
             return InitError(strLoadError);
         }
     }

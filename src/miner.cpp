@@ -360,7 +360,7 @@ CBlock* CreateNewBlock(CWallet* pwallet, bool fProofOfStake)
                             }
 #else
                             {
-                                assert("mempool transaction missing input" == 0);
+                                //assert("mempool transaction missing input" == 0);
                             }
                         // does the if() above execute the next statement in release mode???
                         // gcc or MS.  Is this wrong?? Intended??  Should it?? Is the assert()

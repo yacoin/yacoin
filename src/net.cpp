@@ -1956,10 +1956,6 @@ void ThreadDumpAddress2(void* parg)
     {
         DumpAddresses();
         --vnThreadsRunning[THREAD_DUMPADDRESS];
-      //Sleep(600000);  // why wait 10 minutes?????
-      //Sleep(600 * nMillisecondsPerSecond);
-      //Sleep(10 * nSecondsperMinute * nMillisecondsPerSecond); // these 3 above are all the same
-                                                                // which is clearer?
         Sleep(1 * nSecondsperMinute * nMillisecondsPerSecond);  // try this arbitrary value
         ++vnThreadsRunning[THREAD_DUMPADDRESS];
     }
@@ -2311,13 +2307,12 @@ void ThreadOpenAddedConnections2(void* parg)
           //Sleep(120000); // Retry every 2 minutes
                             // why??? Is this related to any other magic #?????????????????????????
             Sleep(2 * nSecondsperMinute * nMillisecondsPerSecond);
-            //Sleep(90 * nMillisecondsPerSecond); // Retry every 1.5 minutes
             ++vnThreadsRunning[THREAD_ADDEDCONNECTIONS];
         }
         return;
     }
 
-    for (::uint32_t i = 0; true; ++i)
+    for (::uint32_t i = 0; true; ++i)   // for ever
     {
         list<string> lAddresses(0);
         {
@@ -2397,9 +2392,8 @@ void ThreadOpenAddedConnections2(void* parg)
             fConnected = OpenNetworkConnection(CAddress(vserv[i % vserv.size()]), &grant);
             if (!fShutdown)
             {
-              //Sleep(500); // longer?????????????????
-                Sleep(5 * nOneHundredMilliseconds);
-                //Sleep(10 * nMillisecondsPerSecond);
+              //Sleep(6 * nMillisecondsPerSecond);  // is this related to nConnectTimeout?
+                Sleep( nConnectTimeout );  // just trying to get rid of these magic #s
             }
             else
             {

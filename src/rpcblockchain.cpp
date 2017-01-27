@@ -205,6 +205,17 @@ double doGetYACprice()
         throw runtime_error( "getYACprice\n" "Could not get page 1?" );
         return dUSDperYACprice;
     }
+    if (fPrintToConsole) 
+    {
+        printf(
+                "\n"
+                "b/y %.8lf"
+                "\n"
+                "\n"
+                , dPriceRatio
+              );
+    }
+
     //else    //OK, now we have YAC/BTC (Cryptsy's terminology), really BTC/YAC
     dBTCtoYACprice = dPriceRatio;
     sDestination = "";

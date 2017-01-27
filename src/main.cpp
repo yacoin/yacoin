@@ -1121,7 +1121,10 @@ uint256 WantedByOrphan(const CBlock* pblockOrphan)
 
 // yacoin: increasing Nfactor gradually
 const unsigned char minNfactor = 4;
-const unsigned char maxNfactor = 30;
+const unsigned char maxNfactor = MAXIMUM_N_FACTOR;
+                                        //30; since uint32_t fails on 07 Feb 2106 06:28:15 GMT
+                                        //    when stored as an uint32_t in a block
+                                        //    so there is no point going past Nf = 25
 
 unsigned char GetNfactor(::int64_t nTimestamp) 
 {
