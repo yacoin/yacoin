@@ -60,6 +60,7 @@ contains(USE_IPV6, -) {
 
 genjane.target = .genjane
 genjane.commands = touch .genjane; gcc -c -O3 -DSCRYPT_CHACHA -DSCRYPT_KECCAK512 -DSCRYPT_CHOOSE_COMPILETIME -o $$OBJECTS_DIR/scrypt-jane.o src/scrypt-jane/scrypt-jane.c
+LIBS += $$OBJECTS_DIR/scrypt-jane.o
 PRE_TARGETDEPS += .genjane
 QMAKE_EXTRA_TARGETS += genjane
 QMAKE_CLEAN += .genjane
@@ -184,7 +185,6 @@ HEADERS += \
 
 #    src/txdb-leveldb.cpp \
 #    src/txdb-bdb.cpp \
-#
 
 SOURCES += src/qt/bitcoin.cpp src/qt/bitcoingui.cpp \
     src/qt/transactiontablemodel.cpp \
@@ -263,8 +263,8 @@ SOURCES += src/qt/bitcoin.cpp src/qt/bitcoingui.cpp \
     src/qt/multisiginputentry.cpp \
     src/qt/multisigdialog.cpp \
 	src/scrypt-x86.S \
-	src/scrypt-x86_64.S \
-    src/scrypt-jane/scrypt-jane.c
+	src/scrypt-x86_64.S
+#	 src/scrypt-jane/scrypt-jane.c
 
 RESOURCES += \
     src/qt/bitcoin.qrc
