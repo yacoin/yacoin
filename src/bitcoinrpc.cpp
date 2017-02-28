@@ -62,7 +62,6 @@ using namespace boost;
 using namespace boost::asio;
 using namespace json_spirit;
 
-//using namespace std;
 using std::string;
 using std::list;
 using std::runtime_error;
@@ -82,7 +81,7 @@ void ThreadRPCServer3(void* parg);
 
 static inline unsigned short GetDefaultRPCPort()
 {
-    return GetBoolArg("-testnet", false)?7687 :17687;  // these are btc $s 18332 : 8332;
+    return GetBoolArg("-testnet", false)? 7687: 17687;
 }
 
 Object JSONRPCError(int code, const string& message)
@@ -294,8 +293,8 @@ static const CRPCCommand vRPCCommands[] =
     { "getblockcount",          &getblockcount,          true,   false },
 #ifdef WIN32
     { "getblockcountt",         &getcurrentblockandtime, true,   false },
-    { "getyacprice",            &getYACprice,            true,   false },
 #endif
+    { "getyacprice",            &getYACprice,            true,   false },
     { "getconnectioncount",     &getconnectioncount,     true,   false },
     { "getaddrmaninfo",         &getaddrmaninfo,         true,   false },
     { "getpeerinfo",            &getpeerinfo,            true,   false },
@@ -865,17 +864,31 @@ void ThreadRPCServer2(void* parg)
     {
         context.set_options(ssl::context::no_sslv2);
 
-        filesystem::path pathCertFile(GetArg("-rpcsslcertificatechainfile", "server.cert"));
-        if (!pathCertFile.is_complete()) pathCertFile = filesystem::path(GetDataDir()) / pathCertFile;
-        if (filesystem::exists(pathCertFile)) context.use_certificate_chain_file(pathCertFile.string());
-        else printf("ThreadRPCServer ERROR: missing server certificate file %s\n", pathCertFile.string().c_str());
+        filesystem::path 
+            pathCertFile(GetArg("-rpcsslcertificatechainfile", "server.cert"));
 
-        filesystem::path pathPKFile(GetArg("-rpcsslprivatekeyfile", "server.pem"));
-        if (!pathPKFile.is_complete()) pathPKFile = filesystem::path(GetDataDir()) / pathPKFile;
-        if (filesystem::exists(pathPKFile)) context.use_private_key_file(pathPKFile.string(), ssl::context::pem);
-        else printf("ThreadRPCServer ERROR: missing server private key file %s\n", pathPKFile.string().c_str());
+        if (!pathCertFile.is_complete()) 
+            pathCertFile = filesystem::path(GetDataDir()) / pathCertFile;
+        if (filesystem::exists(pathCertFile)) 
+            context.use_certificate_chain_file(pathCertFile.string());
+        else 
+            printf("ThreadRPCServer ERROR: missing server certificate file %s\n", 
+                   pathCertFile.string().c_str()
+                  );
 
-        string strCiphers = GetArg("-rpcsslciphers", "TLSv1+HIGH:!SSLv2:!aNULL:!eNULL:!AH:!3DES:@STRENGTH");
+        filesystem::path 
+            pathPKFile(GetArg("-rpcsslprivatekeyfile", "server.pem"));
+        if (!pathPKFile.is_complete()) 
+            pathPKFile = filesystem::path(GetDataDir()) / pathPKFile;
+        if (filesystem::exists(pathPKFile)) 
+            context.use_private_key_file(pathPKFile.string(), ssl::context::pem); // causes exceptions???
+        else 
+            printf("ThreadRPCServer ERROR: missing server private key file %s\n", 
+                   pathPKFile.string().c_str()
+                  );
+
+        string 
+            strCiphers = GetArg("-rpcsslciphers", "TLSv1+HIGH:!SSLv2:!aNULL:!eNULL:!AH:!3DES:@STRENGTH");
         SSL_CTX_set_cipher_list(context.impl(), strCiphers.c_str());
     }
 
@@ -1435,3 +1448,6 @@ int main(int argc, char *argv[])
 #endif
 
 const CRPCTable tableRPC;
+#ifdef _MSC_VER
+    #include "msvc_warnings.pop.h"
+#endif

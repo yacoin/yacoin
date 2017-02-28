@@ -13,7 +13,6 @@
 
 #include "net.h"
 
-//using namespace std;
 using std::max;
 
 int CAddrInfo::GetTriedBucket(const std::vector<unsigned char> &nKey) const
@@ -706,3 +705,6 @@ void CAddrMan::Connected_(const CService &addr, int64_t nTime)
     if (nTime - info.nTime > nUpdateInterval)
         info.nTime = nTime;
 }
+#ifdef _MSC_VER
+    #include "msvc_warnings.pop.h"
+#endif

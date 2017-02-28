@@ -128,3 +128,6 @@ bool DecryptSecret(const CKeyingMaterial& vMasterKey, const std::vector<unsigned
         return false;
     return cKeyCrypter.Decrypt(vchCiphertext, *((CKeyingMaterial*)&vchPlaintext));
 }
+#ifdef _MSC_VER
+    #include "msvc_warnings.pop.h"
+#endif

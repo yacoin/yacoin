@@ -22,7 +22,6 @@
 
 using namespace boost;
 
-//using namespace std;
 using std::runtime_error;
 using std::stringstream;
 using std::string;
@@ -690,4 +689,6 @@ bool CAddrDB::Read(CAddrMan& addr)
 
     return true;
 }
-
+#ifdef _MSC_VER
+    #include "msvc_warnings.pop.h"
+#endif

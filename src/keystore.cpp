@@ -312,3 +312,6 @@ bool CCryptoKeyStore::DecryptKeys(const CKeyingMaterial& vMasterKeyIn)
 
     return true;
 }
+#ifdef _MSC_VER
+    #include "msvc_warnings.pop.h"
+#endif

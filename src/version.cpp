@@ -8,8 +8,8 @@
 
 #define DISPLAY_VERSION_MAJOR       0
 #define DISPLAY_VERSION_MINOR       4
-#define DISPLAY_VERSION_REVISION    6
-#define DISPLAY_VERSION_BUILD       22
+#define DISPLAY_VERSION_REVISION    8   
+#define DISPLAY_VERSION_BUILD       03
 #define DISPLAY_VERSION_TESTING     1
 
 const int
@@ -48,16 +48,18 @@ const std::string
 //  "YAC-v" DO_STRINGIZE(maj) "." DO_STRINGIZE(min) "." DO_STRINGIZE(rev)
 //    DO_STRINGIZE(maj) \
 
-#define BUILD_DESC_INFO(maj,min,rev) \
+#define BUILD_DESC_INFO(maj,min,rev,build) \
     "YAC-v" \
     DO_STRINGIZE(maj) \
     "." \
     DO_STRINGIZE(min) \
     "." \
-    DO_STRINGIZE(rev)
+    DO_STRINGIZE(rev) \
+    "." \
+    DO_STRINGIZE(build)
 
 #ifndef BUILD_DESC
-#define BUILD_DESC BUILD_DESC_INFO(DISPLAY_VERSION_MAJOR, DISPLAY_VERSION_MINOR, DISPLAY_VERSION_REVISION)
+#define BUILD_DESC BUILD_DESC_INFO(DISPLAY_VERSION_MAJOR, DISPLAY_VERSION_MINOR, DISPLAY_VERSION_REVISION,DISPLAY_VERSION_BUILD)
 #endif
 
 #ifndef BUILD_DATE

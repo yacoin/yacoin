@@ -63,7 +63,6 @@ namespace boost {
 #include <execinfo.h>
 #endif
 
-//using namespace std;  // testing this change
 using std::map;
 using std::string;
 using std::vector;
@@ -76,6 +75,8 @@ map<string, string> mapArgs;
 map<string, vector<string> > mapMultiArgs;
 bool fDebug = false;
 bool fDebugNet = false;
+bool fTestNetNewLogic = false;
+::int32_t nTestNetNewLogicBlockNumber;
 bool fPrintToConsole = false;
 bool fPrintToDebugger = false;
 bool fRequestShutdown = false;
@@ -622,11 +623,12 @@ int64_t GetArg(const std::string& strArg, int64_t nDefault)
 
 bool GetBoolArg(const std::string& strArg, bool fDefault)
 {
-    if (mapArgs.count(strArg))
-    {
-        if (mapArgs[strArg].empty())
-            return true;
-        return (atoi(mapArgs[strArg]) != 0);
+    if (mapArgs.count(strArg))                  // there is/are an argument(s)
+    {                                           // i.e an = sign
+        if (mapArgs[strArg].empty())            // if nothing
+            return true;                        // say true
+        // shouldn't we also test for true or false?!
+        return (atoi(mapArgs[strArg]) != 0);    // if integer not 0 then true
     }
     return fDefault;
 }

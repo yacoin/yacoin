@@ -500,10 +500,10 @@ void BitcoinGUI::createMenuBar()
     help->addSeparator();
     //_________________________________________________________________________
     // remove this WIN32 conditional to test the code on the Mac & linux, etc.
-#ifdef WIN32
+//#ifdef WIN32
     help->addAction(explorerAction);
     help->addSeparator();
-#endif
+//#endif
     help->addAction(aboutAction);
     help->addAction(aboutQtAction);
 }

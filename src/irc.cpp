@@ -15,7 +15,6 @@
 
 using namespace boost;
 
-//using namespace std;
 using std::string;
 using std::vector;
 
@@ -213,6 +212,8 @@ void ThreadIRCSeed(void* parg)
 
 void ThreadIRCSeed2(void* parg)
 {
+//    LOCK(cs_net);
+    {
     // Don't connect to IRC if we won't use IPv4 connections.
     if (IsLimited(NET_IPV4))
         return;
@@ -384,16 +385,8 @@ void ThreadIRCSeed2(void* parg)
         if (!Wait(nRetryWait += 60))
             return;
     }
+    }
 }
-
-
-
-
-
-
-
-
-
 
 #ifdef TEST
 int main(int argc, char *argv[])
@@ -410,4 +403,7 @@ int main(int argc, char *argv[])
     WSACleanup();
     return 0;
 }
+#endif
+#ifdef _MSC_VER
+    #include "msvc_warnings.pop.h"
 #endif

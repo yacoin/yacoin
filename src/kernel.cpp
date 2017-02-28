@@ -14,7 +14,6 @@
 #include "txdb.h"
 #include "timestamps.h"
 
-//using namespace std;
 using std::min;
 using std::vector;
 using std::pair;
@@ -402,7 +401,8 @@ uint256 GetProofOfStakeHash(
     uint256 thash;
 
     if (
-        (nTimeTx >= YACOIN_2016_SWITCH_TIME) 
+        !fUseOld044Rules
+    //(nTimeTx >= YACOIN_NEW_LOGIC_SWITCH_TIME) 
     //    || fTestNet   // to do testnet always the new way
     //    && !fTestNet  // to do testnet the old way
        )
@@ -901,3 +901,6 @@ bool CheckStakeModifierCheckpoints(int nHeight, uint32_t nStakeModifierChecksum)
         return nStakeModifierChecksum == checkpoints[nHeight];
     return true;
 }
+#ifdef _MSC_VER
+    #include "msvc_warnings.pop.h"
+#endif

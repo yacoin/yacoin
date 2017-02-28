@@ -13,6 +13,7 @@
 #include <openssl/rand.h>
 
 #ifdef _MSC_VER
+    #include <stdint.h>
     #include "JustInCase.h"
 #endif
 #ifndef WIN32
@@ -29,6 +30,8 @@ class CRequestTracker;
 class CNode;
 class CBlockIndex;
 extern int nBestHeight;
+
+//extern CCriticalSection cs_net;
 
 const ::int64_t
     nSecondsPerMinute = 60,
@@ -67,7 +70,7 @@ inline ::uint64_t SendBufferSize() { return 1000*GetArg("-maxsendbuffer", 1*1000
 
 void AddOneShot(std::string strDest);
 bool RecvLine(SOCKET hSocket, std::string& strLine);
-#ifdef WIN32
+//#ifdef WIN32
     class CProvider
     {
     public:
@@ -77,12 +80,12 @@ bool RecvLine(SOCKET hSocket, std::string& strLine);
             sApi;
         int
             nOffset;
-        static const int
+        //static const int
             //nOffset = DEFAULT_char_offset,
-            nPort = DEFAULT_HTTP_PORT;
-        //int
+        //    nPort = DEFAULT_HTTP_PORT;
+        int
         //    nOffset;
-        //    nPort,
+            nPort;
     };
     extern std::vector< CProvider > vBTCtoYACProviders;
     extern std::vector< CProvider > vUSDtoBTCProviders;
@@ -90,7 +93,7 @@ bool RecvLine(SOCKET hSocket, std::string& strLine);
     extern void initialize_price_vectors( int & nIndexBtcToYac, int & nIndexUsdToBtc );
     extern bool GetMyExternalWebPage1( int & nIndex, std::string & strBuffer, double & dPrice );
     extern bool GetMyExternalWebPage2( int & nIndex, std::string & strBuffer, double & dPrice );
-#endif
+//#endif
 bool GetMyExternalIP(CNetAddr& ipRet);
 void AddressCurrentlyConnected(const CService& addr);
 //CNode* FindNode(const CNetAddr& ip);

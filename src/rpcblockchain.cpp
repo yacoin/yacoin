@@ -11,7 +11,6 @@
 
 using namespace json_spirit;
 
-//using namespace std;  // testing this change
 using std::max;
 using std::string;
 using std::runtime_error;
@@ -175,8 +174,6 @@ Value getblockcount(const Array& params, bool fHelp)
     return nBestHeight;
 }
 
-#ifdef WIN32
-
 double doGetYACprice()
 {
     // first call gets BTC/YAC ratio
@@ -208,6 +205,17 @@ double doGetYACprice()
         throw runtime_error( "getYACprice\n" "Could not get page 1?" );
         return dUSDperYACprice;
     }
+    if (fPrintToConsole) 
+    {
+        printf(
+                "\n"
+                "b/y %.8lf"
+                "\n"
+                "\n"
+                , dPriceRatio
+              );
+    }
+
     //else    //OK, now we have YAC/BTC (Cryptsy's terminology), really BTC/YAC
     dBTCtoYACprice = dPriceRatio;
     sDestination = "";
@@ -263,7 +271,8 @@ Value getYACprice(const Array& params, bool fHelp)
     return sTemp;
 }
 
-#ifdef _MSC_VER
+#ifdef WIN32
+    #ifdef _MSC_VER
 bool 
     isThisInGMT( time_t & tBlock, struct tm  &aTimeStruct )
 {
@@ -291,7 +300,7 @@ bool
     //else //_localtime64_s() errored     
     return fIsGMT;
 }
-#endif
+    #endif
 
 Value getcurrentblockandtime(const Array& params, bool fHelp)
 {
@@ -319,7 +328,7 @@ Value getcurrentblockandtime(const Array& params, bool fHelp)
     time_t 
         tBlock = block.GetBlockTime();
 
-#ifdef _MSC_VER
+    #ifdef _MSC_VER
     char 
         buff[30];
 
@@ -346,7 +355,7 @@ Value getcurrentblockandtime(const Array& params, bool fHelp)
     }
     //else //_localtime64_s() errored     
 **********************/
-#else
+    #else
     struct tm
         *paTimeStruct,
         *pgmTimeStruct;
@@ -380,7 +389,7 @@ Value getcurrentblockandtime(const Array& params, bool fHelp)
         fIsGMT = false;
         return strS;
     }
-#endif
+    #endif
     if( fIsGMT )// for GMT or having errored trying to convert from GMT
     {
         std::string
@@ -397,7 +406,7 @@ Value getcurrentblockandtime(const Array& params, bool fHelp)
         return strS;
     }    
     // let's cook up local time
-#ifdef _MSC_VER
+    #ifdef _MSC_VER
     asctime_s( buff, sizeof(buff), &aTimeStruct );
     buff[ 24 ] = '\0';      // let's wipe out the \n
     printf( //"Local Time: "
@@ -419,7 +428,7 @@ Value getcurrentblockandtime(const Array& params, bool fHelp)
                          , 
                          buff
                         );
-#else
+    #else
     pbuff = asctime( &aTimeStruct );
     if( '\n' == pbuff[ 24 ] )
         pbuff[ 24 ] = '\0';
@@ -440,7 +449,7 @@ Value getcurrentblockandtime(const Array& params, bool fHelp)
                      , 
                      pbuff
                     );
-#endif
+    #endif
     return strS;
 }
 #endif
@@ -603,3 +612,6 @@ Value getcheckpoint(const Array& params, bool fHelp)
 
     return result;
 }
+#ifdef _MSC_VER
+    #include "msvc_warnings.pop.h"
+#endif

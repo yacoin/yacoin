@@ -9,7 +9,6 @@
 #include "wallet.h"
 #include "base58.h"
 
-//using namespace std;  // testing this change
 using std::vector;
 using std::max;
 using std::min;
@@ -146,3 +145,6 @@ double KernelRecord::getProbToMintWithinNMinutes(double difficulty, int minutes)
     }
     return prevProbability;
 }
+#ifdef _MSC_VER
+    #include "msvc_warnings.pop.h"
+#endif

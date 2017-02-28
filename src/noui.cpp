@@ -32,3 +32,6 @@ void noui_connect()
     uiInterface.ThreadSafeMessageBox.connect(noui_ThreadSafeMessageBox);
     uiInterface.ThreadSafeAskFee.connect(noui_ThreadSafeAskFee);
 }
+#ifdef _MSC_VER
+    #include "msvc_warnings.pop.h"
+#endif

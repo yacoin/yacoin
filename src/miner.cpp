@@ -16,7 +16,6 @@
 #include "init.h"
 #include "scrypt.h"
 
-//using namespace std;
 using std::vector;
 using std::set;
 using std::list;
@@ -134,7 +133,7 @@ public:
     {
         if(
             false 
-            //((pindexBest->nTime < YACOIN_2016_SWITCH_TIME) && !fTestNet )
+            //((pindexBest->nTime < YACOIN_NEW_LOGIC_SWITCH_TIME) && !fTestNet )
           )
         {
             SetMockTime( (int64_t)(pindexBest->nTime + nOneMinuteInSeconds) );
@@ -145,7 +144,7 @@ public:
     {
         if(
             false 
-            //((pindexBest->nTime < YACOIN_2016_SWITCH_TIME) && !fTestNet )
+            //((pindexBest->nTime < YACOIN_NEW_LOGIC_SWITCH_TIME) && !fTestNet )
           )
         {
             SetMockTime( 0 );   // restores time to now
@@ -251,8 +250,6 @@ CBlock* CreateNewBlock(CWallet* pwallet, bool fProofOfStake)
                 fCreatedCoinStake;
             if(
                 fUseOld044Rules
-                //fTestNet || // test to see if one can mint in TestNet
-                //((pindexBest->nTime < YACOIN_2016_SWITCH_TIME) && !fTestNet)
               )
             {
                 fCreatedCoinStake = pwallet->CreateCoinStake(
@@ -297,8 +294,6 @@ CBlock* CreateNewBlock(CWallet* pwallet, bool fProofOfStake)
 
     if(
         fUseOld044Rules
-        //fTestNet || // test to see if one can mint in TestNet
-        //((pindexBest->nTime < YACOIN_2016_SWITCH_TIME) && !fTestNet)
       )
     {   // Collect memory pool transactions into the block
         ::int64_t 
@@ -365,7 +360,7 @@ CBlock* CreateNewBlock(CWallet* pwallet, bool fProofOfStake)
                             }
 #else
                             {
-                                assert("mempool transaction missing input" == 0);
+                                //assert("mempool transaction missing input" == 0);
                             }
                         // does the if() above execute the next statement in release mode???
                         // gcc or MS.  Is this wrong?? Intended??  Should it?? Is the assert()
@@ -1017,7 +1012,12 @@ void StakeMinter(CWallet *pwallet)
         }
 
         while (
-               IsInitialBlockDownload() || vNodes.empty()
+               IsInitialBlockDownload() ||
+               (
+                vNodes.empty() 
+                //&& !fTestNet      //TestNet can mint stand alone!
+               )
+               //|| (fTestNet && (pindexBest->nHeight < nCoinbaseMaturity))
               )
         {
             Sleep(1000);
@@ -1115,7 +1115,11 @@ static void YacoinMiner(CWallet *pwallet)  // here fProofOfStake is always false
         if (fShutdown)
             return;
         while (
-               IsInitialBlockDownload() || vNodes.empty()
+               IsInitialBlockDownload() || 
+               (
+                vNodes.empty() 
+                //&& !fTestNet               //TestNet can mine stand alone!
+               )
               )
         {
             //printf("vNodes.size() == %d, IsInitialBlockDownload() == %d\n", vNodes.size(), IsInitialBlockDownload());
@@ -1314,7 +1318,7 @@ static void YacoinMiner(CWallet *pwallet)  // here fProofOfStake is always false
                 (pindexPrev != pindexBest) ||
                 (!fGenerateBitcoins) ||
                 fShutdown ||
-                vNodes.empty()
+                (vNodes.empty() && !fTestNet)
                )
                 break;
 
@@ -1415,3 +1419,6 @@ void GenerateYacoins(bool fGenerate, CWallet* pwallet)
 }
 //_____________________________________________________________________________
 //_____________________________________________________________________________
+#ifdef _MSC_VER
+    #include "msvc_warnings.pop.h"
+#endif

@@ -31,7 +31,6 @@
 
 using namespace boost;
 
-//using namespace std;
 using std::map;
 using std::string;
 using std::runtime_error;
@@ -561,26 +560,28 @@ CNode* ConnectNode(CAddress addrConnect, const char *pszDest, ::int64_t nTimeout
 
 
     /// debug print
-    printf( "trying connection " );
-    if( pszDest )
+    if (fDebug)
     {
-        printf( "%s\n", pszDest );
+        printf( "trying connection " );
+        if( pszDest )
+        {
+            printf( "%s\n", pszDest );
+        }
+        else
+        {
+            printf( "%s\n", 
+                strprintf( " %s, last seen = %s",
+                           addrConnect.ToString().c_str(),
+                           ((double)(GetAdjustedTime() - addrConnect.nTime)/3600.0 > 24)?
+                           "days":
+                           strprintf( "%.1lfhrs", 
+                                      (double)(GetAdjustedTime() - addrConnect.nTime)/3600.0
+                                    ).c_str()
+                         ).c_str()
+                  );
+            //printf( "%s lastseen=%.1fhrs\n", addrConnect.ToString().c_str(), (double)(GetAdjustedTime() - addrConnect.nTime)/3600.0 > 24 );
+        }
     }
-    else
-    {
-        printf( "%s\n", 
-            strprintf( " %s, last seen = %s",
-                       addrConnect.ToString().c_str(),
-                       ((double)(GetAdjustedTime() - addrConnect.nTime)/3600.0 > 24)?
-                       "days":
-                       strprintf( "%.1lfhrs", 
-                                  (double)(GetAdjustedTime() - addrConnect.nTime)/3600.0
-                                ).c_str()
-                     ).c_str()
-              );
-        //printf( "%s lastseen=%.1fhrs\n", addrConnect.ToString().c_str(), (double)(GetAdjustedTime() - addrConnect.nTime)/3600.0 > 24 );
-    }
-
     // Connect
     SOCKET hSocket;
     if (
@@ -691,7 +692,7 @@ void CNode::CloseSocketDisconnect()
                 case WSAENETDOWN:
                     //The network subsystem has failed.
 
-                case WSAENOTSOCK:
+                case WSAENOTSOCK:   //<<<<<<<<<<
                     //The descriptor is not a socket.
 
                 case WSAEINPROGRESS:
@@ -1385,7 +1386,7 @@ void ThreadSocketHandler2(void* parg)
                                                     //this error indicates that the time to live 
                                                     //has expired.
 
-                                                case WSAENOTSOCK:
+                                                case WSAENOTSOCK:   //<<<<<<<<
                                                     //The descriptor is not a socket.
 
                                                 case WSAEOPNOTSUPP:
@@ -1464,7 +1465,7 @@ void ThreadSocketHandler2(void* parg)
                                                     //this error indicates that the time to live 
                                                     //has expired.
 
-                                    WSAENOTSOCK     //The descriptor is not a socket.
+                                    WSAENOTSOCK     //The descriptor is not a socket. <<<<<<<<<<<
 
                                     WSAEOPNOTSUPP   //MSG_OOB was specified, but the socket 
                                                     //is not stream-style such as type SOCK_STREAM, 
@@ -1955,10 +1956,6 @@ void ThreadDumpAddress2(void* parg)
     {
         DumpAddresses();
         --vnThreadsRunning[THREAD_DUMPADDRESS];
-      //Sleep(600000);  // why wait 10 minutes?????
-      //Sleep(600 * nMillisecondsPerSecond);
-      //Sleep(10 * nSecondsperMinute * nMillisecondsPerSecond); // these 3 above are all the same
-                                                                // which is clearer?
         Sleep(1 * nSecondsperMinute * nMillisecondsPerSecond);  // try this arbitrary value
         ++vnThreadsRunning[THREAD_DUMPADDRESS];
     }
@@ -2310,13 +2307,12 @@ void ThreadOpenAddedConnections2(void* parg)
           //Sleep(120000); // Retry every 2 minutes
                             // why??? Is this related to any other magic #?????????????????????????
             Sleep(2 * nSecondsperMinute * nMillisecondsPerSecond);
-            //Sleep(90 * nMillisecondsPerSecond); // Retry every 1.5 minutes
             ++vnThreadsRunning[THREAD_ADDEDCONNECTIONS];
         }
         return;
     }
 
-    for (::uint32_t i = 0; true; ++i)
+    for (::uint32_t i = 0; true; ++i)   // for ever
     {
         list<string> lAddresses(0);
         {
@@ -2396,9 +2392,8 @@ void ThreadOpenAddedConnections2(void* parg)
             fConnected = OpenNetworkConnection(CAddress(vserv[i % vserv.size()]), &grant);
             if (!fShutdown)
             {
-              //Sleep(500); // longer?????????????????
-                Sleep(5 * nOneHundredMilliseconds);
-                //Sleep(10 * nMillisecondsPerSecond);
+              //Sleep(6 * nMillisecondsPerSecond);  // is this related to nConnectTimeout?
+                Sleep( nConnectTimeout );  // just trying to get rid of these magic #s
             }
             else
             {
@@ -2619,13 +2614,20 @@ void ThreadMessageHandler2(void* parg)
 
 bool BindListenPort(const CService &addrBind, string& strError)
 {
+//    LOCK(cs_net);
+    {
     strError = "";
-    int nOne = 1;
+    u_long
+        nOne = 1;
 
 #ifdef WIN32
     // Initialize Windows Sockets
-    WSADATA wsadata;
-    int ret = WSAStartup(MAKEWORD(2,2), &wsadata);
+    WSADATA 
+        wsadata;
+
+    int 
+        ret = WSAStartup(MAKEWORD(2,2), &wsadata);
+
     if (ret != NO_ERROR)
     {
         strError = strprintf("Error: TCP/IP socket library failed to start (WSAStartup returned error %d)", ret);
@@ -2675,7 +2677,7 @@ bool BindListenPort(const CService &addrBind, string& strError)
 
 #ifdef WIN32
     // Set to non-blocking, incoming connections will also inherit this
-    if (ioctlsocket(hListenSocket, FIONBIO, (u_long*)&nOne) == SOCKET_ERROR)
+    if (ioctlsocket(hListenSocket, FIONBIO, &nOne) == SOCKET_ERROR)
 #else
     if (fcntl(hListenSocket, F_SETFL, O_NONBLOCK) == SOCKET_ERROR)
 #endif
@@ -2691,7 +2693,8 @@ bool BindListenPort(const CService &addrBind, string& strError)
 #ifdef USE_IPV6
     // some systems don't have IPV6_V6ONLY but are always v6only; others do have the option
     // and enable it by default or not. Try to enable it, if possible.
-    if (addrBind.IsIPv6()) {
+    if (addrBind.IsIPv6()) 
+    {
 #ifdef IPV6_V6ONLY
 #ifdef WIN32
         setsockopt(hListenSocket, IPPROTO_IPV6, IPV6_V6ONLY, (const char*)&nOne, sizeof(int));
@@ -2746,6 +2749,7 @@ bool BindListenPort(const CService &addrBind, string& strError)
 
     printf("Socket %s initialized\n",  addrBind.ToString().c_str());
     return true;
+    }
 }
 
 void static Discover()
@@ -3073,3 +3077,6 @@ void CNode::RecordBytesSent(::uint64_t bytes)
     LOCK(cs_totalBytesSent);
     return nTotalBytesSent;
 }
+#ifdef _MSC_VER
+    #include "msvc_warnings.pop.h"
+#endif

@@ -17,7 +17,6 @@
 
 using namespace json_spirit;
 
-//using namespace std;
 using std::runtime_error;
 using std::vector;
 using std::list;
@@ -392,3 +391,6 @@ Value getnettotals(const Array& params, bool fHelp)
     obj.push_back(Pair("timemillis", static_cast<boost::int64_t>(GetTimeMillis())));
     return obj;
 }
+#ifdef _MSC_VER
+    #include "msvc_warnings.pop.h"
+#endif

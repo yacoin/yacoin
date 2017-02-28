@@ -26,7 +26,6 @@
 
 using namespace boost;
 
-//using namespace std;
 using std::string;
 using std::runtime_error;
 using std::make_pair;
@@ -686,6 +685,8 @@ bool CTxDB::LoadBlockIndex()
     #endif
 #endif
 
+// <<<<<<<<<
+
 #ifdef WIN32
     if (fPrintToConsole) 
         (void)printf( "Sorting by height...\n" );        
@@ -984,4 +985,7 @@ bool CTxDB::LoadBlockIndex()
 
     return true;
 }
+#ifdef _MSC_VER
+    #include "msvc_warnings.pop.h"
+#endif
 #endif

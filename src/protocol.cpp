@@ -162,4 +162,6 @@ void CInv::print() const
 {
     printf("CInv(%s)\n", ToString().c_str());
 }
-
+#ifdef _MSC_VER
+    #include "msvc_warnings.pop.h"
+#endif

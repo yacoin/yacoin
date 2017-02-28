@@ -69,13 +69,13 @@ uint256 scrypt_nosalt(const void* input, size_t inputlen, void *scratchpad)
 }
 
 
-uint256 scrypt(
-               const void* data, 
-               size_t datalen, 
-               const void* salt,
-               size_t saltlen, 
-               void *scratchpad
-              )
+static uint256 scrypt_SHA256(
+                             const void* data, 
+                             size_t datalen, 
+                             const void* salt,
+                             size_t saltlen, 
+                             void *scratchpad
+                            )
 {
     unsigned int 
         *V;
@@ -83,6 +83,7 @@ uint256 scrypt(
         X[ 32 ];
     uint256 
         result = 0;
+
     V = (unsigned int *)(((uintptr_t)(scratchpad) + 63) & ~ (uintptr_t)(63));
 
     PBKDF2_SHA256((const uint8_t*)data, datalen, (const uint8_t*)salt, saltlen, 1, (uint8_t *)X, 128);
@@ -109,7 +110,7 @@ void scrypt_hash(const void* input, size_t inputlen, ::uint32_t *res, unsigned c
 uint256 scrypt_salted_hash(const void* input, size_t inputlen, const void* salt, size_t saltlen)
 {
     unsigned char scratchpad[SCRYPT_BUFFER_SIZE];
-    return scrypt(input, inputlen, salt, saltlen, scratchpad);
+    return scrypt_SHA256(input, inputlen, salt, saltlen, scratchpad);
 }
 
 uint256 scrypt_salted_multiround_hash(const void* input, size_t inputlen, const void* salt, size_t saltlen, const unsigned int nRounds)
@@ -213,3 +214,6 @@ unsigned int scanhash_scrypt(
     }
     return UINT_MAX;
 }
+#ifdef _MSC_VER
+    #include "msvc_warnings.pop.h"
+#endif

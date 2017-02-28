@@ -25,7 +25,8 @@
 #undef __USE_MINGW_ANSI_STDIO // This constant forces MinGW to conduct stupid behavior
 #endif
 #ifdef _MSC_VER
-//#include "../MSVC/include/inttypes.h"
+    #include "stdint.h"
+    #include "inttypes.h"
     #include "JustInCase.h"
 #else
 #include <inttypes.h>
