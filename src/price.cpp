@@ -154,8 +154,8 @@ static bool read_in_new_provider( std::string sKey, std::vector< CProvider > & v
     // here is where we should read in new providers from the configuration file
     // arguments, and add them to the vectors we already have.  This way we don't
     // have to recompile if there is even a temporary failure with a web provider.
-    bool
-        fProviderAdded;
+    //bool
+    //    fProviderAdded;
 
     //fProviderAdded = IsProviderAdded( key, vProviders );
 
@@ -190,7 +190,7 @@ static bool read_in_new_provider( std::string sKey, std::vector< CProvider > & v
             if( fPrintToConsole )
             {
                 printf( "scan string: %s\n", sTemp.c_str() );
-                printf( "Error: Probably too long?\n", sTemp.c_str() );
+                printf( "Error: Probably too long?\n" );
             }
             return false;
         }
@@ -200,8 +200,7 @@ static bool read_in_new_provider( std::string sKey, std::vector< CProvider > & v
             caApi[ nArbitrayUrlArgumentLength + 1 ];
         int
             nPortNumber,
-            nOffset,
-            nPort;
+            nOffset;
         int
             nConverted = sscanf( 
                                 sProvider.c_str(),
@@ -287,35 +286,71 @@ class CdoSocket
 private:
     struct hostent 
         *host;
-    SOCKET 
+#ifdef WIN32
+    SOCKET      // in Windows, this is a UINT_PTR (see winsock2.h or ws2def.h)
+                // in linux, I don't know, maybe uint32_t?
+#else
+    int
+#endif
         SocketCopy;
 
     CdoSocket( const CdoSocket & );
     CdoSocket &operator = ( const CdoSocket & );
 
 public:
-    explicit CdoSocket( SOCKET & Socket, const string & sDomain, const int & nPort = DEFAULT_HTTP_PORT )
+    explicit CdoSocket(
+#ifdef WIN32
+                        SOCKET 
+#else
+                        int
+#endif
+                        & Socket, 
+                        const string & sDomain, 
+                        const int & nPort = DEFAULT_HTTP_PORT 
+                      )
     {
         int
             nResult;
-        SocketCopy = NULL;
+
+        SocketCopy = 
+#ifdef WIN32
+            NULL;
         Socket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-        
+#else
+            0;
+        // You have to put what's appropriate here?
+        // from https://www.gnu.org/software/libc/manual/html_node/Inet-Example.html
+        Socket = socket(PF_INET, SOCK_STREAM, 0);
+#endif
         host = gethostbyname( sDomain.c_str() );
 
         if( NULL != host )
         {
+#ifdef WIN32
             SOCKADDR_IN 
+#else
+            struct sockaddr_in 
+#endif
                 SockAddr;
-
+#ifndef WIN32
+            ;   // you have to put whatever is appropriate here?  Maybe something like this:
+    #ifdef SO_NOSIGPIPE
+            int set = 1;
+            setsockopt(hSocket, SOL_SOCKET, SO_NOSIGPIPE, (void*)&set, sizeof(int));
+    #endif
+#endif
             SockAddr.sin_port = htons( (unsigned short)nPort ); // was 80
             SockAddr.sin_family = AF_INET;
             SockAddr.sin_addr.s_addr = *((unsigned long*)host->h_addr); //  null ptr if net is down!!
 
+#ifndef WIN32
+            // Maybe linux needs something like this:
+            int fFlags = fcntl(hSocket, F_GETFL, 0);    // then more code??? Eventually
+#endif
             //cout << "Connecting...\n";
 
-            nResult = connect(Socket,(SOCKADDR*)(&SockAddr),sizeof(SockAddr) );
-
+#ifdef WIN32
+            nResult = connect(Socket,(SOCKADDR *)(&SockAddr),sizeof(SockAddr) );
             if ( SOCKET_ERROR == nResult )
             {
                 std::string
@@ -324,7 +359,6 @@ public:
                                     "connect function failed with error: %d\n", 
                                     WSAGetLastError()
                                   );
-#ifdef WIN32
                 clearLocalSocketError( Socket );
 
                 nResult = closesocket(Socket);
@@ -332,6 +366,9 @@ public:
                     wprintf(L"closesocket function failed with error: %ld\n", WSAGetLastError());
                 //WSACleanup();
 #else
+            nResult = connect( sockfd, (struct sockaddr *)&SockAddr, sizeof(struct sockaddr) );
+            if ( -1 == nResult )
+            {
                 nResult = closesocket(Socket);  //I'm guessing here as I don't linux!
 #endif
                 Socket = NULL;
@@ -345,9 +382,14 @@ public:
         else    // network is down?
         {
             nResult = closesocket(Socket);
+#ifdef WIN32
             if ( SOCKET_ERROR == nResult )
                 wprintf(L"closesocket function failed with error: %ld\n", WSAGetLastError());
             //WSACleanup();
+#else
+            if ( -1 == nResult )
+                ;   // maybe some code?
+#endif            
             Socket = NULL;
             throw runtime_error(
                                 "getYACprice\n"
@@ -383,10 +425,11 @@ static bool GetMyExternalWebPage(
     //
     {
         LOCK( cs_price );
+#ifdef WIN32
         SOCKET 
-#ifdef _MSC_VER
             hSocket = NULL;
 #else
+        int
             hSocket = 0;
 #endif
         try
