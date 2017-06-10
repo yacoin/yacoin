@@ -170,7 +170,7 @@ unsigned int GetProofOfWorkSMA(const CBlockIndex* pIndexLast);
 
 
 
-bool GetWalletFile(CWallet* pwallet, std::string &strWalletFileOut);
+//bool GetWalletFile(CWallet* pwallet, std::string &strWalletFileOut);
 
 /** Position on disk for a particular transaction. */
 class CDiskTxPos
@@ -1011,10 +1011,10 @@ public:
             nSpanOf19 = 1602872224 - nChainStartTime,   // Fri, 16 Oct 2020 18:17:04 GMT                        
             nSpanOf20 = 1636426656 - nChainStartTime,   // Tue, 09 Nov 2021 02:57:36 GMT                        
             nSpanOf21 = 1904862112 - nChainStartTime,   // Mon, 13 May 2030 00:21:52 GMT                        
-            nSpanOf22 = 2173297568 - nChainStartTime,   // Sat, 13 Nov 2038 21:46:08 GMT                        
-            nSpanOf23 = 2441733024 - nChainStartTime,   // Fri, 17 May 2047 19:10:24 GMT                        
-            nSpanOf24 = 3247039392 - nChainStartTime,   // Tue, 22 Nov 2072 11:23:12 GMT                        
-            nSpanOf25 = 3515474848 - nChainStartTime;   // Mon, 26 May 2081 08:47:28 GMT                        
+            nSpanOf22 = 2173297568U - nChainStartTime,   // Sat, 13 Nov 2038 21:46:08 GMT                        
+            nSpanOf23 = 2441733024U - nChainStartTime,   // Fri, 17 May 2047 19:10:24 GMT                        
+            nSpanOf24 = 3247039392U - nChainStartTime,   // Tue, 22 Nov 2072 11:23:12 GMT                        
+            nSpanOf25 = 3515474848U - nChainStartTime;   // Mon, 26 May 2081 08:47:28 GMT                        
             // uint_32 fails here                          Sun, 07 Feb 2106 06:28:15 GMT
           //nSpanOf26 = 5662958496 - nChainStartTime,   // Sat, 14 Jun 2149 12:01:36 GMT                       
           //nSpanOf27 = 6736700320 - nChainStartTime,   // Tue, 24 Jun 2183 01:38:40 GMT                        

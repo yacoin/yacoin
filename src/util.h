@@ -95,6 +95,10 @@ void LogStackTrace();
     #define PRI64u  "llu"
     #define PRI64x  "llx"
 
+    #define PRId64  "lld"
+    #define PRIu64  "llu"
+    #define PRIx64  "llx"
+
   #define PRIszx    "zx"
   #define PRIszu    "zu"
   #define PRIszd    "zd"

@@ -336,7 +336,7 @@ public:
             ;   // you have to put whatever is appropriate here?  Maybe something like this:
     #ifdef SO_NOSIGPIPE
             int set = 1;
-            setsockopt(hSocket, SOL_SOCKET, SO_NOSIGPIPE, (void*)&set, sizeof(int));
+            setsockopt(Socket, SOL_SOCKET, SO_NOSIGPIPE, (void*)&set, sizeof(int));
     #endif
 #endif
             SockAddr.sin_port = htons( (unsigned short)nPort ); // was 80
@@ -345,7 +345,7 @@ public:
 
 #ifndef WIN32
             // Maybe linux needs something like this:
-            int fFlags = fcntl(hSocket, F_GETFL, 0);    // then more code??? Eventually
+            int fFlags = fcntl(Socket, F_GETFL, 0);    // then more code??? Eventually
 #endif
             //cout << "Connecting...\n";
 
@@ -366,7 +366,7 @@ public:
                     wprintf(L"closesocket function failed with error: %ld\n", WSAGetLastError());
                 //WSACleanup();
 #else
-            nResult = connect( sockfd, (struct sockaddr *)&SockAddr, sizeof(struct sockaddr) );
+            nResult = connect( Socket, (struct sockaddr *)&SockAddr, sizeof(struct sockaddr) );
             if ( -1 == nResult )
             {
                 nResult = closesocket(Socket);  //I'm guessing here as I don't linux!
@@ -434,28 +434,13 @@ static bool GetMyExternalWebPage(
 #endif
         try
         {
-            if( DEFAULT_HTTP_PORT != nPort )
-            {
-                CdoSocket 
-                    CthisSocketConnection( 
-                                          hSocket, 
-                                          sDomain,
-                                          nPort
-                                         );
-            }
-            else
-            {
-                CdoSocket 
-                    CthisSocketConnection( 
-                                          hSocket, 
-                                          sDomain           // for gethostbyname()
-                                         );                 //RAII attempt on the socket!?
-            }
-        }
-        catch( std::exception &e )
-        {
-            printf( "%s\n", (string("error: ") + e.what()).c_str() );
-        }
+            CdoSocket 
+                CthisSocketConnection( 
+                                      hSocket,
+                                      sDomain,
+                                      nPort
+                                     );
+
         if (!hSocket)
         {
             return false;
@@ -544,6 +529,11 @@ static bool GetMyExternalWebPage(
                 strLine = "";
             }
             while( fLineOK );
+        }
+        }
+        catch( std::exception &e )
+        {
+            printf( "%s\n", (string("error: ") + e.what()).c_str() );
         }
     }
     if ( 0 < strBuffer.size() )

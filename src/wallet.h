@@ -1093,6 +1093,6 @@ private:
     std::vector<char> _ssExtra;
 };
 
-bool GetWalletFile(CWallet* pwallet, std::string &strWalletFileOut);
+//bool GetWalletFile(CWallet* pwallet, std::string &strWalletFileOut);
 
 #endif
