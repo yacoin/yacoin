@@ -290,7 +290,7 @@ private:
     SOCKET      // in Windows, this is a UINT_PTR (see winsock2.h or ws2def.h)
                 // in linux, I don't know, maybe uint32_t?
 #else
-    int
+    u_int
 #endif
         SocketCopy;
 
@@ -302,7 +302,7 @@ public:
 #ifdef WIN32
                         SOCKET 
 #else
-                        int
+                        u_int
 #endif
                         & Socket, 
                         const string & sDomain, 
@@ -429,7 +429,7 @@ static bool GetMyExternalWebPage(
         SOCKET 
             hSocket = NULL;
 #else
-        int
+        u_int
             hSocket = 0;
 #endif
         try
