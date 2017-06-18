@@ -89,7 +89,7 @@ Value getsubsidy(const Array& params, bool fHelp)
         nBits = GetNextTargetRequired(pindexBest, false);
     }
 
-    return (uint64_t)GetProofOfWorkReward(nBits);
+    return (Value_type)GetProofOfWorkReward(nBits);
 }
 
 Value getmininginfo(const Array& params, bool fHelp)
@@ -107,31 +107,31 @@ Value getmininginfo(const Array& params, bool fHelp)
 
     Object obj, diff, weight;
     obj.push_back(Pair("blocks",        (int)nBestHeight));
-    obj.push_back(Pair("currentblocksize",(uint64_t)nLastBlockSize));
-    obj.push_back(Pair("currentblocktx",(uint64_t)nLastBlockTx));
+    obj.push_back(Pair("currentblocksize",(Value_type)nLastBlockSize));
+    obj.push_back(Pair("currentblocktx",(Value_type)nLastBlockTx));
 
     diff.push_back(Pair("proof-of-work",        GetDifficulty()));
     diff.push_back(Pair("proof-of-stake",       GetDifficulty(GetLastBlockIndex(pindexBest, true))));
-    diff.push_back(Pair("search-interval",      (int)nLastCoinStakeSearchInterval));
+    diff.push_back(Pair("search-interval",      (Value_type)nLastCoinStakeSearchInterval));
     obj.push_back(Pair("difficulty",    diff));
 
     // YACOIN TODO - May need to re-enable blockvalue if used in any custom api's
     // obj.push_back(Pair("blockvalue",    (uint64_t)GetProofOfWorkReward(GetLastBlockIndex(pindexBest, false)->nBits)));
     // WM - Report current Proof-of-Work block reward.
-    obj.push_back(Pair("powreward", (uint64_t)GetProofOfWorkReward(GetLastBlockIndex(pindexBest, false)->nBits) / 1000000.0));
+    obj.push_back(Pair("powreward", (Value_type)GetProofOfWorkReward(GetLastBlockIndex(pindexBest, false)->nBits) / 1000000.0));
     obj.push_back(Pair("netmhashps",     GetPoWMHashPS()));
     obj.push_back(Pair("netstakeweight", GetPoSKernelPS()));
     obj.push_back(Pair("errors",        GetWarnings("statusbar")));
     obj.push_back(Pair("generate",      GetBoolArg("-gen")));
     obj.push_back(Pair("genproclimit",  (int)GetArg("-genproclimit", -1)));
     obj.push_back(Pair("hashespersec",  gethashespersec(params, false)));
-    obj.push_back(Pair("pooledtx",      (uint64_t)mempool.size()));
+    obj.push_back(Pair("pooledtx",      (Value_type)mempool.size()));
 
     weight.push_back(Pair("kernelsrate",   nKernelsRate));
     weight.push_back(Pair("cdaysrate",   nCoinDaysRate));
     obj.push_back(Pair("stakestats", weight));
 
-    obj.push_back(Pair("stakeinterest %",(uint64_t)GetProofOfStakeReward(0, GetLastBlockIndex(pindexBest, true)->nBits,
+    obj.push_back(Pair("stakeinterest %",(Value_type)GetProofOfStakeReward(0, GetLastBlockIndex(pindexBest, true)->nBits,
                                                                  GetLastBlockIndex(pindexBest, true)->nTime, true) / 10000));
     obj.push_back(Pair("testnet",       fTestNet));
 
@@ -145,7 +145,7 @@ Value getmininginfo(const Array& params, bool fHelp)
 #endif    
     
     obj.push_back( Pair( "Nfactor", Nfactor ) );
-    obj.push_back( Pair( "N", N ) );
+    obj.push_back( Pair( "N", (Value_type)N ) );
 
     return obj;
 }
@@ -483,13 +483,13 @@ Value getblocktemplate(const Array& params, bool fHelp)
     pblock->nNonce = 0;
 
     Array transactions;
-    map<uint256, int64_t> setTxIndex;
+    map<uint256, Value_type> setTxIndex;
     int i = 0;
     CTxDB txdb("r");
     BOOST_FOREACH (CTransaction& tx, pblock->vtx)
     {
         uint256 txHash = tx.GetHash();
-        setTxIndex[txHash] = i++;
+        setTxIndex[txHash] = (Value_type)(i++);
 
         if (tx.IsCoinBase() || tx.IsCoinStake())
             continue;
@@ -507,19 +507,21 @@ Value getblocktemplate(const Array& params, bool fHelp)
         bool fInvalid = false;
         if (tx.FetchInputs(txdb, mapUnused, false, false, mapInputs, fInvalid))
         {
-            entry.push_back(Pair("fee", (int64_t)(tx.GetValueIn(mapInputs) - tx.GetValueOut())));
+            entry.push_back(Pair("fee", (Value_type)(tx.GetValueIn(mapInputs) - tx.GetValueOut())));
 
             Array deps;
             BOOST_FOREACH (MapPrevTx::value_type& inp, mapInputs)
             {
-                if (setTxIndex.count(inp.first))
-                    deps.push_back(setTxIndex[inp.first]);
+                if (setTxIndex.count(inp.first)){
+                    Value_type temp = setTxIndex[inp.first];
+                    deps.push_back(temp);
+                }
             }
             entry.push_back(Pair("depends", deps));
 
             int64_t nSigOps = tx.GetLegacySigOpCount();
             nSigOps += tx.GetP2SHSigOpCount(mapInputs);
-            entry.push_back(Pair("sigops", nSigOps));
+            entry.push_back(Pair("sigops", (Value_type)nSigOps));
         }
 
         transactions.push_back(entry);
@@ -543,16 +545,16 @@ Value getblocktemplate(const Array& params, bool fHelp)
     result.push_back(Pair("previousblockhash", pblock->hashPrevBlock.GetHex()));
     result.push_back(Pair("transactions", transactions));
     result.push_back(Pair("coinbaseaux", aux));
-    result.push_back(Pair("coinbasevalue", (int64_t)pblock->vtx[0].vout[0].nValue));
+    result.push_back(Pair("coinbasevalue", (Value_type)pblock->vtx[0].vout[0].nValue));
     result.push_back(Pair("target", hashTarget.GetHex()));
-    result.push_back(Pair("mintime", (int64_t)pindexPrev->GetMedianTimePast()+1));
+    result.push_back(Pair("mintime", (Value_type)pindexPrev->GetMedianTimePast()+1));
     result.push_back(Pair("mutable", aMutable));
     result.push_back(Pair("noncerange", "00000000ffffffff"));
-    result.push_back(Pair("sigoplimit", (int64_t)MAX_BLOCK_SIGOPS));
-    result.push_back(Pair("sizelimit", (int64_t)MAX_BLOCK_SIZE));
-    result.push_back(Pair("curtime", (int64_t)pblock->nTime));
+    result.push_back(Pair("sigoplimit", (Value_type)MAX_BLOCK_SIGOPS));
+    result.push_back(Pair("sizelimit", (Value_type)MAX_BLOCK_SIZE));
+    result.push_back(Pair("curtime", (Value_type)pblock->nTime));
     result.push_back(Pair("bits", HexBits(pblock->nBits)));
-    result.push_back(Pair("height", (int64_t)(pindexPrev->nHeight+1)));
+    result.push_back(Pair("height", (Value_type)(pindexPrev->nHeight+1)));
 
     return result;
 }
