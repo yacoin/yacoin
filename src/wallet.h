@@ -10,13 +10,33 @@
 
 #include <stdlib.h>
 
-#include "main.h"
-#include "key.h"
-#include "keystore.h"
-#include "script.h"
-#include "ui_interface.h"
-#include "util.h"
-#include "walletdb.h"
+#ifndef BITCOIN_MAIN_H
+ #include "main.h"
+#endif
+
+#ifndef BITCOIN_KEY_H
+ #include "key.h"
+#endif
+
+#ifndef BITCOIN_KEYSTORE_H
+ #include "keystore.h"
+#endif
+
+#ifndef H_BITCOIN_SCRIPT
+ #include "script.h"
+#endif
+
+#ifndef BITCOIN_UI_INTERFACE_H
+ #include "ui_interface.h"
+#endif
+
+#ifndef BITCOIN_UTIL_H
+ #include "util.h"
+#endif
+
+#ifndef BITCOIN_WALLETDB_H
+ #include "walletdb.h"
+#endif
 
 //extern unsigned int nStakeMaxAge;
 extern bool fWalletUnlockMintOnly;
@@ -689,27 +709,33 @@ public:
 
         ::int64_t 
             credit = 0;
-        if (filter & MINE_SPENDABLE)
+
         {
+        // fix win gcc crash in WalletUpdateSpent with addresses holding coins minted the second time
+            LOCK(pwallet->cs_wallet);
+
+            if (filter & MINE_SPENDABLE)
+            {
             // GetBalance can assume transactions in mapWallet won't change
-            if (fCreditCached)
-                credit += nCreditCached;
-            else
-            {
-                nCreditCached = pwallet->GetCredit(*this, MINE_SPENDABLE);
-                fCreditCached = true;
-                credit += nCreditCached;
+                if (fCreditCached)
+                    credit += nCreditCached;
+                else
+                {
+                    nCreditCached = pwallet->GetCredit(*this, MINE_SPENDABLE);
+                    fCreditCached = true;
+                    credit += nCreditCached;
+                }
             }
-        }
-        if (filter & MINE_WATCH_ONLY)
-        {
-            if (fWatchCreditCached)
-                credit += nWatchCreditCached;
-            else
+            if (filter & MINE_WATCH_ONLY)
             {
-                nWatchCreditCached = pwallet->GetCredit(*this, MINE_WATCH_ONLY);
-                fWatchCreditCached = true;
-                credit += nWatchCreditCached;
+                if (fWatchCreditCached)
+                    credit += nWatchCreditCached;
+                else
+                {
+                    nWatchCreditCached = pwallet->GetCredit(*this, MINE_WATCH_ONLY);
+                    fWatchCreditCached = true;
+                    credit += nWatchCreditCached;
+                }
             }
         }
         return credit;

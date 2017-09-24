@@ -5,9 +5,17 @@
 #ifndef BITCOIN_WALLETDB_H
 #define BITCOIN_WALLETDB_H
 
-#include "db.h"
-#include "base58.h"
-#include "keystore.h"
+#ifndef BITCOIN_DB_H
+ #include "db.h"
+#endif
+
+#ifndef BITCOIN_BASE58_H
+ #include "base58.h"
+#endif
+
+#ifndef BITCOIN_KEYSTORE_H
+ #include "keystore.h"
+#endif
 
 class CKeyPool;
 class CAccount;

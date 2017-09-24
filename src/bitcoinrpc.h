@@ -16,8 +16,13 @@ class CBlockIndex;
 #include "json/json_spirit_writer_template.h"
 #include "json/json_spirit_utils.h"
 
-#include "util.h"
-#include "checkpoints.h"
+#ifndef BITCOIN_UTIL_H
+ #include "util.h"
+#endif
+
+#ifndef BITCOIN_CHECKPOINT_H
+ #include "checkpoints.h"
+#endif
 
 // HTTP status codes
 enum HTTPStatusCode
@@ -72,7 +77,7 @@ void ThreadRPCServer(void* parg);
 int CommandLineRPC(int argc, char *argv[]);
 
 /** Convert parameter values for RPC call from strings to command-specific JSON objects. */
-json_spirit::Array RPCConvertValues(const std::string &strMethod, const std::vector<std::string> &strParams);
+json_spirit::Array RPCConvertValues(std::string &strMethod, const std::vector<std::string> &strParams);
 
 /*
   Type-check arguments; throws JSONRPCError if wrong type given. Does not check that
@@ -219,12 +224,10 @@ extern json_spirit::Value sendrawtransaction(const json_spirit::Array& params, b
 
 extern json_spirit::Value getbestblockhash(const json_spirit::Array& params, bool fHelp); // in rpcblockchain.cpp
 extern json_spirit::Value getblockcount(const json_spirit::Array& params, bool fHelp); // in rpcblockchain.cpp
-// #ifdef WIN32
-    extern bool isThisInGMT( time_t & tBlock, struct tm  &aTimeStruct );
-    extern json_spirit::Value getcurrentblockandtime(const json_spirit::Array& params, bool fHelp);
-    extern json_spirit::Value getYACprice(const json_spirit::Array& params, bool fHelp);
-    extern double doGetYACprice(void);
-// #endif
+extern bool isThisInGMT( time_t & tBlock, struct tm  &aTimeStruct );
+extern json_spirit::Value getcurrentblockandtime(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value getYACprice(const json_spirit::Array& params, bool fHelp);
+extern double doGetYACprice(void);
 extern json_spirit::Value getdifficulty(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value settxfee(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value getrawmempool(const json_spirit::Array& params, bool fHelp);

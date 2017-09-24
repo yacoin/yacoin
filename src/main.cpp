@@ -9,28 +9,45 @@
     #include "JustInCase.h"
 #endif
 
-#include "alert.h"
-#ifndef WIN32
-    #include "checkpoints.h"
+#ifndef _BITCOINALERT_H_
+ #include "alert.h"
 #endif
-#include "db.h"
-#include "txdb.h"
-#include "net.h"
-#include "init.h"
-#include "ui_interface.h"
+
+#ifndef BITCOIN_CHECKPOINT_H
+ #include "checkpoints.h"
+#endif
+
+#ifndef BITCOIN_DB_H
+ #include "db.h"
+#endif
+
+#ifndef BITCOIN_TXDB_H
+ #include "txdb.h"
+#endif
+
+#ifndef BITCOIN_INIT_H
+ #include "init.h"
+#endif
+
+#ifndef CHECKQUEUE_H
+ #include "checkqueue.h"
+#endif
+
+#ifndef PPCOIN_KERNEL_H
+ #include "kernel.h"
+#endif
+
 #ifdef QT_GUI
-    #include "explorer.h"  
+ #include "explorer.h"
 #endif
-#include "checkqueue.h"
-#include "kernel.h"
+
 #include <boost/algorithm/string/replace.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/filesystem/fstream.hpp>
 #include <boost/math/special_functions/round.hpp>
 
-#include "main.h"
-#ifdef WIN32
-    #include "checkpoints.h"
+#ifndef BITCOIN_MAIN_H
+ #include "main.h"
 #endif
 
 using namespace boost;
@@ -865,8 +882,12 @@ bool CTxMemPool::accept(CTxDB& txdb, CTransaction &tx, bool fCheckInputs,
            hash.ToString().substr(0,10).c_str(),
            mapTx.size());
 #ifdef QT_GUI
+    {
+        LOCK(cs);
+
     lastTxHash.storeLasthash( hash );
-    uiInterface.NotifyBlocksChanged();
+    //uiInterface.NotifyBlocksChanged();
+    }
 #endif
 
     return true;
@@ -1088,16 +1109,20 @@ CBlockIndex* FindBlockByHeight(int nHeight)
     return pblockindex;
 }
 
-bool CBlock::ReadFromDisk(const CBlockIndex* pindex, bool fReadTransactions)
+bool CBlock::ReadFromDisk(const CBlockIndex* pindex, bool fReadTransactions, bool fCheckHeader)
 {
     if (!fReadTransactions)
     {
         *this = pindex->GetBlockHeader();
         return true;
     }
-    if (!ReadFromDisk(pindex->nFile, pindex->nBlockPos, fReadTransactions))
+    if (!ReadFromDisk(pindex->nFile, pindex->nBlockPos, fReadTransactions, fCheckHeader))
         return false;
-    if (GetHash() != pindex->GetBlockHash())
+
+    if (
+        fCheckHeader &&
+        (GetHash() != pindex->GetBlockHash())
+       )
         return error("CBlock::ReadFromDisk() : GetHash() doesn't match index");
     return true;
 }
@@ -1830,7 +1855,7 @@ void static InvalidChainFound(CBlockIndex* pindexNew)
         bnBestInvalidTrust = pindexNew->bnChainTrust;
         CTxDB().WriteBestInvalidTrust(bnBestInvalidTrust);
 #ifdef QT_GUI
-        uiInterface.NotifyBlocksChanged();
+        //uiInterface.NotifyBlocksChanged();
 #endif
     }
 
@@ -2705,7 +2730,7 @@ bool CBlock::SetBestChain(CTxDB& txdb, CBlockIndex* pindexNew)
             pindexBest->GetBlockTime()).c_str()
           );
 #ifdef QT_GUI
-    uiInterface.NotifyBlocksChanged();
+    //uiInterface.NotifyBlocksChanged();
 #endif
 
     // Check the version of the last 100 blocks to see if we need to upgrade:
@@ -2895,10 +2920,12 @@ bool CBlock::AddToBlockIndex(unsigned int nFile, unsigned int nBlockPos)
        ((++counter & 0x0F) == 0) ||     // every 16 blocks, why?
        !IsInitialBlockDownload()
       ) // repaint every 16 blocks if not in initial block download
-        uiInterface.NotifyBlocksChanged();
+    {
+        //uiInterface.NotifyBlocksChanged();
+    }
     else
     {
-    uiInterface.NotifyBlocksChanged();
+    //uiInterface.NotifyBlocksChanged();
     }
 #endif
     return true;
@@ -3085,21 +3112,39 @@ bool CBlock::AcceptBlock()
 
     // Check that the block satisfies synchronized checkpoint
     if (
-        (CheckpointsMode == ::Checkpoints::STRICT) && 
+        (CheckpointsMode == Checkpoints::STRICT_) &&
+/**************
+    // using STRICT instead of STRICT_ collides with windef.h
+    // and strangely cause gcc to fail when WIN32 is true & QT_GUI
+    // but not WIN32 gcc compiling the daemon???
+    // so I changed to STRICT_ which doesn't collide!
+    // if we don't then this if would have to look like
+    if (
+        (CheckpointsMode == 
+#ifdef WIN32 && QT_GUI
+         0
+#else
+         Checkpoints::STRICT
+#endif
+        ) && 
+***************/
         !cpSatisfies
        )
         return error("AcceptBlock() : rejected by synchronized checkpoint");
 
     if (
-        (CheckpointsMode == ::Checkpoints::ADVISORY) && 
+        (CheckpointsMode == Checkpoints::ADVISORY) && 
         !cpSatisfies
        )
         strMiscWarning = _("WARNING: syncronized checkpoint violation detected, but skipped!");
 
     // Enforce rule that the coinbase starts with serialized block height
     CScript expect = CScript() << nHeight;
-    if (vtx[0].vin[0].scriptSig.size() < expect.size() ||
-        !std::equal(expect.begin(), expect.end(), vtx[0].vin[0].scriptSig.begin()))
+    if (
+        ( (!fUseOld044Rules) && ( vtx[0].vin[0].scriptSig.size() < expect.size() ) )
+        ||
+        !std::equal(expect.begin(), expect.end(), vtx[0].vin[0].scriptSig.begin())
+       )
         return DoS(100, error("AcceptBlock() : block height mismatch in coinbase"));
 
     // Write block to history file
@@ -3113,7 +3158,6 @@ bool CBlock::AcceptBlock()
         return error("AcceptBlock() : AddToBlockIndex failed");
 
     // here would be a good place to check for new logic
-
 
     // Relay inventory, but don't relay old inventory during initial block download
     int nBlockEstimate = Checkpoints::GetTotalBlocksEstimate();
@@ -3497,7 +3541,7 @@ bool ProcessBlock(CNode* pfrom, CBlock* pblock)
     if (pfrom && !CSyncCheckpoint::strMasterPrivKey.empty())
         Checkpoints::SendSyncCheckpoint(Checkpoints::AutoSelectSyncCheckpoint());
 #ifdef QT_GUI
-    uiInterface.NotifyBlocksChanged();
+    //uiInterface.NotifyBlocksChanged();
 #endif
 
     return true;
@@ -3931,7 +3975,11 @@ bool LoadBlockIndex(bool fAllowNew)
         bool
             fTest = (
                      block.hashMerkleRoot == 
-                     uint256("0x29c97b046f12638bb31918e42ee10a16ca7d325a2af255e8a503248a1f04e2d2")
+                     uint256(
+                             fTestNet?
+                             "0x29c97b046f12638bb31918e42ee10a16ca7d325a2af255e8a503248a1f04e2d2":
+                             "0x678b76419ff06676a591d3fa9d57d7f7b26d8021b7cc69dde925f39d4cf2244f"
+                            )
                     );
     #ifdef _DEBUG
         assert(fTest);
@@ -3940,7 +3988,12 @@ bool LoadBlockIndex(bool fAllowNew)
             releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
     #endif
 #else
-        assert(block.hashMerkleRoot == uint256("0x29c97b046f12638bb31918e42ee10a16ca7d325a2af255e8a503248a1f04e2d2"));
+        assert(block.hashMerkleRoot == uint256(
+                            fTestNet?
+                            "0x29c97b046f12638bb31918e42ee10a16ca7d325a2af255e8a503248a1f04e2d2":
+                            "0x678b76419ff06676a591d3fa9d57d7f7b26d8021b7cc69dde925f39d4cf2244f"
+                                              )
+              );
 #endif
         block.print();
 #ifdef _MSC_VER

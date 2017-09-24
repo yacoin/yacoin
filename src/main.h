@@ -7,12 +7,29 @@
 
 #include <algorithm>
 
-#include "timestamps.h"
-#include "bignum.h"
-#include "sync.h"
-#include "net.h"
-#include "script.h"
-#include "scrypt.h"
+#ifndef BITCOIN_TIMESTAMPS_H
+ #include "timestamps.h"
+#endif
+
+#ifndef BITCOIN_BIGNUM_H
+ #include "bignum.h"
+#endif
+
+#ifndef BITCOIN_SYNC_H
+ #include "sync.h"
+#endif
+
+#ifndef BITCOIN_NET_H
+ #include "net.h"
+#endif
+
+#ifndef H_BITCOIN_SCRIPT
+ #include "script.h"
+#endif
+
+#ifndef SCRYPT_H
+ #include "scrypt.h"
+#endif
 
 #include <list>
 #include <map>
@@ -50,6 +67,8 @@ static const ::int64_t MIN_TXOUT_AMOUNT = CENT/100;
 static const unsigned char MAXIMUM_N_FACTOR = 25;  //30; since uint32_t fails on 07 Feb 2106 06:28:15 GMT
                                                    //    when stored as an uint32_t in a block
                                                    //    so there is no point going past Nf = 25
+
+static const unsigned char YAC20_N_FACTOR = 16;
 
 inline bool MoneyRange(::int64_t nValue) { return (nValue >= 0 && nValue <= MAX_MONEY); }
 // Threshold for nLockTime: below this value it is interpreted as block number, otherwise as UNIX timestamp.
@@ -154,6 +173,7 @@ std::string GetWarnings(std::string strFor);
 bool GetTransaction(const uint256 &hash, CTransaction &tx, uint256 &hashBlock);
 uint256 WantedByOrphan(const CBlock* pblockOrphan);
 const CBlockIndex* GetLastBlockIndex(const CBlockIndex* pindex, bool fProofOfStake);
+
 void StakeMinter(CWallet *pwallet);
 void ResendWalletTransactions();
 
@@ -1057,19 +1077,32 @@ public:
             else
                 nfactor = MAXIMUM_N_FACTOR;
         }
-        else
+        else    // is TestNet
         {
             nfactor = 4;
         }
-        uint256 thash;
-		scrypt_hash(CVOIDBEGIN(nVersion), sizeof(block_header), UINTBEGIN(thash), nfactor);
+
+        if(
+           nYac20BlockNumberTime &&
+           nTime >= (uint32_t)nYac20BlockNumberTime
+          )
+        {
+            nfactor = YAC20_N_FACTOR;
+        }
+
+        uint256 
+            thash;
+
+        scrypt_hash(CVOIDBEGIN(nVersion), sizeof(block_header), UINTBEGIN(thash), nfactor);
 		return thash;
     }
 
     // yacoin2015
     uint256 GetYacoinHash() const
     {
-        uint256 thash;
+        uint256 
+            thash;
+
         scrypt_hash(CVOIDBEGIN(nVersion), sizeof(block_header), UINTBEGIN(thash), GetNfactor(nTime));
 
         return thash;
@@ -1201,7 +1234,12 @@ public:
         return true;
     }
 
-    bool ReadFromDisk(unsigned int nFile, unsigned int nBlockPos, bool fReadTransactions=true)
+    bool ReadFromDisk(
+                      unsigned int nFile, 
+                      unsigned int nBlockPos, 
+                      bool fReadTransactions = true,
+                      bool fCheckHeader = true
+                     )
     {
         SetNull();
 
@@ -1222,7 +1260,14 @@ public:
         }
 
         // Check the header
-        if (fReadTransactions && IsProofOfWork() && !CheckProofOfWork(GetYacoinHash(), nBits))
+        if (
+            fReadTransactions && 
+            IsProofOfWork() && 
+            (
+             fCheckHeader &&           
+             !CheckProofOfWork(GetYacoinHash(), nBits)
+            )
+           )
             return error("CBlock::ReadFromDisk() : errors in block header");
 
         return true;
@@ -1267,7 +1312,7 @@ public:
 
     bool DisconnectBlock(CTxDB& txdb, CBlockIndex* pindex);
     bool ConnectBlock(CTxDB& txdb, CBlockIndex* pindex, bool fJustCheck=false);
-    bool ReadFromDisk(const CBlockIndex* pindex, bool fReadTransactions=true);
+    bool ReadFromDisk(const CBlockIndex* pindex, bool fReadTransactions=true, bool fCheckHeader = true);
     bool SetBestChain(CTxDB& txdb, CBlockIndex* pindexNew);
     bool AddToBlockIndex(unsigned int nFile, unsigned int nBlockPos);
     bool CheckBlock(bool fCheckPOW=true, bool fCheckMerkleRoot=true, bool fCheckSig=true) const;

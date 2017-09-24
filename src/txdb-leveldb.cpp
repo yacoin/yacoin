@@ -9,9 +9,17 @@
     #include "msvc_warnings.push.h"
 #endif
 
-#include "kernel.h"
-#include "checkpoints.h"
-#include "txdb.h"
+#ifndef PPCOIN_KERNEL_H
+ #include "kernel.h"
+#endif
+
+#ifndef BITCOIN_CHECKPOINT_H
+ #include "checkpoints.h"
+#endif
+
+#ifndef BITCOIN_TXDB_H
+ #include "txdb.h"
+#endif
 
 #include <map>
 
@@ -470,9 +478,9 @@ bool CTxDB::LoadBlockIndex()
     #else
         // seems to be slowing down??
         #ifdef QT_GUI
-        nRefresh = 4000;
+        nRefresh = 8000;
         #else
-        nRefresh = 5000;    // 15000;    //10000;
+        nRefresh = 8000;    // 15000;    //10000;
         #endif
     #endif
     ::int64_t

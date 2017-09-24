@@ -9,14 +9,22 @@
     #include "msvc_warnings.push.h"
 #endif
 
-#include "txdb.h"
-#include "walletdb.h"
-#include "bitcoinrpc.h"
-#include "net.h"
-#include "init.h"
-#include "util.h"
-#include "ui_interface.h"
-#include "checkpoints.h"
+#ifndef BITCOIN_TXDB_H
+ #include "txdb.h"
+#endif
+
+#ifndef BITCOIN_WALLETDB_H
+ #include "walletdb.h"
+#endif
+
+#ifndef _BITCOINRPC_H_
+ #include "bitcoinrpc.h"
+#endif
+
+#ifndef BITCOIN_INIT_H
+ #include "init.h"
+#endif
+
 #include <boost/format.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/filesystem/fstream.hpp>
@@ -270,8 +278,6 @@ bool AppInit(int argc, char* argv[])
                 if( 0 == ret )  // signifies a successful RPC call
                 {
                     fRet = false;
-                    //fRet = true;
-                    //return true;
                 }
 #else
                 exit(ret);
@@ -525,11 +531,11 @@ bool AppInit2()
 
     nBroadcastInterval = max< ::int64_t>(6 * 60 * 60, GetArg("-addrsetlifetime", 24 * 60 * 60));
 
-    CheckpointsMode = Checkpoints::STRICT;
+    CheckpointsMode = Checkpoints::STRICT_;
     std::string strCpMode = GetArg("-cppolicy", "strict");
 
     if(strCpMode == "strict") {
-        CheckpointsMode = Checkpoints::STRICT;
+        CheckpointsMode = Checkpoints::STRICT_;
     }
 
     if(strCpMode == "advisory") {
@@ -724,6 +730,7 @@ bool AppInit2()
         (void)printf( "new logic flag is %s\n", fTestNetNewLogic? "true": "false" );
     }
     printf("\n" );
+
     printf("Using Boost version %1d.%d.%d\n",         // miiill (most, insignificant, least) digits
             BOOST_VERSION / 100000,
             (BOOST_VERSION / 100) % 1000,
@@ -910,7 +917,6 @@ bool AppInit2()
     }
 
 #endif
-
     if (nSocksVersion != 4 && nSocksVersion != 5)
         return InitError(strprintf(_("Unknown -socks proxy version requested: %i"), nSocksVersion));
 

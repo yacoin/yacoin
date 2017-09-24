@@ -6,8 +6,13 @@
     #include "msvc_warnings.push.h"
 #endif
 
-#include "main.h"
-#include "bitcoinrpc.h"
+#ifndef BITCOIN_MAIN_H
+ #include "main.h"
+#endif
+
+#ifndef _BITCOINRPC_H_
+ #include "bitcoinrpc.h"
+#endif
 
 using namespace json_spirit;
 
@@ -202,7 +207,11 @@ double doGetYACprice()
 
     if (!GetMyExternalWebPage1( nIndexBtcToYac, sDestination, dPriceRatio ) )
     {
+#if defined( QT_GUI )
+        dPriceRatio = 0.0;
+#else
         throw runtime_error( "getYACprice\n" "Could not get page 1?" );
+#endif
         return dUSDperYACprice;
     }
     if (fPrintToConsole) 
@@ -222,7 +231,11 @@ double doGetYACprice()
     dPriceRatio = 0.0;
      if (!GetMyExternalWebPage2( nIndexUsdToBtc, sDestination, dPriceRatio ) )
     {
+#if defined( QT_GUI )
+        dPriceRatio = 0.0;
+#else
         throw runtime_error( "getYACprice\n" "Could not get page 2?" );
+#endif
         return dUSDperYACprice;
     }
     // else USD/BTC is OK
@@ -598,7 +611,7 @@ Value getcheckpoint(const Array& params, bool fHelp)
     }
 
     // Check that the block satisfies synchronized checkpoint
-    if (CheckpointsMode == Checkpoints::STRICT)
+    if (CheckpointsMode == Checkpoints::STRICT_)
         result.push_back(Pair("policy", "strict"));
 
     if (CheckpointsMode == Checkpoints::ADVISORY)

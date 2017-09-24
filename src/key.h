@@ -8,11 +8,25 @@
 #include <stdexcept>
 #include <vector>
 
-#include "allocators.h"
-#include "serialize.h"
-#include "uint256.h"
-#include "hash.h"
-#include "bignum.h"
+#ifndef BITCOIN_ALLOCATORS_H
+ #include "allocators.h"
+#endif
+
+#ifndef BITCOIN_SERIALIZE_H
+ #include "serialize.h"
+#endif
+
+#ifndef BITCOIN_UINT256_H
+ #include "uint256.h"
+#endif
+
+#ifndef BITCOIN_HASH_H
+ #include "hash.h"
+#endif
+
+#ifndef BITCOIN_BIGNUM_H
+ #include "bignum.h"
+#endif
 
 #include <openssl/ec.h> // for EC_KEY definition
 

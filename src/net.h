@@ -20,11 +20,25 @@
 #include <arpa/inet.h>
 #endif
 
-#include "mruset.h"
-#include "netbase.h"
-#include "protocol.h"
-#include "addrman.h"
-#include "hash.h"
+#ifndef BITCOIN_MRUSET_H
+ #include "mruset.h"
+#endif
+
+#ifndef BITCOIN_NETBASE_H
+ #include "netbase.h"
+#endif
+
+#ifndef __INCLUDED_PROTOCOL_H__
+ #include "protocol.h"
+#endif
+
+#ifndef _BITCOIN_ADDRMAN
+ #include "addrman.h"
+#endif
+
+#ifndef BITCOIN_HASH_H
+ #include "hash.h"
+#endif
 
 class CRequestTracker;
 class CNode;
@@ -43,6 +57,7 @@ const ::int64_t
 
 const int
     DEFAULT_HTTP_PORT = 80,
+    DEFAULT_HTTPS_PORT = 443,
     DEFAULT_char_offset = 3,
     nOneMinuteInSeconds = 60,
     nTenMilliseconds = 10,

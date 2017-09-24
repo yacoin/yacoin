@@ -6,8 +6,9 @@
 #ifndef BITCOIN_UTIL_H
 #define BITCOIN_UTIL_H
 
-
-#include "uint256.h"
+#ifndef BITCOIN_UINT256_H
+ #include "uint256.h"
+#endif
 
 #ifndef WIN32
 #include <sys/types.h>
@@ -32,14 +33,12 @@
 #if defined(__USE_MINGW_ANSI_STDIO)
 #undef __USE_MINGW_ANSI_STDIO // This constant forces MinGW to conduct stupid behavior
 #endif
-#ifdef _MSC_VER
-#include "../MSVC/include/inttypes.h"
-#else
+
 #include <inttypes.h>
+
+#ifndef BITCOIN_NETBASE_H
+ #include "netbase.h" // for AddTimeData
 #endif
-
-#include "netbase.h" // for AddTimeData
-
 
 static const ::int64_t COIN = 1000000;
 //THEREFORE
@@ -166,6 +165,8 @@ extern bool fDebug;
 extern bool fDebugNet;
 extern bool fTestNetNewLogic;
 extern ::int32_t nTestNetNewLogicBlockNumber;
+extern ::int32_t nYac20BlockNumber;
+extern ::int32_t nYac20BlockNumberTime;
 extern bool fPrintToConsole;
 extern bool fPrintToDebugger;
 extern bool fRequestShutdown;

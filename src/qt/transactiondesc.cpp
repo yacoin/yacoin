@@ -260,10 +260,16 @@ QString TransactionDesc::toHTML(CWallet *wallet, CWalletTx &wtx)
             strHTML += "<hr><br>" + tr("Debug information") + "<br><br>";
             BOOST_FOREACH(const CTxIn& txin, wtx.vin)
                 if(wallet->IsMine(txin))
-                    strHTML += "<b>" + tr("Debit") + ":</b> " + BitcoinUnits::formatWithUnit(BitcoinUnits::BTC, -wallet->GetDebit(txin, MINE_ALL)) + "<br>";
+                    strHTML += "<b>" + tr("Debit") + ":</b> " + 
+                               BitcoinUnits::formatWithUnit(BitcoinUnits::BTC, 
+                                                            -wallet->GetDebit(txin, MINE_ALL)
+                                                           ) + "<br>";
             BOOST_FOREACH(const CTxOut& txout, wtx.vout)
                 if(wallet->IsMine(txout))
-                    strHTML += "<b>" + tr("Credit") + ":</b> " + BitcoinUnits::formatWithUnit(BitcoinUnits::BTC, wallet->GetCredit(txout, MINE_ALL)) + "<br>";
+                    strHTML += "<b>" + tr("Credit") + ":</b> " + 
+                               BitcoinUnits::formatWithUnit(BitcoinUnits::BTC, 
+                                                            wallet->GetCredit(txout, MINE_ALL)
+                                                           ) + "<br>";
 
             strHTML += "<br><b>" + tr("Transaction") + ":</b><br>";
             strHTML += GUIUtil::HtmlEscape(wtx.ToString(), true);

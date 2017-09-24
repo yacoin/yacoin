@@ -8,12 +8,29 @@
     #include "msvc_warnings.push.h"
 #endif
 
-#include "main.h"
-#include "db.h"
-#include "txdb.h"
-#include "init.h"
-#include "miner.h"
-#include "bitcoinrpc.h"
+#ifndef BITCOIN_MAIN_H
+ #include "main.h"
+#endif
+
+#ifndef BITCOIN_DB_H
+ #include "db.h"
+#endif
+
+#ifndef BITCOIN_TXDB_H
+ #include "txdb.h"
+#endif
+
+#ifndef BITCOIN_INIT_H
+ #include "init.h"
+#endif
+
+#ifndef NOVACOIN_MINER_H
+ #include "miner.h"
+#endif
+
+#ifndef _BITCOINRPC_H_
+ #include "bitcoinrpc.h"
+#endif
 
 using namespace json_spirit;
 
@@ -31,8 +48,8 @@ Value gethashespersec(const Array& params, bool fHelp)
             "Returns a recent hashes per second performance measurement averaged over 30 seconds while generating.");
 
     if (GetTimeMillis() - nHPSTimerStart > 30000)
-        return (boost::int64_t)0;
-    return (boost::int64_t)dHashesPerSec;
+       return (boost::int64_t)dHashesPerSec;
+    return (boost::int64_t)0;
 }
 
 Value getgenerate(const Array& params, bool fHelp)
@@ -254,7 +271,7 @@ Value getworkex(const Array& params, bool fHelp)
         CBlock* pdata = (CBlock*)&vchData[0];
 
         // Byte reverse
-        for (int i = 0; i < 128/sizeof( uint32_t ); ++i)     // fix this awful magic# code
+        for (unsigned int i = 0; i < 128/sizeof( uint32_t ); ++i)     // fix this awful magic# code
       //for (int i = 0; i < 128/4; ++i)     // fix this awful magic# code
             ((uint32_t *)pdata)[i] = ByteReverse(((uint32_t *)pdata)[i]);
 
@@ -378,8 +395,8 @@ Value getwork(const Array& params, bool fHelp)
         CBlock* pdata = (CBlock*)&vchData[0];
 
         // Byte reverse
-        for (int i = 0; i < sizeof( pdata )/sizeof( uint32_t ); ++i)
-      //for (int i = 0; i < 128/4; i++) //really, the limit is sizeof( pdata ) / sizeof( uint32_t
+        for (unsigned int i = 0; i < 128/sizeof( uint32_t ); ++i)
+      //for (int i = 0; i < 128/4; i++) //really, the limit is sizeof( *pdata ) / sizeof( uint32_t
             ((uint32_t *)pdata)[i] = ByteReverse(((uint32_t *)pdata)[i]);
 
         // Get saved block

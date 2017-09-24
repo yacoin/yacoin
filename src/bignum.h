@@ -8,7 +8,10 @@
 #include <stdexcept>
 #include <vector>
 #include <openssl/bn.h>
-#include "util.h"
+
+#ifndef BITCOIN_UTIL_H
+ #include "util.h"
+#endif
 
 /** Errors thrown by the bignum class */
 class bignum_error : public std::runtime_error

@@ -3,13 +3,14 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 #include <string>
 
-#include "version.h"
-
+#ifndef BITCOIN_VERSION_H
+ #include "version.h"
+#endif
 
 #define DISPLAY_VERSION_MAJOR       0
 #define DISPLAY_VERSION_MINOR       4
 #define DISPLAY_VERSION_REVISION    8   
-#define DISPLAY_VERSION_BUILD       9
+#define DISPLAY_VERSION_BUILD       16
 #define DISPLAY_VERSION_TESTING     1
 
 const int

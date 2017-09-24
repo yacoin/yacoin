@@ -204,6 +204,7 @@ string CRPCTable::help(string strCommand) const
 {
     string strRet = "";
     set<rpcfn_type> setDone;
+    boost::to_lower( strCommand );
     for (map<string, const CRPCCommand*>::const_iterator mi = mapCommands.begin(); mi != mapCommands.end(); ++mi)
     {
         const CRPCCommand *pcmd = mi->second;
@@ -294,7 +295,9 @@ static const CRPCCommand vRPCCommands[] =
 #ifdef WIN32
     { "getblockcountt",         &getcurrentblockandtime, true,   false },
 #endif
+#if !defined( QT_GUI )
     { "getyacprice",            &getYACprice,            true,   false },
+#endif
     { "getconnectioncount",     &getconnectioncount,     true,   false },
     { "getaddrmaninfo",         &getaddrmaninfo,         true,   false },
     { "getpeerinfo",            &getpeerinfo,            true,   false },
@@ -1265,7 +1268,7 @@ void ConvertTo(Value& value, bool fAllowNull=false)
 }
 
 // Convert strings to command-specific RPC representation
-Array RPCConvertValues(const std::string &strMethod, const std::vector<std::string> &strParams)
+Array RPCConvertValues(std::string &strMethod, const std::vector<std::string> &strParams)
 {
     Array params;
     BOOST_FOREACH(const std::string &param, strParams)
@@ -1276,6 +1279,7 @@ Array RPCConvertValues(const std::string &strMethod, const std::vector<std::stri
     //
     // Special case non-string parameter types
     //
+    boost::to_lower( strMethod );
     if (strMethod == "stop"                   && n > 0) ConvertTo<bool>(params[0]);
     if (strMethod == "getaddednodeinfo"       && n > 0) ConvertTo<bool>(params[0]);
     if (strMethod == "setgenerate"            && n > 0) ConvertTo<bool>(params[0]);
