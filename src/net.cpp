@@ -957,9 +957,9 @@ static void updatePreviousNodecountIf(
 //MB_ICONINFORMATION    0x00000040L The sound specified as the Windows Asterisk sound.
 //MB_ICONASTERISK       0x00000040L See MB_ICONINFORMATION.
 //                      0xFFFFFFFF  A simple beep. If the sound card is not available, the sound is generated using the speaker.
-        unsigned int
-            nUpSound = MB_ICONINFORMATION,
-            nDownSound = MB_ICONERROR;
+        // unsigned int
+            // nUpSound = MB_ICONINFORMATION,
+            // nDownSound = MB_ICONERROR;
         if( "down" == sWhichWay )
         {
             //(void)MessageBeep( nDownSound );

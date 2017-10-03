@@ -4,8 +4,13 @@
 #ifndef PPCOIN_KERNEL_H
 #define PPCOIN_KERNEL_H
 
-#include "main.h"
-#include "wallet.h"
+#ifndef BITCOIN_MAIN_H
+ #include "main.h"
+#endif
+
+#ifndef BITCOIN_WALLET_H
+ #include "wallet.h"
+#endif
 
 // ChainDB upgrade time
 extern unsigned int nModifierUpgradeTime;

@@ -896,7 +896,7 @@ std::string BuildTxDetailsFrom(
                                     );
                 sStandardItemModelElement = strprintf( 
                                                   //" %lld"
-                                                    " %"PRI64d""
+                                                    " %" PRI64d ""
                                                     , (boost::int64_t)tx.nTime
                                                      );
                 sTemp += sStandardItemModelElement + "<br />\n";
@@ -915,7 +915,7 @@ std::string BuildTxDetailsFrom(
                                     );
                 sStandardItemModelElement = strprintf( 
                                                   //" %lld"
-                                                    " %"PRI64d""
+                                                    " %" PRI64d ""
                                                     , (boost::int64_t)pindex->nTime
                                                      );
                 sTemp += sStandardItemModelElement + "<br />\n";
@@ -1478,8 +1478,18 @@ void ExplorerPage::setNumBlocks( int currentHeight )
                         fMostlyUpToDate = false;
                         // add the price update here
                         double 
-                            dPrice = doGetYACprice();
-                
+                            dPrice = 0.0;
+                        try
+                        {   
+                            //temporarily blocked since it causes an exception in Qt somwehow-somewhere
+                            //but not always???
+                            //dPrice = doGetYACprice();
+                        }
+                        catch (std::exception &e) 
+                        {
+                            e;
+                            dPrice = 0.0;
+                        }
                         if ( 0.0 != dPrice )
                         {
                             std::string

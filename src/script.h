@@ -10,8 +10,13 @@
 
 #include <boost/foreach.hpp>
 
-#include "keystore.h"
-#include "bignum.h"
+#ifndef BITCOIN_KEYSTORE_H
+ #include "keystore.h"
+#endif
+
+#ifndef BITCOIN_BIGNUM_H
+ #include "bignum.h"
+#endif
 
 typedef std::vector< ::uint8_t> valtype;
 

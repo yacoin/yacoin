@@ -6,7 +6,9 @@
 #ifndef BITCOIN_LEVELDB_H
 #define BITCOIN_LEVELDB_H
 
-#include "main.h"
+#ifndef BITCOIN_MAIN_H
+ #include "main.h"
+#endif
 
 #include <map>
 #include <string>

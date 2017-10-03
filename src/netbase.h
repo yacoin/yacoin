@@ -7,8 +7,13 @@
 #include <string>
 #include <vector>
 
-#include "serialize.h"
-#include "compat.h"
+#ifndef BITCOIN_SERIALIZE_H
+ #include "serialize.h"
+#endif
+
+#ifndef _BITCOIN_COMPAT_H
+ #include "compat.h"
+#endif
 
 #ifdef WIN32
 extern char* iGetLastErrorText(DWORD nErrorCode);

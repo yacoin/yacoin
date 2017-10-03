@@ -77,6 +77,8 @@ bool fDebug = false;
 bool fDebugNet = false;
 bool fTestNetNewLogic = false;
 ::int32_t nTestNetNewLogicBlockNumber;
+::int32_t nYac20BlockNumber = 0;
+::int32_t nYac20BlockNumberTime = 0;
 bool fPrintToConsole = false;
 bool fPrintToDebugger = false;
 bool fRequestShutdown = false;

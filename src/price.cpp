@@ -8,9 +8,17 @@
     #include "msvc_warnings.push.h"
 #endif
 
-#include "db.h"
-#include "net.h"
-#include "strlcpy.h"
+#ifndef BITCOIN_DB_H
+ #include "db.h"
+#endif
+
+#ifndef BITCOIN_NET_H
+ #include "net.h"
+#endif
+
+#ifndef BITCOIN_STRLCPY_H
+ #include "strlcpy.h"
+#endif
 
 #include <vector>
 
@@ -36,7 +44,7 @@ CProvider aBTCtoYACProviders[] =
             "price_btc",    //"price_usd",
             "/v1/ticker/yacoin/",
             nSpecialCharacterOffset,
-            DEFAULT_HTTP_PORT
+            DEFAULT_HTTPS_PORT
         },
         {   
             "data.bter.com",            // sDomain
@@ -46,14 +54,14 @@ CProvider aBTCtoYACProviders[] =
             DEFAULT_HTTP_PORT
         }
         ,
-        //{
-        //    "api.cryptonator.com", 
-        //    "price", 
-        //    "/api/ticker/yac-btc", 
-        //    nDefaultCharacterOffset,
-        //    nHttpsPort
-        //}
-        //,
+        {   //api.cryptonator.com/api/ticker/yac-btc
+            "api.cryptonator.com", 
+            "price", 
+            "/api/ticker/yac-btc", 
+            nDefaultCharacterOffset,
+            DEFAULT_HTTP_PORT            //nHttpsPort
+        }
+        ,
         {   
             "pubapi2.cryptsy.com",      
             "lasttradeprice",   
@@ -281,6 +289,234 @@ void initialize_price_vectors( int & nIndexBtcToYac, int & nIndexUsdToBtc )
 // in this class, the ctor needs to be 'linux-ed', in other words
 // how does one initialize and connect a socket in a non Windows environment?
 // The MSVC++ & gcc in Windows versions work fine
+
+// test of https
+#include <boost/asio.hpp>
+#include <boost/asio/ssl.hpp>
+/*
+#include <iostream>
+#include <istream>
+#include <ostream>
+#include <string>
+*/ 
+ 
+class CClient
+{
+public:
+	CClient(
+			boost::asio::io_service& io_service, 
+			boost::asio::ssl::context& context, 
+			boost::asio::ip::tcp::resolver::iterator endpoint_iterator,
+            const char *pszApi,
+            const string & sDomain
+	      ) : socket_(io_service, context), read_buffer_length( 866 ), sdomain( sDomain )
+
+	{
+        pszapi = pszApi;
+        
+        socket_.set_verify_mode( boost::asio::ssl::context::verify_none );
+		socket_.set_verify_callback( 
+									boost::bind(
+												&CClient::verify_certificate, 
+												this, 
+												_1, 
+												_2
+											   )
+								   );
+ 
+	    boost::asio::async_connect(
+								socket_.lowest_layer(), 
+								endpoint_iterator, 
+								boost::bind(
+											&CClient::handle_connect, 
+											this, 
+											boost::asio::placeholders::error
+										   )
+								   );
+	}
+ 
+	bool verify_certificate(bool preverified, boost::asio::ssl::verify_context& ctx)
+	{
+		char subject_name[256];
+		X509
+			* cert = X509_STORE_CTX_get_current_cert(ctx.native_handle());
+			
+		X509_NAME_oneline( X509_get_subject_name(cert), subject_name, 256 );
+    
+		std::cout << "Verifying:\n" << subject_name << std::endl;
+ 
+		return preverified;
+	}
+ 
+	void handle_connect(const boost::system::error_code& error)
+	{
+		if(!error)
+		{
+			std::cout << "Connection OK!" << std::endl;
+			socket_.async_handshake(
+									boost::asio::ssl::stream_base::client, 
+									boost::bind(
+												&CClient::handle_handshake, 
+												this, 
+												boost::asio::placeholders::error
+											   )
+								   );
+		}
+		else
+		{
+			std::cout << "Connect failed: " << error.message() << std::endl;
+		}
+	}
+ 
+	void handle_handshake(const boost::system::error_code& error)
+	{
+		if(!error)
+		{
+			std::cout << "Sending request: " << std::endl;
+     
+		std::stringstream request_;
+ 
+        //https://api.coinmarketcap.com/v1/ticker/yacoin/
+
+        //request_ << "POST " << rRequest.mcURI << " HTTP/1.1\r\n";
+        //request_ << "Host: " << rRequest.mcHost << "\r\n";
+
+	    request_ << "GET ";
+	  //request_ << "POST ";
+		
+		request_ << pszapi; //"/v1/ticker/yacoin/ ";
+
+		request_ << "HTTP/1.1\r\n";
+		
+		request_ << "Host: ";
+		request_ << (sdomain + "\r\n").c_str() ;    //"api.coinmarketcap.com\r\n";
+		
+		request_ << "Accept-Encoding: application/json\r\n";
+
+        //request_ << "Accept: application/json\r\n";
+        request_ << "Accept: */*\r\n";
+
+        request_ << "Content-Type: application/json; charset=UTF-8\r\n";
+      //request_ << "Content-Type: application/text; charset=UTF-8\r\n";
+
+        request_ << "Connection: close\r\n";
+      //request_ << "Connection: keep-alive\r\n";
+
+		request_ << "\r\n";
+ 
+	  //std::cout << request_.str() << std::endl;
+		std::cout << request_.str();
+ 
+		boost::asio::async_write(
+								socket_, 
+								boost::asio::buffer(request_.str()), 
+								boost::bind(
+											&CClient::handle_write, 
+											this, 
+											boost::asio::placeholders::error, 
+											boost::asio::placeholders::bytes_transferred
+											)
+								);
+		}
+		else
+		{
+			std::cout << "Handshake failed: " << error.message() << std::endl;
+		}
+	}
+ 
+	void handle_write(const boost::system::error_code& error, size_t bytes_transferred)
+	{
+		if (!error)
+		{
+			std::cout << "Sending request OK!" << std::endl;
+            //Sleep( 2 * nMillisecondsPerSecond );
+			boost::asio::async_read(
+									socket_, 
+									boost::asio::buffer(
+														reply_, 
+														read_buffer_length //685   //bytes_transferred bullshit
+                                                       ), 
+									boost::bind(
+												&CClient::handle_read, 
+												this, 
+												boost::asio::placeholders::error
+                                                , boost::asio::placeholders::bytes_transferred
+											   )
+							       );
+		}
+		else
+		{
+			std::cout << "Write failed: " << error.message() << std::endl;
+		}
+	}
+ 
+	void handle_read(const boost::system::error_code& error, size_t bytes_transferred)
+	{
+		if (!error)
+		{
+			std::cout << "Reply: ";
+			std::cout.write(reply_, bytes_transferred);
+			std::cout << std::endl;
+			std::cout << "Reply done";
+		  std::cout << ", count ";
+		  std::cout << bytes_transferred;
+			std::cout << std::endl;
+		}
+		else
+		{
+			std::cout << "Read failed: " << error.message() << std::endl;
+		}
+	}
+ 
+private:
+	boost::asio::ssl::stream<boost::asio::ip::tcp::socket> socket_;
+	char reply_[0x1 << 16];
+    const size_t read_buffer_length;
+    const char *pszapi;
+    const string & sdomain;
+
+};
+#ifdef _DEBUG
+/*********************
+//int main(int argc, char* argv[])
+{
+	try
+	{
+		boost::asio::io_service io_service;
+ 
+		boost::asio::ip::tcp::resolver resolver( io_service );
+		boost::asio::ip::tcp::resolver::query query( 
+                                                    "api.coinmarketcap.com",
+													"443"
+												   );
+		boost::asio::ip::tcp::resolver::iterator iterator = resolver.resolve(query);
+ 
+		boost::asio::ssl::context context(boost::asio::ssl::context::sslv23);
+	  //context.load_verify_file( "key.pem" );
+		context.load_verify_file( "server.pem" );
+ 
+		CClient c(io_service, context, iterator);
+ 
+		io_service.run();
+	}
+	catch (std::exception& e)
+	{
+		std::cerr << "Exception: " << e.what() << "\n";
+		std::cout << "Exception: " << e.what() << "\n";
+	}
+ 
+    {
+	    //std::cin.get();
+        //// for test purposes
+//        printf("Shutdown requested. Exiting.\n");
+//        return false;
+    }
+}
+*****************/
+#endif
+// end of test
+
+
 class CdoSocket
 {
 private:
@@ -290,7 +526,7 @@ private:
     SOCKET      // in Windows, this is a UINT_PTR (see winsock2.h or ws2def.h)
                 // in linux, I don't know, maybe uint32_t?
 #else
-    int
+    u_int
 #endif
         SocketCopy;
 
@@ -302,7 +538,7 @@ public:
 #ifdef WIN32
                         SOCKET 
 #else
-                        int
+                        u_int
 #endif
                         & Socket, 
                         const string & sDomain, 
@@ -313,11 +549,14 @@ public:
             nResult;
 
         SocketCopy = 
-#ifdef WIN32
+#ifdef _MSC_VER
             NULL;
-        Socket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 #else
             0;
+#endif
+#ifdef WIN32
+        Socket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+#else
         // You have to put what's appropriate here?
         // from https://www.gnu.org/software/libc/manual/html_node/Inet-Example.html
         Socket = socket(PF_INET, SOCK_STREAM, 0);
@@ -336,7 +575,7 @@ public:
             ;   // you have to put whatever is appropriate here?  Maybe something like this:
     #ifdef SO_NOSIGPIPE
             int set = 1;
-            setsockopt(hSocket, SOL_SOCKET, SO_NOSIGPIPE, (void*)&set, sizeof(int));
+            setsockopt(Socket, SOL_SOCKET, SO_NOSIGPIPE, (void*)&set, sizeof(int));
     #endif
 #endif
             SockAddr.sin_port = htons( (unsigned short)nPort ); // was 80
@@ -345,7 +584,7 @@ public:
 
 #ifndef WIN32
             // Maybe linux needs something like this:
-            int fFlags = fcntl(hSocket, F_GETFL, 0);    // then more code??? Eventually
+            int fFlags = fcntl(Socket, F_GETFL, 0);    // then more code??? Eventually
 #endif
             //cout << "Connecting...\n";
 
@@ -366,16 +605,21 @@ public:
                     wprintf(L"closesocket function failed with error: %ld\n", WSAGetLastError());
                 //WSACleanup();
 #else
-            nResult = connect( sockfd, (struct sockaddr *)&SockAddr, sizeof(struct sockaddr) );
+            nResult = connect( Socket, (struct sockaddr *)&SockAddr, sizeof(struct sockaddr) );
             if ( -1 == nResult )
             {
                 nResult = closesocket(Socket);  //I'm guessing here as I don't linux!
 #endif
+#ifdef _MSC_VER
                 Socket = NULL;
-                throw runtime_error(
+#else
+                Socket = 0;
+#endif
+              //throw runtime_error(
+                (void)printf(
                         "getYACprice\n"
                         "Could not connect?"
-                                   );
+                            );
             }
             SocketCopy = Socket;        // success
         }
@@ -390,17 +634,27 @@ public:
             if ( -1 == nResult )
                 ;   // maybe some code?
 #endif            
+
+#ifdef _MSC_VER
             Socket = NULL;
-            throw runtime_error(
-                                "getYACprice\n"
-                                "Network is down?"
-                               );
+#else
+            Socket = 0;
+#endif
+         // throw runtime_error(
+            (void)printf(
+                         "getYACprice\n"
+                         "Network is down?"
+                        );
         }
     }
 
     ~CdoSocket()
     {
+#ifdef _MSC_VER
         if (NULL != SocketCopy)
+#else
+        if (0 != SocketCopy)
+#endif
         {
             clearLocalSocketError( SocketCopy );
             closesocket( SocketCopy );
@@ -415,7 +669,8 @@ static bool GetMyExternalWebPage(
                           string & strBuffer, 
                           double &dPrice,
                           const int & nOffset,
-                          const int & nPort
+                          const int & nPort,
+                          const char *pszApi
                          )
 {
     // here we should
@@ -425,43 +680,69 @@ static bool GetMyExternalWebPage(
     //
     {
         LOCK( cs_price );
-#ifdef WIN32
+
+
+        if (DEFAULT_HTTPS_PORT == nPort)
+        {
+        	try
+        	{
+        	    boost::asio::io_service io_service;
+ 
+    	        boost::asio::ip::tcp::resolver resolver( io_service );
+        		boost::asio::ip::tcp::resolver::query query( 
+                                                        sDomain.c_str(),    //"api.coinmarketcap.com",
+		    											strprintf( "\"%d\"", (int)DEFAULT_HTTPS_PORT ).c_str()  //"443"
+		        										   );
+        		boost::asio::ip::tcp::resolver::iterator iterator = resolver.resolve(query);
+ 
+	            boost::asio::ssl::context context(boost::asio::ssl::context::sslv23);
+        	  //context.load_verify_file( "key.pem" );
+		        context.load_verify_file( "server.pem" );
+ 
+        	    CClient c(io_service, context, iterator, pszApi, sDomain);
+ 
+    	        io_service.run();
+                // we should parse the result here and set dPrice & return true
+                // else on error return false
+        	}
+        	catch (std::exception& e)
+            {
+		        std::cerr << "Exception: " << e.what() << "\n";
+        	    std::cout << "Exception: " << e.what() << "\n";
+                return false;
+            }
+            // we should exit here
+            if( dPrice > 0.0 )
+            {
+                return true;
+            }
+            else
+                return false;
+        }
+#ifdef _MSC_VER
         SOCKET 
             hSocket = NULL;
 #else
-        int
+        u_int
             hSocket = 0;
 #endif
         try
         {
-            if( DEFAULT_HTTP_PORT != nPort )
+            CdoSocket 
+                CthisSocketConnection( 
+                                      hSocket,
+                                      sDomain,
+                                      nPort
+                                     );
+            if (
+                (!hSocket) &&
+                (DEFAULT_HTTPS_PORT != nPort)
+               )
             {
-                CdoSocket 
-                    CthisSocketConnection( 
-                                          hSocket, 
-                                          sDomain,
-                                          nPort
-                                         );
+                return false;
             }
-            else
-            {
-                CdoSocket 
-                    CthisSocketConnection( 
-                                          hSocket, 
-                                          sDomain           // for gethostbyname()
-                                         );                 //RAII attempt on the socket!?
-            }
-        }
-        catch( std::exception &e )
-        {
-            printf( "%s\n", (string("error: ") + e.what()).c_str() );
-        }
-        if (!hSocket)
-        {
-            return false;
-        }
-        else    //if (hSocket)    // then it's OK
-        {
+            //else    //if (hSocket)    // then it's OK
+
             int
                 nUrlLength = (int)strlen(pszTheFullUrl),
                 nBytesSent;
@@ -525,7 +806,7 @@ static bool GetMyExternalWebPage(
 
                             if (1 == sscanf( sTemp.c_str(), "%lf", &dTemp ) )
                             {
-                               dPrice = dTemp;      // just so I can debug.  A good compiler 
+                                dPrice = dTemp;      // just so I can debug.  A good compiler 
                                                     // can optimize this dTemp out!
                             }
                         }
@@ -542,8 +823,12 @@ static bool GetMyExternalWebPage(
                     }
                 }
                 strLine = "";
-            }
+            }   
             while( fLineOK );
+        }
+        catch( std::exception &e )
+        {
+            printf( "%s\n", (string("error: ") + e.what()).c_str() );
         }
     }
     if ( 0 < strBuffer.size() )
@@ -637,7 +922,8 @@ static bool GetExternalWebPage(
                                             strBuffer, 
                                             dPriceRatio,
                                             nCharacterOffset,
-                                            nPort
+                                            nPort,
+                                            sApi.c_str()
                                            );
     return fReturnValue;
 }

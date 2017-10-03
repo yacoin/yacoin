@@ -8,17 +8,23 @@
     #include "msvc_warnings.push.h"
 #endif
 
-#include "txdb.h"
-#include "wallet.h"
-#include "walletdb.h"
-#include "crypter.h"
-#include "ui_interface.h"
-#include "base58.h"
-#include "kernel.h"
-#include "coincontrol.h"
-#include <boost/algorithm/string/replace.hpp>
+#ifndef BITCOIN_TXDB_H
+ #include "txdb.h"
+#endif
 
-#include "main.h"
+#ifndef BITCOIN_WALLET_H
+ #include "wallet.h"
+#endif
+
+#ifndef PPCOIN_KERNEL_H
+ #include "kernel.h"
+#endif
+
+#ifndef COINCONTROL_H
+ #include "coincontrol.h"
+#endif
+
+#include <boost/algorithm/string/replace.hpp>
 
 using std::list;
 using std::pair;
@@ -996,7 +1002,7 @@ void
         sTextString;
     #endif
     if(
-        (0 == (nCount % 6) )   // every 6th times
+        (0 == (nCount % 60) )   // every 60th times due to Matjaz's speedup
       )
     {
         if( 0 == nCount )       // first time
@@ -1021,7 +1027,7 @@ void
     #ifndef QT_GUI
             if( 
               //(0 == (nCount % 100) )   // every 100th time (every 10th next time)
-                (0 == (nCount % 12) )   // every 12th time (every 6th next time)
+                (0 == (nCount % 120) )   // every 120th time (every 60th next time)
               )
     #endif
             {   // let's estimate the time remaining too!
@@ -1186,7 +1192,7 @@ int CWallet::ScanForWalletTransactions(CBlockIndex* pindexStart, bool fUpdate)
         while (pindex)
         {
             CBlock block;
-            block.ReadFromDisk(pindex, true);
+            block.ReadFromDisk(pindex, true, false);
             BOOST_FOREACH(CTransaction& tx, block.vtx)
             {
                 if (AddToWalletIfInvolvingMe(tx, &block, fUpdate))
@@ -3015,13 +3021,13 @@ bool CWallet::SetDefaultKey(const CPubKey &vchPubKey)
     return true;
 }
 
-bool GetWalletFile(CWallet* pwallet, string &strWalletFileOut)
-{
-    if (!pwallet->fFileBacked)
-        return false;
-    strWalletFileOut = pwallet->strWalletFile;
-    return true;
-}
+//bool GetWalletFile(CWallet* pwallet, string &strWalletFileOut)
+//{
+//    if (!pwallet->fFileBacked)
+//        return false;
+//    strWalletFileOut = pwallet->strWalletFile;
+//    return true;
+//}
 
 //
 // Mark old keypool keys as used,
@@ -3202,7 +3208,6 @@ int64_t CWallet::GetOldestKeyPoolTime()
 std::map<CTxDestination, int64_t> CWallet::GetAddressBalances()
 {
     map<CTxDestination, int64_t> balances;
-
     {
         LOCK(cs_wallet);
         BOOST_FOREACH(PAIRTYPE(uint256, CWalletTx) walletEntry, mapWallet)

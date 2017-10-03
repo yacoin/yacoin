@@ -8,8 +8,13 @@
     #include "msvc_warnings.push.h"
 #endif
 
-#include "walletdb.h"
-#include "wallet.h"
+#ifndef BITCOIN_WALLETDB_H
+ #include "walletdb.h"
+#endif
+
+#ifndef BITCOIN_WALLET_H
+ #include "wallet.h"
+#endif
 
 #include <iostream>
 #include <fstream>

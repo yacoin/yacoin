@@ -5,7 +5,9 @@
 #ifndef BITCOIN_INIT_H
 #define BITCOIN_INIT_H
 
-#include "wallet.h"
+#ifndef BITCOIN_WALLET_H
+ #include "wallet.h"
+#endif
 
 extern CWallet* pwalletMain;
 extern std::string strWalletFileName;

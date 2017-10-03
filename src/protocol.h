@@ -10,10 +10,19 @@
 #ifndef __INCLUDED_PROTOCOL_H__
 #define __INCLUDED_PROTOCOL_H__
 
-#include "serialize.h"
-#include "netbase.h"
+#ifndef BITCOIN_SERIALIZE_H
+ #include "serialize.h"
+#endif
+
+#ifndef BITCOIN_NETBASE_H
+ #include "netbase.h"
+#endif
+
 #include <string>
-#include "uint256.h"
+
+#ifndef BITCOIN_UINT256_H
+ #include "uint256.h"
+#endif
 
 extern bool fTestNet;
 static inline unsigned short GetDefaultPort(const bool testnet = fTestNet)

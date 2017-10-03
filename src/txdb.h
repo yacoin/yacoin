@@ -11,10 +11,17 @@
 // with it, this can be deleted.
 
 #ifdef USE_LEVELDB
-#include "txdb-leveldb.h"
+ #ifndef BITCOIN_LEVELDB_H
+  #include "txdb-leveldb.h"
+ #endif
 #else
-#include "db.h"
-#include "txdb-bdb.h"
+ #ifndef BITCOIN_DB_H
+  #include "db.h"
+ #endif
+
+ #ifndef BITCOIN_TXDB_BDB_H
+  #include "txdb-bdb.h"
+ #endif
 #endif
 
 #endif  // BITCOIN_TXDB_H

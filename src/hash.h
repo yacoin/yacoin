@@ -6,9 +6,17 @@
 #ifndef BITCOIN_HASH_H
 #define BITCOIN_HASH_H
 
-#include "serialize.h"
-#include "uint256.h"
-#include "version.h"
+#ifndef BITCOIN_SERIALIZE_H
+ #include "serialize.h"
+#endif
+
+#ifndef BITCOIN_UINT256_H
+ #include "uint256.h"
+#endif
+
+#ifndef BITCOIN_VERSION_H
+ #include "version.h"
+#endif
 
 #include <vector>
 

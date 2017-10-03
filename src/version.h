@@ -4,7 +4,10 @@
 #ifndef BITCOIN_VERSION_H
 #define BITCOIN_VERSION_H
 
-#include "clientversion.h"
+#ifndef CLIENTVERSION_H
+ #include "clientversion.h"
+#endif
+
 #include <string>
 
 //

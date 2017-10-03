@@ -32,9 +32,13 @@
 #include <inttypes.h>
 #endif
 
-#include "allocators.h"
-#include "version.h"
+#ifndef BITCOIN_ALLOCATORS_H
+ #include "allocators.h"
+#endif
 
+#ifndef BITCOIN_VERSION_H
+ #include "version.h"
+#endif
 
 class CScript;
 class CDataStream;

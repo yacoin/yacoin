@@ -4,9 +4,17 @@
 #ifndef __CRYPTER_H__
 #define __CRYPTER_H__
 
-#include "allocators.h" /* for SecureString */
-#include "key.h"
-#include "serialize.h"
+#ifndef BITCOIN_ALLOCATORS_H
+ #include "allocators.h" /* for SecureString */
+#endif
+
+#ifndef BITCOIN_KEY_H
+ #include "key.h"
+#endif
+
+#ifndef BITCOIN_SERIALIZE_H
+ #include "serialize.h"
+#endif
 
 const unsigned int WALLET_CRYPTO_KEY_SIZE = 32;
 const unsigned int WALLET_CRYPTO_SALT_SIZE = 8;

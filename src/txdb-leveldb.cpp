@@ -9,9 +9,17 @@
     #include "msvc_warnings.push.h"
 #endif
 
-#include "kernel.h"
-#include "checkpoints.h"
-#include "txdb.h"
+#ifndef PPCOIN_KERNEL_H
+ #include "kernel.h"
+#endif
+
+#ifndef BITCOIN_CHECKPOINT_H
+ #include "checkpoints.h"
+#endif
+
+#ifndef BITCOIN_TXDB_H
+ #include "txdb.h"
+#endif
 
 #include <map>
 
@@ -470,9 +478,9 @@ bool CTxDB::LoadBlockIndex()
     #else
         // seems to be slowing down??
         #ifdef QT_GUI
-        nRefresh = 4000;
+        nRefresh = 8000;
         #else
-        nRefresh = 5000;    // 15000;    //10000;
+        nRefresh = 8000;    // 15000;    //10000;
         #endif
     #endif
     ::int64_t
@@ -559,10 +567,9 @@ bool CTxDB::LoadBlockIndex()
         pindexNew->nNonce         = diskindex.nNonce;
 
         // Watch for genesis block
-#ifdef WIN32
         if( 
-            (NULL != pindexGenesisBlock) &&
-            (0 == diskindex.nHeight)
+            (0 == diskindex.nHeight) &&
+            (NULL != pindexGenesisBlock)
            )
         {
             if (fPrintToConsole)
@@ -573,14 +580,11 @@ bool CTxDB::LoadBlockIndex()
                             );
         }
         if (
-            (NULL == pindexGenesisBlock) && 
-            (0 == diskindex.nHeight)      // ought to be faster than a hash check!?
+            (0 == diskindex.nHeight) &&     // ought to be faster than a hash check!?
+            (NULL == pindexGenesisBlock)
            )
         {
             if (blockHash == (!fTestNet ? hashGenesisBlock : hashGenesisBlockTestNet))// check anyway, but only if block 0
-#else
-        if (pindexGenesisBlock == NULL && blockHash == (!fTestNet ? hashGenesisBlock : hashGenesisBlockTestNet))
-#endif
             {
                 pindexGenesisBlock = pindexNew;
                 /*************
@@ -597,14 +601,12 @@ bool CTxDB::LoadBlockIndex()
             }
             else
             {
-#ifdef WIN32
                 if (fPrintToConsole)
                     (void)printf( 
                             "Error? a extra genesis block with the wrong hash???"
                             "\n"
                             ""
                                 );
-#endif
             }
         }
         // there seem to be 2 errant blocks?
@@ -615,14 +617,12 @@ bool CTxDB::LoadBlockIndex()
                 (0 == diskindex.nHeight) 
               )
             {
-#ifdef WIN32
                 if (fPrintToConsole)
                     (void)printf( 
                             "Error? a extra genesis null block???"
                             "\n"
                             ""
                                 );
-#endif
             }
         }
         //if (!pindexNew->CheckIndex()) // as it stands, this never fails??? So why bother?????
@@ -728,7 +728,7 @@ bool CTxDB::LoadBlockIndex()
 #endif        
         }
         sort(vSortedByHeight.begin(), vSortedByHeight.end());
- #ifdef WIN32
+#ifdef WIN32
         if (fPrintToConsole) 
             (void)printf( "\ndone\nChecking stake checksums...\n" );
     #ifdef _DEBUG

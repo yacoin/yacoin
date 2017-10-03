@@ -9,7 +9,9 @@
 #include <boost/signals2/signal.hpp>
 #include <boost/signals2/last_value.hpp>
 
-#include "util.h"
+#ifndef BITCOIN_UTIL_H
+ #include "util.h"
+#endif
 
 class CBasicKeyStore;
 class CWallet;
