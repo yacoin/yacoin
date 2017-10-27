@@ -11,16 +11,16 @@ CONFIG += static
 CONFIG += release
 CONFIG += warn_off
 
-BOOST_INCLUDE_PATH=$$YBOO
-BOOST_LIB_PATH=$$YBOO/stage/lib
-BDB_INCLUDE_PATH=$$YBDB/build_unix
-BDB_LIB_PATH=$$YBDB/build_unix
-OPENSSL_INCLUDE_PATH=$$YOSSL/build/include
-OPENSSL_LIB_PATH=$$YOSSL/build/lib
-MINIUPNPC_INCLUDE_PATH=$$YUPNP
-MINIUPNPC_LIB_PATH=$$YUPNP
-QRENCODE_INCLUDE_PATH=$$YQR
-QRENCODE_LIB_PATH=$$YQR/.libs
+BOOST_INCLUDE_PATH=$$YBOO/include
+BOOST_LIB_PATH=$$YBOO/lib
+BDB_INCLUDE_PATH=$$YBDB/include
+BDB_LIB_PATH=$$YBDB/lib
+OPENSSL_INCLUDE_PATH=$$YOSSL/include
+OPENSSL_LIB_PATH=$$YOSSL/lib
+MINIUPNPC_INCLUDE_PATH=$$YUPNP/include
+MINIUPNPC_LIB_PATH=$$YUPNP/lib
+QRENCODE_INCLUDE_PATH=$$YQR/include
+QRENCODE_LIB_PATH=$$YQR/lib
 
 OBJECTS_DIR = build
 MOC_DIR = build
@@ -323,8 +323,8 @@ LIBS += $$join(BOOST_LIB_PATH,,-L,) $$join(BDB_LIB_PATH,,-L,) $$join(OPENSSL_LIB
 LIBS += -lssl -lcrypto -ldb_cxx$$BDB_LIB_SUFFIX -lqrencode
 # -lgdi32 has to happen after -lcrypto (see  #681)
 windows:LIBS += -lws2_32 -lshlwapi -lmswsock -lole32 -loleaut32 -luuid -lgdi32
-LIBS += -lboost_system$$BOOST_LIB_SUFFIX -lboost_filesystem$$BOOST_LIB_SUFFIX -lboost_program_options$$BOOST_LIB_SUFFIX -lboost_thread$$BOOST_LIB_SUFFIX
-windows:LIBS += -lboost_chrono$$BOOST_LIB_SUFFIX -Wl,-Bstatic -lpthread
+LIBS += -lboost_system -lboost_filesystem -lboost_program_options -lboost_thread
+windows:LIBS += -lboost_chrono -Wl,-Bstatic -lpthread
 
 
 #system($$QMAKE_LRELEASE -silent $$PWD/src/qt/locale/translations.pro)
