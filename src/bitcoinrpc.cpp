@@ -2,13 +2,36 @@
 // Copyright (c) 2009-2012 The Bitcoin developers
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
-
 #ifdef _MSC_VER
     #include <stdint.h>
 
     #include "msvc_warnings.push.h"
-#endif
 
+    #include "init.h"
+    //#include "util.h"
+    //#include "sync.h"
+    //#include "ui_interface.h"
+    //#include "base58.h"
+    #include "bitcoinrpc.h"
+    //#include "db.h"
+
+    #undef printf
+    #include <boost/asio.hpp>
+    #include <boost/asio/ip/v6_only.hpp>
+    //#include <boost/bind.hpp>
+    //#include <boost/filesystem.hpp>
+    //#include <boost/foreach.hpp>
+    //#include <boost/iostreams/concepts.hpp>
+    #include <boost/iostreams/stream.hpp>
+    #include <boost/algorithm/string.hpp>
+    //#include <boost/lexical_cast.hpp>
+    #include <boost/asio/ssl.hpp>
+    //#include <boost/filesystem/fstream.hpp>
+    //#include <boost/shared_ptr.hpp>
+    //#include <list>
+
+    //#define printf OutputDebugStringF
+#else
 #include "init.h"
 #include "util.h"
 #include "sync.h"
@@ -32,12 +55,21 @@
 #include <boost/shared_ptr.hpp>
 #include <list>
 
-#define printf OutputDebugStringF
+//#define printf OutputDebugStringF
+#endif
 
-using namespace std;
 using namespace boost;
 using namespace boost::asio;
 using namespace json_spirit;
+
+using std::string;
+using std::list;
+using std::runtime_error;
+using std::map;
+using std::vector;
+using std::set;
+using std::ostringstream;
+using std::invalid_argument;
 
 void ThreadRPCServer2(void* parg);
 
@@ -49,7 +81,7 @@ void ThreadRPCServer3(void* parg);
 
 static inline unsigned short GetDefaultRPCPort()
 {
-    return GetBoolArg("-testnet", false) ? 18344 : 8344;
+    return GetBoolArg("-testnet", false)? 7687: 17687;
 }
 
 Object JSONRPCError(int code, const string& message)
@@ -100,41 +132,68 @@ void RPCTypeCheck(const Object& o,
     }
 }
 
-int64 AmountFromValue(const Value& value)
+::int64_t AmountFromValue(const Value& value)
 {
     double dAmount = value.get_real();
     if (dAmount <= 0.0 || dAmount > MAX_MONEY)
         throw JSONRPCError(RPC_TYPE_ERROR, "Invalid amount");
-    int64 nAmount = roundint64(dAmount * COIN);
+    ::int64_t nAmount = roundint64(dAmount * COIN);
     if (!MoneyRange(nAmount))
         throw JSONRPCError(RPC_TYPE_ERROR, "Invalid amount");
     return nAmount;
 }
 
-Value ValueFromAmount(int64 amount)
+Value ValueFromAmount(::int64_t amount)
 {
     return (double)amount / (double)COIN;
 }
 
 std::string HexBits(unsigned int nBits)
 {
-#if defined( _MSC_VER )
-    union 
-    {
+    union {
         ::int32_t nBits;
         char cBits[4];
     } uBits;
-    uBits.nBits = htonl(::int32_t(nBits));
-#else
-    union {
-        int32_t nBits;
-        char cBits[4];
-    } uBits;
-    uBits.nBits = htonl((int32_t)nBits);
-#endif
+    uBits.nBits = htonl((::int32_t)nBits);
     return HexStr(BEGIN(uBits.cBits), END(uBits.cBits));
 }
 
+
+//
+// Utilities: convert hex-encoded Values
+// (throws error if not hex).
+//
+uint256 ParseHashV(const Value& v, string strName)
+{
+    string strHex;
+    if (v.type() == str_type)
+        strHex = v.get_str();
+    if (!IsHex(strHex)) // Note: IsHex("") is false
+        throw JSONRPCError(RPC_INVALID_PARAMETER, strName+" must be hexadecimal string (not '"+strHex+"')");
+    uint256 result;
+    result.SetHex(strHex);
+    return result;
+}
+
+uint256 ParseHashO(const Object& o, string strKey)
+{
+    return ParseHashV(find_value(o, strKey), strKey);
+}
+
+vector<unsigned char> ParseHexV(const Value& v, string strName)
+{
+    string strHex;
+    if (v.type() == str_type)
+        strHex = v.get_str();
+    if (!IsHex(strHex))
+        throw JSONRPCError(RPC_INVALID_PARAMETER, strName+" must be hexadecimal string (not '"+strHex+"')");
+    return ParseHex(strHex);
+}
+
+vector<unsigned char> ParseHexO(const Object& o, string strKey)
+{
+    return ParseHexV(find_value(o, strKey), strKey);
+}
 
 
 ///
@@ -143,8 +202,9 @@ std::string HexBits(unsigned int nBits)
 
 string CRPCTable::help(string strCommand) const
 {
-    string strRet;
+    string strRet = "";
     set<rpcfn_type> setDone;
+    boost::to_lower( strCommand );
     for (map<string, const CRPCCommand*>::const_iterator mi = mapCommands.begin(); mi != mapCommands.end(); ++mi)
     {
         const CRPCCommand *pcmd = mi->second;
@@ -161,7 +221,19 @@ string CRPCTable::help(string strCommand) const
             if (setDone.insert(pfn).second)
                 (*pfn)(params, true);
         }
-        catch (std::exception& e)
+        catch (const std::invalid_argument& ia) 
+        {
+            string strHelp = string( ia.what() );
+            if ( "" == strCommand )         // just a help w/ no arguments
+            {
+                if (strHelp.find('\n') != string::npos) // there is a \n in the message
+                {
+                    strHelp = strHelp.substr(0, strHelp.find('\n')); // truncate at that point, why?
+                }
+            }
+            strRet += strHelp + "\n";
+        }
+        catch (const std::exception& e)
         {
             // Help text is returned in an exception
             string strHelp = string(e.what());
@@ -180,11 +252,11 @@ string CRPCTable::help(string strCommand) const
 Value help(const Array& params, bool fHelp)
 {
     if (fHelp || params.size() > 1)
-        throw runtime_error(
-            "help [command]\n"
-            "List commands, or get help for a command.");
-
-    string strCommand;
+    {
+      //throw runtime_error( "help [command]\n" "List commands, or get help for a command." );
+        throw invalid_argument( "help [command]\n" "List commands, or get help for a command." );
+    }
+    string strCommand = "";
     if (params.size() > 0)
         strCommand = params[0].get_str();
 
@@ -198,12 +270,12 @@ Value stop(const Array& params, bool fHelp)
         throw runtime_error(
             "stop <detach>\n"
             "<detach> is true or false to detach the database or not for this stop only\n"
-            "Stop YACoin server (and possibly override the detachdb config value).");
+            "Stop YaCoin server (and possibly override the detachdb config value).");
     // Shutdown will take long enough that the response should get back
     if (params.size() > 0)
         bitdb.SetDetach(params[0].get_bool());
     StartShutdown();
-    return "YACoin server stopping";
+    return "YaCoin server stopping";
 }
 
 
@@ -216,45 +288,54 @@ Value stop(const Array& params, bool fHelp)
 static const CRPCCommand vRPCCommands[] =
 { //  name                      function                 safemd  unlocked
   //  ------------------------  -----------------------  ------  --------
-    { "help",                   &help,                   true,   true },
+    { "help",                   &help,                   true,   false },
     { "stop",                   &stop,                   true,   true },
+    { "getbestblockhash",       &getbestblockhash,       true,   false },
     { "getblockcount",          &getblockcount,          true,   false },
 #ifdef WIN32
     { "getblockcountt",         &getcurrentblockandtime, true,   false },
 #endif
+#if !defined( QT_GUI )
+    { "getyacprice",            &getYACprice,            true,   false },
+#endif
     { "getconnectioncount",     &getconnectioncount,     true,   false },
+    { "getaddrmaninfo",         &getaddrmaninfo,         true,   false },
     { "getpeerinfo",            &getpeerinfo,            true,   false },
+    { "addnode",                &addnode,                true,   true  },
+    { "getaddednodeinfo",       &getaddednodeinfo,       true,   true  },
     { "getdifficulty",          &getdifficulty,          true,   false },
+    { "getinfo",                &getinfo,                true,   false },
     { "getgenerate",            &getgenerate,            true,   false },
     { "setgenerate",            &setgenerate,            true,   false },
+    { "getsubsidy",             &getsubsidy,             true,   false },
     { "gethashespersec",        &gethashespersec,        true,   false },
-    { "getinfo",                &getinfo,                true,   false },
     { "getmininginfo",          &getmininginfo,          true,   false },
-    { "getnetworkhashps",       &getnetworkhashps,       true,   false },
     { "getnewaddress",          &getnewaddress,          true,   false },
-    { "getnewpubkey",           &getnewpubkey,           true,   false },
+    { "getnettotals",           &getnettotals,           true,   true  },
     { "getaccountaddress",      &getaccountaddress,      true,   false },
     { "setaccount",             &setaccount,             true,   false },
     { "getaccount",             &getaccount,             false,  false },
     { "getaddressesbyaccount",  &getaddressesbyaccount,  true,   false },
     { "sendtoaddress",          &sendtoaddress,          false,  false },
+    { "mergecoins",             &mergecoins,             false,  false },
     { "getreceivedbyaddress",   &getreceivedbyaddress,   false,  false },
     { "getreceivedbyaccount",   &getreceivedbyaccount,   false,  false },
     { "listreceivedbyaddress",  &listreceivedbyaddress,  false,  false },
     { "listreceivedbyaccount",  &listreceivedbyaccount,  false,  false },
     { "backupwallet",           &backupwallet,           true,   false },
     { "keypoolrefill",          &keypoolrefill,          true,   false },
+    { "keypoolreset",           &keypoolreset,           true,   false },
     { "walletpassphrase",       &walletpassphrase,       true,   false },
     { "walletpassphrasechange", &walletpassphrasechange, false,  false },
     { "walletlock",             &walletlock,             true,   false },
     { "encryptwallet",          &encryptwallet,          false,  false },
     { "validateaddress",        &validateaddress,        true,   false },
-    { "validatepubkey",         &validatepubkey,         true,   false },
     { "getbalance",             &getbalance,             false,  false },
     { "move",                   &movecmd,                false,  false },
     { "sendfrom",               &sendfrom,               false,  false },
     { "sendmany",               &sendmany,               false,  false },
     { "addmultisigaddress",     &addmultisigaddress,     false,  false },
+    { "addredeemscript",        &addredeemscript,        false,  false },
     { "getrawmempool",          &getrawmempool,          true,   false },
     { "getblock",               &getblock,               false,  false },
     { "getblockbynumber",       &getblockbynumber,       false,  false },
@@ -272,11 +353,17 @@ static const CRPCCommand vRPCCommands[] =
     { "submitblock",            &submitblock,            false,  false },
     { "listsinceblock",         &listsinceblock,         false,  false },
     { "dumpprivkey",            &dumpprivkey,            false,  false },
+    { "dumpwallet",             &dumpwallet,             true,   false },
+    { "importwallet",           &importwallet,           false,  false },
     { "importprivkey",          &importprivkey,          false,  false },
+    { "importaddress",          &importaddress,          false,  true  },
+    { "removeaddress",          &removeaddress,          false,  true  },
     { "listunspent",            &listunspent,            false,  false },
     { "getrawtransaction",      &getrawtransaction,      false,  false },
     { "createrawtransaction",   &createrawtransaction,   false,  false },
     { "decoderawtransaction",   &decoderawtransaction,   false,  false },
+    { "createmultisig",         &createmultisig,         false,  false },
+    { "decodescript",           &decodescript,           false,  false },
     { "signrawtransaction",     &signrawtransaction,     false,  false },
     { "sendrawtransaction",     &sendrawtransaction,     false,  false },
     { "getcheckpoint",          &getcheckpoint,          true,   false },
@@ -285,7 +372,7 @@ static const CRPCCommand vRPCCommands[] =
     { "repairwallet",           &repairwallet,           false,  true},
     { "resendtx",               &resendtx,               false,  true},
     { "makekeypair",            &makekeypair,            false,  true},
-    { "sendalert",              &sendalert,              false,  false},
+    { "sendalert",              &sendalert,              false,  false}
 };
 
 CRPCTable::CRPCTable()
@@ -375,7 +462,7 @@ static string HTTPReply(int nStatus, const string& strMsg, bool keepalive)
             "HTTP/1.1 %d %s\r\n"
             "Date: %s\r\n"
             "Connection: %s\r\n"
-            "Content-Length: %"PRIszu"\r\n"
+            "Content-Length: %" PRIszu "\r\n"
             "Content-Type: application/json\r\n"
             "Server: yacoin-json-rpc/%s\r\n"
             "\r\n"
@@ -407,7 +494,7 @@ int ReadHTTPStatus(std::basic_istream<char>& stream, int &proto)
 int ReadHTTPHeader(std::basic_istream<char>& stream, map<string, string>& mapHeadersRet)
 {
     int nLen = 0;
-    loop
+    while (true)
     {
         string str;
         std::getline(stream, str);
@@ -471,7 +558,7 @@ bool HTTPAuthorized(map<string, string>& mapHeaders)
         return false;
     string strUserPass64 = strAuth.substr(6); boost::trim(strUserPass64);
     string strUserPass = DecodeBase64(strUserPass64);
-    return strUserPass == strRPCUserColonPass;
+    return TimingResistantEqual(strUserPass, strRPCUserColonPass);
 }
 
 //
@@ -648,7 +735,7 @@ private:
 void ThreadRPCServer(void* parg)
 {
     // Make this thread recognisable as the RPC listener
-    RenameThread("bitcoin-rpclist");
+    RenameThread("yacoin-rpclist");
 
     try
     {
@@ -759,7 +846,7 @@ void ThreadRPCServer2(void* parg)
         uiInterface.ThreadSafeMessageBox(strprintf(
             _("%s, you must set a rpcpassword in the configuration file:\n %s\n"
               "It is recommended you use the following random password:\n"
-              "rpcuser=bitcoinrpc\n"
+              "rpcuser=yacoinrpc\n"
               "rpcpassword=%s\n"
               "(you do not need to remember this password)\n"
               "If the file does not exist, create it with owner-readable-only file permissions.\n"),
@@ -780,17 +867,31 @@ void ThreadRPCServer2(void* parg)
     {
         context.set_options(ssl::context::no_sslv2);
 
-        filesystem::path pathCertFile(GetArg("-rpcsslcertificatechainfile", "server.cert"));
-        if (!pathCertFile.is_complete()) pathCertFile = filesystem::path(GetDataDir()) / pathCertFile;
-        if (filesystem::exists(pathCertFile)) context.use_certificate_chain_file(pathCertFile.string());
-        else printf("ThreadRPCServer ERROR: missing server certificate file %s\n", pathCertFile.string().c_str());
+        filesystem::path 
+            pathCertFile(GetArg("-rpcsslcertificatechainfile", "server.cert"));
 
-        filesystem::path pathPKFile(GetArg("-rpcsslprivatekeyfile", "server.pem"));
-        if (!pathPKFile.is_complete()) pathPKFile = filesystem::path(GetDataDir()) / pathPKFile;
-        if (filesystem::exists(pathPKFile)) context.use_private_key_file(pathPKFile.string(), ssl::context::pem);
-        else printf("ThreadRPCServer ERROR: missing server private key file %s\n", pathPKFile.string().c_str());
+        if (!pathCertFile.is_complete()) 
+            pathCertFile = filesystem::path(GetDataDir()) / pathCertFile;
+        if (filesystem::exists(pathCertFile)) 
+            context.use_certificate_chain_file(pathCertFile.string());
+        else 
+            printf("ThreadRPCServer ERROR: missing server certificate file %s\n", 
+                   pathCertFile.string().c_str()
+                  );
 
-        string strCiphers = GetArg("-rpcsslciphers", "TLSv1+HIGH:!SSLv2:!aNULL:!eNULL:!AH:!3DES:@STRENGTH");
+        filesystem::path 
+            pathPKFile(GetArg("-rpcsslprivatekeyfile", "server.pem"));
+        if (!pathPKFile.is_complete()) 
+            pathPKFile = filesystem::path(GetDataDir()) / pathPKFile;
+        if (filesystem::exists(pathPKFile)) 
+            context.use_private_key_file(pathPKFile.string(), ssl::context::pem); // causes exceptions???
+        else 
+            printf("ThreadRPCServer ERROR: missing server private key file %s\n", 
+                   pathPKFile.string().c_str()
+                  );
+
+        string 
+            strCiphers = GetArg("-rpcsslciphers", "TLSv1+HIGH:!SSLv2:!aNULL:!eNULL:!AH:!3DES:@STRENGTH");
         SSL_CTX_set_cipher_list(context.impl(), strCiphers.c_str());
     }
 
@@ -897,7 +998,11 @@ void JSONRequest::parse(const Value& valRequest)
     if (valMethod.type() != str_type)
         throw JSONRPCError(RPC_INVALID_REQUEST, "Method must be a string");
     strMethod = valMethod.get_str();
-    if (strMethod != "getwork" && strMethod != "getblocktemplate")
+    if (
+        strMethod != "getwork" && 
+        strMethod != "getworkex" && 
+        strMethod != "getblocktemplate"
+       )
         printf("ThreadRPCServer method=%s\n", strMethod.c_str());
 
     // Parse params
@@ -948,7 +1053,7 @@ static CCriticalSection cs_THREAD_RPCHANDLER;
 void ThreadRPCServer3(void* parg)
 {
     // Make this thread recognisable as the RPC handler
-    RenameThread("bitcoin-rpchand");
+    RenameThread("yacoin-rpchand");
 
     {
         LOCK(cs_THREAD_RPCHANDLER);
@@ -957,7 +1062,8 @@ void ThreadRPCServer3(void* parg)
     AcceptedConnection *conn = (AcceptedConnection *) parg;
 
     bool fRun = true;
-    loop {
+    while (true)
+    {
         if (fShutdown || !fRun)
         {
             conn->close();
@@ -1026,6 +1132,11 @@ void ThreadRPCServer3(void* parg)
             ErrorReply(conn->stream(), objError, jreq.id);
             break;
         }
+        catch (const std::invalid_argument& ia) 
+        {
+            ErrorReply(conn->stream(), JSONRPCError(RPC_PARSE_ERROR, ia.what()), jreq.id);
+            break;
+        }
         catch (std::exception& e)
         {
             ErrorReply(conn->stream(), JSONRPCError(RPC_PARSE_ERROR, e.what()), jreq.id);
@@ -1067,9 +1178,16 @@ json_spirit::Value CRPCTable::execute(const std::string &strMethod, const json_s
         }
         return result;
     }
+    catch (std::invalid_argument& ia)
+    {
+        throw JSONRPCError(RPC_MISC_ERROR, ia.what());
+    }
     catch (std::exception& e)
     {
         throw JSONRPCError(RPC_MISC_ERROR, e.what());
+    }
+    catch (...)    {
+        throw JSONRPCError(RPC_MISC_ERROR, "unknown!?");
     }
 }
 
@@ -1150,7 +1268,7 @@ void ConvertTo(Value& value, bool fAllowNull=false)
 }
 
 // Convert strings to command-specific RPC representation
-Array RPCConvertValues(const std::string &strMethod, const std::vector<std::string> &strParams)
+Array RPCConvertValues(std::string &strMethod, const std::vector<std::string> &strParams)
 {
     Array params;
     BOOST_FOREACH(const std::string &param, strParams)
@@ -1161,10 +1279,15 @@ Array RPCConvertValues(const std::string &strMethod, const std::vector<std::stri
     //
     // Special case non-string parameter types
     //
+    boost::to_lower( strMethod );
     if (strMethod == "stop"                   && n > 0) ConvertTo<bool>(params[0]);
+    if (strMethod == "getaddednodeinfo"       && n > 0) ConvertTo<bool>(params[0]);
     if (strMethod == "setgenerate"            && n > 0) ConvertTo<bool>(params[0]);
     if (strMethod == "setgenerate"            && n > 1) ConvertTo<boost::int64_t>(params[1]);
     if (strMethod == "sendtoaddress"          && n > 1) ConvertTo<double>(params[1]);
+    if (strMethod == "mergecoins"            && n > 0) ConvertTo<double>(params[0]);
+    if (strMethod == "mergecoins"            && n > 1) ConvertTo<double>(params[1]);
+    if (strMethod == "mergecoins"            && n > 2) ConvertTo<double>(params[2]);
     if (strMethod == "settxfee"               && n > 0) ConvertTo<double>(params[0]);
     if (strMethod == "getreceivedbyaddress"   && n > 1) ConvertTo<boost::int64_t>(params[1]);
     if (strMethod == "getreceivedbyaccount"   && n > 1) ConvertTo<boost::int64_t>(params[1]);
@@ -1181,17 +1304,27 @@ Array RPCConvertValues(const std::string &strMethod, const std::vector<std::stri
     if (strMethod == "move"                   && n > 3) ConvertTo<boost::int64_t>(params[3]);
     if (strMethod == "sendfrom"               && n > 2) ConvertTo<double>(params[2]);
     if (strMethod == "sendfrom"               && n > 3) ConvertTo<boost::int64_t>(params[3]);
+    if (strMethod == "gettransaction"         && n > 1) ConvertTo<bool>(params[1]);
     if (strMethod == "listtransactions"       && n > 1) ConvertTo<boost::int64_t>(params[1]);
     if (strMethod == "listtransactions"       && n > 2) ConvertTo<boost::int64_t>(params[2]);
     if (strMethod == "listaccounts"           && n > 0) ConvertTo<boost::int64_t>(params[0]);
+    if (strMethod == "listaccounts"           && n > 1) ConvertTo<bool>(params[1]);
     if (strMethod == "walletpassphrase"       && n > 1) ConvertTo<boost::int64_t>(params[1]);
     if (strMethod == "walletpassphrase"       && n > 2) ConvertTo<bool>(params[2]);
     if (strMethod == "getblocktemplate"       && n > 0) ConvertTo<Object>(params[0]);
     if (strMethod == "listsinceblock"         && n > 1) ConvertTo<boost::int64_t>(params[1]);
+    if (strMethod == "listsinceblock"         && n > 2) ConvertTo<bool>(params[2]);
+
+    if (strMethod == "sendalert"              && n > 2) ConvertTo<boost::int64_t>(params[2]);
+    if (strMethod == "sendalert"              && n > 3) ConvertTo<boost::int64_t>(params[3]);
+    if (strMethod == "sendalert"              && n > 4) ConvertTo<boost::int64_t>(params[4]);
+    if (strMethod == "sendalert"              && n > 5) ConvertTo<boost::int64_t>(params[5]);
+    if (strMethod == "sendalert"              && n > 6) ConvertTo<boost::int64_t>(params[6]);
+
     if (strMethod == "sendmany"               && n > 1) ConvertTo<Object>(params[1]);
     if (strMethod == "sendmany"               && n > 2) ConvertTo<boost::int64_t>(params[2]);
-    if (strMethod == "reservebalance"          && n > 0) ConvertTo<bool>(params[0]);
-    if (strMethod == "reservebalance"          && n > 1) ConvertTo<double>(params[1]);
+    if (strMethod == "reservebalance"         && n > 0) ConvertTo<bool>(params[0]);
+    if (strMethod == "reservebalance"         && n > 1) ConvertTo<double>(params[1]);
     if (strMethod == "addmultisigaddress"     && n > 0) ConvertTo<boost::int64_t>(params[0]);
     if (strMethod == "addmultisigaddress"     && n > 1) ConvertTo<Array>(params[1]);
     if (strMethod == "listunspent"            && n > 0) ConvertTo<boost::int64_t>(params[0]);
@@ -1200,8 +1333,13 @@ Array RPCConvertValues(const std::string &strMethod, const std::vector<std::stri
     if (strMethod == "getrawtransaction"      && n > 1) ConvertTo<boost::int64_t>(params[1]);
     if (strMethod == "createrawtransaction"   && n > 0) ConvertTo<Array>(params[0]);
     if (strMethod == "createrawtransaction"   && n > 1) ConvertTo<Object>(params[1]);
+    if (strMethod == "createmultisig"         && n > 0) ConvertTo<boost::int64_t>(params[0]);
+    if (strMethod == "createmultisig"         && n > 1) ConvertTo<Array>(params[1]);
     if (strMethod == "signrawtransaction"     && n > 1) ConvertTo<Array>(params[1], true);
     if (strMethod == "signrawtransaction"     && n > 2) ConvertTo<Array>(params[2], true);
+    if (strMethod == "keypoolrefill"          && n > 0) ConvertTo<boost::int64_t>(params[0]);
+    if (strMethod == "keypoolreset"           && n > 0) ConvertTo<boost::int64_t>(params[0]);
+    if (strMethod == "importaddress"          && n > 2) ConvertTo<bool>(params[2]);
 
     return params;
 }
@@ -1253,6 +1391,16 @@ int CommandLineRPC(int argc, char *argv[])
                 strPrint = write_string(result, true);
         }
     }
+    catch (const std::runtime_error& e) 
+    {
+        strPrint = string("error: ") + e.what();
+        nRet = 85;  //WTFK
+    }
+    catch (const std::invalid_argument& ia) 
+    {
+        strPrint = string("error: ") + ia.what();
+        nRet = 86;  //WTFK
+    }
     catch (std::exception& e)
     {
         strPrint = string("error: ") + e.what();
@@ -1261,6 +1409,7 @@ int CommandLineRPC(int argc, char *argv[])
     catch (...)
     {
         PrintException(NULL, "CommandLineRPC()");
+        nRet = 88;
     }
 
     if (strPrint != "")

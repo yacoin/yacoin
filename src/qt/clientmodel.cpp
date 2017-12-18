@@ -11,11 +11,14 @@
 #include <QDateTime>
 #include <QTimer>
 
-static const int64 nClientStartupTime = GetTime();
+extern double GetPoSKernelPS();
+extern double GetDifficulty(const CBlockIndex* blockindex);
+
+static const int64_t nClientStartupTime = GetTime();
 
 ClientModel::ClientModel(OptionsModel *optionsModel, QObject *parent) :
     QObject(parent), optionsModel(optionsModel),
-    cachedNumBlocks(0), cachedNumBlocksOfPeers(0), cachedNumScanned(0), pollTimer(0)
+    cachedNumBlocks(0), cachedNumBlocksOfPeers(0), pollTimer(0)
 {
     numBlocksAtStartup = -1;
 
@@ -32,19 +35,36 @@ ClientModel::~ClientModel()
     unsubscribeFromCoreSignals();
 }
 
-int ClientModel::getNumConnections() const
+double ClientModel::getPoSKernelPS()
 {
-    return vNodes.size();
+    return GetPoSKernelPS();
+}
+
+double ClientModel::getDifficulty(bool fProofofStake)
+{
+    if (fProofofStake)
+       return GetDifficulty(GetLastBlockIndex(pindexBest,true));
+    else
+       return GetDifficulty(GetLastBlockIndex(pindexBest,false));
+}
+
+int ClientModel::getNumConnections(uint8_t flags) const
+{
+    LOCK(cs_vNodes);
+    if (flags == CONNECTIONS_ALL) // Shortcut if we want total
+        return (int)(vNodes.size());
+
+    int nNum = 0;
+    BOOST_FOREACH(CNode* pnode, vNodes)
+    if (flags & (pnode->fInbound ? CONNECTIONS_IN : CONNECTIONS_OUT))
+        nNum++;
+
+    return nNum;
 }
 
 int ClientModel::getNumBlocks() const
 {
     return nBestHeight;
-}
-
-int ClientModel::getNumScanned() const
-{
-    return nScanned;
 }
 
 int ClientModel::getNumBlocksAtStartup()
@@ -53,9 +73,22 @@ int ClientModel::getNumBlocksAtStartup()
     return numBlocksAtStartup;
 }
 
+quint64 ClientModel::getTotalBytesRecv() const
+{
+    return CNode::GetTotalBytesRecv();
+}
+
+quint64 ClientModel::getTotalBytesSent() const
+{
+    return CNode::GetTotalBytesSent();
+}
+
 QDateTime ClientModel::getLastBlockDate() const
 {
-    return QDateTime::fromTime_t(pindexBest->GetBlockTime());
+    if (pindexBest)
+        return QDateTime::fromTime_t(pindexBest->GetBlockTime());
+    else
+        return QDateTime::fromTime_t(1367991220); // Genesis block's time
 }
 
 void ClientModel::updateTimer()
@@ -64,17 +97,16 @@ void ClientModel::updateTimer()
     // Periodically check and update with a timer.
     int newNumBlocks = getNumBlocks();
     int newNumBlocksOfPeers = getNumBlocksOfPeers();
-    int newNumScanned = getNumScanned();
 
-    if(cachedNumBlocks != newNumBlocks || cachedNumBlocksOfPeers != newNumBlocksOfPeers ||
-       cachedNumScanned != newNumScanned)
+    if(cachedNumBlocks != newNumBlocks || cachedNumBlocksOfPeers != newNumBlocksOfPeers)
     {
         cachedNumBlocks = newNumBlocks;
         cachedNumBlocksOfPeers = newNumBlocksOfPeers;
-        cachedNumScanned = newNumScanned;
 
-        emit numBlocksChanged(newNumBlocks, newNumBlocksOfPeers, newNumScanned);
+        emit numBlocksChanged(newNumBlocks, newNumBlocksOfPeers);
     }
+
+    emit bytesChanged(getTotalBytesRecv(), getTotalBytesSent());
 }
 
 void ClientModel::updateNumConnections(int numConnections)
@@ -98,7 +130,7 @@ void ClientModel::updateAlert(const QString &hash, int status)
 
     // Emit a numBlocksChanged when the status message changes,
     // so that the view recomputes and updates the status bar.
-    emit numBlocksChanged(getNumBlocks(), getNumBlocksOfPeers(), getNumScanned());
+    emit numBlocksChanged(getNumBlocks(), getNumBlocksOfPeers());
 }
 
 bool ClientModel::isTestNet() const
@@ -114,6 +146,11 @@ bool ClientModel::inInitialBlockDownload() const
 int ClientModel::getNumBlocksOfPeers() const
 {
     return GetNumBlocksOfPeers();
+}
+
+int ClientModel::getNFactor() const
+{
+    return GetNfactor(pindexBest->GetBlockTime());
 }
 
 QString ClientModel::getStatusBarWarnings() const

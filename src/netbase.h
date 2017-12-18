@@ -7,9 +7,17 @@
 #include <string>
 #include <vector>
 
-#include "serialize.h"
-#include "compat.h"
+#ifndef BITCOIN_SERIALIZE_H
+ #include "serialize.h"
+#endif
 
+#ifndef _BITCOIN_COMPAT_H
+ #include "compat.h"
+#endif
+
+#ifdef WIN32
+extern char* iGetLastErrorText(DWORD nErrorCode);
+#endif
 extern int nConnectTimeout;
 
 #ifdef WIN32
@@ -67,7 +75,7 @@ class CNetAddr
         std::string ToString() const;
         std::string ToStringIP() const;
         unsigned int GetByte(int n) const;
-        uint64 GetHash() const;
+        ::uint64_t GetHash() const;
         bool GetInAddr(struct in_addr* pipv4Addr) const;
         std::vector<unsigned char> GetGroup() const;
         int GetReachabilityFrom(const CNetAddr *paddrPartner = NULL) const;
@@ -83,9 +91,9 @@ class CNetAddr
         friend bool operator<(const CNetAddr& a, const CNetAddr& b);
 
         IMPLEMENT_SERIALIZE
-            (
+        (
              READWRITE(FLATDATA(ip));
-            )
+        )
 };
 
 /** A combination of a network address (CNetAddr) and a (TCP) port */
@@ -123,14 +131,14 @@ class CService : public CNetAddr
 #endif
 
         IMPLEMENT_SERIALIZE
-            (
+        (
              CService* pthis = const_cast<CService*>(this);
              READWRITE(FLATDATA(ip));
              unsigned short portN = htons(port);
              READWRITE(portN);
              if (fRead)
                  pthis->port = ntohs(portN);
-            )
+        )
 };
 
 typedef std::pair<CService, int> proxyType;

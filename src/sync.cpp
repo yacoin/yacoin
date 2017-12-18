@@ -1,7 +1,6 @@
 // Copyright (c) 2011-2012 The Bitcoin developers
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
-
 #ifdef _MSC_VER
     #include <stdint.h>
 
@@ -84,14 +83,20 @@ static void push_lock(void* c, const CLockLocation& locklocation, bool fTry)
     if (lockstack.get() == NULL)
         lockstack.reset(new LockStack);
 
-    if (fDebug) printf("Locking: %s\n", locklocation.ToString().c_str());
+    if (fDebug) 
+    {
+        //printf("Locking: %s\n", locklocation.ToString().c_str());
+    }
     dd_mutex.lock();
 
     (*lockstack).push_back(std::make_pair(c, locklocation));
 
-    if (!fTry) {
-        BOOST_FOREACH(const PAIRTYPE(void*, CLockLocation)& i, (*lockstack)) {
-            if (i.first == c) break;
+    if (!fTry) 
+    {
+        BOOST_FOREACH(const PAIRTYPE(void*, CLockLocation)& i, (*lockstack)) 
+        {
+            if (i.first == c) 
+                break;
 
             std::pair<void*, void*> p1 = std::make_pair(i.first, c);
             if (lockorders.count(p1))
@@ -114,7 +119,7 @@ static void pop_lock()
     if (fDebug)
     {
         const CLockLocation& locklocation = (*lockstack).rbegin()->second;
-        printf("Unlocked: %s\n", locklocation.ToString().c_str());
+        //printf("Unlocked: %s\n", locklocation.ToString().c_str());
     }
     dd_mutex.lock();
     (*lockstack).pop_back();

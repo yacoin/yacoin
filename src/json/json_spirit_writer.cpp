@@ -2,6 +2,11 @@
 // Distributed under the MIT License, see accompanying file LICENSE.txt
 
 // json spirit version 4.03
+#ifdef _MSC_VER
+    #include <stdint.h>
+
+    #include "../msvc_warnings.push.h"
+#endif
 
 #include "json_spirit_writer.h"
 #include "json_spirit_writer_template.h"
@@ -92,4 +97,7 @@ std::wstring json_spirit::write_formatted( const wmValue&  value )
     return write_string( value, true );
 }
 
+#endif
+#ifdef _MSC_VER
+    #include "msvc_warnings.pop.h"
 #endif

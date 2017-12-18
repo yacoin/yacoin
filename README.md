@@ -1,7 +1,4 @@
-YACoin The ORIGINAL Scrypt-Jane SHA3 Coin
-====================================================================
-
-Official Development Tree.
+YACoin Official Development Tree.
 
 Many thanks to WindMaster for initially setting up this repository to continue development and promotion of YACoin after the original developer, GitHub user pocopoco, went paka paka. Due to community feedback and the need for an updated and stable client, this is now the official YACoin Development Tree.
 
@@ -13,17 +10,10 @@ N increases over time to increase memory requirements.
 10 minute PoS block targets.
 The PoW subsidy decreases as difficulty increases.
 Maximum PoW reward is 100 coins.
-
-**Ports:**   
-Connection Port:  7688 or testnet: 17688  
-RPC Port       :  8344 or testnet: 18344
-
-Development Process
-===================
-
+Development process
 Developers work in their own trees, then submit pull requests when they think their feature or bug fix is ready. For new features or enhancements to YACoin, please submit pull requests to YACoin testing. Please refer to: https://help.github.com/articles/using-pull-requests if you need any help.
 
-**The patch will be accepted if there is broad consensus that it is a good thing. Developers should expect to rework and resubmit patches if they don't match the project's coding conventions (see coding.txt) or are controversial. Submitting a pull request does not ensure that it will be accepted for the next release, or ever** 
+The patch will be accepted if there is broad consensus that it is a good thing. Developers should expect to rework and resubmit patches if they don't match the project's coding conventions (see coding.txt) or are controversial.
 
 The master branch (YACoin stable) is regularly built and tested, but is not guaranteed to be completely stable.
 

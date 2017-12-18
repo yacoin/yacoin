@@ -2,10 +2,16 @@
 # Distributed under the MIT/X11 software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+CC ?= g++
 CXX ?= g++
 
+
 USE_UPNP:=-
+
 USE_IPV6:=1
+USE_ASM:=1
+
+
 
 BOOST_SUFFIX?=-mgw48-mt-sd-1_55
 
@@ -32,6 +38,7 @@ LIBS= \
  -l crypto
 
 DEFS= \
+	-DUSE_ASM \
 	-DWIN32 \
 	-D_WINDOWS \
 	-DBOOST_THREAD_USE_LIB \
@@ -41,7 +48,8 @@ DEFS= \
 	-DSCRYPT_CHOOSE_COMPILETIME \
 	-DO2
 
-DEBUGFLAGS=-g
+DEBUGFLAGS=\
+	-g
 
 CFLAGS= \
 	-mthreads \
@@ -103,16 +111,19 @@ OBJS= \
     obj/crypter.o \
     obj/db.o \
     obj/init.o \
-  obj/irc.o \
-  obj/kernel.o \
+    obj/irc.o \
+    obj/kernel.o \
     obj/key.o \
     obj/keystore.o \
     obj/main.o \
+    obj/miner.o \
     obj/net.o \
     obj/netbase.o \
+    obj/price.o \
+    obj/stun.o \
     obj/noui.o \
-  obj/pbkdf2.o \
     obj/protocol.o \
+    obj/pbkdf2.o \
     obj/rpcblockchain.o \
     obj/rpcdump.o \
     obj/rpcmining.o \
@@ -121,13 +132,12 @@ OBJS= \
     obj/rpcwallet.o \
     obj/script.o \
   obj/scrypt-jane.o \
-  obj/scrypt_mine.o \
-  obj/scrypt-x86.o \
     obj/sync.o \
     obj/util.o \
     obj/version.o \
     obj/wallet.o \
-    obj/walletdb.o 
+    obj/walletdb.o \
+    obj/scrypt.o
 
 all: yacoind.exe
 

@@ -17,9 +17,18 @@
 
 #include <string>
 #include <vector>
-#include "bignum.h"
-#include "key.h"
-#include "script.h"
+
+#ifndef BITCOIN_BIGNUM_H
+ #include "bignum.h"
+#endif
+
+#ifndef BITCOIN_KEY_H
+ #include "key.h"
+#endif
+
+#ifndef H_BITCOIN_SCRIPT
+ #include "script.h"
+#endif
 
 static const char* pszBase58 = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
 
@@ -51,7 +60,7 @@ inline std::string EncodeBase58(const unsigned char* pbegin, const unsigned char
         if (!BN_div(&dv, &rem, &bn, &bn58, pctx))
             throw bignum_error("EncodeBase58 : BN_div failed");
         bn = dv;
-        unsigned int c = rem.getulong();
+        unsigned int c = rem.getuint32();
         str += pszBase58[c];
     }
 
@@ -94,7 +103,7 @@ inline bool DecodeBase58(const char* psz, std::vector<unsigned char>& vchRet)
                 return false;
             break;
         }
-        bnChar.setulong(p1 - pszBase58);
+        bnChar.setuint32((uint32_t)(p1 - pszBase58));
         if (!BN_mul(&bn, &bn, &bn58, pctx))
             throw bignum_error("DecodeBase58 : BN_mul failed");
         bn += bnChar;
@@ -406,7 +415,7 @@ public:
     {
 #ifdef _MSC_VER
         bool
-            fTest = (32 == vchSecret.size());
+            fTest = (vchSecret.size() == 32);
     #ifdef _DEBUG
         assert(fTest);
     #else

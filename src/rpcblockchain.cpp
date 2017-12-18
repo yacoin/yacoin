@@ -2,20 +2,27 @@
 // Copyright (c) 2009-2012 The Bitcoin developers
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
-
 #ifdef _MSC_VER
-    #include <stdint.h>
-
     #include "msvc_warnings.push.h"
 #endif
 
-#include "main.h"
-#include "bitcoinrpc.h"
+#ifndef BITCOIN_MAIN_H
+ #include "main.h"
+#endif
+
+#ifndef _BITCOINRPC_H_
+ #include "bitcoinrpc.h"
+#endif
 
 using namespace json_spirit;
-using namespace std;
+
+using std::max;
+using std::string;
+using std::runtime_error;
+using std::vector;
 
 extern void TxToJSON(const CTransaction& tx, const uint256 hashBlock, json_spirit::Object& entry);
+extern enum Checkpoints::CPMode CheckpointsMode;
 
 double GetDifficulty(const CBlockIndex* blockindex)
 {
@@ -48,6 +55,57 @@ double GetDifficulty(const CBlockIndex* blockindex)
     return dDiff;
 }
 
+double GetPoWMHashPS()
+{
+    int nPoWInterval = 72;
+    int64_t nTargetSpacingWorkMin = 30, nTargetSpacingWork = 30;
+
+    CBlockIndex* pindex = pindexGenesisBlock;
+    CBlockIndex* pindexPrevWork = pindexGenesisBlock;
+
+    while (pindex)
+    {
+        if (pindex->IsProofOfWork())
+        {
+            int64_t nActualSpacingWork = pindex->GetBlockTime() - pindexPrevWork->GetBlockTime();
+            nTargetSpacingWork = ((nPoWInterval - 1) * nTargetSpacingWork + nActualSpacingWork + nActualSpacingWork) / (nPoWInterval + 1);
+            nTargetSpacingWork = max(nTargetSpacingWork, nTargetSpacingWorkMin);
+            pindexPrevWork = pindex;
+        }
+
+        pindex = pindex->pnext;
+    }
+
+    return GetDifficulty() * 4294.967296 / nTargetSpacingWork;
+}
+
+double GetPoSKernelPS()
+{
+    int nPoSInterval = 72;
+    double dStakeKernelsTriedAvg = 0;
+    int nStakesHandled = 0, nStakesTime = 0;
+
+    CBlockIndex* pindex = pindexBest;;
+    CBlockIndex* pindexPrevStake = NULL;
+
+    while (pindex && nStakesHandled < nPoSInterval)
+    {
+        if (pindex->IsProofOfStake())
+        {
+            dStakeKernelsTriedAvg += GetDifficulty(pindex) * 4294967296.0;
+            nStakesTime += pindexPrevStake ? (pindexPrevStake->nTime - pindex->nTime) : 0;
+            pindexPrevStake = pindex;
+            nStakesHandled++;
+        }
+
+        pindex = pindex->pprev;
+    }
+
+    if (!nStakesHandled)
+        return 0;
+
+    return dStakeKernelsTriedAvg / nStakesTime;
+}
 
 Object blockToJSON(const CBlock& block, const CBlockIndex* blockindex, bool fPrintTransactionDetail)
 {
@@ -65,7 +123,8 @@ Object blockToJSON(const CBlock& block, const CBlockIndex* blockindex, bool fPri
     result.push_back(Pair("nonce", (boost::uint64_t)block.nNonce));
     result.push_back(Pair("bits", HexBits(block.nBits)));
     result.push_back(Pair("difficulty", GetDifficulty(blockindex)));
-
+    result.push_back(Pair("blocktrust", leftTrim(blockindex->GetBlockTrust().GetHex(), '0')));
+    result.push_back(Pair("chaintrust", leftTrim(blockindex->bnChainTrust.GetHex(), '0')));
     if (blockindex->pprev)
         result.push_back(Pair("previousblockhash", blockindex->pprev->GetBlockHash().GetHex()));
     if (blockindex->pnext)
@@ -74,30 +133,41 @@ Object blockToJSON(const CBlock& block, const CBlockIndex* blockindex, bool fPri
     result.push_back(Pair("flags", strprintf("%s%s", blockindex->IsProofOfStake()? "proof-of-stake" : "proof-of-work", blockindex->GeneratedStakeModifier()? " stake-modifier": "")));
     result.push_back(Pair("proofhash", blockindex->IsProofOfStake()? blockindex->hashProofOfStake.GetHex() : blockindex->GetBlockHash().GetHex()));
     result.push_back(Pair("entropybit", (int)blockindex->GetStakeEntropyBit()));
-    result.push_back(Pair("modifier", strprintf("%016"PRI64x, blockindex->nStakeModifier)));
+    result.push_back(Pair("modifier", strprintf("%016" PRIx64, blockindex->nStakeModifier)));
     result.push_back(Pair("modifierchecksum", strprintf("%08x", blockindex->nStakeModifierChecksum)));
+    result.push_back(Pair("posblocks", (int)blockindex->nPosBlockCount));
     Array txinfo;
     BOOST_FOREACH (const CTransaction& tx, block.vtx)
     {
         if (fPrintTransactionDetail)
         {
-            Object entry;
+            CDataStream ssTx(SER_NETWORK, PROTOCOL_VERSION);
+            ssTx << tx;
+            string strHex = HexStr(ssTx.begin(), ssTx.end());
 
-            entry.push_back(Pair("txid", tx.GetHash().GetHex()));
-            TxToJSON(tx, 0, entry);
-
-            txinfo.push_back(entry);
+            txinfo.push_back(strHex);
         }
         else
             txinfo.push_back(tx.GetHash().GetHex());
     }
 
     result.push_back(Pair("tx", txinfo));
-    result.push_back(Pair("signature", HexStr(block.vchBlockSig.begin(), block.vchBlockSig.end())));
+
+    if ( block.IsProofOfStake() )
+        result.push_back(Pair("signature", HexStr(block.vchBlockSig.begin(), block.vchBlockSig.end())));
 
     return result;
 }
 
+Value getbestblockhash(const Array& params, bool fHelp)
+{
+    if (fHelp || params.size() != 0)
+        throw runtime_error(
+            "getbestblockhash\n"
+            "Returns the hash of the best block in the longest block chain.");
+
+    return hashBestChain.GetHex();
+}
 
 Value getblockcount(const Array& params, bool fHelp)
 {
@@ -109,7 +179,142 @@ Value getblockcount(const Array& params, bool fHelp)
     return nBestHeight;
 }
 
+double doGetYACprice()
+{
+    // first call gets BTC/YAC ratio
+    // second call gets USD/BTC, so the product is USD/YAC
+    double
+        dPriceRatio = 0.0,
+        dUSDperYACprice = 0.0,
+        dUSDtoBTCprice = 0.0,
+        dBTCtoYACprice = 0.0;
+
+    string
+        sDestination = "";
+
+    // if the provider is good, which we could use the next time called
+    // we could save which one say in a static index, set to 0 initially
+    static int
+        nIndexBtcToYac = 0,
+        nIndexUsdToBtc = 0; // these both assume that the arrays have >= 1 element each!
+    static bool
+        fCopied = false;
+    if( !fCopied )
+    {
+        initialize_price_vectors( nIndexBtcToYac, nIndexUsdToBtc );
+        fCopied = true;
+    }
+
+    if (!GetMyExternalWebPage1( nIndexBtcToYac, sDestination, dPriceRatio ) )
+    {
+#if defined( QT_GUI )
+        dPriceRatio = 0.0;
+#else
+        throw runtime_error( "getYACprice\n" "Could not get page 1?" );
+#endif
+        return dUSDperYACprice;
+    }
+    if (fPrintToConsole) 
+    {
+        printf(
+                "\n"
+                "b/y %.8lf"
+                "\n"
+                "\n"
+                , dPriceRatio
+              );
+    }
+
+    //else    //OK, now we have YAC/BTC (Cryptsy's terminology), really BTC/YAC
+    dBTCtoYACprice = dPriceRatio;
+    sDestination = "";
+    dPriceRatio = 0.0;
+     if (!GetMyExternalWebPage2( nIndexUsdToBtc, sDestination, dPriceRatio ) )
+    {
+#if defined( QT_GUI )
+        dPriceRatio = 0.0;
+#else
+        throw runtime_error( "getYACprice\n" "Could not get page 2?" );
+#endif
+        return dUSDperYACprice;
+    }
+    // else USD/BTC is OK
+    dUSDtoBTCprice = dPriceRatio;
+
+    dUSDperYACprice = dBTCtoYACprice * dUSDtoBTCprice;
+    if (fPrintToConsole) 
+    {
+        printf(
+                "b/y %lf, $/b %lf, $/y = %lf"
+                "\n"
+                , dBTCtoYACprice
+                , dUSDtoBTCprice 
+                , dUSDperYACprice
+              );
+    }
+    return dUSDperYACprice;
+}
+
+Value getYACprice(const Array& params, bool fHelp)
+{
+    if (
+        fHelp || 
+        (0 < params.size())
+       )
+    {
+        throw runtime_error(
+            "getyacprice \n"
+            "Returns the current price of YAC in USD"
+                           );
+    }
+
+    string sTemp;
+    try
+    {
+        double 
+            dPrice = doGetYACprice();
+
+        sTemp = strprintf( "%0.8lf", dPrice );
+    }
+    catch( std::exception &e )
+    {
+        printf( "%s\n", (string("error: ") + e.what()).c_str() );
+        sTemp = "";
+    }
+    return sTemp;
+}
+
 #ifdef WIN32
+    #ifdef _MSC_VER
+bool 
+    isThisInGMT( time_t & tBlock, struct tm  &aTimeStruct )
+{
+    bool
+        fIsGMT = true;  // the least of all evils
+
+    struct tm
+        gmTimeStruct;
+
+    if( !_localtime64_s( &aTimeStruct, &tBlock ) )   // OK
+    {   
+        // are we in GMT?      to          from
+        if( !_gmtime64_s( &gmTimeStruct, &tBlock ) )   // OK we can compare
+        {
+            if( 
+               // tBlock != _mkgmtime( &aTimeStruct ) 
+               ( (aTimeStruct).tm_hour != (gmTimeStruct).tm_hour ) ||  // .tm_hour && .tm_mday
+               ( (aTimeStruct).tm_mday != (gmTimeStruct).tm_mday )     // .tm_hour && .tm_mday
+              )
+                fIsGMT = false;
+          //else    // we are in GMT to begin with
+        }
+      //else    // _gmtime64_s() errored
+    }
+    //else //_localtime64_s() errored     
+    return fIsGMT;
+}
+    #endif
+
 Value getcurrentblockandtime(const Array& params, bool fHelp)
 {
     if (
@@ -130,19 +335,25 @@ Value getcurrentblockandtime(const Array& params, bool fHelp)
 
     block.ReadFromDisk(pbi);
 
-#ifdef _MSC_VER
     struct tm
-        aTimeStruct,
-        gmTimeStruct;
-    char 
-        buff[30];
-    bool
-        fIsGMT = true;  // the least of all evils
+        aTimeStruct;
+
     time_t 
         tBlock = block.GetBlockTime();
-                        //    to         from
+
+    #ifdef _MSC_VER
+    char 
+        buff[30];
+
+    bool
+        fIsGMT = true;  // the least of all evils
+    fIsGMT = isThisInGMT( tBlock, aTimeStruct );
+/**************    
+    struct tm
+        gmTimeStruct;
     if( !_localtime64_s( &aTimeStruct, &tBlock ) )   // OK
-    {   // are we in GMT?      to          from
+    {   
+        // are we in GMT?      to          from
         if( !_gmtime64_s( &gmTimeStruct, &tBlock ) )   // OK we can compare
         {
             if( 
@@ -155,18 +366,16 @@ Value getcurrentblockandtime(const Array& params, bool fHelp)
         }
       //else    // _gmtime64_s() errored
     }
-  //else //_localtime64_s() errored     
-#else
+    //else //_localtime64_s() errored     
+**********************/
+    #else
     struct tm
-        aTimeStruct,
         *paTimeStruct,
         *pgmTimeStruct;
     char 
         *pbuff;
     bool
         fIsGMT = true;  // the least of all evils
-    time_t 
-        tBlock = block.GetBlockTime();
     std::string
         strS;
 
@@ -193,7 +402,7 @@ Value getcurrentblockandtime(const Array& params, bool fHelp)
         fIsGMT = false;
         return strS;
     }
-#endif
+    #endif
     if( fIsGMT )// for GMT or having errored trying to convert from GMT
     {
         std::string
@@ -210,7 +419,7 @@ Value getcurrentblockandtime(const Array& params, bool fHelp)
         return strS;
     }    
     // let's cook up local time
-#ifdef _MSC_VER
+    #ifdef _MSC_VER
     asctime_s( buff, sizeof(buff), &aTimeStruct );
     buff[ 24 ] = '\0';      // let's wipe out the \n
     printf( //"Local Time: "
@@ -232,7 +441,7 @@ Value getcurrentblockandtime(const Array& params, bool fHelp)
                          , 
                          buff
                         );
-#else
+    #else
     pbuff = asctime( &aTimeStruct );
     if( '\n' == pbuff[ 24 ] )
         pbuff[ 24 ] = '\0';
@@ -241,7 +450,6 @@ Value getcurrentblockandtime(const Array& params, bool fHelp)
             "\n"
             ""
             , pbuff );
-
     strS = strprintf(
                      "%d %s (local %s)"
                      "\n"
@@ -254,7 +462,7 @@ Value getcurrentblockandtime(const Array& params, bool fHelp)
                      , 
                      pbuff
                     );
-#endif
+    #endif
     return strS;
 }
 #endif
@@ -279,10 +487,10 @@ Value settxfee(const Array& params, bool fHelp)
     if (fHelp || params.size() < 1 || params.size() > 1 || AmountFromValue(params[0]) < MIN_TX_FEE)
         throw runtime_error(
             "settxfee <amount>\n"
-            "<amount> is a real and is rounded to the nearest 0.01");
+            "<amount> is a real and is rounded to the nearest " + FormatMoney(MIN_TX_FEE));
 
     nTransactionFee = AmountFromValue(params[0]);
-    nTransactionFee = (nTransactionFee / CENT) * CENT;  // round to cent
+    nTransactionFee = (nTransactionFee / MIN_TX_FEE) * MIN_TX_FEE;  // round to minimum fee
 
     return true;
 }
@@ -316,7 +524,7 @@ Value getblockhash(const Array& params, bool fHelp)
         throw runtime_error("Block number out of range.");
 
     CBlockIndex* pblockindex = FindBlockByHeight(nHeight);
-    return pblockindex->GetHash().GetHex();
+    return pblockindex->phashBlock->GetHex();
 }
 
 Value getblock(const Array& params, bool fHelp)
@@ -344,7 +552,7 @@ Value getblockbynumber(const Array& params, bool fHelp)
 {
     if (fHelp || params.size() < 1 || params.size() > 2)
         throw runtime_error(
-            "getblock <number> [txinfo]\n"
+            "getblockbynumber <number> [txinfo]\n"
             "txinfo optional to print more detailed tx info\n"
             "Returns details of a block with given block-number.");
 
@@ -357,7 +565,7 @@ Value getblockbynumber(const Array& params, bool fHelp)
     while (pblockindex->nHeight > nHeight)
         pblockindex = pblockindex->pprev;
 
-    uint256 hash = pblockindex->GetHash();
+    uint256 hash = *pblockindex->phashBlock;
 
     pblockindex = mapBlockIndex[hash];
     block.ReadFromDisk(pblockindex, true);
@@ -365,7 +573,7 @@ Value getblockbynumber(const Array& params, bool fHelp)
     return blockToJSON(block, pblockindex, params.size() > 1 ? params[1].get_bool() : false);
 }
 
-// ppcoin: get information of sync-checkpoint
+// get information of sync-checkpoint
 Value getcheckpoint(const Array& params, bool fHelp)
 {
     if (fHelp || params.size() != 0)
@@ -377,9 +585,41 @@ Value getcheckpoint(const Array& params, bool fHelp)
     CBlockIndex* pindexCheckpoint;
 
     result.push_back(Pair("synccheckpoint", Checkpoints::hashSyncCheckpoint.ToString().c_str()));
-    pindexCheckpoint = mapBlockIndex[Checkpoints::hashSyncCheckpoint];        
+    pindexCheckpoint = mapBlockIndex[Checkpoints::hashSyncCheckpoint];
     result.push_back(Pair("height", pindexCheckpoint->nHeight));
     result.push_back(Pair("timestamp", DateTimeStrFormat(pindexCheckpoint->GetBlockTime()).c_str()));
+
+    if (Checkpoints::checkpointMessage.vchSig.size() != 0)
+    {
+        Object msgdata;
+        CUnsignedSyncCheckpoint checkpoint;
+
+        CDataStream sMsg(Checkpoints::checkpointMessage.vchMsg, SER_NETWORK, PROTOCOL_VERSION);
+        sMsg >> checkpoint;
+
+        Object parsed; // message version and data (block hash)
+        parsed.push_back(Pair("version", checkpoint.nVersion));
+        parsed.push_back(Pair("hash", checkpoint.hashCheckpoint.GetHex().c_str()));
+        msgdata.push_back(Pair("parsed", parsed));
+
+        Object raw; // raw checkpoint message data
+        raw.push_back(Pair("data", HexStr(Checkpoints::checkpointMessage.vchMsg).c_str()));
+        raw.push_back(Pair("signature", HexStr(Checkpoints::checkpointMessage.vchSig).c_str()));
+        msgdata.push_back(Pair("raw", raw));
+
+        result.push_back(Pair("data", msgdata));
+    }
+
+    // Check that the block satisfies synchronized checkpoint
+    if (CheckpointsMode == Checkpoints::STRICT_)
+        result.push_back(Pair("policy", "strict"));
+
+    if (CheckpointsMode == Checkpoints::ADVISORY)
+        result.push_back(Pair("policy", "advisory"));
+
+    if (CheckpointsMode == Checkpoints::PERMISSIVE)
+        result.push_back(Pair("policy", "permissive"));
+
     if (mapArgs.count("-checkpointkey"))
         result.push_back(Pair("checkpointmaster", true));
 

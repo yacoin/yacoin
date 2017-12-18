@@ -1,75 +1,45 @@
 #include "aboutdialog.h"
 #include "ui_aboutdialog.h"
+
+#include "dialogwindowflags.h"
+
 #include "clientmodel.h"
 
 #include "version.h"
 
-#include "db.h"
-#include <boost/version.hpp> 
-#include <openssl/crypto.h>
+#include <QKeyEvent>
 
 AboutDialog::AboutDialog(QWidget *parent) :
-    QDialog(parent),
+    QWidget(parent, DIALOGWINDOWHINTS),
     ui(new Ui::AboutDialog)
 {
     ui->setupUi(this);
+#ifdef WIN32
+    const char *pC = __DATE__; //"mmm dd yyyy"
+    ui->copyrightLabel->setText(
+        //Copyright © 2009-2015 The Bitcoin developers
+        //Copyright © 2011-2012 The PPCoin Developers
+        //Copyright © 2014 The Peerunity Developers
+        //Copyright © 2014 The EmerCoin Developers
+        //Copyright © 2012-2015 The NovaCoin developers
+        //Copyright © 2013-2015 The Yacoin developers
+
+                                tr("Copyright") + QString(" &copy; 2009-2014 ") + tr("The Bitcoin developers,") + "<br \\>" +
+                                tr("Copyright") + QString(" &copy; 2011-2012 ") + tr("The PPCoin developers,") + "<br \\>" +
+                                tr("Copyright") + QString(" &copy; 2014 ") + tr("The Peerunity developers,") + "<br \\>" +
+                                tr("Copyright") + QString(" &copy; 2014 ") + tr("The EmerCoin developers,") + "<br \\>" +
+                                tr("Copyright") + QString(" &copy; 2012-2015 ") + tr("The NovaCoin developers,") + "<br \\>" +
+                                tr("Copyright") + QString(" &copy; 2013-<b>%1</b> ").arg( &pC[ 7 ] ) + tr("The YACoin developers.") 
+                               );
+#else
+#endif
 }
 
 void AboutDialog::setModel(ClientModel *model)
 {
     if(model)
     {
-        int
-            nBdbMajor,
-            nBdbMinor,
-            nBdbPatch;
-
-        (void)db_version( &nBdbMajor, &nBdbMinor, &nBdbPatch );
-        std::string
-            sOpenSSLVersion = "",
-            sBdbVersion = "",
-            sBoostVersion = "",
-            sBoostWin = "";
-
-        sOpenSSLVersion = strprintf("&nbsp;&nbsp;&nbsp;&nbsp;"
-                                    //"&nbsp;&nbsp;"
-                                    "(<b>OpenSSL</b> %s"
-                                    "",
-                                    SSLeay_version(SSLEAY_VERSION)
-                                   );
-        sBdbVersion = strprintf(    "&nbsp;&nbsp;&nbsp;&nbsp;"
-                                    //"&nbsp;&nbsp;"
-                                    "<b>BerkeleyDB</b> %d.%d.%d"
-                                    "", 
-                                    nBdbMajor,
-                                    nBdbMinor,
-                                    nBdbPatch
-                                   );
-        sBoostVersion = strprintf(  "&nbsp;&nbsp;&nbsp;&nbsp;"
-                                    //"&nbsp;&nbsp;"
-                                    "<b>Boost</b> %d.%d.%d"         // miiill (most, insignificant, least) digits
-                                    "",
-                                    BOOST_VERSION / 100000,
-                                    (BOOST_VERSION / 100) % 1000,
-                                    BOOST_VERSION % 100
-                                     );
-#ifdef BOOST_WINDOWS
-        sBoostWin =          (  "&nbsp;&nbsp;&nbsp;&nbsp;"
-                                //"&nbsp;&nbsp;"
-                                "Windows platform is available to Boost" 
-                             );
-#endif
-        ui->versionLabel->setText(
-                                  model->formatFullVersion() +
-                                  QString::fromStdString(
-                                                        //"(" +
-                                                        sOpenSSLVersion +
-                                                        sBdbVersion +
-                                                        sBoostVersion +
-                                                        sBoostWin +
-                                                        ")"
-                                                         )
-                                 );
+        ui->versionLabel->setText(model->formatFullVersion());
     }
 }
 
@@ -78,7 +48,22 @@ AboutDialog::~AboutDialog()
     delete ui;
 }
 
-void AboutDialog::on_buttonBox_accepted()
+void AboutDialog::keyPressEvent(QKeyEvent *event)
+{
+#ifdef ANDROID
+    if(event->key() == Qt::Key_Back)
+    {
+        close();
+    }
+#else
+    if(event->key() == Qt::Key_Escape)
+    {
+        close();
+    }
+#endif
+}
+
+void AboutDialog::on_pushButton_clicked()
 {
     close();
 }
