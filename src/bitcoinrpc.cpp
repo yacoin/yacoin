@@ -4,32 +4,18 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 #ifdef _MSC_VER
     #include <stdint.h>
-
     #include "msvc_warnings.push.h"
 
     #include "init.h"
-    //#include "util.h"
-    //#include "sync.h"
-    //#include "ui_interface.h"
-    //#include "base58.h"
     #include "bitcoinrpc.h"
-    //#include "db.h"
 
     #undef printf
+
     #include <boost/asio.hpp>
     #include <boost/asio/ip/v6_only.hpp>
-    //#include <boost/bind.hpp>
-    //#include <boost/filesystem.hpp>
-    //#include <boost/foreach.hpp>
-    //#include <boost/iostreams/concepts.hpp>
     #include <boost/iostreams/stream.hpp>
     #include <boost/algorithm/string.hpp>
-    //#include <boost/lexical_cast.hpp>
     #include <boost/asio/ssl.hpp>
-    //#include <boost/filesystem/fstream.hpp>
-    //#include <boost/shared_ptr.hpp>
-    //#include <list>
-
     //#define printf OutputDebugStringF
 #else
 #include "init.h"
@@ -221,9 +207,17 @@ string CRPCTable::help(string strCommand) const
             if (setDone.insert(pfn).second)
                 (*pfn)(params, true);
         }
-        catch (const std::invalid_argument& ia) 
+        catch (const std::exception& e)
+        {   // Help text is returned in an exception
+            string strHelp = string(e.what());
+            if (strCommand == "")
+                if (strHelp.find('\n') != string::npos)
+                    strHelp = strHelp.substr(0, strHelp.find('\n'));
+            strRet += strHelp + "\n";
+        }
+         catch (...) 
         {
-            string strHelp = string( ia.what() );
+            string strHelp = string("Unknown help Error?");
             if ( "" == strCommand )         // just a help w/ no arguments
             {
                 if (strHelp.find('\n') != string::npos) // there is a \n in the message
@@ -231,15 +225,6 @@ string CRPCTable::help(string strCommand) const
                     strHelp = strHelp.substr(0, strHelp.find('\n')); // truncate at that point, why?
                 }
             }
-            strRet += strHelp + "\n";
-        }
-        catch (const std::exception& e)
-        {
-            // Help text is returned in an exception
-            string strHelp = string(e.what());
-            if (strCommand == "")
-                if (strHelp.find('\n') != string::npos)
-                    strHelp = strHelp.substr(0, strHelp.find('\n'));
             strRet += strHelp + "\n";
         }
     }
@@ -295,9 +280,9 @@ static const CRPCCommand vRPCCommands[] =
 #ifdef WIN32
     { "getblockcountt",         &getcurrentblockandtime, true,   false },
 #endif
-#if !defined( QT_GUI )
+//#if !defined( QT_GUI )
     { "getyacprice",            &getYACprice,            true,   false },
-#endif
+//#endif
     { "getconnectioncount",     &getconnectioncount,     true,   false },
     { "getaddrmaninfo",         &getaddrmaninfo,         true,   false },
     { "getpeerinfo",            &getpeerinfo,            true,   false },
@@ -1132,11 +1117,6 @@ void ThreadRPCServer3(void* parg)
             ErrorReply(conn->stream(), objError, jreq.id);
             break;
         }
-        catch (const std::invalid_argument& ia) 
-        {
-            ErrorReply(conn->stream(), JSONRPCError(RPC_PARSE_ERROR, ia.what()), jreq.id);
-            break;
-        }
         catch (std::exception& e)
         {
             ErrorReply(conn->stream(), JSONRPCError(RPC_PARSE_ERROR, e.what()), jreq.id);
@@ -1171,22 +1151,22 @@ json_spirit::Value CRPCTable::execute(const std::string &strMethod, const json_s
         {
             if (pcmd->unlocked)
                 result = pcmd->actor(params, false);
-            else {
-                LOCK2(cs_main, pwalletMain->cs_wallet);
-                result = pcmd->actor(params, false);
+            else 
+            {
+                {
+                    LOCK2(cs_main, pwalletMain->cs_wallet);
+                    result = pcmd->actor(params, false);
+                }
             }
         }
         return result;
-    }
-    catch (std::invalid_argument& ia)
-    {
-        throw JSONRPCError(RPC_MISC_ERROR, ia.what());
     }
     catch (std::exception& e)
     {
         throw JSONRPCError(RPC_MISC_ERROR, e.what());
     }
-    catch (...)    {
+    catch (...)
+    {
         throw JSONRPCError(RPC_MISC_ERROR, "unknown!?");
     }
 }
@@ -1359,56 +1339,62 @@ int CommandLineRPC(int argc, char *argv[])
 
         // Method
         if (argc < 2)
-            throw runtime_error("too few parameters");
+            throw invalid_argument("too few parameters");
         string strMethod = argv[1];
 
         // Parameters default to strings
         std::vector<std::string> strParams(&argv[2], &argv[argc]);
-        Array params = RPCConvertValues(strMethod, strParams);
+        Object reply;
 
-        // Execute
-        Object reply = CallRPC(strMethod, params);
-
-        // Parse reply
-        const Value& result = find_value(reply, "result");
-        const Value& error  = find_value(reply, "error");
-
-        if (error.type() != null_type)
+        try
         {
-            // Error
-            strPrint = "error: " + write_string(error, false);
-            int code = find_value(error.get_obj(), "code").get_int();
-            nRet = abs(code);
-        }
-        else
-        {
-            // Result
-            if (result.type() == null_type)
-                strPrint = "";
-            else if (result.type() == str_type)
-                strPrint = result.get_str();
+            Array params = RPCConvertValues(strMethod, strParams);
+
+            // Execute
+            reply = CallRPC(strMethod, params);
+
+            // Parse reply
+            const Value& result = find_value(reply, "result");
+            const Value& error  = find_value(reply, "error");
+
+            if (error.type() != null_type)
+            {
+                // Error
+                strPrint = "error: " + write_string(error, false);
+                int code = find_value(error.get_obj(), "code").get_int();
+                nRet = abs(code);
+            }
             else
-                strPrint = write_string(result, true);
+            {
+                // Result
+                if (result.type() == null_type)
+                    strPrint = "";
+                else if (result.type() == str_type)
+                    strPrint = result.get_str();
+                else
+                    strPrint = write_string(result, true);
+            }
         }
-    }
-    catch (const std::runtime_error& e) 
-    {
-        strPrint = string("error: ") + e.what();
-        nRet = 85;  //WTFK
-    }
-    catch (const std::invalid_argument& ia) 
-    {
-        strPrint = string("error: ") + ia.what();
-        nRet = 86;  //WTFK
+        catch (std::exception& e)
+        {
+            strPrint = string("error: ") + e.what();
+            nRet = 87;
+        }
+        catch (...)
+        {
+            PrintException(NULL, "CommandLineRPC()");
+            nRet = 88;
+        }
     }
     catch (std::exception& e)
     {
-        strPrint = string("error: ") + e.what();
+        strPrint = string("Exception Error: ") + e.what();
         nRet = 87;
     }
     catch (...)
     {
-        PrintException(NULL, "CommandLineRPC()");
+      //PrintException(NULL, "Unknown CommandLineRPC() Error");
+        strPrint = string("Unknown CommandLineRPC() Error: ");
         nRet = 88;
     }
 

@@ -8,14 +8,33 @@
     #include "msvc_warnings.push.h"
 #endif
 
-#include "irc.h"
-#include "db.h"
-#include "net.h"
-#include "init.h"
-#include "strlcpy.h"
-#include "addrman.h"
-#include "ui_interface.h"
-#include "miner.h"
+#ifndef BITCOIN_IRC_H
+ #include "irc.h"
+#endif
+
+#ifndef BITCOIN_DB_H
+ #include "db.h"
+#endif
+
+#ifndef BITCOIN_INIT_H
+ #include "net.h"
+#endif
+
+#ifndef BITCOIN_INIT_H
+ #include "init.h"
+#endif
+
+#ifndef BITCOIN_STRLCPY_H
+ #include "strlcpy.h"
+#endif
+
+#ifndef _BITCOIN_ADDRMAN
+ #include "addrman.h"
+#endif
+
+#ifndef NOVACOIN_MINER_H
+ #include "miner.h"
+#endif
 
 #include <vector>
 #ifdef WIN32
@@ -2885,7 +2904,8 @@ void StartNode(void* parg)
         printf("Error: NewThread(ThreadStakeMinter) failed\n");
 
     // Generate coins in the background
-    GenerateYacoins(GetBoolArg("-gen", false), pwalletMain);}
+    GenerateYacoins(GetBoolArg("-gen", false), pwalletMain);
+}
 
 bool StopNode()
 {

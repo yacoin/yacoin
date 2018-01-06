@@ -5,10 +5,13 @@
     #include "msvc_warnings.push.h"
 #endif
 
-#include "init.h" // for pwalletMain
-#include "bitcoinrpc.h"
-#include "ui_interface.h"
-#include "base58.h"
+#ifndef BITCOIN_INIT_H
+ #include "init.h" // for pwalletMain
+#endif
+
+#ifndef _BITCOINRPC_H_
+ #include "bitcoinrpc.h"
+#endif
 
 #define printf OutputDebugStringF
 

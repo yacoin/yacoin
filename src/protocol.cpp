@@ -8,11 +8,12 @@
     #include "msvc_warnings.push.h"
 #endif
 
-#include "protocol.h"
-//#include "util.h"
-//#include "netbase.h"
+#ifndef __INCLUDED_PROTOCOL_H__
+ #include "protocol.h"      
+#endif
 
-#include "net.h"    
+#ifndef BITCOIN_NET_H
+ #include "net.h"    
 // to bring in 
 //enum
 //{
@@ -21,6 +22,7 @@
 //    MSG_TYPELIST_LENGTH = 3
 //};
 // and somehow time it to ppszTypeName (below), if only in this comment!!!
+#endif
 
 #ifndef WIN32
 # include <arpa/inet.h>

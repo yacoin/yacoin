@@ -5,11 +5,13 @@
 #ifndef BITCOIN_JUSTINCASE_H
 #define BITCOIN_JUSTINCASE_H
 
-#ifdef _MSC_VER
-    #define __PRETTY_FUNCTION__ __FUNCTION__
-    #ifndef _DEBUG
-        #include <string>
-        extern void releaseModeAssertionfailure( const char* pFileName, const int nL, const std::string strFunctionName );
-    #endif
-#endif
+//    #ifndef _DEBUG
+//        #include <string>
+//        extern void releaseModeAssertionfailure( 
+//                                        const char* pFileName, 
+//                                        const int nL, 
+//                                        const std::string strFunctionName, 
+//                                        const char * booleanExpression 
+//                                               );
+//    #endif
 #endif

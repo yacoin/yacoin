@@ -1,4 +1,3 @@
-
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2012 The Bitcoin developers
 // Distributed under the MIT/X11 software license, see the accompanying
@@ -67,6 +66,7 @@ void LogStackTrace();
 
 /* Format characters for (s)size_t and ptrdiff_t */
 #if defined(_MSC_VER) || defined(__MSVCRT__)
+//#if defined(_MSC_VER)
   /* (s)size_t and ptrdiff_t have the same size specifier in MSVC:
      http://msdn.microsoft.com/en-us/library/tcxf1dw6%28v=vs.100%29.aspx
    */
@@ -90,6 +90,14 @@ void LogStackTrace();
   //#define PRI64x  "I64x"
 #else /* C99 standard */
     // these seem to be missing?
+ #ifdef WIN32
+    #define PRId64  "I64d"
+    #define PRI64d  "I64d"
+    #define PRIu64  "I64u"
+    #define PRI64x  "I64x"
+    #define PRIx64  "I64x"
+    #define PRI64u  "I64u"
+ #else
     #define PRI64d  "lld"
     #define PRI64u  "llu"
     #define PRI64x  "llx"
@@ -97,7 +105,7 @@ void LogStackTrace();
     #define PRId64  "lld"
     #define PRIu64  "llu"
     #define PRIx64  "llx"
-
+ #endif
   #define PRIszx    "zx"
   #define PRIszu    "zu"
   #define PRIszd    "zd"
@@ -507,18 +515,7 @@ public:
     T median() const
     {
         int size = vSorted.size();
-#ifdef _MSC_VER
-        bool
-            fTest = (size > 0);
-    #ifdef _DEBUG
-        assert(fTest);
-    #else
-        if( !fTest )
-            releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
-    #endif
-#else
-        assert(size>0);
-#endif
+        Yassert(size>0);
         if(size & 1) // Odd number of elements
         {
             return vSorted[size/2];

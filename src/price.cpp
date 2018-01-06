@@ -46,22 +46,27 @@ CProvider aBTCtoYACProviders[] =
             nSpecialCharacterOffset,
             DEFAULT_HTTPS_PORT
         },
+        {   //https://yobit.net/api/3/ticker/yac_btc (2)
+            "yobit.net",
+            "last",
+            "/api/3/ticker/yac_btc",
+            nUnusualCharacterOffset,
+            DEFAULT_HTTPS_PORT
+        },
         {   
             "data.bter.com",            // sDomain
             "avg",                     // sPriceRatioKey
             "/api/1/ticker/yac_btc",    // sApi
             nDefaultCharacterOffset,
             DEFAULT_HTTP_PORT
-        }
-        ,
+        },
         {   //api.cryptonator.com/api/ticker/yac-btc
             "api.cryptonator.com", 
             "price", 
             "/api/ticker/yac-btc", 
             nDefaultCharacterOffset,
             DEFAULT_HTTP_PORT            //nHttpsPort
-        }
-        ,
+        },
         {   
             "pubapi2.cryptsy.com",      
             "lasttradeprice",   
@@ -78,16 +83,35 @@ CProvider aCurrencyToBTCProviders[] =
             "/",
             nUnusualCharacterOffset,
             DEFAULT_HTTP_PORT
-        }
-        ,
+        },
+        {   //http://api.coinmarketcap.com/v1/ticker/bitcoin/
+            "api.coinmarketcap.com",
+            "price_usd",
+            "/v1/ticker/bitcoin/",
+            nSpecialCharacterOffset,
+            DEFAULT_HTTPS_PORT
+        },
+        {   //https://yobit.net/api/3/ticker/btc_usd (2)
+            "yobit.net",
+            "last",
+            "/api/3/ticker/btc_usd",
+            nUnusualCharacterOffset,
+            DEFAULT_HTTPS_PORT
+        },
+        {   //https://api.cryptonator.com/api/ticker/btc-usd "price", (3)
+            "api.cryptonator.com", 
+            "price", 
+            "/api/ticker/btc-usd", 
+            nDefaultCharacterOffset,
+            DEFAULT_HTTPS_PORT
+        },
         {   
             "btc.blockr.io",
             "value",
             "/api/v1/coin/info",
             nUnusualCharacterOffset,
             DEFAULT_HTTP_PORT
-        }
-        ,
+        },
         {   
             "pubapi2.cryptsy.com",
             "lastdata",
@@ -293,227 +317,366 @@ void initialize_price_vectors( int & nIndexBtcToYac, int & nIndexUsdToBtc )
 // test of https
 #include <boost/asio.hpp>
 #include <boost/asio/ssl.hpp>
-/*
-#include <iostream>
-#include <istream>
-#include <ostream>
-#include <string>
-*/ 
- 
-class CClient
+//_____________________________________________________________________________
+
+namespace {
+    const int nBufferSize = 0x800;
+}
+class client
 {
 public:
-	CClient(
-			boost::asio::io_service& io_service, 
-			boost::asio::ssl::context& context, 
-			boost::asio::ip::tcp::resolver::iterator endpoint_iterator,
-            const char *pszApi,
-            const string & sDomain
-	      ) : socket_(io_service, context), read_buffer_length( 866 ), sdomain( sDomain )
-
-	{
-        pszapi = pszApi;
-        
-        socket_.set_verify_mode( boost::asio::ssl::context::verify_none );
-		socket_.set_verify_callback( 
-									boost::bind(
-												&CClient::verify_certificate, 
-												this, 
-												_1, 
-												_2
-											   )
-								   );
- 
-	    boost::asio::async_connect(
-								socket_.lowest_layer(), 
-								endpoint_iterator, 
-								boost::bind(
-											&CClient::handle_connect, 
-											this, 
-											boost::asio::placeholders::error
-										   )
-								   );
-	}
- 
-	bool verify_certificate(bool preverified, boost::asio::ssl::verify_context& ctx)
-	{
-		char subject_name[256];
-		X509
-			* cert = X509_STORE_CTX_get_current_cert(ctx.native_handle());
-			
-		X509_NAME_oneline( X509_get_subject_name(cert), subject_name, 256 );
-    
-		std::cout << "Verifying:\n" << subject_name << std::endl;
- 
-		return preverified;
-	}
- 
-	void handle_connect(const boost::system::error_code& error)
-	{
-		if(!error)
-		{
-			std::cout << "Connection OK!" << std::endl;
-			socket_.async_handshake(
-									boost::asio::ssl::stream_base::client, 
-									boost::bind(
-												&CClient::handle_handshake, 
-												this, 
-												boost::asio::placeholders::error
-											   )
-								   );
-		}
-		else
-		{
-			std::cout << "Connect failed: " << error.message() << std::endl;
-		}
-	}
- 
-	void handle_handshake(const boost::system::error_code& error)
-	{
-		if(!error)
-		{
-			std::cout << "Sending request: " << std::endl;
-     
-		std::stringstream request_;
- 
-        //https://api.coinmarketcap.com/v1/ticker/yacoin/
-
-        //request_ << "POST " << rRequest.mcURI << " HTTP/1.1\r\n";
-        //request_ << "Host: " << rRequest.mcHost << "\r\n";
-
-	    request_ << "GET ";
-	  //request_ << "POST ";
-		
-		request_ << pszapi; //"/v1/ticker/yacoin/ ";
-
-		request_ << "HTTP/1.1\r\n";
-		
-		request_ << "Host: ";
-		request_ << (sdomain + "\r\n").c_str() ;    //"api.coinmarketcap.com\r\n";
-		
-		request_ << "Accept-Encoding: application/json\r\n";
-
-        //request_ << "Accept: application/json\r\n";
-        request_ << "Accept: */*\r\n";
-
-        request_ << "Content-Type: application/json; charset=UTF-8\r\n";
-      //request_ << "Content-Type: application/text; charset=UTF-8\r\n";
-
-        request_ << "Connection: close\r\n";
-      //request_ << "Connection: keep-alive\r\n";
-
-		request_ << "\r\n";
- 
-	  //std::cout << request_.str() << std::endl;
-		std::cout << request_.str();
- 
-		boost::asio::async_write(
-								socket_, 
-								boost::asio::buffer(request_.str()), 
-								boost::bind(
-											&CClient::handle_write, 
-											this, 
-											boost::asio::placeholders::error, 
-											boost::asio::placeholders::bytes_transferred
-											)
-								);
-		}
-		else
-		{
-			std::cout << "Handshake failed: " << error.message() << std::endl;
-		}
-	}
- 
-	void handle_write(const boost::system::error_code& error, size_t bytes_transferred)
-	{
-		if (!error)
-		{
-			std::cout << "Sending request OK!" << std::endl;
-            //Sleep( 2 * nMillisecondsPerSecond );
-			boost::asio::async_read(
-									socket_, 
-									boost::asio::buffer(
-														reply_, 
-														read_buffer_length //685   //bytes_transferred bullshit
-                                                       ), 
-									boost::bind(
-												&CClient::handle_read, 
-												this, 
-												boost::asio::placeholders::error
-                                                , boost::asio::placeholders::bytes_transferred
-											   )
-							       );
-		}
-		else
-		{
-			std::cout << "Write failed: " << error.message() << std::endl;
-		}
-	}
- 
-	void handle_read(const boost::system::error_code& error, size_t bytes_transferred)
-	{
-		if (!error)
-		{
-			std::cout << "Reply: ";
-			std::cout.write(reply_, bytes_transferred);
-			std::cout << std::endl;
-			std::cout << "Reply done";
-		  std::cout << ", count ";
-		  std::cout << bytes_transferred;
-			std::cout << std::endl;
-		}
-		else
-		{
-			std::cout << "Read failed: " << error.message() << std::endl;
-		}
-	}
- 
-private:
-	boost::asio::ssl::stream<boost::asio::ip::tcp::socket> socket_;
-	char reply_[0x1 << 16];
-    const size_t read_buffer_length;
-    const char *pszapi;
-    const string & sdomain;
-
-};
-#ifdef _DEBUG
-/*********************
-//int main(int argc, char* argv[])
-{
-	try
-	{
-		boost::asio::io_service io_service;
- 
-		boost::asio::ip::tcp::resolver resolver( io_service );
-		boost::asio::ip::tcp::resolver::query query( 
-                                                    "api.coinmarketcap.com",
-													"443"
-												   );
-		boost::asio::ip::tcp::resolver::iterator iterator = resolver.resolve(query);
- 
-		boost::asio::ssl::context context(boost::asio::ssl::context::sslv23);
-	  //context.load_verify_file( "key.pem" );
-		context.load_verify_file( "server.pem" );
- 
-		CClient c(io_service, context, iterator);
- 
-		io_service.run();
-	}
-	catch (std::exception& e)
-	{
-		std::cerr << "Exception: " << e.what() << "\n";
-		std::cout << "Exception: " << e.what() << "\n";
-	}
- 
+    client(
+            boost::asio::io_service& io_service, 
+            boost::asio::ssl::context& context, 
+            boost::asio::ip::tcp::resolver::iterator endpoint_iterator
+            , const char *pszHostParameter
+            , const char *pszArgParameter
+          ) : socket_(io_service, context), pszHost( pszHostParameter ), pszArg( pszArgParameter )
     {
-	    //std::cin.get();
-        //// for test purposes
-//        printf("Shutdown requested. Exiting.\n");
-//        return false;
+        reply_[ 0 ] = '\0';
+        socket_.set_verify_mode( boost::asio::ssl::context::verify_none );
+        socket_.set_verify_callback( 
+                                    boost::bind( 
+                                                &client::verify_certificate, 
+                                                this, 
+                                                _1, 
+                                                _2 
+                                               ) 
+                                   );
+
+        boost::asio::async_connect( 
+                                    socket_.lowest_layer(), 
+                                    endpoint_iterator, 
+                                    boost::bind(
+                                                &client::handle_connect, 
+                                                this, 
+                                                boost::asio::placeholders::error
+                                               )
+                                  );
+    }
+  
+    bool verify_certificate(bool preverified, boost::asio::ssl::verify_context& ctx)
+    {
+        char 
+            subject_name[256];
+
+        X509 *cert = X509_STORE_CTX_get_current_cert( ctx.native_handle() );
+        X509_NAME_oneline( X509_get_subject_name( cert ), subject_name, 256 );
+        std::cout << "Verifying:\n" << subject_name << std::endl;
+
+        return preverified;
+    }
+
+    void handle_connect( const boost::system::error_code& error )
+    {
+        if( !error )
+        {
+            std::cout << "Connection OK!" << std::endl;
+            socket_.async_handshake(
+                                    boost::asio::ssl::stream_base::client, 
+                                    boost::bind(
+                                                &client::handle_handshake, 
+                                                this, 
+                                                boost::asio::placeholders::error
+                                               )
+                                   );
+        }
+        else
+        {
+            std::cout << "Connect failed: " << error.message() << std::endl;
+        }
+    }
+
+    void handle_handshake( const boost::system::error_code& error )
+    {
+        if(!error)
+        {
+            std::cout << "Sending request: " << std::endl;
+      
+            std::stringstream request_;
+
+            request_ << "GET ";
+            request_ << pszArg;
+            request_ << " HTTP/1.1\r\n";
+
+            request_ << "Host: ";
+            request_ << pszHost;
+            request_ << "\r\n";
+
+    		request_ << "Accept-Encoding: application/json\r\n";
+            request_ << "Accept-Encoding: */*\r\n";
+            request_ << "Content-Type: application/json; charset=UTF-8\r\n";
+            request_ << "Connection: close\r\n";
+          //  request_ << "Connection: keep-alive\r\n";
+
+            request_ << "\r\n";
+            std::cout << request_.str();
+
+            boost::asio::async_write(
+                                    socket_, 
+                                    boost::asio::buffer( request_.str() ), 
+                                    boost::bind(
+                                                &client::handle_write, 
+                                                this, 
+                                                boost::asio::placeholders::error, 
+                                                boost::asio::placeholders::bytes_transferred
+                                               )
+                                    );
+        }
+        else
+        {
+            std::cout << "Handshake failed: " << error.message() << std::endl;
+        }
+    }
+
+    void handle_write( 
+                        const boost::system::error_code& error, 
+                        size_t bytes_transferred
+                     )
+    {
+        if (!error)
+        {
+            std::cout << "Sending request OK!" << std::endl;
+            boost::asio::async_read(
+                                    socket_, 
+                                    boost::asio::buffer(
+                                                        reply_, 
+                                                        nBufferSize - 1
+                                                       ), 
+                                    boost::bind(
+                                                &client::handle_read, 
+                                                this, 
+                                                boost::asio::placeholders::error, 
+                                                boost::asio::placeholders::bytes_transferred
+                                               )
+                                   );
+        }
+        else
+        {
+            std::cout << "Write failed: " << error.message() << std::endl;
+        }
+    }
+
+    void handle_read(
+                    const boost::system::error_code& error, 
+                    size_t bytes_transferred
+                    )
+    {
+        if( (0 < bytes_transferred) && (bytes_transferred < (nBufferSize - 1) ) )
+            reply_[ bytes_transferred ] = '\0';
+        if (
+            (!error) ||
+            ("short read" == error.message())
+           )
+        {
+            std::cout << "Reply: ";
+            std::cout.write( reply_, bytes_transferred );
+            std::cout << "\n";
+        }
+        else
+        {
+            std::cout << "Read failed: " << error.message() << std::endl;
+            reply_[ 0 ] = '\0';
+        }
+    }
+    string get_reply()
+    {
+        char
+            *cp = &reply_[ 0 ];
+        string
+            s( cp );
+
+        return s;
+    }
+
+private:
+    boost::asio::ssl::stream<boost::asio::ip::tcp::socket> socket_;
+    const char 
+        *pszHost;
+    const char 
+        *pszArg;
+    char 
+      //reply_[ 0x1 << 16 ];    // a big buffer!!
+        reply_[ nBufferSize ];    // 2k, a less big buffer!!
+};
+//_____________________________________________________________________________
+
+static bool parseAline( string &s, string & strLine, unsigned int &i )
+{
+    char 
+        c;
+    int
+        nBytes;
+    const unsigned int
+        nLength = s.length();
+
+    for (; i < nLength; ++i)
+    {
+        char 
+            c;
+        c = s.at(i);
+        strLine += c;
+        if( '\n' == c )  // the signal for a line received
+        {
+            ++i;
+            break;
+        }
+        else
+        {
+            if (!strLine.empty() )
+                continue;
+            else   // done
+                return false;
+        }
+    }
+    return true;
+}
+//_____________________________________________________________________________
+static void 
+    client2_test( 
+                 string &s 
+                 , const char *pszApi = "/v1/ticker/yacoin/"
+                 , const string & sDomain = "api.coinmarketcap.com"
+                 , const int nPort = 443
+                )
+{
+    const char
+        *sHost,
+        *sArg;
+    const char 
+        *pszPort = "443";
+
+    sHost = sDomain.c_str();    //"api.coinmarketcap.com";
+    sArg = pszApi;  //"/v1/ticker/yacoin/";
+    try
+    {
+        boost::asio::io_service io_service;
+
+        boost::asio::ip::tcp::resolver resolver(io_service);
+        boost::asio::ip::tcp::resolver::query query( sHost, pszPort );
+        boost::asio::ip::tcp::resolver::iterator iterator = resolver.resolve(query);
+
+        boost::asio::ssl::context context(boost::asio::ssl::context::sslv23);
+        context.load_verify_file( "server.pem" );
+
+        client c(io_service, context, iterator, sHost, sArg);
+
+        io_service.run();
+        s = c.get_reply();
+    }
+    catch (std::exception& e)
+    {
+        std::cerr << "Exception: " << e.what() << "\n";
     }
 }
-*****************/
-#endif
+//_____________________________________________________________________________
+
+//void
+//    do_https_test( 
+//                  void
+//                 )
+//{
+//    string
+//        s = "";
+//    client2_test( s );
+//    if( "" == s )   // failure
+//        return;
+//    //else  work on s
+//}
+//_____________________________________________________________________________
+
+static void
+    do_https_api_call(
+                        string &strBuffer
+                      , double &dPrice
+                      , const string & sDomain = "api.coinmarketcap.com"
+                      , const string & skey = "price_btc"
+                      , const int & nOffset = 4
+                      , const int nPort = 443
+                      , const char *pszApi = "/v1/ticker/yacoin/"
+                     )
+{
+//#ifdef _DEBUG
+    string
+        s = "";
+    client2_test( 
+                 s
+                 , pszApi
+                 , sDomain
+                 , nPort
+                );
+    if( "" == s )   // failure
+        return;
+    //else  work on s
+    try
+    {
+        string
+            strLine = "",
+            &strLineResponse = strLine;
+
+        bool 
+            fLineOK = false;
+
+        unsigned int
+            count = 0,
+            &nCounter = count;
+        do
+        {
+            fLineOK = parseAline( s, strLineResponse, nCounter );
+            if (fShutdown)
+            {
+                return;
+            }
+            if (fLineOK)
+            {
+                strBuffer += strLineResponse;
+                if( string::npos != strLineResponse.find( skey, 0 ) )
+                {
+                    if(
+                        ("" == skey)
+                        ||
+                        string::npos != strLineResponse.find( skey, 0 ) 
+                      ) 
+                    {
+                        string
+                            sTemp;
+
+                        if("" != skey)
+                        {
+                            if(
+                                ("USD" == skey)
+                                ||
+                                ("value" == skey)
+                              )
+                                sTemp = strLineResponse.substr( strLine.find( skey, 0 ) + skey.size() + nOffset);
+                            else
+                                sTemp = strLineResponse.substr( strLine.find( skey, 0 ) + skey.size() + nOffset);
+                        }
+                        else
+                            sTemp = strLineResponse;
+
+                        double 
+                            dTemp;
+
+                        if (1 == sscanf( sTemp.c_str(), "%lf", &dTemp ) )
+                        {
+                            dPrice = dTemp;     // just so I can debug.  A good compiler 
+                                                // can optimize this dTemp out!
+                            break;
+                        }
+                    }
+                }
+            }
+            strLineResponse = "";
+        }   
+        while( fLineOK );
+    }
+    catch( std::exception &e )
+    {
+        printf( "%s\n", (string("error: ") + e.what()).c_str() );
+    }
+//#endif
+}
 // end of test
 
 
@@ -684,41 +847,21 @@ static bool GetMyExternalWebPage(
 
         if (DEFAULT_HTTPS_PORT == nPort)
         {
-        	try
-        	{
-        	    boost::asio::io_service io_service;
- 
-    	        boost::asio::ip::tcp::resolver resolver( io_service );
-        		boost::asio::ip::tcp::resolver::query query( 
-                                                        sDomain.c_str(),    //"api.coinmarketcap.com",
-		    											strprintf( "\"%d\"", (int)DEFAULT_HTTPS_PORT ).c_str()  //"443"
-		        										   );
-        		boost::asio::ip::tcp::resolver::iterator iterator = resolver.resolve(query);
- 
-	            boost::asio::ssl::context context(boost::asio::ssl::context::sslv23);
-        	  //context.load_verify_file( "key.pem" );
-		        context.load_verify_file( "server.pem" );
- 
-        	    CClient c(io_service, context, iterator, pszApi, sDomain);
- 
-    	        io_service.run();
-                // we should parse the result here and set dPrice & return true
-                // else on error return false
-        	}
-        	catch (std::exception& e)
-            {
-		        std::cerr << "Exception: " << e.what() << "\n";
-        	    std::cout << "Exception: " << e.what() << "\n";
-                return false;
-            }
-            // we should exit here
+            do_https_api_call(
+                                strBuffer, 
+                                dPrice,
+                                sDomain,
+                                skey,
+                                nOffset,
+                                DEFAULT_HTTPS_PORT,
+                                pszApi
+                             );
             if( dPrice > 0.0 )
-            {
                 return true;
-            }
             else
                 return false;
         }
+        //else regular http
 #ifdef _MSC_VER
         SOCKET 
             hSocket = NULL;
@@ -734,10 +877,7 @@ static bool GetMyExternalWebPage(
                                       sDomain,
                                       nPort
                                      );
-            if (
-                (!hSocket) &&
-                (DEFAULT_HTTPS_PORT != nPort)
-               )
+            if (!hSocket) 
             {
                 return false;
             }

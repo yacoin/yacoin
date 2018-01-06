@@ -13,10 +13,6 @@
  #include "txdb.h"
 #endif
 
-#ifndef BITCOIN_WALLETDB_H
- #include "walletdb.h"
-#endif
-
 #ifndef _BITCOINRPC_H_
  #include "bitcoinrpc.h"
 #endif
@@ -455,6 +451,8 @@ std::string HelpMessage()
 
     return strUsage;
 }
+
+//_____________________________________________________________________________
 
 /** Initialize bitcoin.
  *  @pre Parameters should be parsed and config file should be read.
@@ -1072,6 +1070,13 @@ bool AppInit2()
     BOOST_FOREACH(string strDest, mapMultiArgs["-seednode"])
         AddOneShot(strDest);
 
+//test for https, before loading block index, so as to test with fast turn around
+// until done, then remove
+//#ifdef _DEBUG
+//    do_https_test();
+//#endif
+    //fRequestShutdown = true;
+
     // ********************************************************* Step 7: load blockchain
 
     if (!bitdb.Open(GetDataDir()))
@@ -1350,6 +1355,7 @@ bool AppInit2()
     if (!strErrors.str().empty())
         return InitError(strErrors.str());
 
+    //Yassert( false );   //test
 #ifdef _MSC_VER
     #ifdef _DEBUG
         printf("\a" );    // just to call me back after a long debug startup!

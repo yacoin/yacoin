@@ -5,15 +5,19 @@
     #include <stdint.h>
 
     #include "msvc_warnings.push.h"
-    #include "JustInCase.h"
 #endif
 
-#include "bitcoinrpc.h"
-#include "alert.h"
-#include "wallet.h"
-#include "db.h"
-#include "walletdb.h"
-#include "net.h"
+#ifndef _BITCOINRPC_H_
+ #include "bitcoinrpc.h"
+#endif
+
+#ifndef _BITCOINALERT_H_
+ #include "alert.h"
+#endif
+
+#ifndef BITCOIN_WALLET_H
+ #include "wallet.h"
+#endif
 
 using namespace json_spirit;
 

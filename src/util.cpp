@@ -6,11 +6,22 @@
     #include "msvc_warnings.push.h"
 #endif
 
-#include "util.h"
-#include "sync.h"
-#include "strlcpy.h"
-#include "version.h"
-#include "ui_interface.h"
+#ifndef BITCOIN_UTIL_H
+ #include "util.h"
+#endif
+
+#ifndef BITCOIN_SYNC_H
+ #include "sync.h"
+#endif
+
+#ifndef BITCOIN_STRLCPY_H
+ #include "strlcpy.h"
+#endif
+
+#ifndef BITCOIN_UI_INTERFACE_H
+ #include "ui_interface.h"
+#endif
+
 #include <boost/algorithm/string/join.hpp>
 
 // Work around clang compilation problem in Boost 1.46:
@@ -35,12 +46,15 @@ namespace boost {
 #include <openssl/rand.h>
 
 #ifdef WIN32
-#ifdef _MSC_VER
-#pragma warning(disable:4786)
-#pragma warning(disable:4804)
-#pragma warning(disable:4805)
-#pragma warning(disable:4717)
-#endif
+ #ifdef _MSC_VER
+ #pragma warning(disable:4786)
+ #pragma warning(disable:4804)
+ #pragma warning(disable:4805)
+ #pragma warning(disable:4717)
+ #else
+ //#include "stdio.h"
+ //#include "string.h"
+ #endif
 #ifdef _WIN32_WINNT
 #undef _WIN32_WINNT
 #endif
@@ -574,11 +588,11 @@ void ParseParameters(int argc, const char* const argv[])
             pszValue = strchr(psz, '=');
             *pszValue++ = '\0';
         }
-        #ifdef WIN32
+#ifdef WIN32
         _strlwr(psz);
         if (psz[0] == '/')
             psz[0] = '-';
-        #endif
+#endif
 #ifdef _MSC_VER
         if ('-' != psz[0])  // how about this instead
             continue;

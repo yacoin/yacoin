@@ -69,19 +69,30 @@ scrypt_power_on_self_test(void) {
 		res &= ~2;
 	}
 
-	for (i = 0, scrypt_valid = 1; post_settings[i].pw; i++) {
+	for (i = 0, scrypt_valid = 1; post_settings[i].pw; ++i)
+    {
 		t = post_settings + i;
-		scrypt((uint8_t *)t->pw, strlen(t->pw), (uint8_t *)t->salt, strlen(t->salt), t->Nfactor, t->rfactor, t->pfactor, test_digest, sizeof(test_digest));
+		scrypt(
+               (uint8_t *)t->pw, 
+               strlen(t->pw), 
+               (uint8_t *)t->salt, 
+               strlen(t->salt), 
+               t->Nfactor, 
+               t->rfactor, 
+               t->pfactor, 
+               test_digest, 
+               sizeof(test_digest)
+              );
 		scrypt_valid &= scrypt_verify(post_vectors[i], test_digest, sizeof(test_digest));
 	}
 	
-	if (!scrypt_valid) {
+	if (!scrypt_valid) 
+    {
 #if !defined(SCRYPT_TEST)
 		scrypt_fatal_error("scrypt: scrypt power-on-self-test failed");
 #endif
 		res &= ~4;
 	}
-
 	return res;
 }
 
@@ -115,10 +126,14 @@ scrypt_free(scrypt_aligned_alloc *aa) {
 }
 #else
 static scrypt_aligned_alloc
-scrypt_alloc(uint64_t size) {
-	static const size_t max_alloc = (size_t)-1;
-	scrypt_aligned_alloc aa;
-	size += (SCRYPT_BLOCK_BYTES - 1);
+scrypt_alloc(uint64_t size) 
+{
+	static const size_t 
+        max_alloc = (size_t)-1;
+	scrypt_aligned_alloc 
+        aa;
+
+    size += (SCRYPT_BLOCK_BYTES - 1);
 	if (size > max_alloc)
 		scrypt_fatal_error("scrypt: not enough address space on this CPU to allocate required memory");
 	aa.mem = (uint8_t *)malloc((size_t)size);
@@ -129,17 +144,38 @@ scrypt_alloc(uint64_t size) {
 }
 
 static void
-scrypt_free(scrypt_aligned_alloc *aa) {
+scrypt_free(scrypt_aligned_alloc *aa) 
+{
 	free(aa->mem);
 }
 #endif
 
 
 void
-scrypt(const uint8_t *password, size_t password_len, const uint8_t *salt, size_t salt_len, uint8_t Nfactor, uint8_t rfactor, uint8_t pfactor, uint8_t *out, size_t bytes) {
-	scrypt_aligned_alloc YX, V;
-	uint8_t *X, *Y;
-	uint32_t N, r, p, chunk_bytes, i;
+scrypt(
+       const uint8_t *password, 
+       size_t password_len, 
+       const uint8_t *salt, 
+       size_t salt_len, 
+       uint8_t Nfactor, 
+       uint8_t rfactor, 
+       uint8_t pfactor, 
+       uint8_t *out, 
+       size_t bytes
+      ) 
+{
+	scrypt_aligned_alloc 
+        YX, 
+        V;
+	uint8_t 
+        *X, 
+        *Y;
+	uint32_t 
+        N, 
+        r, 
+        p, 
+        chunk_bytes, 
+        i;
 
 #if !defined(SCRYPT_CHOOSE_COMPILETIME)
 	scrypt_ROMixfn scrypt_ROMix = scrypt_getROMix();
@@ -147,7 +183,8 @@ scrypt(const uint8_t *password, size_t password_len, const uint8_t *salt, size_t
 
 #if !defined(SCRYPT_TEST)
 	static int power_on_self_test = 0;
-	if (!power_on_self_test) {
+	if (!power_on_self_test) 
+    {
 		power_on_self_test = 1;
 		if (!scrypt_power_on_self_test())
 			scrypt_fatal_error("scrypt: power on self test failed");
@@ -166,7 +203,7 @@ scrypt(const uint8_t *password, size_t password_len, const uint8_t *salt, size_t
 	p = (1 << pfactor);
 
 	chunk_bytes = SCRYPT_BLOCK_BYTES * r * 2;
-	V = scrypt_alloc((uint64_t)N * chunk_bytes);
+    V = scrypt_alloc((uint64_t)N * chunk_bytes);
 	YX = scrypt_alloc((p + 1) * chunk_bytes);
 
 	/* 1: X = PBKDF2(password, salt) */
@@ -175,16 +212,24 @@ scrypt(const uint8_t *password, size_t password_len, const uint8_t *salt, size_t
 	scrypt_pbkdf2(password, password_len, salt, salt_len, 1, X, chunk_bytes * p);
 
 	/* 2: X = ROMix(X) */
-	for (i = 0; i < p; i++)
-		scrypt_ROMix((scrypt_mix_word_t *)(X + (chunk_bytes * i)), (scrypt_mix_word_t *)Y, (scrypt_mix_word_t *)V.ptr, N, r);
+	for (i = 0; i < p; ++i)
+    {
+		scrypt_ROMix(
+                     (scrypt_mix_word_t *)(X + (chunk_bytes * i)), 
+                     (scrypt_mix_word_t *)Y, 
+                     (scrypt_mix_word_t *)V.ptr, 
+                     N, 
+                     r
+                    );
+    }
 
 	/* 3: Out = PBKDF2(password, X) */
 	scrypt_pbkdf2(password, password_len, X, chunk_bytes * p, 1, out, bytes);
 
 	scrypt_ensure_zero(YX.ptr, (p + 1) * chunk_bytes);
 
-	scrypt_free(&V);
 	scrypt_free(&YX);
+	scrypt_free(&V);
 }
 #if defined( _WINDOWS )
 #if !defined( QT_GUI )

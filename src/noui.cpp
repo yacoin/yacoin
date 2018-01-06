@@ -8,11 +8,11 @@
     #include "msvc_warnings.push.h"
 #endif
 
-#include "ui_interface.h"
-#include "init.h"
-#include "bitcoinrpc.h"
-
 #include <string>
+
+#ifndef BITCOIN_UI_INTERFACE_H
+ #include "ui_interface.h"
+#endif
 
 static int noui_ThreadSafeMessageBox(const std::string& message, const std::string& caption, int style)
 {

@@ -5,14 +5,21 @@
     #include <stdint.h>
 
     #include "msvc_warnings.push.h"
-    #include "JustInCase.h"
 #endif
 
 #include <boost/assign/list_of.hpp>
 
-#include "kernel.h"
-#include "txdb.h"
-#include "timestamps.h"
+#ifndef PPCOIN_KERNEL_H
+ #include "kernel.h"
+#endif
+
+#ifndef BITCOIN_TXDB_H
+ #include "txdb.h"
+#endif
+
+#ifndef BITCOIN_TIMESTAMPS_H
+ #include "timestamps.h"
+#endif
 
 using std::min;
 using std::vector;
@@ -100,18 +107,7 @@ static bool GetLastStakeModifier(const CBlockIndex* pindex, uint64_t& nStakeModi
 // Get selection interval section (in seconds)
 static int64_t GetStakeModifierSelectionIntervalSection(int nSection)
 {
-#ifdef _MSC_VER
-    bool
-        fTest = ((nSection >= 0) && (nSection < 64));
-    #ifdef _DEBUG
-        assert(fTest);
-    #else
-        if( !fTest )
-            releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
-    #endif
-#else
-    assert (nSection >= 0 && nSection < 64);
-#endif
+    Yassert (nSection >= 0 && nSection < 64);
     return (                                        // what is the purpose of this calculation?
             nModifierInterval * 63 /                // what is the range of inputs??? etc. 
             (
@@ -532,20 +528,22 @@ bool CheckStakeKernelHash(
     if (fPrintProofOfStake)
     {
         printf(
-                "CheckStakeKernelHash() : using modifier 0x%016"PRI64x" "
+                "CheckStakeKernelHash() : using modifier 0x%016" PRI64x " "
                 "at height=%d "
                 "timestamp=%s "
                 "for block from height=%d "
                 "timestamp=%s"
                 "\n"
                 "",
-            nStakeModifier, nStakeModifierHeight,
+            nStakeModifier, 
+            nStakeModifierHeight,
             DateTimeStrFormat(nStakeModifierTime).c_str(),
             mapBlockIndex[blockFrom.GetHash()]->nHeight,
-            DateTimeStrFormat(blockFrom.GetBlockTime()).c_str());
+            DateTimeStrFormat(blockFrom.GetBlockTime()).c_str()
+              );
         printf(
-            "CheckStakeKernelHash() : check protocol=%s "
-            "modifier=0x%016"PRI64x" "
+            "CheckStakeKernelHash() : "     //check protocol=%s "
+            "modifier=0x%016" PRI64x " "
             "nTimeBlockFrom=%u "
             "nTxPrevOffset=%u "
             "nTimeTxPrev=%u "
@@ -571,7 +569,7 @@ bool CheckStakeKernelHash(
     if (fDebug && !fPrintProofOfStake)
     {
         printf(
-            "CheckStakeKernelHash() : using modifier 0x%016"PRI64x" "
+            "CheckStakeKernelHash() : using modifier 0x%016" PRI64x " "
             "at height=%d "
             "timestamp=%s "
             "for block from height=%d "
@@ -584,7 +582,7 @@ bool CheckStakeKernelHash(
             DateTimeStrFormat(blockFrom.GetBlockTime()).c_str());
         printf(
             "CheckStakeKernelHash() : pass protocol=%s "
-            "modifier=0x%016"PRI64x" "
+            "modifier=0x%016" PRI64x " "
             "nTimeBlockFrom=%u "
             "nTxPrevOffset=%u "
             "nTimeTxPrev=%u "
@@ -878,7 +876,7 @@ bool CheckProofOfStake(const CTransaction& tx, unsigned int nBits, uint256& hash
 // Get stake modifier checksum
 uint32_t GetStakeModifierChecksum(const CBlockIndex* pindex)
 {
-    assert (
+    Yassert(
             pindex->pprev || 
             pindex->GetBlockHash() == (!fTestNet ? hashGenesisBlock : hashGenesisBlockTestNet)
            );
