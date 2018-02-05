@@ -4,10 +4,17 @@
     #include "msvc_warnings.push.h"
 #endif
 
-#include "kernelrecord.h"
+#ifndef KERNELRECORD_H
+ #include "kernelrecord.h"
+#endif
 
-#include "wallet.h"
-#include "base58.h"
+#ifndef BITCOIN_WALLET_H
+ #include "wallet.h"
+#endif
+
+#ifndef BITCOIN_BASE58_H
+ #include "base58.h"
+#endif
 
 using std::vector;
 using std::max;

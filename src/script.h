@@ -404,18 +404,7 @@ public:
     {
         // I'm not sure if this should push the script or concatenate scripts.
         // If there's ever a use for pushing a script onto a script, delete this member fn
-#ifdef _MSC_VER
-        bool
-            fTest = (!"Warning: Pushing a CScript onto a CScript with << is probably not intended, use + to concatenate!");
-    #ifdef _DEBUG
-        assert(fTest);
-    #else
-        if( !fTest )
-            releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
-    #endif
-#else
-        assert(!"Warning: Pushing a CScript onto a CScript with << is probably not intended, use + to concatenate!");
-#endif
+        Yassert(!"Warning: Pushing a CScript onto a CScript with << is probably not intended, use + to concatenate!");
         return *this;
     }
 
@@ -505,34 +494,12 @@ public:
     {
         if (opcode == OP_0)
             return 0;
-#ifdef _MSC_VER
-        bool
-            fTest = (opcode >= OP_1 && opcode <= OP_16);
-    #ifdef _DEBUG
-        assert(fTest);
-    #else
-        if( !fTest )
-            releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
-    #endif
-#else
-        assert(opcode >= OP_1 && opcode <= OP_16);
-#endif
+        Yassert(opcode >= OP_1 && opcode <= OP_16);
         return (int)opcode - (int)(OP_1 - 1);
     }
     static opcodetype EncodeOP_N(int n)
     {
-#ifdef _MSC_VER
-        bool
-            fTest = (n >= 0 && n <= 16);
-    #ifdef _DEBUG
-        assert(fTest);
-    #else
-        if( !fTest )
-            releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
-    #endif
-#else
-        assert(n >= 0 && n <= 16);
-#endif
+        Yassert(n >= 0 && n <= 16);
         if (n == 0)
             return OP_0;
         return (opcodetype)(OP_1+n-1);

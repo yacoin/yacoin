@@ -7,8 +7,13 @@
     #include "msvc_warnings.push.h"
 #endif
 
-#include "sync.h"
-#include "util.h"
+#ifndef BITCOIN_SYNC_H
+ #include "sync.h"
+#endif
+
+#ifndef BITCOIN_UTIL_H
+ #include "util.h"
+#endif
 
 #include <boost/foreach.hpp>
 

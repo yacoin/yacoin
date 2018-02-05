@@ -6,7 +6,6 @@
     #include <stdint.h>
 
     #include "msvc_warnings.push.h"
-    #include "JustInCase.h"
 #endif
 
 #ifndef _BITCOINALERT_H_
@@ -1540,7 +1539,7 @@ const CBlockIndex* GetLastBlockIndex(const CBlockIndex* pindex, bool fProofOfSta
 {
     while (
            pindex &&                                    // there is a block
-           pindex->pprev &&                             // there ia a previous block 
+           pindex->pprev &&                             // there is a previous block 
            (pindex->IsProofOfStake() != fProofOfStake)  // the block is a !fProofOfStake
           )
         pindex = pindex->pprev;                         // go back
@@ -1985,18 +1984,7 @@ bool CTransaction::FetchInputs(CTxDB& txdb, const map<uint256, CTxIndex>& mapTes
     for (unsigned int i = 0; i < vin.size(); i++)
     {
         const COutPoint prevout = vin[i].prevout;
-#ifdef _MSC_VER
-        bool
-            fTest = (inputsRet.count(prevout.hash) != 0);
-    #ifdef _DEBUG
-        assert(fTest);
-    #else
-        if( !fTest )
-            releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
-    #endif
-#else
-        assert(inputsRet.count(prevout.hash) != 0);
-#endif
+        Yassert(inputsRet.count(prevout.hash) != 0);
         const CTxIndex& txindex = inputsRet[prevout.hash].first;
         const CTransaction& txPrev = inputsRet[prevout.hash].second;
         if (prevout.n >= txPrev.vout.size() || prevout.n >= txindex.vSpent.size())
@@ -2102,18 +2090,7 @@ bool CTransaction::ConnectInputs(
         {
             COutPoint 
                 prevout = vin[i].prevout;
-#ifdef _MSC_VER
-            bool
-                fTest = (inputs.count(prevout.hash) > 0);
-    #ifdef _DEBUG
-            assert(fTest);
-    #else
-            if( !fTest )
-                releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
-    #endif
-#else
-            assert(inputs.count(prevout.hash) > 0);
-#endif
+            Yassert(inputs.count(prevout.hash) > 0);
             CTxIndex
                 & txindex = inputs[prevout.hash].first;
             CTransaction
@@ -2157,18 +2134,7 @@ bool CTransaction::ConnectInputs(
         {
             COutPoint 
                 prevout = vin[i].prevout;
-#ifdef _MSC_VER
-            bool
-                fTest = (inputs.count(prevout.hash) > 0);
-    #ifdef _DEBUG
-            assert(fTest);
-    #else
-            if( !fTest )
-                releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
-    #endif
-#else
-            assert(inputs.count(prevout.hash) > 0);
-#endif
+            Yassert(inputs.count(prevout.hash) > 0);
             CTxIndex
                 & txindex = inputs[prevout.hash].first;
             CTransaction
@@ -3183,7 +3149,7 @@ bool CBlock::AcceptBlock()
 // yacoin2015: ProofOfWork/ProofOfStake block ratio
 double CBlockIndex::GetPoWPoSRatio() const
 {
-    assert ( nPosBlockCount > 0 );
+    Yassert ( nPosBlockCount > 0 );
     return (double)( nHeight - nPosBlockCount ) / (double) nPosBlockCount;
 }
 
@@ -3971,53 +3937,15 @@ bool LoadBlockIndex(bool fAllowNew)
         printf("block.nBits ==\n%s\n", the_target.ToString().c_str());
         printf("block.hashMerkleRoot ==\n%s\n", block.hashMerkleRoot.ToString().c_str());
 
-#ifdef _MSC_VER
-        bool
-            fTest = (
-                     block.hashMerkleRoot == 
-                     uint256(
-                             fTestNet?
-                             "0x29c97b046f12638bb31918e42ee10a16ca7d325a2af255e8a503248a1f04e2d2":
-                             "0x678b76419ff06676a591d3fa9d57d7f7b26d8021b7cc69dde925f39d4cf2244f"
-                            )
-                    );
-    #ifdef _DEBUG
-        assert(fTest);
-    #else
-        if( !fTest )
-            releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
-    #endif
-#else
-        assert(block.hashMerkleRoot == uint256(
+        Yassert(block.hashMerkleRoot == uint256(
                             fTestNet?
                             "0x29c97b046f12638bb31918e42ee10a16ca7d325a2af255e8a503248a1f04e2d2":
                             "0x678b76419ff06676a591d3fa9d57d7f7b26d8021b7cc69dde925f39d4cf2244f"
                                               )
               );
-#endif
         block.print();
-#ifdef _MSC_VER
-        fTest = (block.GetHash() == (!fTestNet ? hashGenesisBlock : hashGenesisBlockTestNet));
-    #ifdef _DEBUG
-        assert(fTest);
-    #else
-        if( !fTest )
-            releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
-    #endif
-#else
-        assert(block.GetHash() == (!fTestNet ? hashGenesisBlock : hashGenesisBlockTestNet));
-#endif
-#ifdef _MSC_VER
-        fTest = (block.CheckBlock());
-    #ifdef _DEBUG
-        assert(fTest);
-    #else
-        if( !fTest )
-            releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
-    #endif
-#else
-        assert(block.CheckBlock());
-#endif
+        Yassert(block.GetHash() == (!fTestNet ? hashGenesisBlock : hashGenesisBlockTestNet));
+        Yassert(block.CheckBlock());
         // Start new block file
         unsigned int nFile;
         unsigned int nBlockPos;
@@ -4290,18 +4218,7 @@ string GetWarnings(string strFor)
         return strStatusBar;
     else if (strFor == "rpc")
         return strRPC;
-#ifdef _MSC_VER
-    bool
-        fTest = (!"GetWarnings() : invalid parameter");
-    #ifdef _DEBUG
-    assert(fTest);
-    #else
-    if( !fTest )
-        releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
-    #endif
-#else
-    assert(!"GetWarnings() : invalid parameter");
-#endif
+    Yassert(!"GetWarnings() : invalid parameter");
     return "error";
 }
 
@@ -5730,23 +5647,31 @@ public:
 #endif
     }
 } instance_of_cmaincleanup;
+//_____________________________________________________________________________
 
-#ifdef _MSC_VER
-void releaseModeAssertionfailure( const char* pFileName, const int nL, const std::string strFunctionName )
-{
+void releaseModeAssertionfailure( 
+                                 const char* pFileName, 
+                                 const int nL, 
+                                 const std::string strFunctionName,
+                                 const char * booleanExpression 
+                                )
+{   //Assertion failed: (fAssertBoolean), file l:\backups\senadjyac045.2\yacoin\src\init.cpp, line 1368
     (void)printf( 
                  "\n"
-                 "file:%s, line#%d, function %s()"
-                 "\n"
-                 "release mode assertion failure!?"
+                 "Release mode\n"
+                 "Assertion failed: (%s), file %s, line %d,\n"
+                 "function %s()"
                  "\n"
                  "\n"
                  ""
+                 , booleanExpression
                  , pFileName                //__FILE__
                  , nL                       //__LINE__
-                 , strFunctionName.c_str()  // __PRETTY_FUNCTION__
+                 , strFunctionName.c_str()  // __FUNCTION__
                 );
     StartShutdown();    // maybe there are other ways??
 }
+//_____________________________________________________________________________
+#ifdef _MSC_VER
     #include "msvc_warnings.pop.h"
 #endif

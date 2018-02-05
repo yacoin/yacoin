@@ -14,10 +14,13 @@
 
 #ifdef _MSC_VER
     #include <stdint.h>
-    #include "JustInCase.h"
 #endif
 #ifndef WIN32
 #include <arpa/inet.h>
+#endif
+
+#ifndef YACOIN_YASSERT_H
+ #include "Yassert.h"
 #endif
 
 #ifndef BITCOIN_MRUSET_H
@@ -500,18 +503,7 @@ public:
             nChecksum = 0;
 
         memcpy(&nChecksum, &hash, sizeof(nChecksum));
-#ifdef _MSC_VER
-        bool
-            fTest = (nMessageStart - nHeaderStart >= CMessageHeader::CHECKSUM_OFFSET + sizeof(nChecksum));
-    #ifdef _DEBUG
-        assert(fTest);
-    #else
-        if( !fTest )
-            releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
-    #endif
-#else
-        assert(nMessageStart - nHeaderStart >= CMessageHeader::CHECKSUM_OFFSET + sizeof(nChecksum));
-#endif
+        Yassert(nMessageStart - nHeaderStart >= CMessageHeader::CHECKSUM_OFFSET + sizeof(nChecksum));
         memcpy((char*)&vSend[nHeaderStart] + CMessageHeader::CHECKSUM_OFFSET, &nChecksum, sizeof(nChecksum));
 
         if (fDebug) 
@@ -793,4 +785,7 @@ class CTransaction;
 void RelayTransaction(const CTransaction& tx, const uint256& hash);
 void RelayTransaction(const CTransaction& tx, const uint256& hash, const CDataStream& ss);
 
+// just for test purposes
+//void do_https_test();
+//_____________________________________________________________________________
 #endif

@@ -8,11 +8,26 @@
     #include "msvc_warnings.push.h"
 #endif
 
-#include "db.h"
-#include "net.h"
-#include "util.h"
-#include "main.h"
-#include "ui_interface.h"
+#ifndef BITCOIN_DB_H
+ #include "db.h"
+#endif
+
+#ifndef BITCOIN_NET_H
+ #include "net.h"
+#endif
+
+#ifndef BITCOIN_UTIL_H
+ #include "util.h"
+#endif
+
+#ifndef BITCOIN_MAIN_H
+ #include "main.h"
+#endif
+
+#ifndef BITCOIN_UI_INTERFACE_H
+ #include "ui_interface.h"
+#endif
+
 #include <boost/filesystem.hpp>
 #include <boost/filesystem/fstream.hpp>
 
@@ -214,18 +229,7 @@ void CDBEnv::MakeMock()
 CDBEnv::VerifyResult CDBEnv::Verify(std::string strFile, bool (*recoverFunc)(CDBEnv& dbenv, std::string strFile))
 {
     LOCK(cs_db);
-#ifdef _MSC_VER
-    bool
-        fTest = (mapFileUseCount.count(strFile) == 0);
-    #ifdef _DEBUG
-    assert(fTest);
-    #else
-    if( !fTest )
-        releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
-    #endif
-#else
-    assert(mapFileUseCount.count(strFile) == 0);
-#endif
+    Yassert(mapFileUseCount.count(strFile) == 0);
     Db db(&dbenv, 0);
     int result = db.verify(strFile.c_str(), NULL, NULL, 0);
     if (result == 0)
@@ -242,18 +246,7 @@ bool CDBEnv::Salvage(std::string strFile, bool fAggressive,
                      std::vector<CDBEnv::KeyValPair >& vResult)
 {
     LOCK(cs_db);
-#ifdef _MSC_VER
-    bool
-        fTest = (mapFileUseCount.count(strFile) == 0);
-    #ifdef _DEBUG
-    assert(fTest);
-    #else
-    if( !fTest )
-        releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
-    #endif
-#else
-    assert(mapFileUseCount.count(strFile) == 0);
-#endif
+    Yassert(mapFileUseCount.count(strFile) == 0);
     u_int32_t flags = DB_SALVAGE;
     if (fAggressive) flags |= DB_AGGRESSIVE;
 

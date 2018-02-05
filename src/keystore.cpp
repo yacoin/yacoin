@@ -6,12 +6,19 @@
     #include <stdint.h>
 
     #include "msvc_warnings.push.h"
-    #include "JustInCase.h"
 #endif
 
-#include "keystore.h"
-#include "script.h"
-#include "base58.h"
+#ifndef BITCOIN_KEYSTORE_H
+ #include "keystore.h"
+#endif
+
+#ifndef H_BITCOIN_SCRIPT
+ #include "script.h"
+#endif
+
+#ifndef BITCOIN_BASE58_H
+ #include "base58.h"
+#endif
 
 extern bool fWalletUnlockMintOnly;
 

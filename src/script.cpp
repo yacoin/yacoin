@@ -6,19 +6,18 @@
     #include <stdint.h>
 
     #include "msvc_warnings.push.h"
-    #include "JustInCase.h"
 #endif
 
 #include <boost/foreach.hpp>
 #include <boost/tuple/tuple.hpp>
 
-#include "script.h"
-//#include "keystore.h"
-//#include "bignum.h"
-//#include "key.h"
-#include "main.h"
-//#include "sync.h"
-//#include "util.h"
+#ifndef H_BITCOIN_SCRIPT
+ #include "script.h"
+#endif
+
+#ifndef BITCOIN_MAIN_H
+ #include "main.h"
+#endif
 
 using namespace boost;
 
@@ -752,18 +751,7 @@ bool EvalScript(
                     case OP_NOT:        bn = (bn == bnZero); break;
                     case OP_0NOTEQUAL:  bn = (bn != bnZero); break;
                     default:            
-#ifdef _MSC_VER
-                        bool
-                            fTest = (!"invalid opcode");
-    #ifdef _DEBUG
-                        assert(fTest);
-    #else
-                        if( !fTest )
-                            releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
-    #endif
-#else
-                        assert(!"invalid opcode"); 
-#endif
+                        Yassert(!"invalid opcode"); 
                         break;
                     }
                     popstack(stack);
@@ -813,18 +801,7 @@ bool EvalScript(
                     case OP_MIN:                 bn = (bn1 < bn2 ? bn1 : bn2); break;
                     case OP_MAX:                 bn = (bn1 > bn2 ? bn1 : bn2); break;
                     default:                     
-#ifdef _MSC_VER
-                        bool
-                            fTest = (!"invalid opcode");
-    #ifdef _DEBUG
-                        assert(fTest);
-    #else
-                        if( !fTest )
-                            releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
-    #endif
-#else
-                        assert(!"invalid opcode"); 
-#endif
+                        Yassert(!"invalid opcode"); 
                         break;
                     }
                     popstack(stack);
@@ -1893,18 +1870,7 @@ bool VerifyScript(const CScript& scriptSig, const CScript& scriptPubKey, const C
         // stackCopy cannot be empty here, because if it was the
         // P2SH  HASH <> EQUAL  scriptPubKey would be evaluated with
         // an empty stack and the EvalScript above would return false.
-#ifdef _MSC_VER
-        bool
-            fTest = (!stackCopy.empty());
-    #ifdef _DEBUG
-        assert(fTest);
-    #else
-        if( !fTest )
-            releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
-    #endif
-#else
-        assert(!stackCopy.empty());
-#endif
+        Yassert(!stackCopy.empty());
 
         const valtype& pubKeySerialized = stackCopy.back();
         CScript pubKey2(pubKeySerialized.begin(), pubKeySerialized.end());
@@ -1922,18 +1888,7 @@ bool VerifyScript(const CScript& scriptSig, const CScript& scriptPubKey, const C
 
 bool SignSignature(const CKeyStore &keystore, const CScript& fromPubKey, CTransaction& txTo, unsigned int nIn, int nHashType)
 {
-#ifdef _MSC_VER
-    bool
-        fTest = (nIn < txTo.vin.size());
-    #ifdef _DEBUG
-    assert(fTest);
-    #else
-    if( !fTest )
-        releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
-    #endif
-#else
-    assert(nIn < txTo.vin.size());
-#endif
+    Yassert(nIn < txTo.vin.size());
     CTxIn& txin = txTo.vin[nIn];
 
     // Leave out the signature from the hash, since a signature can't sign itself.
@@ -1968,41 +1923,10 @@ bool SignSignature(const CKeyStore &keystore, const CScript& fromPubKey, CTransa
 
 bool SignSignature(const CKeyStore &keystore, const CTransaction& txFrom, CTransaction& txTo, unsigned int nIn, int nHashType)
 {
-#ifdef _MSC_VER
-    bool
-        fTest = (nIn < txTo.vin.size());
-    #ifdef _DEBUG
-    assert(fTest);
-    #else
-    if( !fTest )
-        releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
-    #endif
-#else
-    assert(nIn < txTo.vin.size());
-#endif
+    Yassert(nIn < txTo.vin.size());
     CTxIn& txin = txTo.vin[nIn];
-#ifdef _MSC_VER
-    fTest = (txin.prevout.n < txFrom.vout.size());
-    #ifdef _DEBUG
-    assert(fTest);
-    #else
-    if( !fTest )
-        releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
-    #endif
-#else
-    assert(txin.prevout.n < txFrom.vout.size());
-#endif
-#ifdef _MSC_VER
-    fTest = (txin.prevout.hash == txFrom.GetHash());
-    #ifdef _DEBUG
-    assert(fTest);
-    #else
-    if( !fTest )
-        releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
-    #endif
-#else
-    assert(txin.prevout.hash == txFrom.GetHash());
-#endif
+    Yassert(txin.prevout.n < txFrom.vout.size());
+    Yassert(txin.prevout.hash == txFrom.GetHash());
     const CTxOut& txout = txFrom.vout[txin.prevout.n];
 
     return SignSignature(keystore, txout.scriptPubKey, txTo, nIn, nHashType);
@@ -2034,18 +1958,7 @@ static CScript CombineMultisig(CScript scriptPubKey, const CTransaction& txTo, u
     }
 
     // Build a map of pubkey -> signature by matching sigs to pubkeys:
-#ifdef _MSC_VER
-    bool
-        fTest = (vSolutions.size() > 1);
-    #ifdef _DEBUG
-    assert(fTest);
-    #else
-    if( !fTest )
-        releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
-    #endif
-#else
-    assert(vSolutions.size() > 1);
-#endif
+    Yassert(vSolutions.size() > 1);
     unsigned int nSigsRequired = vSolutions.front()[0];
     unsigned int nPubKeys = (unsigned int)(vSolutions.size()-2);
     map<valtype, valtype> sigs;

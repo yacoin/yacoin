@@ -7,6 +7,10 @@
 #include <string>
 #include <vector>
 
+#ifndef YACOIN_YASSERT_H
+ #include "Yassert.h"
+#endif
+
 #ifndef BITCOIN_SERIALIZE_H
  #include "serialize.h"
 #endif

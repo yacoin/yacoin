@@ -5,7 +5,6 @@
     #include <stdint.h>
 
     #include "msvc_warnings.push.h"
-    #include "JustInCase.h"
 #endif
 
 #include <openssl/aes.h>

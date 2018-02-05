@@ -10,7 +10,7 @@
 #define DISPLAY_VERSION_MAJOR       0
 #define DISPLAY_VERSION_MINOR       4
 #define DISPLAY_VERSION_REVISION    8   
-#define DISPLAY_VERSION_BUILD       16
+#define DISPLAY_VERSION_BUILD       19
 #define DISPLAY_VERSION_TESTING     1
 
 const int
@@ -45,9 +45,9 @@ const std::string
 #    include "build.h"
 #endif
 
-//#define BUILD_DESC_INFO(maj,min,rev) \
+//#define BUILD_DESC_INFO(maj,min,rev) 
 //  "YAC-v" DO_STRINGIZE(maj) "." DO_STRINGIZE(min) "." DO_STRINGIZE(rev)
-//    DO_STRINGIZE(maj) \
+//    DO_STRINGIZE(maj) 
 
 #define BUILD_DESC_INFO(maj,min,rev,build) \
     "YAC-v" \

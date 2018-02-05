@@ -140,18 +140,7 @@ protected:
     {
         if (fReadOnly)
         {
-#ifdef _MSC_VER
-            bool
-                fTest = (!"Write called on database in read-only mode");
-    #ifdef _DEBUG
-            assert(fTest);
-    #else
-            if( !fTest )
-                releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
-    #endif
-#else
-            assert(!"Write called on database in read-only mode");
-#endif
+            Yassert(!"Write called on database in read-only mode");
         }
         CDataStream ssKey(SER_DISK, CLIENT_VERSION);
         ssKey.reserve(1000);
@@ -179,18 +168,7 @@ protected:
             return false;
         if (fReadOnly)
         {
-#ifdef _MSC_VER
-            bool
-                fTest = (!"Erase called on database in read-only mode");
-    #ifdef _DEBUG
-            assert(fTest);
-    #else
-            if( !fTest )
-                releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
-    #endif
-#else
-            assert(!"Erase called on database in read-only mode");
-#endif
+            Yassert(!"Erase called on database in read-only mode");
         }
         CDataStream ssKey(SER_DISK, CLIENT_VERSION);
         ssKey.reserve(1000);
