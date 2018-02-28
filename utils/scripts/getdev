@@ -1,0 +1,35 @@
+if [ -z ${YDIR+x} ]; then echo "YDIR var is unset. Aborting."; return 0
+elif [ -z ${YDL+x} ]; then echo "YDL var is unset. Aborting."; return 0
+elif ! cd $YDIR; then echo "Can not switch to $YDIR directory - YDIR. Aborting."; return 0
+elif ! cd $YDL; then echo "Can not switch to $YDL directory - YDL. Aborting."; cd $YDIR; return 0
+fi
+
+################## download ##################
+cd $YDL
+echo -e "\nStarting download\n"
+
+################## download and setup 7za.exe  - 7zip in command line release ##################
+if [ ! -f /bin/7za.exe ]; then
+curl -L -k http://sourceforge.net/projects/sevenzip/files/7-Zip/9.20/7za920.zip > 7za920.zip
+unzip -o 7za920.zip 7za.exe
+mv 7za.exe /bin
+fi
+
+################## TDM-GCC Compiler ##################
+curl -L -k http://sourceforge.net/projects/tdm-gcc/files/TDM-GCC%205%20series/5.1.0-tdm-1%20SJLJ/gcc-5.1.0-tdm-1-core.tar.lzma > gcc-5.1.0-tdm-1-core.tar.lzma
+curl -L -k http://sourceforge.net/projects/tdm-gcc/files/TDM-GCC%205%20series/5.1.0-tdm-1%20DW2/gcc-5.1.0-tdm-1-dw2-core.tar.lzma > gcc-5.1.0-tdm-1-dw2-core.tar.lzma
+curl -L -k http://sourceforge.net/projects/tdm-gcc/files/TDM-GCC%205%20series/5.1.0-tdm-1%20SJLJ/gcc-5.1.0-tdm-1-c++.tar.lzma > gcc-5.1.0-tdm-1-c++.tar.lzma
+curl -L -k http://sourceforge.net/projects/tdm-gcc/files/GDB/gdb32-7.9.1-tdm-1.tar.lzma > gdb32-7.9.1-tdm-1.tar.lzma
+
+curl -L -k http://sourceforge.net/projects/mingw/files/MinGW/Base/binutils/binutils-2.24/binutils-2.24-1-mingw32-bin.tar.xz > binutils-2.24-1-mingw32-bin.tar.xz
+curl -L -k http://sourceforge.net/projects/mingw/files/MinGW/Base/gettext/gettext-0.18.3.2-1/libintl-0.18.3.2-1-mingw32-dll-8.tar.xz > libintl-0.18.3.2-1-mingw32-dll-8.tar.xz
+curl -L -k http://sourceforge.net/projects/mingw/files/MinGW/Base/w32api/w32api-3.17/w32api-3.17-2-mingw32-dev.tar.lzma > w32api-3.17-2-mingw32-dev.tar.lzma
+curl -L -k http://sourceforge.net/projects/mingw/files/MinGW/Base/mingwrt/mingwrt-3.20/mingwrt-3.20-2-mingw32-dev.tar.lzma > mingwrt-3.20-2-mingw32-dev.tar.lzma
+curl -L -k http://sourceforge.net/projects/mingw/files/MinGW/Extension/make/make-3.82.90-cvs/make-3.82.90-2-mingw32-cvs-20120902-bin.tar.lzma > make-3.82.90-2-mingw32-cvs-20120902-bin.tar.lzma
+
+################## CodeBlocks IDE ##################
+curl -L -k http://sourceforge.net/projects/codeblocks/files/Binaries/Nightlies/2015/CB_20151115_rev10574_win32.7z > CB_20151115_rev10574_win32.7z
+curl -L -k http://sourceforge.net/projects/codeblocks/files/Binaries/Nightlies/Prerequisites/wxmsw28u_gcc_cb_wx2812_gcc492-TDM.7z > wxmsw28u_gcc_cb_wx2812_gcc492-TDM.7z
+curl -L -k http://sourceforge.net/projects/codeblocks/files/Binaries/Nightlies/Prerequisites/mingwm10_gcc492-TDM.7z > mingwm10_gcc492-TDM.7z
+
+

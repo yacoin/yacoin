@@ -1,0 +1,69 @@
+########################################################################################
+# Boost
+
+if [ -z "$YOS" ]; then
+echo -e "\n\n\nYOS not set.\nAborting build\n\n\n"
+else
+
+[ -d "$YBOO" ] || export YBOO=$YSW/`pwd | xargs basename`
+
+if [ "$1" == "check" ]; then
+############################ Check if exists
+case $YOS in
+  linux*) [ -d "$YBOO/lib" ] && [ -f "`find $YBOO/lib/* -prune -name "*.so" | head -1`" ] && echo "found";;
+  *) [ -d "$YBOO/lib" ] && [ `find $YBOO/lib/* -prune -name "*.a" ! -name "*.dll.a" | wc -l` -gt 6 ] && echo "found";;
+esac
+
+else
+############################ Build
+case $YOS in
+########################################## Linux
+linux*)
+
+if ! grep Q_MOC_RUN boost/type_traits/detail/has_binary_operator.hpp > /dev/null; then
+echo "#ifndef Q_MOC_RUN" > tmpf
+cat boost/type_traits/detail/has_binary_operator.hpp >> tmpf
+echo "#endif // Q_MOC_RUN" >> tmpf
+mv tmpf boost/type_traits/detail/has_binary_operator.hpp
+fi
+
+./bootstrap.sh
+./b2 -a cxxflags="-std=gnu++0x" --with-chrono --with-filesystem --with-regex --with-program_options --with-system --with-thread --with-date_time --with-serialization --with-iostreams -s ZLIB_SOURCE="$YZLIB" -s NO_BZIP2=1 threading=multi variant=release --prefix=$YBOO install
+
+;;
+########################################## Mac OSX
+darwin*)
+
+CFLAGS="-isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.6.sdk -mmacosx-version-min=10.6"
+./bootstrap.sh
+./b2 cxxflags="${CFLAGS}" --with-chrono --with-filesystem --with-regex --with-program_options --with-system --with-thread --with-date_time --with-serialization --with-iostreams -s ZLIB_SOURCE="$YZLIB" -s NO_BZIP2=1 --link=static --runtime-link=static threading=multi variant=release --prefix=$YBOO install
+
+;;
+########################################## Windows
+*)
+
+if ! grep Q_MOC_RUN boost/type_traits/detail/has_binary_operator.hpp > /dev/null; then
+echo "#ifndef Q_MOC_RUN" > tmpf
+cat boost/type_traits/detail/has_binary_operator.hpp >> tmpf
+echo "#endif // Q_MOC_RUN" >> tmpf
+mv tmpf boost/type_traits/detail/has_binary_operator.hpp
+fi
+
+if [ -f "$YZLIB/lib/libz.a" ]; then
+sed 's/--with-date_time/--with-date_time\ --with-serialization\ --with-iostreams\ -s\ ZLIB_SOURCE="%YZLIB%"/' $YDIR/scripts/cmdboost.bat > ./cmdboost.bat
+else
+cp $YDIR/scripts/cmdboost.bat .
+fi
+
+YTMP=`pwd | xargs basename | sed 's/.\{2\}$//' | sed 's/\_/-/'`
+sed -i "s/INCLUDESUBDIR/$YTMP/" cmdboost.bat
+cmd "/c cmdboost.bat"
+
+;;
+
+esac
+
+if ! grep YBOO $YSW/yconf  > /dev/null; then echo "YBOO=$YBOO" >> $YSW/yconf ; fi
+fi
+fi
+

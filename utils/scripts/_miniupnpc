@@ -1,0 +1,47 @@
+########################################################################################
+# MiniUPNPc
+
+if [ -z "$YOS" ]; then
+echo -e "\n\n\nYOS not set.\nAborting build\n\n\n"
+else
+
+[ -d "$YUPNP" ] || export YUPNP=$YSW/`pwd | xargs basename`
+
+if [ "$1" == "check" ]; then
+############################ Check if exists
+case $YOS in
+  linux*) [ -d "$YUPNP/lib" ] && [ -f "`find $YUPNP/lib/* -prune -name "*.so" | head -1`" ] && echo "found";;
+  *) [ -d "$YUPNP/lib" ] && [ -f "$YUPNP/lib/libminiupnpc.a" ] && echo "found";;
+esac
+
+else
+############################ Build
+
+case $YOS in
+########################################## Linux
+linux*)
+
+make
+mkdir -p $YUPNP/include $YUPNP/lib && cp *.h $YUPNP/include && cp *.a *.so $YUPNP/lib
+;;
+########################################## Mac OSX
+darwin*)
+
+CFLAGS="-isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.6.sdk -mmacosx-version-min=10.6" \
+make upnpc-static
+mkdir -p $YUPNP/include $YUPNP/lib && cp *.h $YUPNP/include && cp *.a $YUPNP/lib
+;;
+########################################## Windows
+*)
+
+if ! grep libgcc Makefile.mingw > /dev/null; then sed -i 's/^LDLIBS\ =/LDLIBS\ =\ -static\ -static-libgcc\ -s/' Makefile.mingw; fi
+make -f Makefile.mingw init upnpc-static
+mkdir -p $YUPNP/include $YUPNP/lib && cp *.h $YUPNP/include && cp *.a $YUPNP/lib
+;;
+
+esac
+
+if ! grep YUPNP $YSW/yconf > /dev/null; then echo "YUPNP=$YUPNP" >> $YSW/yconf; fi
+fi
+fi
+

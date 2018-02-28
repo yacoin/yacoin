@@ -1,0 +1,140 @@
+[ -z "$YDIR" ] && { echo "YDIR not set. Aborting."; return 1; }
+[ -d "$YDIR" ] || { echo "YDIR path invalid. Aborting."; return 1; }
+[ -d "$YDIR/scripts" ] || { echo "scripts path invalid. Aborting."; return 1; }
+
+# alias ymake='make -f $YDIR/scripts/makefile'
+
+YDL="$YDIR/downloads"
+YSTAGE="$YDIR/stage"
+YSW="$YDIR/sw"
+
+[ -d "$YDL" ] || mkdir -p $YDL
+[ -d "$YSTAGE" ] || mkdir -p $YSTAGE
+[ -d "$YSW" ] || mkdir -p $YSW
+
+case "$YOS" in mingw*)
+  [ -d "$YDIR/gcc" ] || mkdir -p $YDIR/gcc
+  [ -d "$YDIR/codeblocks" ] || mkdir -p $YDIR/codeblocks
+esac
+
+
+############# eXtract files in YDL folder to YSTAGE folder #############
+xdeps ()
+{
+  if [ $# -eq 0 ]; then
+    echo -e "\nxdeps needs source filename argument.\n"
+    ls -1 $YDL | sort
+    echo -e "\npick one from list shown. "
+    return 1
+  fi
+
+  [ -z "$YDL" ] && { echo "YDL not set. Aborting."; return 1; }
+  [ -d "$YDL" ] || { echo "YDL not set correctly. Aborting."; return 1; }
+  [ -z "$YSTAGE" ] && { echo "YSTAGE not set. Aborting."; return 1; }
+  [ -d "$YSTAGE" ] || { echo "YSTAGE not set correctly. Aborting."; return 1; }
+  [ -f "$YDL/$1" ] || { echo "File $YDL/$1 not Found. Aborting."; return 1; }
+
+  case "$1" in
+    *.tar.gz) tar -zxvf $YDL/$1 -C $YSTAGE ;;
+    *.tar.bz2) tar -jxvf $YDL/$1 -C $YSTAGE ;;
+    *.7z) 7za x -aoa $YDL/$1 -o$YSTAGE ;;
+    *) echo "File Format Unsupported $1" ;;
+  esac
+}
+
+############# set Y vars using directories in YSTAGE folder #############
+sdeps()
+{
+for file in `find $YSW/* -prune -type d`
+do
+  filename=$(basename $file)
+
+  if [ $# -gt 0 ]; then
+    case $filename in
+    $1*) : ;;
+    *) filename= ;;
+    esac
+  fi
+
+  case $filename in
+    boost*) YBOO=$file; echo "YBOO=$YBOO"; export YBOO ;;
+    openssl*) YOSSL=$file; echo "YOSSL=$YOSSL"; export YOSSL ;;
+    db*) YBDB=$file; echo "YBDB=$YBDB"; export YBDB ;;
+    leveldb*) YLDB=$file; echo "YLDB=$YLDB"; export YLDB ;;
+    miniupnp*) YUPNP=$file; echo "YUPNP=$YUPNP"; export YUPNP ;;
+    zlib*) YZLIB=$file; echo "YZLIB=$YZLIB"; export YZLIB ;;
+    libevent*) YEVT=$file; echo "YEVT=$YEVT"; export YEVT ;;
+    libpng*) YPNG=$file; echo "YPNG=$YPNG"; export YPNG ;;
+    qrenc*) YQR=$file; echo "YQR=$YQR"; export YQR ;;
+    qt*) YQT=$file; echo "YQT=$YQT"; export YQT ;;
+    pcre*) YPCRE=$file; echo "YPCRE=$YPCRE"; export YPCRE ;;
+    jansson*) YJANS=$file; echo "YJANS=$YJANS"; export YJANS ;;
+    curl*) YCURL=$file; echo "YCURL=$YCURL"; export YCURL ;;
+    wxWidgets*) YWX=$file; echo "YWX=$YWX"; export YWX ;;
+  esac
+done
+
+}
+
+############# unset Y env vars #############
+udeps()
+{
+unset YBOO; unset YOSSL;unset YBDB;unset YUPNP;unset YZLIB;unset YPNG;unset YQR;unset YQT;unset YWX;unset YPCRE;unset YJANS;unset YCURL;unset YLDB;unset YEVT;
+echo -e "\nvariables unset:\nYBOO YOSSL YBDB YUPNP YZLIB YPNG YQR YQT YWX YPCRE YJANS YCURL YLDB YEVT"
+}
+
+############# find dependency starting with $1 in YSTAGE folder #############
+fdeps()
+{
+find $YSTAGE/* -prune -type d -name "$1*" | sort;
+}
+
+############# print current dependancies #############
+pdeps()
+{
+env | grep "^Y" | egrep -v "^YDL|^YSTAGE|^YDIR" | sort
+}
+
+############# Print info from environment #############
+yinfo ()
+{
+echo -e ""
+set | grep "^build"
+echo -e ""
+set | grep "^Y"
+echo -e ""
+cat $YDIR/scripts/makefile | grep -e "^[[:alpha:]]" | grep -v "SELF_DIR" | awk '{print "ymake "$1}' | sed "s/://g"
+}
+
+##############################################################################
+if [ -f "$YSW/yconf" ]; then
+source $YSW/yconf
+else
+touch $YSW/yconf
+fi
+
+[ -f "$YDIR/scripts/fbuilddeps" ] && source $YDIR/scripts/fbuilddeps
+
+case "$YOS" in mingw*)
+CMDPATH=`which cmd | awk '{print substr($0, 1, length($0)-4)}'`
+CURLPATH=`which curl | awk '{print substr($0, 1, length($0)-5)}'`
+PATH=.:$YDIR/gcc/bin:/mingw32/bin:/usr/bin:/bin:$CMDPATH:$CURLPATH
+esac
+
+
+[ -d "$YQT" ] && PATH=$PATH:$YQT/bin && export YQT
+[ -d "$YWX" ] && export YWX
+[ -d "$YBOO" ] && export YBOO
+[ -d "$YOSSL" ] && export YOSSL
+[ -d "$YBDB" ] && export YBDB
+[ -d "$YLDB" ] && export YLDB
+[ -d "$YUPNP" ] && export YUPNP
+[ -d "$YZLIB" ] && export YZLIB
+[ -d "$YPNG" ] && export YPNG
+[ -d "$YQR" ] && export YQR
+[ -d "$YPCRE" ] && export YPCRE
+[ -d "$YJANS" ] && export YJANS
+[ -d "$YCURL" ] && export YCURL
+[ -d "$YEVT" ] && export YEVT
+
+#[ -f "$YWX/bin/wx-config" ] && PATH=$YWX/bin:$PATH && YTMP=`wx-config --prefix` && PATH=`cygpath $YTMP`/lib:$PATH

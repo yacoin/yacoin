@@ -3,6 +3,10 @@ src/yacoin
 src/yacoind
 src/test_yacoin
 src/build.h
+src/miniupnpc
+utils/sw
+utils/stage
+utils/downloads
 .*.swp
 *.*~*
 *.bak
@@ -23,3 +27,5 @@ qrc_*.cpp
 .DS_Store
 build
 README.md
+.genjane
+.genleveldb

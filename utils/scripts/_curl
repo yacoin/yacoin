@@ -1,0 +1,56 @@
+########################################################################################
+# cURL
+
+if [ -z "$YOS" ]; then
+echo -e "\n\n\nYOS not set.\nAborting build\n\n\n"
+else
+
+[ -d "$YCURL" ] || export YCURL=$YSW/`pwd | xargs basename`
+
+if [ "$1" == "check" ]; then
+############################ Check if exists
+case $YOS in
+  linux*) [ -d "$YCURL/lib" ] && [ -f "`find $YCURL/lib/* -prune -name "*.so" | head -1`" ] && echo "found";;
+  *) [ -d "$YCURL/lib" ] && [ -f "$YCURL/lib/libcurl.a" ] && echo "found";;
+esac
+
+else
+############################ Build
+
+case $YOS in
+########################################## Linux
+linux*)
+
+LIBS="-ldl" ./configure --prefix=$YCURL --enable-static --enable-shared --disable-debug --with-zlib=$YZLIB --with-ssl=$YOSSL
+make && make install
+
+;;
+########################################## Mac OSX
+darwin*)
+
+CFLAGS="-isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.6.sdk -mmacosx-version-min=10.6" \
+./configure --prefix=$YCURL --disable-shared --disable-debug --with-zlib=$YZLIB --with-ssl=$YOSSL
+make && make install
+
+;;
+########################################## Windows
+*)
+
+if [ "$1" = "openssl" ]; then
+[ -d "$YOSSL/lib" ] || { echo -e "\n\n\n\ncURL not build. Check YOSSL directory.\n\n\n\n"; return 1; }
+./configure --prefix=$YCURL LDFLAGS='-static -static-libgcc -s' --disable-shared --disable-debug --with-zlib=$YZLIB --with-ssl=$YOSSL
+else
+./configure --prefix=$YCURL LDFLAGS='-static -static-libgcc -s' --disable-shared --disable-debug --with-zlib=$YZLIB --without-ssl
+fi
+
+find . -name Makefile | xargs sed -i 's/\/usr\/bin\///g'
+make && make install
+
+;;
+
+esac
+
+if ! grep YCURL $YSW/yconf > /dev/null; then echo "YCURL=$YCURL" >> $YSW/yconf; fi
+fi
+fi
+
