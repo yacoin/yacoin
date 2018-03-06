@@ -29,3 +29,8 @@ build
 README.md
 .genjane
 .genleveldb
+yacoind-*
+autom4te.cache
+.deps
+.dirstamp
+Makefile.in
