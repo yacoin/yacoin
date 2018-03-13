@@ -42,11 +42,11 @@ SCRYPTDEFS=-DBOOST_SPIRIT_THREADSAFE -DUSE_LEVELDB -DUSE_ASM
 SCRYPTHARDENING=-fno-stack-protector -fstack-protector-all -Wstack-protector -D_FORTIFY_SOURCE=2 -fPIC
 xCXXFLAGS=-O2 -msse2 -pthread -Wall -Wextra -Wformat -Wformat-security -Wno-unused-parameter $(SCRYPTDEFS) $(SCRYPTHARDENING) -std=c++0x
 
-yacoind-scrypt-x86.o: scrypt-x86.S
-	$(CXX) -c $(xCXXFLAGS) -MMD -o $@ $<
+# yacoind-scrypt-x86.o: scrypt-x86.S
+# 	$(CXX) -c $(xCXXFLAGS) -MMD -o $@ $<
 
-yacoind-scrypt-x86_64.o: scrypt-x86_64.S
-	$(CXX) -c $(xCXXFLAGS) -MMD -o $@ $<
+# yacoind-scrypt-x86_64.o: scrypt-x86_64.S
+# 	$(CXX) -c $(xCXXFLAGS) -MMD -o $@ $<
 
 SCRYPTDEFS+=-DSCRYPT_KECCAK512 -DSCRYPT_CHACHA -DSCRYPT_CHOOSE_COMPILETIME
 DEFS+=-DSCRYPT_KECCAK512 -DSCRYPT_CHACHA -DSCRYPT_CHOOSE_COMPILETIME
@@ -93,8 +93,8 @@ yacoind_SOURCES = \
     kernel.cpp \
     pbkdf2.cpp \
     scrypt.cpp \
-    scrypt-x86.S \ 
-    scrypt-x86_64.S \ 
+    scrypt-x86.S \
+    scrypt-x86_64.S \
     scrypt-jane/scrypt-jane.c
 
 
@@ -108,18 +108,21 @@ DISTCLEANFILES = obj/build.h
 
 EXTRA_DIST = leveldb
 
+all-local: obj/build.h
+	echo hallo
+
 clean-local:
 	-$(MAKE) -C leveldb clean
 	rm -f leveldb/*/*.gcno leveldb/helpers/memenv/*.gcno
-	-rm -f config.h
+	rm -f config.h
 
 .rc.o:
 	@test -f $(WINDRES)
 	$(AM_V_GEN) $(WINDRES) -DWINDRES_PREPROC -i $< -o $@
 
-.mm.o:
-	$(AM_V_CXX) $(OBJCXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) \
-	  $(CPPFLAGS) $(AM_CXXFLAGS) $(QT_INCLUDES) $(CXXFLAGS)  -c -o $@ $<
+# .mm.o:
+# 	$(AM_V_CXX) $(OBJCXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) \
+# 	  $(CPPFLAGS) $(AM_CXXFLAGS) $(QT_INCLUDES) $(CXXFLAGS)  -c -o $@ $<
 
 %.pb.cc %.pb.h: %.proto
 	@test -f $(PROTOC)
