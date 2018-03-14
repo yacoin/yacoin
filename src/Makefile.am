@@ -4,6 +4,7 @@ AM_LDFLAGS = $(PTHREAD_CFLAGS) $(LIBTOOL_LDFLAGS)
 
 
 if EMBEDDED_LEVELDB
+DEFS+=-DUSE_LEVELDB
 LEVELDB_CPPFLAGS += -I$(srcdir)/leveldb/include
 LEVELDB_CPPFLAGS += -I$(srcdir)/leveldb/helpers
 LEVELDB_CPPFLAGS += -I$(srcdir)/leveldb/helpers/memenv
@@ -31,14 +32,14 @@ if BUILD_BITCOIND
   bin_PROGRAMS += yacoind
 endif
 
-.PHONY: FORCE
+BUILT_SOURCES = obj/build.h
 
-obj/build.h: FORCE
+obj/build.h:
 	@$(MKDIR_P) $(builddir)/obj
 	@$(top_srcdir)/share/genbuild.sh $(abs_top_builddir)/src/obj/build.h \
 	  $(abs_top_srcdir)
 
-SCRYPTDEFS=-DBOOST_SPIRIT_THREADSAFE -DUSE_LEVELDB -DUSE_ASM 
+SCRYPTDEFS=-DBOOST_SPIRIT_THREADSAFE -DUSE_ASM 
 SCRYPTHARDENING=-fno-stack-protector -fstack-protector-all -Wstack-protector -D_FORTIFY_SOURCE=2 -fPIC
 xCXXFLAGS=-O2 -msse2 -pthread -Wall -Wextra -Wformat -Wformat-security -Wno-unused-parameter $(SCRYPTDEFS) $(SCRYPTHARDENING) -std=c++0x
 
@@ -107,9 +108,6 @@ CLEANFILES = leveldb/libleveldb.a leveldb/libmemenv.a *.gcda *.gcno
 DISTCLEANFILES = obj/build.h
 
 EXTRA_DIST = leveldb
-
-all-local: obj/build.h
-	echo hallo
 
 clean-local:
 	-$(MAKE) -C leveldb clean
