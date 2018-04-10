@@ -276,7 +276,7 @@ $(QT_MOC_CPP): $(PROTOBUF_H)
 qt_yacoin_qt_CPPFLAGS = $(BITCOIN_INCLUDES) $(BITCOIN_QT_INCLUDES) \
   $(QT_INCLUDES) $(PROTOBUF_CFLAGS) $(QR_CFLAGS)
 
-qt_yacoin_qt_SOURCES = qt/bitcoin.cpp
+qt_yacoin_qt_SOURCES = qt/bitcoin.cpp $(yacoind_SOURCES) kernelrecord.cpp
 if TARGET_DARWIN
   qt_yacoin_qt_SOURCES += $(BITCOIN_MM)
 endif
