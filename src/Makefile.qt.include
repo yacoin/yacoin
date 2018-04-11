@@ -28,6 +28,7 @@ QT_FORMS_UI = \
 #  qt/forms/qrcodedialog.ui
 
 QT_MOC_CPP = \
+  qt/moc_aboutdialog.cpp \
   qt/moc_addressbookpage.cpp \
   qt/moc_addresstablemodel.cpp \
   qt/moc_askpassphrasedialog.cpp \
@@ -40,13 +41,23 @@ QT_MOC_CPP = \
   qt/moc_coincontroltreewidget.cpp \
   qt/moc_csvmodelwriter.cpp \
   qt/moc_editaddressdialog.cpp \
+  qt/moc_explorer.cpp \
   qt/moc_guiutil.cpp \
   qt/moc_macdockiconhandler.cpp \
   qt/moc_macnotificationhandler.cpp \
+  qt/moc_mintingfilterproxy.cpp \
+  qt/moc_mintingtablemodel.cpp \
+  qt/moc_mintingview.cpp \
+  qt/moc_monitoreddatamapper.cpp \
+  qt/moc_multisigaddressentry.cpp \
+  qt/moc_multisigdialog.cpp \
+  qt/moc_multisiginputentry.cpp \
   qt/moc_notificator.cpp \
   qt/moc_optionsdialog.cpp \
   qt/moc_optionsmodel.cpp \
   qt/moc_overviewpage.cpp \
+  qt/moc_qrcodedialog.cpp \
+  qt/moc_qtipcserver.cpp \
   qt/moc_qvalidatedlineedit.cpp \
   qt/moc_qvaluecombobox.cpp \
   qt/moc_rpcconsole.cpp \
@@ -57,6 +68,7 @@ QT_MOC_CPP = \
   qt/moc_transactiondesc.cpp \
   qt/moc_transactiondescdialog.cpp \
   qt/moc_transactionfilterproxy.cpp \
+  qt/moc_transactionrecord.cpp \
   qt/moc_transactiontablemodel.cpp \
   qt/moc_transactionview.cpp \
   qt/moc_walletmodel.cpp   
@@ -86,7 +98,7 @@ QT_MOC = \
 #  qt/intro.moc
 
 
-#QT_QRC_CPP = qt/qrc_bitcoin.cpp
+QT_QRC_CPP = qt/qrc_bitcoin.cpp
 QT_QRC = qt/bitcoin.qrc
 #QT_QRC_LOCALE_CPP = qt/qrc_bitcoin_locale.cpp
 #QT_QRC_LOCALE = qt/bitcoin_locale.qrc
@@ -237,18 +249,55 @@ BITCOIN_QT_CPP = \
   qt/transactionview.cpp \
   qt/qvaluecombobox.cpp \
   qt/bitcoinamountfield.cpp \
-  qt/optionsmodel.cpp
-#  qt/qrcodedialog.cpp
-
+  qt/optionsmodel.cpp\
+  txdb-leveldb.cpp \
+  alert.cpp \
+  version.cpp \
+  checkpoints.cpp \
+  netbase.cpp \
+  addrman.cpp \
+  crypter.cpp \
+  key.cpp \
+  db.cpp \
+  irc.cpp \
+  keystore.cpp \
+  stun.cpp \
+  miner.cpp \
+  main.cpp \
+  net.cpp \
+  protocol.cpp \
+  bitcoinrpc.cpp \
+  price.cpp \
+  rpcdump.cpp \
+  rpcnet.cpp \
+  rpcmining.cpp \
+  rpcwallet.cpp \
+  rpcblockchain.cpp \
+  rpcrawtransaction.cpp \
+  script.cpp \
+  sync.cpp \
+  util.cpp \
+  wallet.cpp \
+  walletdb.cpp \
+  noui.cpp \
+  kernel.cpp \
+  pbkdf2.cpp \
+  scrypt.cpp \
+  scrypt-x86.S \
+  scrypt-x86_64.S \
+  scrypt-jane/scrypt-jane.c \
+  kernelrecord.cpp \
+  init.cpp
+  
 RES_IMAGES = \
   qt/res/images/splash.png
 
-# RES_MOVIES = $(wildcard qt/res/movies/spinner-*.png)
+RES_MOVIES = $(wildcard qt/res/movies/spinner-*.png)
 
 BITCOIN_RC = qt/res/bitcoin-qt-res.rc
 
 BITCOIN_QT_INCLUDES = -I$(builddir)/qt -I$(srcdir)/qt -I$(srcdir)/qt/forms \
-  -I$(builddir)/qt/forms
+  -I$(builddir)/qt/forms -DQT_GUI
 
 qt_libbitcoinqt_a_CPPFLAGS = $(BITCOIN_INCLUDES) $(BITCOIN_QT_INCLUDES) \
   $(QT_INCLUDES) $(QT_DBUS_INCLUDES) $(PROTOBUF_CFLAGS) $(QR_CFLAGS)
@@ -276,7 +325,8 @@ $(QT_MOC_CPP): $(PROTOBUF_H)
 qt_yacoin_qt_CPPFLAGS = $(BITCOIN_INCLUDES) $(BITCOIN_QT_INCLUDES) \
   $(QT_INCLUDES) $(PROTOBUF_CFLAGS) $(QR_CFLAGS)
 
-qt_yacoin_qt_SOURCES = qt/bitcoin.cpp $(yacoind_SOURCES) kernelrecord.cpp
+qt_yacoin_qt_SOURCES = qt/bitcoin.cpp 
+
 if TARGET_DARWIN
   qt_yacoin_qt_SOURCES += $(BITCOIN_MM)
 endif
@@ -288,7 +338,7 @@ if ENABLE_WALLET
 qt_yacoin_qt_LDADD += $(LIBBITCOIN_WALLET)
 endif
 qt_yacoin_qt_LDADD += $(LIBBITCOIN_CLI) $(LIBBITCOIN_COMMON) $(LIBBITCOIN_UTIL) $(LIBBITCOIN_CRYPTO) $(LIBBITCOIN_UNIVALUE) $(LIBLEVELDB) $(LIBMEMENV) \
-  $(BOOST_LIBS) $(QT_LIBS) $(QT_DBUS_LIBS) $(QR_LIBS) $(PROTOBUF_LIBS) $(BDB_LIBS) $(SSL_LIBS) $(CRYPTO_LIBS) $(MINIUPNPC_LIBS) $(LIBSECP256K1)
+  $(BOOST_LIBS) $(QT_LIBS) $(QT_DBUS_LIBS) $(QR_LIBS) $(PROTOBUF_LIBS) $(BDB_LIBS) $(SSL_LIBS) $(CRYPTO_LIBS) $(MINIUPNPC_LIBS) $(LIBSECP256K1) -ldl -lrt
 qt_yacoin_qt_LDFLAGS = $(RELDFLAGS) $(AM_LDFLAGS) $(QT_LDFLAGS) $(LIBTOOL_APP_LDFLAGS)
 qt_yacoin_qt_LIBTOOLFLAGS = --tag CXX
 
