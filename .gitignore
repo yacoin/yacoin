@@ -34,3 +34,9 @@ autom4te.cache
 .deps
 .dirstamp
 Makefile.in
+src/config/bitcoin-config.h
+src/config/bitcoin-config.h.in
+src/config/stamp-h1
+config.log
+config.status
+libtool
