@@ -11,9 +11,10 @@ jobs:
       - run: |
           ./autogen.sh
           ./configure --enable-tests 
-          make 
-          mkdir testresults
-          src/yacoin_test > testresults/test 
+          make           
+          cd src
+          mkdir unittestresults
+          ./yacoin_test > ../unittestresults/unittestresults.txt
       - store_artifacts:
           path: src/unittestresults
           destination: testresults
