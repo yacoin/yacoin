@@ -1,0 +1,13 @@
+version: 2
+jobs:
+  build:
+    docker:
+      - image: dev34253/yacoinbuild:latest
+
+    working_directory: ~/repo
+
+    steps:
+      - checkout
+      - run: ./autogen.sh && ./configure && make
+
+

@@ -1,4 +1,0 @@
-language: node_js
-
-build:
-  - console.log("Hello World!");
