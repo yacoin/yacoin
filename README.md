@@ -1,4 +1,4 @@
-https://circleci.com/gh/dev34253/yacoin.svg?style=shield&circle-token=:circle-token
+[![CircleCI](https://circleci.com/gh/dev34253/yacoin.svg?style=svg)](https://circleci.com/gh/dev34253/yacoin)
 
 YACoin Official Development Tree.
 
