@@ -528,7 +528,7 @@ bool CheckStakeKernelHash(
     if (fPrintProofOfStake)
     {
         printf(
-                "CheckStakeKernelHash() : using modifier 0x%016" PRI64x " "
+                "CheckStakeKernelHash() : using modifier 0x%016" PRIx64 " "
                 "at height=%d "
                 "timestamp=%s "
                 "for block from height=%d "
@@ -543,7 +543,7 @@ bool CheckStakeKernelHash(
               );
         printf(
             "CheckStakeKernelHash() : "     //check protocol=%s "
-            "modifier=0x%016" PRI64x " "
+            "modifier=0x%016" PRIx64 " "
             "nTimeBlockFrom=%u "
             "nTxPrevOffset=%u "
             "nTimeTxPrev=%u "
@@ -569,7 +569,7 @@ bool CheckStakeKernelHash(
     if (fDebug && !fPrintProofOfStake)
     {
         printf(
-            "CheckStakeKernelHash() : using modifier 0x%016" PRI64x " "
+            "CheckStakeKernelHash() : using modifier 0x%016" PRIx64 " "
             "at height=%d "
             "timestamp=%s "
             "for block from height=%d "
@@ -582,7 +582,7 @@ bool CheckStakeKernelHash(
             DateTimeStrFormat(blockFrom.GetBlockTime()).c_str());
         printf(
             "CheckStakeKernelHash() : pass protocol=%s "
-            "modifier=0x%016" PRI64x " "
+            "modifier=0x%016" PRIx64 " "
             "nTimeBlockFrom=%u "
             "nTxPrevOffset=%u "
             "nTimeTxPrev=%u "

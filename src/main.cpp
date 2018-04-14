@@ -1163,7 +1163,7 @@ unsigned char GetNfactor(::int64_t nTimestamp)
 
     ::int64_t 
         nAgeOfBlockOrTxInSeconds = nTimestamp - (fTestNet? nChainStartTimeTestNet: nChainStartTime),  //nChainStartTime,
-        nSavedAgeOfBlockOrTxInSeconds = nAgeOfBlockOrTxInSeconds;
+        // nSavedAgeOfBlockOrTxInSeconds = nAgeOfBlockOrTxInSeconds;
 
     while ((nAgeOfBlockOrTxInSeconds >> 1) > 3)     // nAgeOfBlockOrTxInSeconds / 2 is 4 or more
     {
@@ -1179,7 +1179,7 @@ unsigned char GetNfactor(::int64_t nTimestamp)
         n = 0;
     if (n > 255)
       //printf("GetNfactor(%ld) - something wrong(n == %d)\n", nTimestamp, n);
-        printf("GetNfactor(%"PRI64d") - something wrong(n == %d)\n", nTimestamp, n); // for g++
+        printf("GetNfactor(%"PRId64") - something wrong(n == %d)\n", nTimestamp, n); // for g++
 
     // so n is between 0 and 0xff
     unsigned char N = (unsigned char)n;
@@ -1191,7 +1191,7 @@ unsigned char GetNfactor(::int64_t nTimestamp)
       )
     {
         printf(
-                "GetNfactor: %"PRI64d" -> %d %"PRI64d" : %d / %d\n", 
+                "GetNfactor: %"PRI64d" -> %d %"PRId64" : %d / %d\n", 
                 nTimestamp - (fTestNet? nChainStartTimeTestNet: nChainStartTime), //nChainStartTime,   // 64 bit int
                 nBitCount, 
                 nAgeOfBlockOrTxInSeconds, 
@@ -1352,7 +1352,7 @@ CBigNum inline GetProofOfStakeLimit(int nHeight, unsigned int nTime)
     ::int64_t 
         nSubsidy = nCoinAge * 33 / (365 * 33 + 8) * nRewardCoinYear;
     if (fDebug && GetBoolArg("-printcreation"))
-        printf("GetProofOfStakeReward(): create=%s nCoinAge=%"PRI64d"\n", FormatMoney(nSubsidy).c_str(), nCoinAge);
+        printf("GetProofOfStakeReward(): create=%s nCoinAge=%"PRId64"\n", FormatMoney(nSubsidy).c_str(), nCoinAge);
     return nSubsidy;
 }
 // miner's coin stake reward based on nBits and coin age spent (coin-days)

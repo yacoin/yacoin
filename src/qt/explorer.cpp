@@ -896,7 +896,7 @@ std::string BuildTxDetailsFrom(
                                     );
                 sStandardItemModelElement = strprintf( 
                                                   //" %lld"
-                                                    " %" PRI64d ""
+                                                    " %" PRId64 ""
                                                     , (boost::int64_t)tx.nTime
                                                      );
                 sTemp += sStandardItemModelElement + "<br />\n";
@@ -2152,7 +2152,7 @@ std::string BuildBlockinfoDetailsFrom(
                             sStandardItemModelElement.c_str()
                            );
     sStandardItemModelElement = strprintf(
-                        " %016"PRI64x" "
+                        " %016"PRIx64" "
                         , pblockindex->nStakeModifier
                                          );
     sTemp += sStandardItemModelElement + "<br />";

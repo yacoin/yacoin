@@ -552,7 +552,7 @@ CBlock* CreateNewBlock(CWallet* pwallet, bool fProofOfStake)
             nLastBlockSize = nBlockSize;
 
             if (fDebug && GetBoolArg("-printpriority"))
-                printf("CreateNewBlock(): total size %"PRI64u"\n", nBlockSize);
+                printf("CreateNewBlock(): total size %"PRIu64"\n", nBlockSize);
 
             if (pblock->IsProofOfWork())
                 pblock->vtx[0].vout[0].nValue = GetProofOfWorkReward(pblock->nBits);
@@ -1140,8 +1140,8 @@ static void YacoinMiner(CWallet *pwallet)  // here fProofOfStake is always false
         //
         // Create new block
         //
-        unsigned int 
-            nTransactionsUpdatedLast = nTransactionsUpdated;
+        // unsigned int 
+        //     nTransactionsUpdatedLast = nTransactionsUpdated;
 
         CBlockIndex
             * pindexPrev = pindexBest;

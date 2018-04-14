@@ -596,8 +596,9 @@ bool CTxDB::LoadBlockIndex()
         vSortedByHeight.reserve(mapBlockIndex.size());
         //vSortedByHeight.resize( mapBlockIndex.size() );
 
-        int
-            nUpdatePeriod = 10000;
+#ifdef WIN32
+        int nUpdatePeriod = 10000;
+#endif
         BOOST_FOREACH(const PAIRTYPE(uint256, CBlockIndex*)& item, mapBlockIndex)
         {
             CBlockIndex
