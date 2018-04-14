@@ -8,6 +8,12 @@ jobs:
 
     steps:
       - checkout
-      - run: ./autogen.sh && ./configure && make
-
-
+      - run: |
+          ./autogen.sh
+          ./configure --enable-tests 
+          make 
+          mkdir testresults
+          src/yacoin_test > testresults/test 
+      - store_artifacts:
+          path: src/unittestresults
+          destination: testresults
