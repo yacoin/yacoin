@@ -59,6 +59,47 @@ yacoind-scrypt-jane.o: scrypt-jane/scrypt-jane.c
 # libbitcoin_util_a-clientversion.$(OBJEXT): obj/build.h
 # yacoind: obj/build.h
 
+# libyacoin_wallet_a_SOURCES= \
+#     txdb-leveldb.cpp \
+#     alert.cpp \
+#     version.cpp \
+#     checkpoints.cpp \
+#     netbase.cpp \
+#     addrman.cpp \
+#     crypter.cpp \
+#     key.cpp \
+#     db.cpp \
+#     irc.cpp \
+#     keystore.cpp \
+#     stun.cpp \
+#     miner.cpp \
+#     main.cpp \
+#     net.cpp \
+#     protocol.cpp \
+#     bitcoinrpc.cpp \
+#     price.cpp \
+#     rpcdump.cpp \
+#     rpcnet.cpp \
+#     rpcmining.cpp \
+#     rpcwallet.cpp \
+#     rpcblockchain.cpp \
+#     rpcrawtransaction.cpp \
+#     script.cpp \
+#     sync.cpp \
+#     util.cpp \
+#     wallet.cpp \
+#     walletdb.cpp \
+#     noui.cpp \
+#     kernel.cpp \
+#     pbkdf2.cpp \
+#     scrypt.cpp \
+#     scrypt-x86.S \
+#     scrypt-x86_64.S \
+#     scrypt-jane/scrypt-jane.c
+# libyacoin_wallet_a_LDADD = $(BOOST_LIBS) $(BDB_LIBS) $(SSL_LIBS) $(CRYPTO_LIBS) $(MINIUPNPC_LIBS) $(LIBLEVELDB) $(LIBMEMENV)
+# libyacoin_wallet_a_CPPFLAGS = $(BITCOIN_INCLUDES)
+# libyacoin_wallet_a_LDFLAGS = $(RELDFLAGS) $(AM_LDFLAGS) $(LIBTOOL_APP_LDFLAGS) -ldl -lpthread -lrt
+
 yacoind_SOURCES = \
     txdb-leveldb.cpp \
     alert.cpp \
@@ -132,7 +173,7 @@ endif
 
 if ENABLE_TESTS
 bin_PROGRAMS+=yacoin_test
-yacoin_test_SOURCES= $(yacoind_SOURCES) \
+yacoin_test_SOURCES= \
   test/allocator_tests.cpp \
   test/base32_tests.cpp \
   test/base58_tests.cpp \
@@ -143,9 +184,46 @@ yacoin_test_SOURCES= $(yacoind_SOURCES) \
   test/netbase_tests.cpp \
   test/rpc_tests.cpp \
   test/sigopcount_tests.cpp \
+  test/script_tests.cpp \
   test/test_bitcoin.cpp \
-  test/transaction_tests.cpp
-
+  test/transaction_tests.cpp \
+  txdb-leveldb.cpp \
+  alert.cpp \
+  version.cpp \
+  checkpoints.cpp \
+  netbase.cpp \
+  addrman.cpp \
+  crypter.cpp \
+  key.cpp \
+  db.cpp \
+  init.cpp \
+  irc.cpp \
+  keystore.cpp \
+  stun.cpp \
+  miner.cpp \
+  main.cpp \
+  net.cpp \
+  protocol.cpp \
+  bitcoinrpc.cpp \
+  price.cpp \
+  rpcdump.cpp \
+  rpcnet.cpp \
+  rpcmining.cpp \
+  rpcwallet.cpp \
+  rpcblockchain.cpp \
+  rpcrawtransaction.cpp \
+  script.cpp \
+  sync.cpp \
+  util.cpp \
+  wallet.cpp \
+  walletdb.cpp \
+  noui.cpp \
+  kernel.cpp \
+  pbkdf2.cpp \
+  scrypt.cpp \
+  scrypt-x86.S \
+  scrypt-x86_64.S \
+  scrypt-jane/scrypt-jane.c
 #  test/accounting_tests.cpp \
 #  test/bignum_tests.cpp \
 #  test/Checkpoints_tests.cpp \
@@ -153,13 +231,12 @@ yacoin_test_SOURCES= $(yacoind_SOURCES) \
 #  test/miner_tests.cpp \
 #  test/multisig_tests.cpp \
 #  test/script_P2SH_tests.cpp \
-#  test/script_tests.cpp \
 #  test/uint160_tests.cpp \
 #  test/uint256_tests.cpp \
 #  test/util_tests.cpp \
 #  test/wallet_tests.cpp
 
 yacoin_test_LDADD = $(BOOST_LIBS) $(BDB_LIBS) $(SSL_LIBS) $(CRYPTO_LIBS) $(MINIUPNPC_LIBS) $(LIBLEVELDB) $(LIBMEMENV)  $(BOOST_UNIT_TEST_FRAMEWORK_LIB)
-yacoin_test_CPPFLAGS = $(BITCOIN_INCLUDES)
+yacoin_test_CPPFLAGS = $(BITCOIN_INCLUDES) -DTESTS_ENABLED
 yacoin_test_LDFLAGS = $(RELDFLAGS) $(AM_LDFLAGS) $(LIBTOOL_APP_LDFLAGS) -ldl -lpthread -lrt
 endif

@@ -71,6 +71,11 @@ void ExitTimeout(void* parg)
 #endif
 }
 
+
+static bool 
+    fExit;
+    
+#ifndef TESTS_ENABLED
 void StartShutdown()
 {
 #ifdef QT_GUI
@@ -81,8 +86,6 @@ void StartShutdown()
     NewThread(Shutdown, NULL);
 #endif
 }
-static bool 
-    fExit;
 
 void Shutdown(void* parg)
 {
@@ -150,6 +153,7 @@ void Shutdown(void* parg)
         ExitThread(0);
     }
 }
+#endif
 
 void HandleSIGTERM(int)
 {
@@ -217,7 +221,7 @@ void HandleSIGHUP(int)
 //
 // Start
 //
-#if !defined(QT_GUI)
+#if !defined(QT_GUI) && !defined(TESTS_ENABLED)
 bool AppInit(int argc, char* argv[])
 {
     bool fRet = false;
