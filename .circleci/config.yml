@@ -14,7 +14,7 @@ jobs:
           make           
           cd src
           mkdir unittestresults
-          ./yacoin_test > ../unittestresults/unittestresults.txt
+          ./yacoin_test > ./unittestresults/unittestresults.txt
       - store_artifacts:
           path: src/unittestresults
           destination: testresults
