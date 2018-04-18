@@ -181,11 +181,17 @@ yacoin_test_SOURCES= \
   test/bignum_tests.cpp \
   test/getarg_tests.cpp \
   test/mruset_tests.cpp \
+  test/multisig_tests.cpp \
   test/rpc_tests.cpp \
+  test/script_P2SH_tests.cpp \
   test/sigopcount_tests.cpp \
   test/script_tests.cpp \
   test/test_bitcoin.cpp \
   test/transaction_tests.cpp \
+  test/util_tests.cpp \
+  test/wallet_tests.cpp \
+  test/uint160_tests.cpp \
+  test/uint256_tests.cpp \
   txdb-leveldb.cpp \
   alert.cpp \
   version.cpp \
@@ -224,17 +230,8 @@ yacoin_test_SOURCES= \
   scrypt-x86_64.S \
   scrypt-jane/scrypt-jane.c
 
-  
-#  test/DoS_tests.cpp \
-#  test/miner_tests.cpp \
-#  test/multisig_tests.cpp \
-#  test/script_P2SH_tests.cpp \
-#  test/uint160_tests.cpp \
-#  test/uint256_tests.cpp \
-#  test/util_tests.cpp \
-#  test/wallet_tests.cpp
-
 # FAILING
+#  test/miner_tests.cpp \
 #  test/key_tests.cpp \
 #  test/base58_tests.cpp \
 #  test/netbase_tests.cpp \
