@@ -1,3 +1,6 @@
+config.log
+config.status
+libtool
 src/*.exe
 src/yacoin
 src/yacoind
@@ -37,6 +40,8 @@ Makefile.in
 src/config/bitcoin-config.h
 src/config/bitcoin-config.h.in
 src/config/stamp-h1
-config.log
-config.status
-libtool
+src/qt/forms/ui*.h
+src/yacoin_test
+src/log.0000000*1
+src/qt/*moc
+.vscode/*
