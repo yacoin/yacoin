@@ -1,7 +1,5 @@
-# DIST_SUBDIRS = secp256k1
 DIST_SUBDIRS =
 AM_LDFLAGS = $(PTHREAD_CFLAGS) $(LIBTOOL_LDFLAGS)
-
 
 if EMBEDDED_LEVELDB
 DEFS+=-DUSE_LEVELDB
@@ -60,9 +58,6 @@ xCXXFLAGS_SCRYPT_JANE=-O3 -msse2 -pthread -Wall -Wextra -Wformat -Wformat-securi
 yacoind-scrypt-jane.o: scrypt-jane/scrypt-jane.c
 	gcc -c $(xCXXFLAGS_SCRYPT_JANE) -MMD -o $@ $<
 
-# libbitcoin_util_a-clientversion.$(OBJEXT): obj/build.h
-# yacoind: obj/build.h
-
 libyacoin_common_a_SOURCES= \
     txdb-leveldb.cpp \
     alert.cpp \
@@ -102,49 +97,10 @@ libyacoin_common_a_SOURCES= \
     scrypt-x86_64.S \
     scrypt-jane/scrypt-jane.c
 
-# libyacoin_common_a_LIBADD = $(BOOST_LIBS) $(BDB_LIBS) $(SSL_LIBS) $(CRYPTO_LIBS) $(MINIUPNPC_LIBS) $(LIBLEVELDB) $(LIBMEMENV)
 libyacoin_common_a_CPPFLAGS = $(BITCOIN_INCLUDES)
 libyacoin_common_a_LDFLAGS = $(RELDFLAGS) $(AM_LDFLAGS) $(LIBTOOL_APP_LDFLAGS) -ldl -lpthread -lrt
 
 yacoind_SOURCES = init.cpp
-
-    # txdb-leveldb.cpp \
-    # alert.cpp \
-    # version.cpp \
-    # checkpoints.cpp \
-    # netbase.cpp \
-    # addrman.cpp \
-    # crypter.cpp \
-    # key.cpp \
-    # db.cpp \
-    # irc.cpp \
-    # keystore.cpp \
-    # stun.cpp \
-    # miner.cpp \
-    # main.cpp \
-    # net.cpp \
-    # protocol.cpp \
-    # bitcoinrpc.cpp \
-    # price.cpp \
-    # rpcdump.cpp \
-    # rpcnet.cpp \
-    # rpcmining.cpp \
-    # rpcwallet.cpp \
-    # rpcblockchain.cpp \
-    # rpcrawtransaction.cpp \
-    # script.cpp \
-    # sync.cpp \
-    # util.cpp \
-    # wallet.cpp \
-    # walletdb.cpp \
-    # noui.cpp \
-    # kernel.cpp \
-    # pbkdf2.cpp \
-    # scrypt.cpp \
-    # scrypt-x86.S \
-    # scrypt-x86_64.S \
-    # scrypt-jane/scrypt-jane.c
-
 
 yacoind_LDADD = $(LIBYACOIN_COMMON)
 yacoind_LDADD += $(BOOST_LIBS) $(BDB_LIBS) $(SSL_LIBS) $(CRYPTO_LIBS) $(MINIUPNPC_LIBS) $(LIBLEVELDB) $(LIBMEMENV)
@@ -201,7 +157,7 @@ yacoin_test_SOURCES= \
   test/uint256_tests.cpp \
   init.cpp
 
-# FAILING
+# FAILING tests
 #  test/miner_tests.cpp \
 #  test/key_tests.cpp \
 #  test/base58_tests.cpp \
