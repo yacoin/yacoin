@@ -137,8 +137,8 @@ BITCOIN_QT_H = \
   qt/qvalidatedlineedit.h \
   qt/overviewpage.h \
   qt/askpassphrasedialog.h \
-  qt/coincontroldialog.h
-#  qt/qrcodedialog.h
+  qt/coincontroldialog.h \
+  qt/qrcodedialog.h
 
 RES_ICONS = \
   qt/res/icons/yacoin-128.png \
