@@ -1,3 +1,4 @@
+configure
 config.log
 config.status
 libtool
@@ -45,3 +46,4 @@ src/yacoin_test
 src/log.0000000*1
 src/qt/*moc
 .vscode/*
+src/libyacoin_common.a
