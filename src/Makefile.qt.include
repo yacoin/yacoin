@@ -190,7 +190,6 @@ RES_ICONS = \
   qt/res/icons/key.png \
   qt/res/icons/synced.png
 
-
 BITCOIN_QT_CPP = \
   qt/mintingview.cpp \
   qt/signverifymessagedialog.cpp \
@@ -235,6 +234,7 @@ BITCOIN_QT_CPP = \
   qt/qvaluecombobox.cpp \
   qt/bitcoinamountfield.cpp \
   qt/optionsmodel.cpp \
+  qt/qrcodedialog.cpp \
   init.cpp
 
 #  kernelrecord.cpp
@@ -251,7 +251,7 @@ BITCOIN_QT_INCLUDES = -I$(builddir)/qt -I$(srcdir)/qt -I$(srcdir)/qt/forms \
   -I$(builddir)/qt/forms -DQT_GUI
 
 qt_libbitcoinqt_a_CPPFLAGS = $(BITCOIN_INCLUDES) $(BITCOIN_QT_INCLUDES) \
-  $(QT_INCLUDES) $(QT_DBUS_INCLUDES) $(PROTOBUF_CFLAGS) $(QR_CFLAGS)
+  $(QT_INCLUDES) $(QT_DBUS_INCLUDES) $(PROTOBUF_CFLAGS) $(QR_CFLAGS) -DUSE_QRCODE
 
 qt_libbitcoinqt_a_SOURCES = $(BITCOIN_QT_CPP) $(BITCOIN_QT_H) $(QT_FORMS_UI) \
   $(QT_QRC) $(QT_QRC_LOCALE) $(QT_TS) $(PROTOBUF_PROTO) $(RES_ICONS) $(RES_IMAGES) $(RES_MOVIES)
