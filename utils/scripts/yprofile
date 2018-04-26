@@ -5,7 +5,7 @@ echo "Running on OS: $YOS"
 case $YOS in
   linux*) YDIR=$(pwd)/deps;;
   darwin*) YDIR=$HOME/ydir;;
-  *) YDIR=/ydir;;
+  *) YDIR=$(pwd)/deps;;
 esac
 
 mkdir -p $YDIR 
@@ -14,4 +14,3 @@ cp -r scripts $YDIR
 [ -d "$YDIR" ] && cd $YDIR || { echo "invalid YDIR. Yenv not set. "; return 1; }
 [ -f "$YDIR/scripts/yenv" ] && source $YDIR/scripts/yenv
 export YDIR
-
