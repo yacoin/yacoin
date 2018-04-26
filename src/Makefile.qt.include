@@ -249,45 +249,11 @@ BITCOIN_QT_CPP = \
   qt/transactionview.cpp \
   qt/qvaluecombobox.cpp \
   qt/bitcoinamountfield.cpp \
-  qt/optionsmodel.cpp\
-  txdb-leveldb.cpp \
-  alert.cpp \
-  version.cpp \
-  checkpoints.cpp \
-  netbase.cpp \
-  addrman.cpp \
-  crypter.cpp \
-  key.cpp \
-  db.cpp \
-  irc.cpp \
-  keystore.cpp \
-  stun.cpp \
-  miner.cpp \
-  main.cpp \
-  net.cpp \
-  protocol.cpp \
-  bitcoinrpc.cpp \
-  price.cpp \
-  rpcdump.cpp \
-  rpcnet.cpp \
-  rpcmining.cpp \
-  rpcwallet.cpp \
-  rpcblockchain.cpp \
-  rpcrawtransaction.cpp \
-  script.cpp \
-  sync.cpp \
-  util.cpp \
-  wallet.cpp \
-  walletdb.cpp \
-  noui.cpp \
-  kernel.cpp \
-  pbkdf2.cpp \
-  scrypt.cpp \
-  scrypt-x86.S \
-  scrypt-x86_64.S \
-  scrypt-jane/scrypt-jane.c \
-  kernelrecord.cpp \
+  qt/optionsmodel.cpp \
   init.cpp
+
+#  kernelrecord.cpp
+#  rpcblockchain.cpp
   
 RES_IMAGES = \
   qt/res/images/splash.png
@@ -337,8 +303,8 @@ qt_yacoin_qt_LDADD = qt/libbitcoinqt.a $(LIBBITCOIN_SERVER)
 if ENABLE_WALLET
 qt_yacoin_qt_LDADD += $(LIBBITCOIN_WALLET)
 endif
-qt_yacoin_qt_LDADD += $(LIBBITCOIN_CLI) $(LIBBITCOIN_COMMON) $(LIBBITCOIN_UTIL) $(LIBBITCOIN_CRYPTO) $(LIBBITCOIN_UNIVALUE) $(LIBLEVELDB) $(LIBMEMENV) \
-  $(BOOST_LIBS) $(QT_LIBS) $(QT_DBUS_LIBS) $(QR_LIBS) $(PROTOBUF_LIBS) $(BDB_LIBS) $(SSL_LIBS) $(CRYPTO_LIBS) $(MINIUPNPC_LIBS) $(LIBSECP256K1) -ldl -lrt
+qt_yacoin_qt_LDADD += $(LIBYACOIN_COMMON) $(LIBLEVELDB) $(LIBMEMENV) $(BOOST_LIBS) $(QT_LIBS) $(QT_DBUS_LIBS) $(QR_LIBS) \
+  $(PROTOBUF_LIBS) $(BDB_LIBS) $(SSL_LIBS) $(CRYPTO_LIBS) $(MINIUPNPC_LIBS) $(LIBSECP256K1) -ldl -lrt
 qt_yacoin_qt_LDFLAGS = $(RELDFLAGS) $(AM_LDFLAGS) $(QT_LDFLAGS) $(LIBTOOL_APP_LDFLAGS)
 qt_yacoin_qt_LIBTOOLFLAGS = --tag CXX
 

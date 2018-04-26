@@ -47,3 +47,5 @@ src/log.0000000*1
 src/qt/*moc
 .vscode/*
 src/libyacoin_common.a
+src/qt/libbitcoinqt.a
+src/qt/moc_*
