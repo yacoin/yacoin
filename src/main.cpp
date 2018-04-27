@@ -3050,10 +3050,11 @@ bool CBlock::AcceptBlock()
     ::int64_t 
         nMedianTimePast = pindexPrev->GetMedianTimePast();
     int 
-        nMaxOffset = 12 * nSecondsPerHour; // 12 hours
+      //nMaxOffset = 12 * nSecondsPerHour; // 12 hours
+        nMaxOffset = 7 * nSecondsPerDay; // One week (test)
 
     if (fTestNet)   // || pindexPrev->nTime < 1450569600)
-        nMaxOffset = 7 * 7 * nSecondsPerDay; // One week (permanently on testNet
+        nMaxOffset = 7 * 7 * nSecondsPerDay; // 7 weeks on testNet
 
 // Check timestamp against prev
     if (GetBlockTime() <= pindexPrev->GetMedianTimePast() || FutureDrift(GetBlockTime()) < pindexPrev->GetBlockTime())

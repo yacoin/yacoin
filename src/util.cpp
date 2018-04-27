@@ -1534,7 +1534,7 @@ void
         sTextString;
     #endif
     if(
-        (0 == (nCount % 6) )   // every 6th times
+        (0 == (nCount % 6) )   // every 6th time
       )
     {
         if( 0 == nCount )       // first time

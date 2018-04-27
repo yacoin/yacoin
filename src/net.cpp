@@ -28,10 +28,6 @@
  #include "strlcpy.h"
 #endif
 
-#ifndef _BITCOIN_ADDRMAN
- #include "addrman.h"
-#endif
-
 #ifndef NOVACOIN_MINER_H
  #include "miner.h"
 #endif
@@ -63,7 +59,8 @@ using std::set;
 
 const unsigned int 
     nStakeMaxAge = 90 * nSecondsPerDay,             //60 * 60 * 24 * 90; // 90 days as full weight
-    nOnedayOfAverageBlocks = nSecondsPerDay / nStakeTargetSpacing;  // should be 144 if it's BTC!
+    nOnedayOfAverageBlocks = (nSecondsPerDay / nStakeTargetSpacing)/10;  // the old 144
+    //nOnedayOfAverageBlocks = nSecondsPerDay / nStakeTargetSpacing;  // should be 144 if it's BTC!
 unsigned int 
     nStakeMinAge = 30 * nSecondsPerDay,             //60 * 60 * 24 * 30; // 30 days as zero time weight
     nStakeTargetSpacing = 1 * nSecondsperMinute,    //1 * 60; // 1-minute stake spacing

@@ -1612,13 +1612,19 @@ void ThreadCleanWalletPassphrase(void* parg)
 
 Value walletpassphrase(const Array& params, bool fHelp)
 {
-    if (pwalletMain->IsCrypted() && (fHelp || params.size() < 2 || params.size() > 3))
+    if (
+        fHelp ||    // otherwise this doesn't showup in help!
+        (
+         pwalletMain->IsCrypted() && 
+         (fHelp || params.size() < 2 || params.size() > 3)
+        )
+       )
         throw runtime_error(
             "walletpassphrase <passphrase> <timeout> [mintonly]\n"
             "Stores the wallet decryption key in memory for <timeout> seconds.\n"
             "mintonly is optional true/false allowing only block minting.");
-    if (fHelp)
-        return true;
+    //if (fHelp)    // this is not needed now
+    //    return true;
     if (!pwalletMain->IsCrypted())
         throw JSONRPCError(RPC_WALLET_WRONG_ENC_STATE, "Error: running with an unencrypted wallet, but walletpassphrase was called.");
 
@@ -1657,12 +1663,18 @@ Value walletpassphrase(const Array& params, bool fHelp)
 
 Value walletpassphrasechange(const Array& params, bool fHelp)
 {
-    if (pwalletMain->IsCrypted() && (fHelp || params.size() != 2))
+    if (
+        fHelp ||    // otherwise this doesn't showup in help!
+        (
+         pwalletMain->IsCrypted() && 
+         (fHelp || params.size() != 2)
+        )
+       )
         throw runtime_error(
             "walletpassphrasechange <oldpassphrase> <newpassphrase>\n"
             "Changes the wallet passphrase from <oldpassphrase> to <newpassphrase>.");
-    if (fHelp)
-        return true;
+    //if (fHelp)
+    //    return true;
     if (!pwalletMain->IsCrypted())
         throw JSONRPCError(RPC_WALLET_WRONG_ENC_STATE, "Error: running with an unencrypted wallet, but walletpassphrasechange was called.");
 
@@ -1690,14 +1702,20 @@ Value walletpassphrasechange(const Array& params, bool fHelp)
 
 Value walletlock(const Array& params, bool fHelp)
 {
-    if (pwalletMain->IsCrypted() && (fHelp || params.size() != 0))
+    if (
+        fHelp ||    // otherwise this doesn't showup in help!
+        (
+         pwalletMain->IsCrypted() && 
+         (fHelp || params.size() != 0)
+        )
+       )
         throw runtime_error(
             "walletlock\n"
             "Removes the wallet encryption key from memory, locking the wallet.\n"
             "After calling this method, you will need to call walletpassphrase again\n"
             "before being able to call any methods which require the wallet to be unlocked.");
-    if (fHelp)
-        return true;
+    //if (fHelp)
+    //    return true;
     if (!pwalletMain->IsCrypted())
         throw JSONRPCError(RPC_WALLET_WRONG_ENC_STATE, "Error: running with an unencrypted wallet, but walletlock was called.");
 
@@ -1713,12 +1731,18 @@ Value walletlock(const Array& params, bool fHelp)
 
 Value encryptwallet(const Array& params, bool fHelp)
 {
-    if (!pwalletMain->IsCrypted() && (fHelp || params.size() != 1))
-        throw runtime_error(
+    if (
+        fHelp ||    // otherwise this doesn't showup in help!
+        (
+         !pwalletMain->IsCrypted() && 
+         (fHelp || params.size() != 1)
+        )
+       )
+         throw runtime_error(
             "encryptwallet <passphrase>\n"
             "Encrypts the wallet with <passphrase>.");
-    if (fHelp)
-        return true;
+    //if (fHelp)
+    //    return true;
     if (pwalletMain->IsCrypted())
         throw JSONRPCError(RPC_WALLET_WRONG_ENC_STATE, "Error: running with an encrypted wallet, but encryptwallet was called.");
 

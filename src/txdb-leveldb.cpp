@@ -9,16 +9,16 @@
     #include "msvc_warnings.push.h"
 #endif
 
-#ifndef PPCOIN_KERNEL_H
- #include "kernel.h"
-#endif
-
 #ifndef BITCOIN_CHECKPOINT_H
  #include "checkpoints.h"
 #endif
 
 #ifndef BITCOIN_TXDB_H
  #include "txdb.h"
+#endif
+
+#ifndef PPCOIN_KERNEL_H
+ #include "kernel.h"
 #endif
 
 #include <map>
@@ -360,19 +360,17 @@ bool CTxDB::LoadBlockIndex()
         return true;
     }
 #ifdef WIN32
-    int
-        nMaxHeightGuess = 0,
-        nCounter = 0,
-    #ifdef _DEBUG
-        nRefresh = 2000;    // generally resfresh rates are chosen to give ~1 update/sec
-    #else
+    const int
+  #ifdef _DEBUG
+        nREFRESH = 2000;    // generally resfresh rates are chosen to give ~1 update/sec
+  #else
         // seems to be slowing down??
-        #ifdef QT_GUI
-        nRefresh = 8000;
-        #else
-        nRefresh = 8000;    // 15000;    //10000;
-        #endif
-    #endif
+        nREFRESH = 12000;
+  #endif
+    int
+        nMaxHeightGuess = 1,
+        nCounter = 0,
+        nRefresh = nREFRESH;
     ::int64_t
         n64MsStartTime = GetTimeMillis();
 #endif
@@ -530,7 +528,9 @@ bool CTxDB::LoadBlockIndex()
         // to "hone in on" the %age done.  
         // Towards the end it ought to be pretty accurate.
         if( nMaxHeightGuess < pindexNew->nHeight )
+        {
             nMaxHeightGuess = pindexNew->nHeight;
+        }
         if( 0 == ( nCounter % nRefresh ) )  // every nRefresh-th time through the loop
         {
             float                   // these #s are just to slosh the . around
@@ -539,24 +539,26 @@ bool CTxDB::LoadBlockIndex()
                 sGutsNoise = strprintf(
                             "%7d (%3.2f%%)"
                             "",
-                            pindexNew->nHeight,
+                            nCounter, //pindexNew->nHeight,
                             dEstimate > 100.0? 100.0: dEstimate
                                       );
             if (fPrintToConsole)
             {
+                /****************
                 (void)printf( 
                             "%s"
                             "   "
                             "",
                             sGutsNoise.c_str()
                             );
+                ****************/
                 DoProgress( nCounter, nMaxHeightGuess, n64MsStartTime );
-                (void)printf( 
-                            "\r"
-                            );
+                //(void)printf( 
+                //            "\r"
+                //            );
             }
     #ifdef QT_GUI
-            uiInterface.InitMessage( sGutsNoise.c_str() );
+        //    uiInterface.InitMessage( sGutsNoise.c_str() );
     #endif
         }
 #endif
@@ -596,9 +598,8 @@ bool CTxDB::LoadBlockIndex()
         vSortedByHeight.reserve(mapBlockIndex.size());
         //vSortedByHeight.resize( mapBlockIndex.size() );
 
-#ifdef WIN32
-        int nUpdatePeriod = 10000;
-#endif
+        int
+            nUpdatePeriod = 10000;
         BOOST_FOREACH(const PAIRTYPE(uint256, CBlockIndex*)& item, mapBlockIndex)
         {
             CBlockIndex
@@ -624,6 +625,8 @@ bool CTxDB::LoadBlockIndex()
             (void)printf( "\ndone\nChecking stake checksums...\n" );
     #ifdef _DEBUG
         nUpdatePeriod /= 4; // speed up update for debug mode
+    #else
+        nUpdatePeriod *= 5; // slow down update for release mode
     #endif
     #ifdef QT_GUI
         uiInterface.InitMessage( _("done") );

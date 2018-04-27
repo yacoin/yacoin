@@ -6,8 +6,12 @@
     #include <stdint.h>
     #include "msvc_warnings.push.h"
 
+ #ifndef BITCOIN_INIT_H
     #include "init.h"
+ #endif
+ #ifndef _BITCOINRPC_H_
     #include "bitcoinrpc.h"
+ #endif
 
     #undef printf
 
@@ -238,8 +242,8 @@ Value help(const Array& params, bool fHelp)
 {
     if (fHelp || params.size() > 1)
     {
-      //throw runtime_error( "help [command]\n" "List commands, or get help for a command." );
-        throw invalid_argument( "help [command]\n" "List commands, or get help for a command." );
+        throw runtime_error( "help [command]\n" "List commands, or get help for a command." );
+      //throw invalid_argument( "help [command]\n" "List commands, or get help for a command." );
     }
     string strCommand = "";
     if (params.size() > 0)
@@ -280,9 +284,7 @@ static const CRPCCommand vRPCCommands[] =
 #ifdef WIN32
     { "getblockcountt",         &getcurrentblockandtime, true,   false },
 #endif
-//#if !defined( QT_GUI )
     { "getyacprice",            &getYACprice,            true,   false },
-//#endif
     { "getconnectioncount",     &getconnectioncount,     true,   false },
     { "getaddrmaninfo",         &getaddrmaninfo,         true,   false },
     { "getpeerinfo",            &getpeerinfo,            true,   false },

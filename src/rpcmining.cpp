@@ -8,14 +8,6 @@
     #include "msvc_warnings.push.h"
 #endif
 
-#ifndef BITCOIN_MAIN_H
- #include "main.h"
-#endif
-
-#ifndef BITCOIN_DB_H
- #include "db.h"
-#endif
-
 #ifndef BITCOIN_TXDB_H
  #include "txdb.h"
 #endif
@@ -111,15 +103,15 @@ Value getsubsidy(const Array& params, bool fHelp)
 
 Value getmininginfo(const Array& params, bool fHelp)
 {
-    unsigned char Nfactor;
-    uint64_t N;
-
     if (fHelp || params.size() != 0)
         throw runtime_error(
             "getmininginfo\n"
             "Returns an object containing mining-related information.");
 
-    float nKernelsRate = 0, nCoinDaysRate = 0;
+    float 
+        nKernelsRate = 0, 
+        nCoinDaysRate = 0;
+
     pwalletMain->GetStakeStats(nKernelsRate, nCoinDaysRate);
 
     Object obj, diff, weight;
@@ -153,14 +145,16 @@ Value getmininginfo(const Array& params, bool fHelp)
     obj.push_back(Pair("testnet",       fTestNet));
 
     // WM - Tweaks to report current Nfactor and N.
-    Nfactor = GetNfactor(pindexBest->GetBlockTime());
+    unsigned char 
+        Nfactor = GetNfactor(pindexBest->GetBlockTime());
 
+    uint64_t 
+        N;
 #ifdef _MSC_VER
     N = uint64_t( 1 ) << ( Nfactor + 1 );    
 #else    
     N = 1 << ( Nfactor + 1 );
 #endif    
-    
     obj.push_back( Pair( "Nfactor", Nfactor ) );
     obj.push_back( Pair( "N", (Value_type)N ) );
 

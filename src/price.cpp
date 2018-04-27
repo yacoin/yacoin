@@ -16,10 +16,6 @@
  #include "net.h"
 #endif
 
-#ifndef BITCOIN_STRLCPY_H
- #include "strlcpy.h"
-#endif
-
 #include <vector>
 
 using std::string;
@@ -39,14 +35,14 @@ static const int
     nUnusualCharacterOffset = 2;
 CProvider aBTCtoYACProviders[] = 
     {    
-        {   //http://api.coinmarketcap.com/v1/ticker/yacoin/
+        {   //https://api.coinmarketcap.com/v1/ticker/yacoin/
             "api.coinmarketcap.com",
             "price_btc",    //"price_usd",
             "/v1/ticker/yacoin/",
             nSpecialCharacterOffset,
             DEFAULT_HTTPS_PORT
         },
-        {   //https://yobit.net/api/3/ticker/yac_btc (2)
+        {   //https://yobit.net/api/3/ticker/yac_btc
             "yobit.net",
             "last",
             "/api/3/ticker/yac_btc",
@@ -77,13 +73,6 @@ CProvider aBTCtoYACProviders[] =
     };
 CProvider aCurrencyToBTCProviders[] = 
     {
-        {   
-            "api.bitcoinvenezuela.com",
-            "USD",
-            "/",
-            nUnusualCharacterOffset,
-            DEFAULT_HTTP_PORT
-        },
         {   //http://api.coinmarketcap.com/v1/ticker/bitcoin/
             "api.coinmarketcap.com",
             "price_usd",
@@ -104,6 +93,13 @@ CProvider aCurrencyToBTCProviders[] =
             "/api/ticker/btc-usd", 
             nDefaultCharacterOffset,
             DEFAULT_HTTPS_PORT
+        },
+        {   
+            "api.bitcoinvenezuela.com",
+            "USD",
+            "/",
+            nUnusualCharacterOffset,
+            DEFAULT_HTTP_PORT
         },
         {   
             "btc.blockr.io",
@@ -503,10 +499,6 @@ private:
 
 static bool parseAline( string &s, string & strLine, unsigned int &i )
 {
-    char 
-        c;
-    int
-        nBytes;
     const unsigned int
         nLength = s.length();
 
@@ -514,6 +506,7 @@ static bool parseAline( string &s, string & strLine, unsigned int &i )
     {
         char 
             c;
+
         c = s.at(i);
         strLine += c;
         if( '\n' == c )  // the signal for a line received
@@ -697,7 +690,7 @@ private:
     CdoSocket &operator = ( const CdoSocket & );
 
 public:
-    explicit CdoSocket(
+    CdoSocket(
 #ifdef WIN32
                         SOCKET 
 #else
@@ -706,13 +699,13 @@ public:
                         & Socket, 
                         const string & sDomain, 
                         const int & nPort = DEFAULT_HTTP_PORT 
-                      )
+             )
     {
         int
             nResult;
 
         SocketCopy = 
-#ifdef _MSC_VER
+#ifdef WIN32
             NULL;
 #else
             0;
@@ -773,7 +766,7 @@ public:
             {
                 nResult = closesocket(Socket);  //I'm guessing here as I don't linux!
 #endif
-#ifdef _MSC_VER
+#ifdef WIN32
                 Socket = NULL;
 #else
                 Socket = 0;
@@ -798,7 +791,7 @@ public:
                 ;   // maybe some code?
 #endif            
 
-#ifdef _MSC_VER
+#ifdef WIN32
             Socket = NULL;
 #else
             Socket = 0;
@@ -813,7 +806,7 @@ public:
 
     ~CdoSocket()
     {
-#ifdef _MSC_VER
+#ifdef WIN32
         if (NULL != SocketCopy)
 #else
         if (0 != SocketCopy)
@@ -862,9 +855,10 @@ static bool GetMyExternalWebPage(
                 return false;
         }
         //else regular http
-#ifdef _MSC_VER
+#ifdef WIN32
         SOCKET 
-            hSocket = NULL;
+            hsocket = NULL,
+            & hSocket = hsocket;
 #else
         u_int
             hSocket = 0;

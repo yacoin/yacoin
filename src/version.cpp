@@ -10,7 +10,7 @@
 #define DISPLAY_VERSION_MAJOR       0
 #define DISPLAY_VERSION_MINOR       4
 #define DISPLAY_VERSION_REVISION    8   
-#define DISPLAY_VERSION_BUILD       19
+#define DISPLAY_VERSION_BUILD       21
 #define DISPLAY_VERSION_TESTING     1
 
 const int

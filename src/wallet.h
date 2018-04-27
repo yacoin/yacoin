@@ -36,7 +36,17 @@ typedef std::set<std::pair<const CWalletTx*,unsigned int> > CoinsSet;
 
 // Preloaded coins metadata
 // (txid, vout.n) => ((txindex, (tx, vout.n)), (block, modifier))
-typedef std::map<std::pair<uint256, unsigned int>, std::pair<std::pair<CTxIndex, std::pair<const CWalletTx*,unsigned int> >, std::pair<CBlock, ::uint64_t> > > MetaMap;
+//typedef std::map< std::pair<uint256, unsigned int>, std::pair< std::pair< CTxIndex, std::pair<const CWalletTx*,unsigned int> >, std::pair<CBlock, ::uint64_t> > > MetaMap;
+typedef std::map<
+                  std::pair<uint256, unsigned int>,     // the unique key
+                  std::pair<
+                            std::pair<
+                                      CTxIndex, 
+                                      std::pair<const CWalletTx*,unsigned int> 
+                                     >, 
+                            std::pair<CBlock, ::uint64_t> 
+                           >                            // the value 
+                > MetaMap;
 
 
 /** (client) version numbers for particular wallet features */
