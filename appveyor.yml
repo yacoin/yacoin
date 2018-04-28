@@ -1,15 +1,14 @@
 before_build:
-  - echo hallo
+  - echo BEFORE BUILD
+  - pwd
   
 
 build_script:
   - echo building
   - pwd
-  - cd ..
-  - md yacoindep
-  - cd yacoindep
-  - echo hallo > yacointxt.txt
-  - type yacointxt.txt
+  - cd utils
+  - source build.sh
 
 after_build:
-  - echo done
+  - echo AFTER BUILD
+  - pwd
