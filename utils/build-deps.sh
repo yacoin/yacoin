@@ -1,5 +1,5 @@
 export YACREPO=$(pwd)/..
-CURRENDIR=$(pwd)
+CURRENTDIR=$(pwd)
 
 source ./scripts/yprofile
 
@@ -27,5 +27,5 @@ buildberkeleydb
 cd $YDIR
 buildqt
 
-cd $(CURRENDIR)
+cd $CURRENTDIR
 date
