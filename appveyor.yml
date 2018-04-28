@@ -7,4 +7,3 @@ build_script:
 
 after_build:
   - echo done
-  
