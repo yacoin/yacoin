@@ -5,7 +5,7 @@ echo "Running on OS: $YOS"
 case $YOS in
   linux*) YDIR=$(pwd)/deps;;
   darwin*) YDIR=$HOME/ydir;;
-  *) YDIR=$(pwd)/deps;;
+  *) YDIR=$(pwd)/../../yacoindeps;;
 esac
 
 mkdir -p $YDIR 

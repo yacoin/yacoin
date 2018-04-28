@@ -50,3 +50,8 @@ src/qt/*moc
 src/libyacoin_common.a
 src/qt/libbitcoinqt.a
 src/qt/moc_*
+release/yacoin-qt.exe
+Makefile.Debug
+Makefile.release
+object_script.yacoin-qt.Debug
+object_script.yacoin-qt.Release
