@@ -4,6 +4,12 @@ before_build:
 
 build_script:
   - echo building
+  - pwd
+  - cd ..
+  - md yacoindep
+  - cd yacoindep
+  - echo hallo > yacointxt.txt
+  - type yacointxt.txt
 
 after_build:
   - echo done
