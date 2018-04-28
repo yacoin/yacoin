@@ -1,0 +1,10 @@
+before_build:
+  - echo hallo
+  
+
+build_script:
+  - echo building
+
+after_build:
+  - echo done
+  
