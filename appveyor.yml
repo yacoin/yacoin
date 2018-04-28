@@ -1,8 +1,15 @@
 before_build:
-  - echo BEFORE BUILD
+  - echo "Downloading precompiled dependencies"  
+  - md yacoindeps
+  - cd yacoindeps
+  - md sw
+  - cd sw
+  - curl -fsS -o YacoinDependencies.zip https://drive.google.com/file/d/1mgeaL_vKnKnbLDRVa3AsbPh_AUfuYg5a/view?usp=sharing   
+  - 7z x YacoinDependencies.zip
+  - dir
+  - dir YacoinDependencies
   - pwd
   
-
 build_script:
   - echo building
   - pwd
