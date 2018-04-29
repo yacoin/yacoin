@@ -1,5 +1,7 @@
 before_build:
-  - echo "Downloading precompiled dependencies"  
+  - echo "Downloading precompiled dependencies"
+  - uname
+  - uname -m
   - curl -c ./cookie.txt -s -L "https://drive.google.com/uc?export=download&id=1mgeaL_vKnKnbLDRVa3AsbPh_AUfuYg5a" > tmp.txt
   - sed -i -e "s/.*\(uc?export.*\)\">Download anywa.*/\1/" tmp.txt
   - grep export tmp.txt > tmp2.txt
