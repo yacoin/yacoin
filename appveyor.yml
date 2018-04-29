@@ -1,24 +1,29 @@
 before_build:
-  - echo "Downloading precompiled dependencies"
-  - uname
-  - uname -m
-  - pwd
-  - curl -c ./cookie.txt -s -L "https://drive.google.com/uc?export=download&id=1tzi3SR9bZ_QCF3uRTH2VjSRsuuBWBVd9" > tmp.txt
-  - grep -v DOCTYPE tmp.txt > tmp2.txt
-  - cat tmp2.txt
-  - ls
-  - sed -e 's/.*\(uc?export.*\)">Download anywa.*/\1/' tmp2.txt > tmp.txt
-  - cat tmp.txt
-  - sed -e 's/amp;//g' tmp.txt > tmp2.txt
-  - cat tmp2.txt
-  - export req=$(cat tmp2.txt)
-  - echo $req
-  - echo "https://drive.google.com$req"
-  - curl -b ./cookie.txt -o yacoindependencies.zip -s -L "https://drive.google.com/$req"
-  - 7z x yacoindeps.zip
-  - cd yacoindeps/sw/
-  - sed -e 's/REPLACEPATH/\/c\/projects' yconf > yconf2
-  - mv yconf2 yconf
+  - |-
+    echo "Downloading precompiled dependencies"
+    uname
+    uname -m
+    pwd
+    curl -c ./cookie.txt -s -L "https://drive.google.com/uc?export=download&id=1tzi3SR9bZ_QCF3uRTH2VjSRsuuBWBVd9" > tmp.txt
+    grep -v DOCTYPE tmp.txt > tmp2.txt
+    cat tmp2.txt
+    ls
+    sed -e 's/.*uc?export/uc?export/' tmp2.txt > tmp3.txt
+    cat tmp3.txt
+    sed -e 's/>Download anywa.*//' tmp3.txt > tmp4.txt
+    cat tmp4.txt
+    sed -e 's/\"//"' tmp4.txt > tmp5.txt
+    cat tmp5.txt
+    sed -e 's/amp;//g' tmp5.txt > tmp6.txt
+    cat tmp6.txt
+    export req=$(cat tmp6.txt)
+    echo $req
+    echo "https://drive.google.com$req"
+    curl -b ./cookie.txt -o yacoindependencies.zip -s -L "https://drive.google.com/$req"
+    7z x yacoindeps.zip
+    cd yacoindeps/sw/
+    sed -e 's/REPLACEPATH/\/c\/projects' yconf > yconf2
+    mv yconf2 yconf
 
 build_script:
   - echo building
