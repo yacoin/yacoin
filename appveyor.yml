@@ -10,9 +10,9 @@ before_build:
     ls
     sed -e 's/.*uc?export/uc?export/' tmp2.txt > tmp3.txt
     cat tmp3.txt
-    sed -e 's/>Download anywa.*//' tmp3.txt > tmp4.txt
+    sed -e 's/>Download.*//' tmp3.txt > tmp4.txt
     cat tmp4.txt
-    sed -e 's/\"//"' tmp4.txt > tmp5.txt
+    sed -e 's/\"//' tmp4.txt > tmp5.txt
     cat tmp5.txt
     sed -e 's/amp;//g' tmp5.txt > tmp6.txt
     cat tmp6.txt
