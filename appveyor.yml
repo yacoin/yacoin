@@ -8,18 +8,14 @@ before_build:
     grep -v DOCTYPE tmp.txt > tmp2.txt
     cat tmp2.txt
     ls
-    sed -e 's/.*uc?export/uc?export/' tmp2.txt > tmp3.txt
+    sed -e 's/.*confirm=/confirm=/' tmp2.txt > tmp3.txt
     cat tmp3.txt
-    sed -e 's/Download.*//' tmp3.txt > tmp4.txt
+    sed -e 's/&id=.*//' tmp3.txt > tmp4.txt
     cat tmp4.txt
-    sed -e 's/\\"//' tmp4.txt > tmp5.txt
-    cat tmp5.txt
-    sed -e 's/amp;//g' tmp5.txt > tmp6.txt
-    cat tmp6.txt
-    export req=$(cat tmp6.txt)
+    export req=$(cat tmp4.txt)
     echo $req
-    echo "https://drive.google.com$req"
-    curl -b ./cookie.txt -o yacoindependencies.zip -s -L "https://drive.google.com/$req"
+    echo "https://drive.google.com//uc?export=download&id=1tzi3SR9bZ_QCF3uRTH2VjSRsuuBWBVd9&$req"
+    curl -b ./cookie.txt -o yacoindependencies.zip -s -L "https://drive.google.com//uc?export=download&id=1tzi3SR9bZ_QCF3uRTH2VjSRsuuBWBVd9&$req"
     7z x yacoindeps.zip
     cd yacoindeps/sw/
     sed -e 's/REPLACEPATH/\/c\/projects' yconf > yconf2
