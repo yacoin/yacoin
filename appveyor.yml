@@ -21,10 +21,8 @@ before_build:
 
 build_script:
   - echo building
-  - pwd
   - cd utils
-  - echo $PATH
-  - sh ./build.sh
+  - sh ./build-qt.sh
 
 after_build:
   - echo AFTER BUILD
