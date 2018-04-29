@@ -12,7 +12,7 @@ before_build:
     cat tmp3.txt
     sed -e 's/Download.*//' tmp3.txt > tmp4.txt
     cat tmp4.txt
-    sh sed -e 's/\"//' tmp4.txt > tmp5.txt
+    sed -e 's/\\"//' tmp4.txt > tmp5.txt
     cat tmp5.txt
     sed -e 's/amp;//g' tmp5.txt > tmp6.txt
     cat tmp6.txt
