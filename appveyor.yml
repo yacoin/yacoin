@@ -1,9 +1,11 @@
 before_build:
   - echo "Downloading precompiled dependencies"  
   - curl -c ./cookie.txt -s -L "https://drive.google.com/uc?export=download&id=1mgeaL_vKnKnbLDRVa3AsbPh_AUfuYg5a" > first.txt
-  - query=`sed -e "s/>Download anyway.*//" first.txt |sed -e "s/.*href=//" | grep uc?export | sed -e "s/\"//g" | sed -e "s/amp;//g"`
-  - echo "https://drive.google.com${query}"
-  - curl -b ./cookie.txt -o yacoindependencies.zip -s -L "https://drive.google.com${query}"
+  - sed -e "s/>Download anyway.*//" first.txt |sed -e "s/.*href=//" | grep uc?export | sed -e "s/\"//g" | sed -e "s/amp;//g" > tmp.txt
+  - cat tmp.txt
+  - req=`cat tmp.txt`
+  - echo "https://drive.google.com${req}"
+  - curl -b ./cookie.txt -o yacoindependencies.zip -s -L "https://drive.google.com${req}"
   - 7z x yacoindependencies.zip
   - md yacoindeps
   - cd yacoindeps
