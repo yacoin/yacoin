@@ -32,6 +32,7 @@ INCLUDEPATHS= \
 
 LIBS= \
   -Wl, -Bstatic \
+  -lminiupnpc -liphlpapi \
   -lleveldb \
   -lmemenv \
   -lssl \
@@ -82,9 +83,8 @@ TESTDEFS = -DTEST_DATA_DIR=$(abspath test/data)
 ifndef USE_UPNP
 	override USE_UPNP = -
 endif
-ifeq (${USE_UPNP}, 1)
- LIBS += -l miniupnpc -l iphlpapi
- DEFS += -DSTATICLIB -DUSE_UPNP=$(USE_UPNP)
+ifneq (${USE_UPNP}, -)
+ DEFS += -DSTATICLIB -DUSE_UPNP=$(USE_UPNP) -DMINIUPNP_STATICLIB
 endif
 
 ifneq (${USE_IPV6}, -)
