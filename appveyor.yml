@@ -4,8 +4,10 @@ before_build:
   - uname -m
   - curl -c ./cookie.txt -s -L "https://drive.google.com/uc?export=download&id=1mgeaL_vKnKnbLDRVa3AsbPh_AUfuYg5a" > tmp.txt
   - grep Download tmp.txt > tmp2.txt
-  - sed -e "s/.*\(uc?export.*\)\">Download anywa.*/\1/" tmp2.txt > tmp.txt
-  - sed -e "s/amp;//g" tmp.txt > tmp2.txt
+  - cat tmp2.txt
+  - sed -e 's/.*\(uc?export.*\)">Download anywa.*/\1/' tmp2.txt > tmp.txt
+  - cat tmp.txt
+  - sed -e 's/amp;//g' tmp.txt > tmp2.txt
   - cat tmp2.txt
   - export req=$(cat tmp2.txt)
   - echo $req
