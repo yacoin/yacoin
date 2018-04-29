@@ -7,8 +7,10 @@ before_build:
   - grep export tmp.txt > tmp2.txt
   - sed -e "s/amp;//g" tmp2.txt > tmp.txt
   - set /p req=<tmp.txt
-  - echo "https://drive.google.com${req}"
-  - curl -b ./cookie.txt -o yacoindependencies.zip -s -L "https://drive.google.com/${req}"
+  - cat tmp.txt
+  - echo $req
+  - echo "https://drive.google.com$req"
+  - curl -b ./cookie.txt -o yacoindependencies.zip -s -L "https://drive.google.com/$req"
   - 7z x yacoindependencies.zip
   - md yacoindeps
   - cd yacoindeps
