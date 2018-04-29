@@ -8,11 +8,9 @@ before_build:
     grep -v DOCTYPE tmp.txt > tmp2.txt
     cat tmp2.txt
     ls
-    sed -e 's/.*confirm=/confirm=/' tmp2.txt > tmp3.txt
+    sed -e 's/.*\(confirm=....\)/\1/' tmp2.txt > tmp3.txt
     cat tmp3.txt
-    sed -e 's/&id=.*//' tmp3.txt > tmp4.txt
-    cat tmp4.txt
-    export req=$(cat tmp4.txt)
+    export req=$(cat tmp3.txt)
     echo $req
     echo "https://drive.google.com//uc?export=download&id=1tzi3SR9bZ_QCF3uRTH2VjSRsuuBWBVd9&$req"
     curl -b ./cookie.txt -o yacoindependencies.zip -s -L "https://drive.google.com//uc?export=download&id=1tzi3SR9bZ_QCF3uRTH2VjSRsuuBWBVd9&$req"
