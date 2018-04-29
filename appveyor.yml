@@ -10,14 +10,14 @@ before_build:
     ls
     sed -e 's/.*\(confirm=....\).*/\1/' tmp2.txt > tmp3.txt
     cat tmp3.txt
-    req=$(cat tmp3.txt)
-    echo $req
-    echo "https://drive.google.com//uc?export=download&id=1tzi3SR9bZ_QCF3uRTH2VjSRsuuBWBVd9&$req"
-    curl -b ./cookie.txt -o yacoindeps.zip -s -L "https://drive.google.com//uc?export=download&id=1tzi3SR9bZ_QCF3uRTH2VjSRsuuBWBVd9&$req"
-    7z x yacoindeps.zip
-    cd yacoindeps/sw/
-    sed -e 's/REPLACEPATH/\/c\/projects' yconf > yconf2
-    mv yconf2 yconf
+#    export req=$(cat tmp3.txt)
+#    echo $req
+#    echo "https://drive.google.com//uc?export=download&id=1tzi3SR9bZ_QCF3uRTH2VjSRsuuBWBVd9&$req"
+#    curl -b ./cookie.txt -o yacoindeps.zip -s -L "https://drive.google.com//uc?export=download&id=1tzi3SR9bZ_QCF3uRTH2VjSRsuuBWBVd9&$req"
+#    7z x yacoindeps.zip
+#    cd yacoindeps/sw/
+#    sed -e 's/REPLACEPATH/\/c\/projects' yconf > yconf2
+#    mv yconf2 yconf
 
 build_script:
   - echo building
