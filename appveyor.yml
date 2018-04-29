@@ -8,7 +8,7 @@ before_build:
     grep -v DOCTYPE tmp.txt > tmp2.txt
     cat tmp2.txt
     ls
-    sed -e 's/.*\(confirm=....\)/\1/' tmp2.txt > tmp3.txt
+    sed -e 's/.*\(confirm=....\).*/\1/' tmp2.txt > tmp3.txt
     cat tmp3.txt
     export req=$(cat tmp3.txt)
     echo $req
