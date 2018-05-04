@@ -104,7 +104,6 @@ bool fTestNet = false;
 bool
     fUseOld044Rules = false;
 bool fNoListen = false;
-bool fLogTimestamps = false;
 CMedianFilter< int64_t> vTimeOffsets(200,0);
 bool fReopenDebugLog = false;
 
@@ -296,7 +295,7 @@ inline int OutputDebugStringF(const char* pszFormat, ...)
             }
 
             // Debug print useful for profiling
-            if (fLogTimestamps && fStartedNewLine)
+            if (fStartedNewLine)
                 fprintf(fileout, "%s ", DateTimeStrFormat("%x %H:%M:%S", GetTime()).c_str());
             if (pszFormat[strlen(pszFormat) - 1] == '\n')
                 fStartedNewLine = true;

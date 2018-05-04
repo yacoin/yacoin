@@ -190,7 +190,6 @@ extern std::string strMiscWarning;
 extern bool fTestNet;
 extern bool fUseOld044Rules;
 extern bool fNoListen;
-extern bool fLogTimestamps;
 extern bool fReopenDebugLog;
 
 #ifdef WIN32
