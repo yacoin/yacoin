@@ -1,0 +1,12 @@
+stages:
+  - build
+
+buildwindows:
+  stage: build
+  script:
+    - echo Hallo
+    - cd
+    - dir
+    - echo pwd > test.sh
+    - c:\git\bin\bash.exe --login -i -- test.sh
+
