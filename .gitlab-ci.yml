@@ -5,4 +5,4 @@ buildwindows:
   stage: build
   script:
     - cd utils
-    - c:\git\bin\bash.exe --login -i -- build.sh
+    - c:\git\bin\bash.exe --login -i -- build.sh > buildlog.log 2>&1
