@@ -12,10 +12,6 @@
  #include "keystore.h"
 #endif
 
-#ifndef H_BITCOIN_SCRIPT
- #include "script.h"
-#endif
-
 #ifndef BITCOIN_BASE58_H
  #include "base58.h"
 #endif

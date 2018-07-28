@@ -17,10 +17,6 @@
  #include "txdb.h"
 #endif
 
-#ifndef BITCOIN_TIMESTAMPS_H
- #include "timestamps.h"
-#endif
-
 using std::min;
 using std::vector;
 using std::pair;

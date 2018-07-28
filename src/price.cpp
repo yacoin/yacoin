@@ -44,7 +44,7 @@ CProvider aBTCtoYACProviders[] =
         },
         {   //https://yobit.net/api/3/ticker/yac_btc
             "yobit.net",
-            "last",
+            "avg",
             "/api/3/ticker/yac_btc",
             nUnusualCharacterOffset,
             DEFAULT_HTTPS_PORT
@@ -857,8 +857,7 @@ static bool GetMyExternalWebPage(
         //else regular http
 #ifdef WIN32
         SOCKET 
-            hsocket = NULL,
-            & hSocket = hsocket;
+            hSocket = NULL;
 #else
         u_int
             hSocket = 0;

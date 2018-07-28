@@ -1162,7 +1162,7 @@ unsigned char GetNfactor(::int64_t nTimestamp)
         return minNfactor;
 
     ::int64_t 
-        nAgeOfBlockOrTxInSeconds = nTimestamp - (fTestNet? nChainStartTimeTestNet: nChainStartTime);  
+        nAgeOfBlockOrTxInSeconds = nTimestamp - (fTestNet? nChainStartTimeTestNet: nChainStartTime);
         //nChainStartTime, nSavedAgeOfBlockOrTxInSeconds = nAgeOfBlockOrTxInSeconds;
 
     while ((nAgeOfBlockOrTxInSeconds >> 1) > 3)     // nAgeOfBlockOrTxInSeconds / 2 is 4 or more
@@ -2943,6 +2943,10 @@ bool CBlock::CheckBlock(bool fCheckPOW, bool fCheckMerkleRoot, bool fCheckSig) c
         if (GetBlockTime() != (::int64_t)vtx[1].nTime)
             return DoS(50, error("CheckBlock() : coinstake timestamp violation nTimeBlock=%" PRId64 " nTimeTx=%u", GetBlockTime(), vtx[1].nTime));
 
+        // Check timestamp  06/04/2018 missing test in this 0.4.5-0.48 code.  Thanks Joe! ;>
+        if (GetBlockTime() > FutureDrift(GetAdjustedTime()))
+            return error("CheckBlock() : block timestamp too far in the future");
+
         // NovaCoin: check proof-of-stake block signature
         if (fCheckSig && !CheckBlockSignature())
         {
@@ -3049,23 +3053,27 @@ bool CBlock::AcceptBlock()
 
     ::int64_t 
         nMedianTimePast = pindexPrev->GetMedianTimePast();
-    int 
-      //nMaxOffset = 12 * nSecondsPerHour; // 12 hours
-        nMaxOffset = 7 * nSecondsPerDay; // One week (test)
+//    int 
+//      //nMaxOffset = 12 * nSecondsPerHour; // 12 hours
+//        nMaxOffset = 7 * nSecondsPerDay; // One week (test)
 
-    if (fTestNet)   // || pindexPrev->nTime < 1450569600)
-        nMaxOffset = 7 * 7 * nSecondsPerDay; // 7 weeks on testNet
+//    if (fTestNet)   // || pindexPrev->nTime < 1450569600)
+//        nMaxOffset = 7 * 7 * nSecondsPerDay; // 7 weeks on testNet
 
 // Check timestamp against prev
-    if (GetBlockTime() <= pindexPrev->GetMedianTimePast() || FutureDrift(GetBlockTime()) < pindexPrev->GetBlockTime())
+    if (
+        GetBlockTime() <= pindexPrev->GetMedianTimePast()
+        ||
+        FutureDrift(GetBlockTime()) < pindexPrev->GetBlockTime()
+       )
         return error("AcceptBlock() : block's timestamp is too early");
-
+/******* removed since it does't exist in <=0.4.4 code.  Thanks again, Joe ;>
     if (
         (pindexPrev->nHeight > 1) && 
         ( (nMedianTimePast + nMaxOffset) < GetBlockTime() )
        )
         return error("AcceptBlock() : block's timestamp is too far in the future");
-
+*******/
     // Check that all transactions are finalized
     BOOST_FOREACH(const CTransaction& tx, vtx)
         if (!tx.IsFinal(nHeight, GetBlockTime()))

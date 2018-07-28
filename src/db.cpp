@@ -12,18 +12,6 @@
  #include "db.h"
 #endif
 
-#ifndef BITCOIN_NET_H
- #include "net.h"
-#endif
-
-#ifndef BITCOIN_UTIL_H
- #include "util.h"
-#endif
-
-#ifndef BITCOIN_MAIN_H
- #include "main.h"
-#endif
-
 #ifndef BITCOIN_UI_INTERFACE_H
  #include "ui_interface.h"
 #endif

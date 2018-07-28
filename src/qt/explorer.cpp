@@ -83,7 +83,8 @@ void pop_a_message_box( std::string s );
 // explorer area constructor
 // initializes the headers for the blocks and transactions table views
 //_____________________________________________________________________________
-ExplorerPage::ExplorerPage(QDialog * const parent) :
+ExplorerPage::ExplorerPage(QDialog * parent, bool fNoCloseButton ) :
+//ExplorerPage::ExplorerPage(QDialog * const parent) :
     QDialog(parent)
     //QWidget(parent)
     , ui(new Ui::ExplorerPage)
@@ -100,6 +101,9 @@ ExplorerPage::ExplorerPage(QDialog * const parent) :
     fBlockEditConnected = false;
     fBlockHashEditConnected = false;
     fTxHashEditConnected = false;
+    fCloseButton = !fNoCloseButton;
+    if( fNoCloseButton )
+        ui->closeButton->hide();
 
     const int
         nGOOD_impossible_value = -1;
@@ -108,7 +112,8 @@ ExplorerPage::ExplorerPage(QDialog * const parent) :
 
     pQTVblocks = ui->tableViewForBlocks;
     pQTVblocks->setShowGrid( false );
-    nROWS_OF_DISPLAYED_BLOCKS = 10;
+    nROWS_OF_DISPLAYED_BLOCKS = 20;
+    //nROWS_OF_DISPLAYED_BLOCKS = 10;
 
     pQTVtransactions = ui->tableViewForTransactions;
     pQTVtransactions->setShowGrid( false );
@@ -161,7 +166,7 @@ ExplorerPage::ExplorerPage(QDialog * const parent) :
                 this,
                 SLOT(showBkInfoDetails( QModelIndex ))
                      );
-   if ( fOK )
+    if ( fOK )
         pExplorerBlockDialog->fBlkInfoConnected = true;
 
     fOK = connect(
@@ -896,7 +901,7 @@ std::string BuildTxDetailsFrom(
                                     );
                 sStandardItemModelElement = strprintf( 
                                                   //" %lld"
-                                                    " %" PRId64 ""
+                                                    " %" PRI64d ""
                                                     , (boost::int64_t)tx.nTime
                                                      );
                 sTemp += sStandardItemModelElement + "<br />\n";
@@ -1531,7 +1536,8 @@ void ExplorerPage::setNumBlocks( int currentHeight )
         QModelIndex
             TransactionTableIndex;
 
-        static uint256
+        //static uint256
+        uint256
             lastHashKnown = 0;
             
         bool
@@ -1815,7 +1821,8 @@ void ExplorerPage::setNumBlocks( int currentHeight )
 
 void ExplorerPage::on_closeButton_clicked()
 {
-    close();
+    if( true == fCloseButton )
+        close();
 }
 
 //_____________________________________________________________________________
@@ -2152,7 +2159,7 @@ std::string BuildBlockinfoDetailsFrom(
                             sStandardItemModelElement.c_str()
                            );
     sStandardItemModelElement = strprintf(
-                        " %016"PRIx64" "
+                        " %016"PRI64x" "
                         , pblockindex->nStakeModifier
                                          );
     sTemp += sStandardItemModelElement + "<br />";
@@ -2884,6 +2891,8 @@ void TransactionExplorerPage::on_closeButton_clicked()
 CLastTxHash::CLastTxHash( )
 {
     lastHash = 0;
+    //nNumberOfExplorers = 2;
+    explorer_counter = nNumberOfExplorers;
 }
 //_____________________________________________________________________________
 //
@@ -2891,6 +2900,9 @@ CLastTxHash::CLastTxHash( )
 void CLastTxHash::storeLasthash( uint256 &hash )
 {
     lastHash = hash;
+    if( 0 == --explorer_counter )
+        explorer_counter = nNumberOfExplorers;
+
 }
 //_____________________________________________________________________________
 //

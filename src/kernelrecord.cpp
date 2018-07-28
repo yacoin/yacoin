@@ -12,10 +12,6 @@
  #include "wallet.h"
 #endif
 
-#ifndef BITCOIN_BASE58_H
- #include "base58.h"
-#endif
-
 using std::vector;
 using std::max;
 using std::min;

@@ -7,12 +7,12 @@
     #include "msvc_warnings.push.h"
 #endif
 
-#ifndef _BITCOIN_ADDRMAN
- #include "addrman.h"
+#ifndef YACOIN_YASSERT_H
+ #include "Yassert.h"
 #endif
 
-#ifndef BITCOIN_HASH_H
- #include "hash.h"
+#ifndef _BITCOIN_ADDRMAN
+ #include "addrman.h"
 #endif
 
 #ifndef BITCOIN_NET_H

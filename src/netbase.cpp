@@ -9,7 +9,7 @@
 #endif
 
 #ifndef BITCOIN_NETBASE_H
- #include "netbase.h"
+// #include "netbase.h"
 #endif
 
 #ifndef BITCOIN_UTIL_H
@@ -33,7 +33,6 @@
 #endif
 
 #ifdef _MSC_VER
-#include <BaseTsd.h>
 typedef SSIZE_T ssize_t;
 #endif
 

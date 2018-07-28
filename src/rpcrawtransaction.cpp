@@ -10,10 +10,6 @@
 
 #include <boost/assign/list_of.hpp>
 
-#ifndef BITCOIN_BASE58_H
- #include "base58.h"
-#endif
-
 #ifndef _BITCOINRPC_H_
  #include "bitcoinrpc.h"
 #endif

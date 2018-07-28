@@ -16,14 +16,6 @@
  #include "txdb.h"
 #endif
 
-#ifndef BITCOIN_MAIN_H
- #include "main.h"
-#endif
-
-#ifndef BITCOIN_UINT256_H
- #include "uint256.h"
-#endif
-
 namespace Checkpoints
 {
     typedef std::map<int, std::pair<uint256, unsigned int> > MapCheckpoints;
