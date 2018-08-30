@@ -860,8 +860,8 @@ static bool GetMyExternalWebPage(
             hSocket = NULL,
             & hsocket = hSocket;
 #else
-        u_int
-            hSocket = 0;
+        u_int hSocket = 0;
+        u_int &hsocket = hSocket;
 #endif
         try
         {
@@ -1088,7 +1088,7 @@ bool GetMyExternalWebPage1( int & nIndexBtcToYac, string & strBuffer, double & d
                             "y/b = %lf"
                             "\n"
                             , 1.0/dPrice
-                          );
+                          );    
                 }
             }
             break;
