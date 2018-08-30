@@ -44,7 +44,7 @@ CProvider aBTCtoYACProviders[] =
         },
         {   //https://yobit.net/api/3/ticker/yac_btc
             "yobit.net",
-            "avg",
+            "last",
             "/api/3/ticker/yac_btc",
             nUnusualCharacterOffset,
             DEFAULT_HTTPS_PORT
@@ -857,7 +857,8 @@ static bool GetMyExternalWebPage(
         //else regular http
 #ifdef WIN32
         SOCKET 
-            hSocket = NULL;
+            hSocket = NULL,
+            & hsocket = hSocket;
 #else
         u_int
             hSocket = 0;
@@ -866,7 +867,7 @@ static bool GetMyExternalWebPage(
         {
             CdoSocket 
                 CthisSocketConnection( 
-                                      hSocket,
+                                      hsocket,
                                       sDomain,
                                       nPort
                                      );
@@ -901,7 +902,7 @@ static bool GetMyExternalWebPage(
 
             do
             {
-                fLineOK = recvAline(hSocket, strLine);
+                fLineOK = recvAline(hsocket, strLine);
                 if (fShutdown)
                 {
                     return false;
@@ -947,7 +948,7 @@ static bool GetMyExternalWebPage(
                         strLine = "";
                         do
                         {
-                            fLineOK = recvAline(hSocket, strLine);
+                            fLineOK = recvAline(hsocket, strLine);
                             Sleep( nArbitraryShortTimeInMilliseconds ); // may not even be needed?
                             strLine = "";            
                         }
