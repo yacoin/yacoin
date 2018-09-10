@@ -1,0 +1,52 @@
+########################################################################################
+# BerkeleyDB
+
+if [ -z "$YOS" ]; then
+echo -e "\n\n\nYOS not set.\nAborting build\n\n\n"
+else
+
+[ -d "$YBDB" ] || export YBDB=$YSW/`pwd | xargs basename`
+
+if [ "$1" == "check" ]; then
+############################ Check if exists
+case $YOS in
+  linux*) [ -d "$YBDB/lib" ] && [ `find $YBDB/lib/* -prune -name "*.so" | wc -l` -gt 1 ]&& echo "found";;
+  *) [ -d "$YBDB/lib" ] && [ `find $YBDB/lib/* -prune -name "*.a" ! -name "*.dll.a" | wc -l` -gt 3 ] && echo "found";;
+esac
+
+else
+############################ Build
+case $YOS in
+########################################## Linux
+linux*)
+
+cd build_unix
+../dist/configure CXXFLAGS='-std=gnu++0x' --enable-cxx --disable-replication --enable-static --enable-shared --prefix=$YBDB
+make && make install
+;;
+########################################## Mac OSX
+darwin*)
+
+[ -f "atomic.patch" ] || curl -OL https://raw.github.com/narkoleptik/os-x-berkeleydb-patch/master/atomic.patch && patch dbinc/atomic.h < atomic.patch
+cd build_unix
+
+#CC=gcc-4.8 CXX=g++-4.8 LDFLAGS="-static-libgcc -static-libstdc++" \
+CFLAGS="-isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.6.sdk -mmacosx-version-min=10.6" \
+../dist/configure --enable-cxx --disable-replication --disable-shared --prefix=$YBDB
+make && make install
+
+;;
+########################################## Windows
+*)
+
+cd build_unix
+../dist/configure CXXFLAGS='-std=gnu++0x' --enable-mingw --enable-cxx --disable-replication --disable-shared --prefix=$YBDB
+make && make install
+;;
+
+esac
+
+if ! grep YBDB $YSW/yconf > /dev/null; then echo "YBDB=$YBDB" >> $YSW/yconf; fi
+fi
+fi
+

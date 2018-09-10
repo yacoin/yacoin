@@ -5,13 +5,19 @@
     #include <stdint.h>
 
     #include "msvc_warnings.push.h"
-    #include "JustInCase.h"
 #endif
 
-#include "addrman.h"
-#include "hash.h"
+#ifndef YACOIN_YASSERT_H
+ #include "Yassert.h"
+#endif
 
-#include "net.h"
+#ifndef _BITCOIN_ADDRMAN
+ #include "addrman.h"
+#endif
+
+#ifndef BITCOIN_NET_H
+ #include "net.h"
+#endif
 
 using std::max;
 
@@ -121,44 +127,13 @@ void CAddrMan::SwapRandom(unsigned int nRndPos1, unsigned int nRndPos2)
     if (nRndPos1 == nRndPos2)
         return;
 
-#ifdef _MSC_VER
-    bool
-        fTest = (nRndPos1 < vRandom.size() && nRndPos2 < vRandom.size());
-    #ifdef _DEBUG
-    assert(fTest);
-    #else
-    if( !fTest )
-        releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
-    #endif
-#else
-    assert(nRndPos1 < vRandom.size() && nRndPos2 < vRandom.size());
-#endif
+    Yassert(nRndPos1 < vRandom.size() && nRndPos2 < vRandom.size());
 
     int nId1 = vRandom[nRndPos1];
     int nId2 = vRandom[nRndPos2];
 
-#ifdef _MSC_VER
-    fTest = (mapInfo.count(nId1) == 1);
-    #ifdef _DEBUG
-    assert(fTest);
-    #else
-    if( !fTest )
-        releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
-    #endif
-#else
-    assert(mapInfo.count(nId1) == 1);
-#endif
-#ifdef _MSC_VER
-    fTest = (mapInfo.count(nId2) == 1);
-    #ifdef _DEBUG
-    assert(fTest);
-    #else
-    if( !fTest )
-        releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
-    #endif
-#else
-    assert(mapInfo.count(nId2) == 1);
-#endif
+    Yassert(mapInfo.count(nId1) == 1);
+    Yassert(mapInfo.count(nId2) == 1);
 
     mapInfo[nId1].nRandomPos = nRndPos2;
     mapInfo[nId2].nRandomPos = nRndPos1;
@@ -181,18 +156,7 @@ int CAddrMan::SelectTried(int nKBucket)
         int nTemp = vTried[nPos];
         vTried[nPos] = vTried[i];
         vTried[i] = nTemp;
-#ifdef _MSC_VER
-        bool
-            fTest = (nOldest == -1 || mapInfo.count(nTemp) == 1);
-    #ifdef _DEBUG
-        assert(fTest);
-    #else
-        if( !fTest )
-            releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
-    #endif
-#else
-        assert(nOldest == -1 || mapInfo.count(nTemp) == 1);
-#endif
+        Yassert(nOldest == -1 || mapInfo.count(nTemp) == 1);
         if (nOldest == -1 || mapInfo[nTemp].nLastSuccess < mapInfo[nOldest].nLastSuccess) {
            nOldest = nTemp;
            nOldestPos = nPos;
@@ -204,35 +168,13 @@ int CAddrMan::SelectTried(int nKBucket)
 
 int CAddrMan::ShrinkNew(int nUBucket)
 {
-#ifdef _MSC_VER
-    bool
-        fTest = (nUBucket >= 0 && (unsigned int)nUBucket < vvNew.size());
-    #ifdef _DEBUG
-    assert(fTest);
-    #else
-    if( !fTest )
-        releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
-    #endif
-#else
-    assert(nUBucket >= 0 && (unsigned int)nUBucket < vvNew.size());
-#endif
+    Yassert(nUBucket >= 0 && (unsigned int)nUBucket < vvNew.size());
     std::set<int> &vNew = vvNew[nUBucket];
 
     // first look for deletable items
     for (std::set<int>::iterator it = vNew.begin(); it != vNew.end(); it++)
     {
-#ifdef _MSC_VER
-        bool
-            fTest = (mapInfo.count(*it));
-    #ifdef _DEBUG
-        assert(fTest);
-    #else
-        if( !fTest )
-            releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
-    #endif
-#else
-        assert(mapInfo.count(*it));
-#endif
+        Yassert(mapInfo.count(*it));
         CAddrInfo &info = mapInfo[*it];
         if (info.IsTerrible())
         {
@@ -257,34 +199,13 @@ int CAddrMan::ShrinkNew(int nUBucket)
     {
         if (nI == n[0] || nI == n[1] || nI == n[2] || nI == n[3])
         {
-#ifdef _MSC_VER
-            bool
-                fTest = (nOldest == -1 || mapInfo.count(*it) == 1);
-    #ifdef _DEBUG
-            assert(fTest);
-    #else
-            if( !fTest )
-                releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
-    #endif
-#else
-            assert(nOldest == -1 || mapInfo.count(*it) == 1);
-#endif
+            Yassert(nOldest == -1 || mapInfo.count(*it) == 1);
             if (nOldest == -1 || mapInfo[*it].nTime < mapInfo[nOldest].nTime)
                 nOldest = *it;
         }
         nI++;
     }
-#ifdef _MSC_VER
-    fTest = (mapInfo.count(nOldest) == 1);
-    #ifdef _DEBUG
-    assert(fTest);
-    #else
-    if( !fTest )
-        releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
-    #endif
-#else
-    assert(mapInfo.count(nOldest) == 1);
-#endif
+    Yassert(mapInfo.count(nOldest) == 1);
     CAddrInfo &info = mapInfo[nOldest];
     if (--info.nRefCount == 0)
     {
@@ -301,18 +222,7 @@ int CAddrMan::ShrinkNew(int nUBucket)
 
 void CAddrMan::MakeTried(CAddrInfo& info, int nId, int nOrigin)
 {
-#ifdef _MSC_VER
-    bool
-        fTest = (vvNew[nOrigin].count(nId) == 1);
-    #ifdef _DEBUG
-    assert(fTest);
-    #else
-    if( !fTest )
-        releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
-    #endif
-#else
-    assert(vvNew[nOrigin].count(nId) == 1);
-#endif
+    Yassert(vvNew[nOrigin].count(nId) == 1);
 
     // remove the entry from all new buckets
     for (std::vector<std::set<int> >::iterator it = vvNew.begin(); it != vvNew.end(); it++)
@@ -322,17 +232,7 @@ void CAddrMan::MakeTried(CAddrInfo& info, int nId, int nOrigin)
     }
     nNew--;
 
-#ifdef _MSC_VER
-    fTest = (info.nRefCount == 0);
-    #ifdef _DEBUG
-    assert(fTest);
-    #else
-    if( !fTest )
-        releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
-    #endif
-#else
-    assert(info.nRefCount == 0);
-#endif
+    Yassert(info.nRefCount == 0);
 
     // what tried bucket to move the entry to
     int nKBucket = info.GetTriedBucket(nKey);
@@ -351,17 +251,7 @@ void CAddrMan::MakeTried(CAddrInfo& info, int nId, int nOrigin)
     int nPos = SelectTried(nKBucket);
 
     // find which new bucket it belongs to
-#ifdef _MSC_VER
-    fTest = (mapInfo.count(vTried[nPos]) == 1);
-    #ifdef _DEBUG
-    assert(fTest);
-    #else
-    if( !fTest )
-        releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
-    #endif
-#else
-    assert(mapInfo.count(vTried[nPos]) == 1);
-#endif
+    Yassert(mapInfo.count(vTried[nPos]) == 1);
     int nUBucket = mapInfo[vTried[nPos]].GetNewBucket(nKey);
     std::set<int> &vNew = vvNew[nUBucket];
 
@@ -539,18 +429,7 @@ CAddress CAddrMan::Select_(int nUnkBias)
             std::vector<int> &vTried = vvTried[nKBucket];
             if (vTried.size() == 0) continue;
             int nPos = GetRandInt(vTried.size());
-#ifdef _MSC_VER
-            bool
-                fTest = (mapInfo.count(vTried[nPos]) == 1);
-    #ifdef _DEBUG
-            assert(fTest);
-    #else
-            if( !fTest )
-                releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
-    #endif
-#else
-            assert(mapInfo.count(vTried[nPos]) == 1);
-#endif
+            Yassert(mapInfo.count(vTried[nPos]) == 1);
             CAddrInfo &info = mapInfo[vTried[nPos]];
             if (GetRandInt(1<<30) < fChanceFactor*info.GetChance()*(1<<30))
                 return info;
@@ -567,19 +446,8 @@ CAddress CAddrMan::Select_(int nUnkBias)
             int nPos = GetRandInt(vNew.size());
             std::set<int>::iterator it = vNew.begin();
             while (nPos--)
-                it++;
-#ifdef _MSC_VER
-            bool
-                fTest = (mapInfo.count(*it) == 1);
-    #ifdef _DEBUG
-            assert(fTest);
-    #else
-            if( !fTest )
-                releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
-    #endif
-#else
-            assert(mapInfo.count(*it) == 1);
-#endif
+                it++;       // is this post inc really tied to the next statement? Can we do better?
+            Yassert(mapInfo.count(*it) == 1);
             CAddrInfo &info = mapInfo[*it];
             if (GetRandInt(1<<30) < fChanceFactor*info.GetChance()*(1<<30))
                 return info;
@@ -659,18 +527,7 @@ void CAddrMan::GetAddr_(std::vector<CAddress> &vAddr)
     {
         int nRndPos = GetRandInt(vRandom.size() - n) + n;
         SwapRandom(n, nRndPos);
-#ifdef _MSC_VER
-        bool
-            fTest = (mapInfo.count(vRandom[n]) == 1);
-    #ifdef _DEBUG
-        assert(fTest);
-    #else
-        if( !fTest )
-            releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
-    #endif
-#else
-        assert(mapInfo.count(vRandom[n]) == 1);
-#endif
+        Yassert(mapInfo.count(vRandom[n]) == 1);
         vAddr.push_back(mapInfo[vRandom[n]]);
     }
 }

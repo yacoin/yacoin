@@ -92,6 +92,7 @@ BitcoinGUI::BitcoinGUI(QWidget *parent):
     aboutDialog(0),
     optionsDialog(0)
     , pExplorerDialog( 0 )   // dialog style
+    , pExplorerDialog2( 0 )   // dialog style
 {
     setWindowOpacity(qreal(98)/100);
     setStyleSheet("selection-color: #000066;");
@@ -158,13 +159,33 @@ BitcoinGUI::BitcoinGUI(QWidget *parent):
     transactionView = new TransactionView(this);
     vbox->addWidget(transactionView);
     transactionsPage->setLayout(vbox);
-
+    //________________________________________
     mintingPage = new QWidget(this);
     QVBoxLayout *vboxMinting = new QVBoxLayout();
+
     mintingView = new MintingView(this);
     vboxMinting->addWidget(mintingView);
     mintingPage->setLayout(vboxMinting);
+//________________________________________
+        // So we need an explorerPage pointer instance of an ExplorerPage class
+  //pExplorerDialog = new ExplorerPage( this );
+    pExplorerDialog = new ExplorerPage( 0 );
 
+    ExplorerPageDialog = new QWidget(this);
+    QHBoxLayout *mainExplorerLayout = new QHBoxLayout;
+
+    //pExplorerView = new ExplorerPage( 0 );
+    //mainExplorerLayout->addWidget(pExplorerView);
+    //ExplorerPageDialog->setLayout(mainExplorerLayout);
+
+    // pExplorerView = new ExplorerPage( 0 );
+    pExplorerDialog2 = new ExplorerPage( 0, true );
+    pExplorerDialog2->setModel(clientModel);
+
+    mainExplorerLayout->addWidget(pExplorerDialog2);
+    ExplorerPageDialog->setLayout(mainExplorerLayout);
+
+    //________________________________________
     addressBookPage = new AddressBookPage(AddressBookPage::ForEditing, AddressBookPage::SendingTab);
 
     receiveCoinsPage = new AddressBookPage(AddressBookPage::ForEditing, AddressBookPage::ReceivingTab);
@@ -182,6 +203,7 @@ BitcoinGUI::BitcoinGUI(QWidget *parent):
     centralWidget->addWidget(addressBookPage);
     centralWidget->addWidget(receiveCoinsPage);
     centralWidget->addWidget(sendCoinsPage);
+    centralWidget->addWidget(ExplorerPageDialog);
     setCentralWidget(centralWidget);
 
     // Create status bar
@@ -238,14 +260,10 @@ BitcoinGUI::BitcoinGUI(QWidget *parent):
     // Double-clicking on a transaction on the transaction history page shows details
     connect(transactionView, SIGNAL(doubleClicked(QModelIndex)), transactionView, SLOT(showDetails()));
 
-    // So we need an explorerPage pointer instance of an ExplorerPage class
-  //pExplorerDialog = new ExplorerPage( this );
-    pExplorerDialog = new ExplorerPage( 0 );
-
     rpcConsole = new RPCConsole(0);
     connect(openRPCConsoleAction, SIGNAL(triggered()), rpcConsole, SLOT(show()));
 
-        //_________________________________________________________________________
+    //_________________________________________________________________________
     bool
         fOK = connect(
                 pExplorerDialog->pQTVblocks,            // sender object pointer
@@ -295,6 +313,56 @@ BitcoinGUI::BitcoinGUI(QWidget *parent):
                  );
     if ( fOK )
         pExplorerDialog->fTxHashEditConnected = true;
+    //_________________________________________________________________________
+    //_________________________________________________________________________
+    fOK = connect(
+                pExplorerDialog2->pQTVblocks,            // sender object pointer
+                SIGNAL(clicked( QModelIndex )),         // sender signal
+                pExplorerDialog2,                        // receiver object pointer
+                SLOT(showBkDetails( QModelIndex ))      // receiver object method
+                 );
+    if ( fOK )
+        pExplorerDialog2->fBlkConnected = true;
+    //_________________________________________________________________________
+
+    fOK = connect(
+                pExplorerDialog2->pQTVtransactions, 
+                SIGNAL(clicked( QModelIndex )), 
+                pExplorerDialog2, 
+                SLOT(showTxDetails( QModelIndex ))
+                 );
+    if ( fOK )
+        pExplorerDialog2->fTxConnected = true;
+    //_________________________________________________________________________
+
+    fOK = connect(
+                pExplorerDialog2->pBlockNumberLineEdit,
+                SIGNAL( returnPressed() ),
+                pExplorerDialog2,
+                SLOT(showBlockLineDetails( ))
+                 );
+    if ( fOK )
+        pExplorerDialog2->fBlockEditConnected = true;
+    //_________________________________________________________________________
+
+    fOK = connect(
+                pExplorerDialog2->pBlockHashLineEdit,
+                SIGNAL( returnPressed() ),
+                pExplorerDialog2,
+                SLOT(showBlockHashLineDetails( ))
+                 );
+    if ( fOK )
+        pExplorerDialog2->fBlockHashEditConnected = true;
+    //_________________________________________________________________________
+
+    fOK = connect(
+                pExplorerDialog2->pTxIDLineEdit,
+                SIGNAL( returnPressed() ),
+                pExplorerDialog2,
+                SLOT(showTxIdLineDetails( ))
+                 );
+    if ( fOK )
+        pExplorerDialog2->fTxHashEditConnected = true;
     //_________________________________________________________________________
 
     aboutDialog = new AboutDialog(0);
@@ -362,10 +430,17 @@ void BitcoinGUI::createActions()
     mintingAction->setShortcut(QKeySequence(Qt::ALT + Qt::Key_5));
     tabGroup->addAction(mintingAction);
 
+    explorerActionButton =
+       new QAction(QIcon(":/icons/explorer"), tr("&Explorer"), this);
+    explorerActionButton->setToolTip(tr("Explore the block chain, and more."));
+    explorerActionButton->setCheckable(true);
+    explorerActionButton->setShortcut(QKeySequence(Qt::ALT + Qt::Key_6));
+    tabGroup->addAction(explorerActionButton);
+
     addressBookAction = new QAction(QIcon(":/icons/address-book"), tr("&Address Book"), this);
     addressBookAction->setToolTip(tr("Edit the list of stored addresses and labels"));
     addressBookAction->setCheckable(true);
-    addressBookAction->setShortcut(QKeySequence(Qt::ALT + Qt::Key_6));
+    addressBookAction->setShortcut(QKeySequence(Qt::ALT + Qt::Key_7));
     tabGroup->addAction(addressBookAction);
 
     multisigAction = new QAction(QIcon(":/icons/send"), tr("Multisig"), this);
@@ -382,6 +457,11 @@ void BitcoinGUI::createActions()
     connect(historyAction, SIGNAL(triggered()), this, SLOT(gotoHistoryPage()));
     connect(mintingAction, SIGNAL(triggered()), this, SLOT(showNormalIfMinimized()));
     connect(mintingAction, SIGNAL(triggered()), this, SLOT(gotoMintingPage()));
+
+    connect(explorerActionButton, SIGNAL(triggered()), this, SLOT(showNormalIfMinimized()));
+    //connect(explorerActionButton, SIGNAL(triggered()), this, SLOT(explorerClicked()));    //OK works
+    connect(explorerActionButton, SIGNAL(triggered()), this, SLOT(gotoExplorerPage())); // doesn't work
+
     connect(addressBookAction, SIGNAL(triggered()), this, SLOT(showNormalIfMinimized()));
     connect(addressBookAction, SIGNAL(triggered()), this, SLOT(gotoAddressBookPage()));
     connect(multisigAction, SIGNAL(triggered()), this, SLOT(showNormalIfMinimized()));
@@ -438,17 +518,19 @@ void BitcoinGUI::createActions()
     openRPCConsoleAction = new QAction(QIcon(":/icons/debugwindow"), tr("&Debug window"), this);
     openRPCConsoleAction->setStatusTip(tr("Open debugging and diagnostic console"));
 
-        //_________________________________________________________________________
-    explorerAction = 
-        new QAction(QIcon(":/icons/explorer"), tr("&Explorer"), this); // activates w/ ctl-E
-    explorerAction->setStatusTip(tr("Browse the block chain and transactions"));
-    explorerAction->setToolTip(tr("Browse the block chain and transactions"));
+    //_________________________________________________________________________
+    //explorerActionOldMenu = 
+    //    new QAction(QIcon(":/icons/explorer"), tr("&Explorer"), this); // activates w/ ctl-E
+    //explorerActionOldMenu->setStatusTip(tr("Browse the block chain and transactions"));
+    //explorerActionOldMenu->setToolTip(tr("Browse the Block Chain and transactions"));
     //_________________________________________________________________________
 
     connect(quitAction, SIGNAL(triggered()), qApp, SLOT(quit()));
     connect(aboutAction, SIGNAL(triggered()), this, SLOT(aboutClicked()));
     connect(aboutQtAction, SIGNAL(triggered()), qApp, SLOT(aboutQt()));
-    connect(explorerAction, SIGNAL(triggered()), this, SLOT(explorerClicked()));
+
+    //connect(explorerActionOldMenu, SIGNAL(triggered()), this, SLOT(explorerClicked()));
+
     connect(optionsAction, SIGNAL(triggered()), this, SLOT(optionsClicked()));
     connect(toggleHideAction, SIGNAL(triggered()), this, SLOT(toggleHidden()));
     connect(encryptWalletAction, SIGNAL(triggered(bool)), this, SLOT(encryptWallet(bool)));
@@ -494,16 +576,34 @@ void BitcoinGUI::createMenuBar()
     securityMenu->addAction(unlockWalletMiningAction);
     securityMenu->addAction(lockWalletAction);
     settings->addAction(optionsAction);
+//_________________________________________________
+    QMenu *eXplorer = appMenuBar->addMenu(tr("&Explorer"));
+//    eXplorer->addAction(explorerLaunch);
+//    connect(explorerLaunch, SIGNAL(triggered()), this, SLOT(explorerClicked()));
 
+    explorerActionNewMenu = 
+        new QAction(QIcon(":/icons/explorer"), tr("&Explorer"), this); // activates w/ E or alt-E
+    //_________________________________________________
+    eXplorer->addAction(explorerActionNewMenu);
+//    connect(eXplorer, SIGNAL(triggered()), this, SLOT(explorerClicked()));
+//    connect(eXplorer, SIGNAL(triggered()), explorerActionNewMenu, SLOT(explorerClicked())); // doesn't crash nor work!
+    //_________________________________________________
+//    eXplorer->setStatusTip(tr("Browse the block chain and transactions"));
+    explorerActionNewMenu->setStatusTip(tr("Browse the block chain and transactions"));
+    explorerActionNewMenu->setToolTip(tr("Browse the Block Chain and transactions"));
+    //_________________________________________________
+    connect(explorerActionNewMenu, SIGNAL(triggered()), this, SLOT(showNormalIfMinimized()));
+    //connect(eXplorer, SIGNAL(triggered()), this, SLOT(showNormalIfMinimized()));
+    connect(explorerActionNewMenu, SIGNAL(triggered()), this, SLOT(explorerClicked()));
+    //connect(eXplorer, SIGNAL(triggered()), this, SLOT(explorerClicked()));
+//_________________________________________________
     QMenu *help = appMenuBar->addMenu(tr("&Help"));
     help->addAction(openRPCConsoleAction);
     help->addSeparator();
-    //_________________________________________________________________________
-    // remove this WIN32 conditional to test the code on the Mac & linux, etc.
-//#ifdef WIN32
-    help->addAction(explorerAction);
-    help->addSeparator();
-//#endif
+ 
+    //help->addAction(explorerActionOldMenu);
+    //help->addSeparator();
+
     help->addAction(aboutAction);
     help->addAction(aboutQtAction);
 }
@@ -517,7 +617,9 @@ void BitcoinGUI::createToolBars()
     toolbar->addAction(receiveCoinsAction);
     toolbar->addAction(historyAction);
     toolbar->addAction(mintingAction);
+    toolbar->addAction(explorerActionButton);
     toolbar->addAction(addressBookAction);
+
 
     QToolBar *toolbar2 = addToolBar(tr("Actions toolbar"));
     toolbar2->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
@@ -676,6 +778,8 @@ void BitcoinGUI::aboutClicked()
 
 void BitcoinGUI::explorerClicked()
 {
+    //if( !pExplorerDialog )
+    //    pExplorerDialog = new ExplorerPage( 0 );
     pExplorerDialog->setModel(clientModel);
     pExplorerDialog->show();        // makes it modal-less
 
@@ -819,6 +923,10 @@ void BitcoinGUI::setNumBlocks(int count, int nTotalBlocks)
     if ( pExplorerDialog )
     {
         pExplorerDialog->setNumBlocks( count );
+    }
+    if ( pExplorerDialog2 )
+    {
+        pExplorerDialog2->setNumBlocks( count );
     }
 
 }
@@ -1043,6 +1151,14 @@ void BitcoinGUI::gotoMintingPage()
     connect(exportAction, SIGNAL(triggered()), mintingView, SLOT(exportClicked()));
 }
 
+void BitcoinGUI::gotoExplorerPage()
+{
+    explorerActionButton->setChecked(true);
+    centralWidget->setCurrentWidget(ExplorerPageDialog);
+
+    exportAction->setEnabled(true);
+    disconnect(exportAction, SIGNAL(triggered()), 0, 0);
+}
 
 void BitcoinGUI::gotoAddressBookPage()
 {

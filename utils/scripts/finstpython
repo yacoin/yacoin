@@ -1,0 +1,57 @@
+# Python portable 2.7 and 3.4, included easy_install and pip
+# Do not forget to include python path in environment profile
+
+instpip()
+{
+cd $pybase
+curl -L -k https://bootstrap.pypa.io/ez_setup.py > ez_setup.py
+PATH=$pybase:$PATH
+python ez_setup.py
+export PATH=$pybase/Scripts:$PATH
+easy_install pip
+}
+
+################## Python 2.7 ##################
+instpython2()
+{
+pybase=$YBASE/python27
+[ -f "$pybase/python.exe" ] && return 0
+mkdir -p $pybase
+[ -f "$YDL/python-2.7-bin-win32.7z" ] || curl -L -k https://python-common-portable.googlecode.com/files/python-2.7-bin-win32.7z > $YDL/python-2.7-bin-win32.7z
+7za x -aoa $YDL/python-2.7-bin-win32.7z -o$pybase
+
+instpip
+}
+
+################## Python 3.4 ##################
+instpython3()
+{
+pybase=$YBASE/python34
+[ -f "$pybase/python.exe" ] && return 0
+mkdir -p $pybase
+[ -f "$YDL/python-3.4.2.zip" ] || curl -L -k https://sourceforge.net/projects/minimalportablepython/files/python-3.4.2.zip > $YDL/python-3.4.2.zip
+7za x -aoa $YDL/python-3.4.2.zip -o$pybase
+
+instpip
+}
+
+echo "Now type one":
+echo "instpython2"
+echo "instpython3"
+
+
+
+
+###You need to include python path in environment
+#PATH=$pybase:$PATH
+#export PATH=$pybase/Scripts:$PATH
+
+
+
+### pkg install examples
+#pip list
+#pip install base58
+#pip install python-bitcoinlib
+#easy_install yolk
+#easy_install stratum
+

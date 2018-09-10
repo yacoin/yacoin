@@ -8,14 +8,29 @@
     #include "msvc_warnings.push.h"
 #endif
 
-#include "irc.h"
-#include "db.h"
-#include "net.h"
-#include "init.h"
-#include "strlcpy.h"
-#include "addrman.h"
-#include "ui_interface.h"
-#include "miner.h"
+#ifndef BITCOIN_IRC_H
+ #include "irc.h"
+#endif
+
+#ifndef BITCOIN_DB_H
+ #include "db.h"
+#endif
+
+#ifndef BITCOIN_INIT_H
+ #include "net.h"
+#endif
+
+#ifndef BITCOIN_INIT_H
+ #include "init.h"
+#endif
+
+#ifndef BITCOIN_STRLCPY_H
+ #include "strlcpy.h"
+#endif
+
+#ifndef NOVACOIN_MINER_H
+ #include "miner.h"
+#endif
 
 #include <vector>
 #ifdef WIN32
@@ -44,7 +59,8 @@ using std::set;
 
 const unsigned int 
     nStakeMaxAge = 90 * nSecondsPerDay,             //60 * 60 * 24 * 90; // 90 days as full weight
-    nOnedayOfAverageBlocks = nSecondsPerDay / nStakeTargetSpacing;  // should be 144 if it's BTC!
+    nOnedayOfAverageBlocks = (nSecondsPerDay / nStakeTargetSpacing)/10;  // the old 144
+    //nOnedayOfAverageBlocks = nSecondsPerDay / nStakeTargetSpacing;  // should be 144 if it's BTC!
 unsigned int 
     nStakeMinAge = 30 * nSecondsPerDay,             //60 * 60 * 24 * 30; // 30 days as zero time weight
     nStakeTargetSpacing = 1 * nSecondsperMinute,    //1 * 60; // 1-minute stake spacing
@@ -2885,7 +2901,8 @@ void StartNode(void* parg)
         printf("Error: NewThread(ThreadStakeMinter) failed\n");
 
     // Generate coins in the background
-    GenerateYacoins(GetBoolArg("-gen", false), pwalletMain);}
+    GenerateYacoins(GetBoolArg("-gen", false), pwalletMain);
+}
 
 bool StopNode()
 {

@@ -68,6 +68,7 @@ private:
     OverviewPage *overviewPage;
     QWidget *transactionsPage;
     QWidget *mintingPage;
+    QWidget *ExplorerPageDialog;
     AddressBookPage *addressBookPage;
     AddressBookPage *receiveCoinsPage;
     SendCoinsDialog *sendCoinsPage;
@@ -108,6 +109,11 @@ private:
     QAction *openRPCConsoleAction;
     QAction *explorerAction;        // new
 
+    QAction *explorerActionButton;
+    //QAction *explorerActionOldMenu;
+    QAction *explorerActionNewMenu;
+    QAction *explorerLaunch;
+
     QSystemTrayIcon *trayIcon;
     Notificator *notificator;
     TransactionView *transactionView;
@@ -115,7 +121,10 @@ private:
     RPCConsole *rpcConsole;
     AboutDialog *aboutDialog;
     OptionsDialog *optionsDialog;
-    ExplorerPage *pExplorerDialog;
+    
+    ExplorerPage *pExplorerDialog = NULL;
+    ExplorerPage *pExplorerDialog2= NULL;
+    //ExplorerPage *pExplorerView;
 
     QMovie *syncIconMovie;
 
@@ -171,6 +180,8 @@ private slots:
     void gotoReceiveCoinsPage();
     /** Switch to send coins page */
     void gotoSendCoinsPage();
+    
+    void gotoExplorerPage();
 
     /** Show Sign/Verify Message dialog and switch to sign message tab */
     void gotoSignMessageTab(QString addr = "");

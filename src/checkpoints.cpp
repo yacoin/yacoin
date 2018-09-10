@@ -8,11 +8,13 @@
 #include <boost/assign/list_of.hpp> // for 'map_list_of()'
 #include <boost/foreach.hpp>
 
-#include "checkpoints.h"
+#ifndef BITCOIN_CHECKPOINT_H
+ #include "checkpoints.h"
+#endif
 
-#include "txdb.h"
-#include "main.h"
-#include "uint256.h"
+#ifndef BITCOIN_TXDB_H
+ #include "txdb.h"
+#endif
 
 namespace Checkpoints
 {
@@ -250,18 +252,7 @@ namespace Checkpoints
 
         LOCK(cs_hashSyncCheckpoint);
         // sync-checkpoint should always be accepted block
-#ifdef _MSC_VER
-        bool
-            fTest = (mapBlockIndex.count(hashSyncCheckpoint));
-    #ifdef _DEBUG
-        assert(fTest);
-    #else
-        if( !fTest )
-            releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
-    #endif
-#else
-        assert(mapBlockIndex.count(hashSyncCheckpoint));
-#endif
+        Yassert(mapBlockIndex.count(hashSyncCheckpoint));
         const CBlockIndex* pindexSync = mapBlockIndex[hashSyncCheckpoint];
 
         if (nHeight > pindexSync->nHeight)
@@ -408,18 +399,7 @@ namespace Checkpoints
     {
         LOCK(cs_hashSyncCheckpoint);
         // sync-checkpoint should always be accepted block
-#ifdef _MSC_VER
-        bool
-            fTest = (mapBlockIndex.count(hashSyncCheckpoint));
-    #ifdef _DEBUG
-        assert(fTest);
-    #else
-        if( !fTest )
-            releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
-    #endif
-#else
-        assert(mapBlockIndex.count(hashSyncCheckpoint));
-#endif
+        Yassert(mapBlockIndex.count(hashSyncCheckpoint));
         const CBlockIndex* pindexSync = mapBlockIndex[hashSyncCheckpoint];
         return (nBestHeight >= pindexSync->nHeight + nCoinbaseMaturity ||
                 pindexSync->GetBlockTime() + nStakeMinAge < GetAdjustedTime());

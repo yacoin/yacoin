@@ -16,6 +16,7 @@
 #include "txdb-bdb.h"
 #include "util.h"
 #include "main.h"
+
 #include <boost/version.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/filesystem/fstream.hpp>
@@ -46,53 +47,20 @@ void MakeMockTXDB() {
 
 bool CTxDB::ReadTxIndex(uint256 hash, CTxIndex& txindex)
 {
-#ifdef _MSC_VER
-    bool
-        fTest = (!fClient);
-    #ifdef _DEBUG
-    assert(fTest);
-    #else
-    if( !fTest )
-        releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
-    #endif
-#else
-    assert(!fClient);
-#endif
+    Yassert(!fClient);
     txindex.SetNull();
     return Read(make_pair(string("tx"), hash), txindex);
 }
 
 bool CTxDB::UpdateTxIndex(uint256 hash, const CTxIndex& txindex)
 {
-#ifdef _MSC_VER
-    bool
-        fTest = (!fClient);
-    #ifdef _DEBUG
-    assert(fTest);
-    #else
-    if( !fTest )
-        releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
-    #endif
-#else
-    assert(!fClient);
-#endif
+    Yassert(!fClient);
     return Write(make_pair(string("tx"), hash), txindex);
 }
 
 bool CTxDB::AddTxIndex(const CTransaction& tx, const CDiskTxPos& pos, int nHeight)
 {
-#ifdef _MSC_VER
-    bool
-        fTest = (!fClient);
-    #ifdef _DEBUG
-    assert(fTest);
-    #else
-    if( !fTest )
-        releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
-    #endif
-#else
-    assert(!fClient);
-#endif
+    Yassert(!fClient);
 
     // Add to tx index
     uint256 hash = tx.GetHash();
@@ -102,18 +70,7 @@ bool CTxDB::AddTxIndex(const CTransaction& tx, const CDiskTxPos& pos, int nHeigh
 
 bool CTxDB::EraseTxIndex(const CTransaction& tx)
 {
-#ifdef _MSC_VER
-    bool
-        fTest = (!fClient);
-    #ifdef _DEBUG
-    assert(fTest);
-    #else
-    if( !fTest )
-        releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
-    #endif
-#else
-    assert(!fClient);
-#endif
+    Yassert(!fClient);
     uint256 hash = tx.GetHash();
 
     return Erase(make_pair(string("tx"), hash));
@@ -121,35 +78,13 @@ bool CTxDB::EraseTxIndex(const CTransaction& tx)
 
 bool CTxDB::ContainsTx(uint256 hash)
 {
-#ifdef _MSC_VER
-    bool
-        fTest = (!fClient);
-    #ifdef _DEBUG
-    assert(fTest);
-    #else
-    if( !fTest )
-        releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
-    #endif
-#else
-    assert(!fClient);
-#endif
+    Yassert(!fClient);
     return Exists(make_pair(string("tx"), hash));
 }
 
 bool CTxDB::ReadDiskTx(uint256 hash, CTransaction& tx, CTxIndex& txindex)
 {
-#ifdef _MSC_VER
-    bool
-        fTest = (!fClient);
-    #ifdef _DEBUG
-    assert(fTest);
-    #else
-    if( !fTest )
-        releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
-    #endif
-#else
-    assert(!fClient);
-#endif
+    Yassert(!fClient);
     tx.SetNull();
     if (!ReadTxIndex(hash, txindex))
         return false;

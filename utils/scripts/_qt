@@ -1,0 +1,60 @@
+########################################################################################
+# Qt
+
+if [ -z "$YOS" ]; then
+echo -e "\n\n\nYOS not set.\nAborting build\n\n\n"
+else
+
+[ -d "$YQT" ] || export YQT=$YSW/`pwd | xargs basename`
+
+if [ "$1" == "check" ]; then
+############################ Check if exists
+case $YOS in
+  linux*) [ -d "$YQT/lib" ] && [ `find $YQT/lib/* -prune -name "*.so" | wc -l` -gt 16 ] && echo "found";;
+  *) [ -d "$YQT/lib" ] && [ `find $YQT/lib/* -prune -name "*.a" ! -name "*.dll.a" | wc -l` -gt 13 ] && echo "found";;
+esac
+
+else
+############################ Build
+case $YOS in
+########################################## Linux
+linux*)
+
+case $YOS in *64*) YTMP="-64";; *) YTMP=;; esac
+if ! grep QMAKE_CXXFLAGS mkspecs/linux-g++$YTMP/qmake.conf > /dev/null; then sed -i '1 i\QMAKE_CXXFLAGS *= -std=gnu++0x' mkspecs/linux-g++$YTMP/qmake.conf; fi
+./configure -prefix $YQT -platform linux-g++$YTMP -release -shared -opensource -confirm-license -no-sql-sqlite -no-qt3support -no-opengl -qt-zlib -no-gif -qt-libpng -qt-libmng -no-libtiff -qt-libjpeg -no-openssl -no-dbus -no-phonon -no-phonon-backend -no-multimedia -no-audio-backend -no-webkit -no-script -no-scripttools -no-declarative -no-declarative-debug -nomake demos -nomake examples
+make && make install
+
+;;
+########################################## Mac OSX
+darwin*)
+
+OSXSDK="/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.6.sdk"
+sed -i "" -e "s/mmacosx-version-min=10.5/mmacosx-version-min=10.6/" configure mkspecs/common/g++-macx.conf
+sed -i "" -e 's/CFG_ZLIB=\"system\"/CFG_ZLIB=\"yes\"/' configure
+./configure -prefix $YQT -release -static -opensource -confirm-license -platform macx-g++ -platform macx-g++ -sdk ${OSXSDK} -arch x86_64 -no-sql-sqlite -no-qt3support -no-opengl -qt-zlib -no-gif -qt-libpng -qt-libmng -no-libtiff -qt-libjpeg -no-openssl -no-dbus -no-phonon -no-phonon-backend -no-multimedia -no-audio-backend -no-webkit -no-script -no-scripttools -no-declarative -no-declarative-debug -nomake demos -nomake examples
+make && make install
+
+;;
+########################################## Windows
+*)
+
+echo -e "include(../win32-g++/qmake.conf)\nQMAKE_CXXFLAGS *= -std=gnu++0x\nQMAKE_LFLAGS = -static -static-libgcc -static-libstdc++ -s" > mkspecs/win32-g++-4.6/qmake.conf
+if ! grep libstdc++ qmake/Makefile.win32-g++ > /dev/null; then sed -i 's/-static-libgcc/-static -static-libgcc -static-libstdc++/' qmake/Makefile.win32-g++; fi
+if ! grep 'static ' qmake/Makefile.win32-g++-sh > /dev/null; then sed -i 's/-static-libgcc/-static -static-libgcc/' qmake/Makefile.win32-g++-sh; fi
+
+awk -v addtxt=" && defined(SKIPHACK)" '/defined\(QT_NO_THREAD\)\ \&\&\ defined\(_POSIX_THREAD_SAFE_FUNCTIONS\)/ {$0=$0addtxt} 1' src/corelib/tools/qdatetime.cpp > tmpf
+if ! grep SKIPHACK src/corelib/tools/qdatetime.cpp > /dev/null; then mv tmpf src/corelib/tools/qdatetime.cpp; fi
+
+./configure.exe -prefix $YQT -release -static -opensource -confirm-license -platform win32-g++-4.6 -no-sql-sqlite -no-qt3support -no-opengl -qt-zlib -no-gif -qt-libpng -qt-libmng -no-libtiff -qt-libjpeg -no-dsp -no-vcproj -no-openssl -no-dbus -no-phonon -no-phonon-backend -no-multimedia -no-audio-backend -no-webkit -no-script -no-scripttools -no-declarative -no-declarative-debug -qt-style-windows -qt-style-windowsxp -qt-style-windowsvista -no-style-plastique -no-style-cleanlooks -no-style-motif -no-style-cde -nomake demos -nomake examples
+make && make install
+
+;;
+
+esac
+
+if ! grep YQT $YSW/yconf > /dev/null; then echo "YQT=$YQT" >> $YSW/yconf; fi
+if [ `echo $PATH | grep qt-everywhere | wc -l` -eq 0 ]; then export PATH=$PATH:$YQT/bin; fi
+fi
+fi
+

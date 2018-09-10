@@ -8,12 +8,7 @@
 
 #include "json_spirit_value.h"
 
-#ifndef _MSC_VER
-    #include "util.h"
-#else
-    #include "..\util.h"
-#endif
-//extern const int COINdecimalPower;
+#include "util.h"
 
 #include <cassert>
 #include <sstream>
@@ -23,18 +18,7 @@ namespace json_spirit
 {
     inline char to_hex_char( unsigned int c )
     {
-#ifdef _MSC_VER
-        bool
-            fTest = ( c <= 0xF );
-    #ifdef _DEBUG
-        assert(fTest);
-    #else
-        if( !fTest )
-            releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
-    #endif
-#else
-        assert( c <= 0xF );
-#endif
+        Yassert( c <= 0xF );
         const char ch = static_cast< char >( c );
 
         if( ch < 10 ) return '0' + ch;
@@ -45,7 +29,7 @@ namespace json_spirit
     template< class String_type >
     String_type non_printable_to_string( unsigned int c )
     {
-        typedef typename String_type::value_type Char_type;
+        // typedef typename String_type::value_type Char_type;
 
         String_type result( 6, '\\' );
 
@@ -152,18 +136,7 @@ namespace json_spirit
 
                 case null_type:  os_ << "null";               break;
                 default: 
-#ifdef _MSC_VER
-                    bool
-                        fTest = ( false );
-    #ifdef _DEBUG
-                    assert(fTest);
-    #else
-                    if( !fTest )
-                        releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
-    #endif
-#else
-                    assert( false );
-#endif
+                    Yassert( false );
                     break;
             }
         }

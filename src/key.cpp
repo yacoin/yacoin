@@ -5,7 +5,6 @@
     #include <stdint.h>
 
     #include "msvc_warnings.push.h"
-    #include "JustInCase.h"
 #endif
 
 #include <map>
@@ -485,18 +484,7 @@ bool CKey::Verify(uint256 hash, const std::vector<unsigned char>& vchSig)
         const unsigned char
             * sigptr = &vchSig[0];
 
-#ifdef _MSC_VER
-        bool
-            fTest = (norm_sig);
-    #ifdef _DEBUG
-        assert(fTest);
-    #else
-        if( !fTest )
-            releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
-    #endif
-#else
-        assert(norm_sig);
-#endif
+        Yassert(norm_sig);
         if (d2i_ECDSA_SIG(&norm_sig, &sigptr, vchSig.size()) == NULL)
         {
         /* As of OpenSSL 1.0.0p d2i_ECDSA_SIG frees and nulls the pointer on

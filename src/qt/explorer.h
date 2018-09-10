@@ -41,6 +41,19 @@ class QStandardItemModel;
 class ClientModel;
 class CTransaction;
 //_____________________________________________________________________________
+const int nNumberOfExplorers = 2;
+class CLastTxHash
+{
+public:
+    CLastTxHash();
+    void storeLasthash( uint256 &hash );
+    uint256 retrieveLastHash( void );
+private:
+    uint256 lastHash;
+    int explorer_counter;
+};
+//_____________________________________________________________________________
+//_____________________________________________________________________________
 //_____________________________________________________________________________
 
 class ExplorerPage : 
@@ -79,11 +92,14 @@ class ExplorerPage :
         nROWS_OF_DISPLAYED_TRANSACTIONS;
 
 public:
-    explicit ExplorerPage(QDialog * const parent = 0);
+    //ExplorerPage(BitcoinGUI* parent = 0);
+    ExplorerPage(QDialog * parent = 0, bool fNoCloseButton = false);
+    //explicit ExplorerPage(QDialog * const parent = 0);
     //ExplorerPage(QWidget *parent = 0);
     //virtual ~ExplorerPage();
     ~ExplorerPage();
 
+    CLastTxHash lastTxHashInside;
     // the table and transaction views, that like to be fed by "models"
     QTableView
         *pQTVblocks;
@@ -161,6 +177,8 @@ private:
     std::string
         sCOIN_SYMBOL;
 
+    bool
+        fCloseButton;
     static                // declaration
     bool
         fDontReenterMe,
@@ -291,17 +309,6 @@ private:
 
 private slots:
     void on_closeButton_clicked();
-};
-//_____________________________________________________________________________
-//_____________________________________________________________________________
-class CLastTxHash
-{
-public:
-    CLastTxHash();
-    void storeLasthash( uint256 &hash );
-    uint256 retrieveLastHash( void );
-private:
-    uint256 lastHash;
 };
 //_____________________________________________________________________________
 

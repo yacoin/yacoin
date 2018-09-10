@@ -54,7 +54,9 @@
 
 #include "ministun.h"
 
-#include "sync.h"
+#ifndef BITCOIN_SYNC_H
+ #include "sync.h"
+#endif
 //extern CCriticalSection cs_net;
 
 extern int GetRandInt(int nMax);

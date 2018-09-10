@@ -170,6 +170,7 @@ void RPCExecutor::request(const QString &command)
             strPrint = write_string(result, true);
 
         emit reply(RPCConsole::CMD_REPLY, QString::fromStdString(strPrint));
+        return; //!!! test
     }
     catch (json_spirit::Object& objError)
     {
@@ -179,13 +180,13 @@ void RPCExecutor::request(const QString &command)
             std::string message = find_value(objError, "message").get_str();
             emit reply(RPCConsole::CMD_ERROR, QString::fromStdString(message) + " (code " + QString::number(code) + ")");
         }
-        catch (const std::invalid_argument& ia) 
+        catch (std::exception &e)
         {
-            emit reply(RPCConsole::CMD_ERROR, QString::fromStdString(write_string(json_spirit::Value(objError), false)));
+            emit reply(RPCConsole::CMD_ERROR, QString("Exception error!?"));
         }
-        catch(std::runtime_error &) // raised when converting to invalid type, i.e. missing code or message
-        {   // Show raw JSON object
-            emit reply(RPCConsole::CMD_ERROR, QString::fromStdString(write_string(json_spirit::Value(objError), false)));
+        catch (...) 
+        {
+            emit reply(RPCConsole::CMD_ERROR, QString("Unknown error!?"));
         }
         //catch (...) 
         //{
@@ -199,12 +200,13 @@ void RPCExecutor::request(const QString &command)
     }
     catch (std::exception& e)
     {
-        emit reply(RPCConsole::CMD_ERROR, QString("Error: ") + QString::fromStdString(e.what()));
+        emit reply(RPCConsole::CMD_ERROR, QString("Exception Error1: ") + QString::fromStdString(e.what()));
     }
     catch (...) 
     {
-        emit reply(RPCConsole::CMD_ERROR, QString("unknown error!?"));
+        emit reply(RPCConsole::CMD_ERROR, QString("Unknown Error!?1"));
     }
+    return;
 }
 
 RPCConsole::RPCConsole(QWidget *parent) :
@@ -500,11 +502,11 @@ QString RPCConsole::FormatBytes(quint64 bytes)
     if(bytes < 1024)
         return QString(tr("%1 B")).arg(bytes);
     if(bytes < 1024 * 1024)
-        return QString(tr("%1 KB")).arg(bytes / 1024);
+        return QString(tr("%1 KB")).arg(bytes / 1024);  // couldn't one do >>10?
     if(bytes < 1024 * 1024 * 1024)
-        return QString(tr("%1 MB")).arg(bytes / 1024 / 1024);
+        return QString(tr("%1 MB")).arg((bytes / 1024) / 1024);
 
-    return QString(tr("%1 GB")).arg(bytes / 1024 / 1024 / 1024);
+    return QString(tr("%1 GB")).arg(((bytes / 1024) / 1024) / 1024);
 }
 
 void RPCConsole::setTrafficGraphRange(int mins)

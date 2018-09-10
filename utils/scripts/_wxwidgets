@@ -1,0 +1,66 @@
+########################################################################################
+# wxWidgets
+
+if [ -z "$YOS" ]; then
+echo -e "\n\n\nYOS not set.\nAborting build\n\n\n"
+else
+
+[ -d "$YWX" ] || export YWX=$YSW/`pwd | xargs basename`
+
+if [ "$1" == "check" ]; then
+############################ Check if exists
+[ -f "$YWX/bin/wx-config" ] && echo "found"
+
+else
+############################ Build
+case $YOS in
+########################################## Linux
+linux*)
+
+mkdir -p stage && cd stage
+../configure CXXFLAGS="-std=gnu++0x -Wno-unused-variable -Wno-deprecated-declarations" --disable-debug_flag --prefix=$YWX
+make && make install
+
+;;
+########################################## Mac OSX
+darwin*)
+
+mkdir -p stage && cd stage
+../configure --enable-macosx_arch=x86_64 --with-macosx-sdk=/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.6.sdk --with-macosx-version-min=10.6 --disable-debug_flag --disable-shared --prefix=$YWX
+make && make install
+
+;;
+########################################## Windows
+*)
+
+mkdir -p stage && cd stage
+# CXXFLAGS are ignored
+../configure CXX="g++ -std=gnu++0x -Wno-unused-variable -Wno-deprecated-declarations" LDFLAGS="-static -static-libgcc -static-libstdc++ -s" --build=x86-winnt-mingw32 --disable-shared --disable-debug_flag --prefix=$YWX
+
+YTMP=`cygpath -m $YDIR | sed 's/\//\\\\\//g'`
+find . -name Makefile | xargs sed -i 's/\ \'$YDIR'/\ '$YTMP'/'
+find . -name Makefile | xargs sed -i 's/\/usr\/bin\///'
+
+make && make install
+
+# work around bug in make install under msys
+YRSRC=-`echo $YSW | sed 's/\//\\\\\//g'`
+YRTGT=-`cygpath -m $YSW | sed 's/\//\\\\\//g'`
+sed -i "s/${YRSRC}/${YRTGT}/" $YWX/bin/wx-config
+YTMP="$YWX/include/"`ls $YWX/include | sed 's/\///'`
+cp -r ../include/wx $YTMP/
+rm -f $YTMP/wx/msw/setup.h
+( cd $YTMP/wx; rm -r android cocoa dfb gtk gtk1 motif msdos os2 osx private univ unix x11 qt )
+rm -rf `find $YTMP -type d -name wince`
+
+echo "ignore errors, try wx-config"
+
+;;
+
+esac
+
+if ! grep YWX $YSW/yconf > /dev/null; then echo "YWX=$YWX" >> $YSW/yconf; fi
+if [ `echo $PATH | grep wx | wc -l` -eq 0 ]; then export PATH=$YWX/bin:$PATH; fi
+fi
+fi
+

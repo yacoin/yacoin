@@ -1,6 +1,9 @@
 // Copyright (c) 2012 The Bitcoin developers
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
+
+// 0.4.9.02     8/27/2018 reordered CProvider aBTCtoYACProviders[] in price.cpp
+
 #include <string>
 
 #ifndef BITCOIN_VERSION_H
@@ -9,8 +12,8 @@
 
 #define DISPLAY_VERSION_MAJOR       0
 #define DISPLAY_VERSION_MINOR       4
-#define DISPLAY_VERSION_REVISION    8   
-#define DISPLAY_VERSION_BUILD       16
+#define DISPLAY_VERSION_REVISION    9
+#define DISPLAY_VERSION_BUILD       02
 #define DISPLAY_VERSION_TESTING     1
 
 const int
@@ -45,9 +48,9 @@ const std::string
 #    include "build.h"
 #endif
 
-//#define BUILD_DESC_INFO(maj,min,rev) \
+//#define BUILD_DESC_INFO(maj,min,rev) 
 //  "YAC-v" DO_STRINGIZE(maj) "." DO_STRINGIZE(min) "." DO_STRINGIZE(rev)
-//    DO_STRINGIZE(maj) \
+//    DO_STRINGIZE(maj) 
 
 #define BUILD_DESC_INFO(maj,min,rev,build) \
     "YAC-v" \

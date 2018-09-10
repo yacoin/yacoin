@@ -1,0 +1,49 @@
+########################################################################################
+# Jansson
+
+if [ -z "$YOS" ]; then
+echo -e "\n\n\nYOS not set.\nAborting build\n\n\n"
+else
+
+[ -d "$YJANS" ] || export YJANS=$YSW/`pwd | xargs basename`
+
+if [ "$1" == "check" ]; then
+############################ Check if exists
+case $YOS in
+  linux*) [ -d "$YJANS/lib" ] && [ -f "`find $YJANS/lib/* -prune -name "*.so" | head -1`" ] && echo "found";;
+  *) [ -d "$YJANS/lib" ] && [ -f "$YJANS/lib/libjansson.a" ] && echo "found";;
+esac
+
+else
+############################ Build
+case $YOS in
+########################################## Linux
+linux*)
+
+./configure --enable-static --enable-shared --prefix=$YJANS
+make && make install
+
+;;
+########################################## Mac OSX
+darwin*)
+
+CFLAGS="-isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.6.sdk -mmacosx-version-min=10.6" \
+CPPFLAGS="-isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.6.sdk -mmacosx-version-min=10.6" \
+./configure --disable-shared --enable-static --prefix=$YJANS
+make && make install
+
+;;
+########################################## Windows
+*)
+
+./configure LDFLAGS="-static -static-libgcc" --disable-shared --enable-static --prefix=$YJANS
+make && make install
+
+;;
+
+esac
+
+if ! grep YJANS $YSW/yconf > /dev/null; then echo "YJANS=$YJANS" >> $YSW/yconf; fi
+fi
+fi
+

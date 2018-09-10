@@ -5,6 +5,7 @@
 
 #include "main.h"
 #include "wallet.h"
+#include "script.h"
 
 using namespace std;
 using namespace json_spirit;
@@ -76,7 +77,9 @@ BOOST_AUTO_TEST_CASE(tx_valid)
                     break;
                 }
 
-                BOOST_CHECK_MESSAGE(VerifyScript(tx.vin[i].scriptSig, mapprevOutScriptPubKeys[tx.vin[i].prevout], tx, i, test[2].get_bool(), 0), strTest);
+                unsigned int flags = SCRIPT_VERIFY_NONE;
+                if(test[2].get_bool()) flags = STRICT_FLAGS;
+                BOOST_CHECK_MESSAGE(VerifyScript(tx.vin[i].scriptSig, mapprevOutScriptPubKeys[tx.vin[i].prevout], tx, i, flags, 0), strTest);
             }
         }
     }

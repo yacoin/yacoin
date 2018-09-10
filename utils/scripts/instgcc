@@ -1,0 +1,30 @@
+gccbase=$YDIR/gcc
+################## GNU C++ ##################
+
+if [ ! -f "$gccbase/bin/g++.exe" ]; then
+
+mkdir -p $gccbase
+function xgcc ()
+{ 	
+	case "$1" in
+		*.tar.lzma)	7za e -aoa $YDL/$1 -so | 7za x -aoa -si -ttar -o$gccbase ;;
+		*.tar.xz)	7za e -aoa $YDL/$1 -so | 7za x -aoa -si -ttar -o$gccbase ;;
+		*.tar.gz)	7za e -aoa $YDL/$1 -so | 7za x -aoa -si -ttar -o$gccbase ;;
+		*.7z)		7za x -aoa $YDL/$1 -o$gccbase ;;
+		*)			echo "File Format Unsupported $1" ;;
+	esac
+}
+
+xgcc gcc-5.1.0-tdm-1-dw2-core.tar.lzma
+xgcc gcc-5.1.0-tdm-1-core.tar.lzma
+xgcc gcc-5.1.0-tdm-1-c++.tar.lzma
+xgcc gdb32-7.9.1-tdm-1.tar.lzma
+xgcc w32api-3.17-2-mingw32-dev.tar.lzma
+xgcc binutils-2.24-1-mingw32-bin.tar.xz
+xgcc libintl-0.18.3.2-1-mingw32-dll-8.tar.xz
+xgcc mingwrt-3.20-2-mingw32-dev.tar.lzma
+xgcc make-3.82.90-2-mingw32-cvs-20120902-bin.tar.lzma
+
+cp $gccbase/bin/mingw32-make.exe $gccbase/bin/make.exe
+
+fi
