@@ -1,5 +1,3 @@
-[![CircleCI](https://circleci.com/gh/dev34253/yacoin.svg?style=svg)](https://circleci.com/gh/dev34253/yacoin)
-
 YACoin Official Development Tree.
 
 Many thanks to WindMaster for initially setting up this repository to continue development and promotion of YACoin after the original developer, GitHub user pocopoco, went paka paka. Due to community feedback and the need for an updated and stable client, this is now the official YACoin Development Tree.
