@@ -53,6 +53,8 @@ bool fUseFastStakeMiner;
 bool fUseMemoryLog;
 enum Checkpoints::CPMode CheckpointsMode;
 
+static bool fExit;
+
 // Ping and address broadcast intervals
 extern ::int64_t nPingInterval;
 extern ::int64_t nBroadcastInterval;
@@ -82,8 +84,6 @@ void StartShutdown()
     NewThread(Shutdown, NULL);
 #endif
 }
-static bool 
-    fExit;
 
 void Shutdown(void* parg)
 {
