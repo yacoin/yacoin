@@ -25,6 +25,7 @@ install:
   - travis_retry sudo apt-get install libqrencode-dev -y
   - travis_retry sudo apt-get install git -y
   - travis_retry sudo apt-get install ca-certificates -y
+  - echo "Done"
 
 script: 
   - ./autogen.sh
