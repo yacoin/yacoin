@@ -44,7 +44,7 @@ CProvider aBTCtoYACProviders[] =
         },
         {   //https://yobit.net/api/3/ticker/yac_btc
             "yobit.net",
-            "last",
+            "avg",
             "/api/3/ticker/yac_btc",
             nUnusualCharacterOffset,
             DEFAULT_HTTPS_PORT
@@ -512,7 +512,7 @@ static bool parseAline( string &s, string & strLine, unsigned int &i )
         if( '\n' == c )  // the signal for a line received
         {
             ++i;
-            break;
+            return true;
         }
         else
         {
@@ -522,7 +522,7 @@ static bool parseAline( string &s, string & strLine, unsigned int &i )
                 return false;
         }
     }
-    return true;
+    return false;
 }
 //_____________________________________________________________________________
 static void 
@@ -857,17 +857,16 @@ static bool GetMyExternalWebPage(
         //else regular http
 #ifdef WIN32
         SOCKET 
-            hSocket = NULL,
-            & hsocket = hSocket;
+            hSocket = NULL;
 #else
-        u_int hSocket = 0;
-        u_int &hsocket = hSocket;
+        u_int
+            hSocket = 0;
 #endif
         try
         {
             CdoSocket 
                 CthisSocketConnection( 
-                                      hsocket,
+                                      hSocket,
                                       sDomain,
                                       nPort
                                      );
@@ -902,7 +901,7 @@ static bool GetMyExternalWebPage(
 
             do
             {
-                fLineOK = recvAline(hsocket, strLine);
+                fLineOK = recvAline(hSocket, strLine);
                 if (fShutdown)
                 {
                     return false;
@@ -948,7 +947,7 @@ static bool GetMyExternalWebPage(
                         strLine = "";
                         do
                         {
-                            fLineOK = recvAline(hsocket, strLine);
+                            fLineOK = recvAline(hSocket, strLine);
                             Sleep( nArbitraryShortTimeInMilliseconds ); // may not even be needed?
                             strLine = "";            
                         }
@@ -1088,7 +1087,7 @@ bool GetMyExternalWebPage1( int & nIndexBtcToYac, string & strBuffer, double & d
                             "y/b = %lf"
                             "\n"
                             , 1.0/dPrice
-                          );    
+                          );
                 }
             }
             break;
