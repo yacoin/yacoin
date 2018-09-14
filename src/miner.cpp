@@ -1202,7 +1202,7 @@ static void YacoinMiner(CWallet *pwallet)  // here fProofOfStake is always false
                      "Starting mining loop\n"
                     );
 #endif
-        while( true )        //loop
+        while( fGenerateBitcoins )        //loop
         {
             unsigned int nHashesDone = 0;
             unsigned int nNonceFound;
@@ -1343,8 +1343,6 @@ static void YacoinMiner(CWallet *pwallet)  // here fProofOfStake is always false
             if (pblock->GetBlockTime() >= ((::int64_t)pblock->vtx[0].nTime + nMaxClockDrift))
                 break;  // need to update coinbase timestamp
         }
-        if (!fGenerateBitcoins) //<<<<<<<<<<< test
-            break;
     }   
 //    scrypt_buffer_free(scratchbuf);
 }
