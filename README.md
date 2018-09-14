@@ -1,4 +1,4 @@
-[![Build Status](https://travis-ci.org/yacoin/yacoin.svg?branch=master)](https://travis-ci.org/yacoin/yacoin)
+[![Build Status](https://travis-ci.org/yacoin/yacoin.svg?branch=0.4.9)](https://travis-ci.org/yacoin/yacoin)
 YACoin Official Development Tree.
 
 Many thanks to WindMaster for initially setting up this repository to continue development and promotion of YACoin after the original developer, GitHub user pocopoco, went paka paka. Due to community feedback and the need for an updated and stable client, this is now the official YACoin Development Tree.
