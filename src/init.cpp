@@ -237,7 +237,7 @@ bool AppInit(int argc, char* argv[])
         }
         ReadConfigFile(mapArgs, mapMultiArgs);
 
-        if (mapArgs.count("-?") || mapArgs.count("--h") || mapArgs.count("--help"))
+        if (mapArgs.count("-?") || mapArgs.count("-h") || mapArgs.count("--help"))
         {
             // First part of help message is specific to yacoind / RPC client
             std::string strUsage = _("Yacoin version") + " " + FormatFullVersion() + "\n\n" +
@@ -254,7 +254,7 @@ bool AppInit(int argc, char* argv[])
             fRet = false;
             //Shutdown(NULL);
 #else
-            return false;
+            exit(0);
 #endif
         }
         else

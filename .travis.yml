@@ -34,3 +34,5 @@ script:
   - cd src
   - mkdir unittestresults
   - ./yacoin_test > ./unittestresults/unittestresults.txt
+  - cd ../test/functional
+  - python3 test_runner.py
