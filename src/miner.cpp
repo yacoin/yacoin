@@ -10,11 +10,23 @@
     #include <memory>
 #endif
 
-#include "txdb.h"
-#include "miner.h"
-#include "kernel.h"
-#include "init.h"
-#include "scrypt.h"
+#ifndef BITCOIN_TXDB_H
+ #include "txdb.h"
+#endif
+
+#ifndef NOVACOIN_MINER_H
+// #include "miner.h"
+#endif
+
+#ifndef PPCOIN_KERNEL_H
+ #include "kernel.h"
+#endif
+
+#ifndef BITCOIN_INIT_H
+ #include "init.h"
+#endif
+
+//#include "scrypt.h"
 
 using std::vector;
 using std::set;
@@ -822,19 +834,7 @@ void IncrementExtraNonce(CBlock* pblock, CBlockIndex* pindexPrev, unsigned int& 
     unsigned int 
         nHeight = pindexPrev->nHeight+1; // Height first in coinbase required for block.version=2
     pblock->vtx[0].vin[0].scriptSig = (CScript() << nHeight << CBigNum(nExtraNonce)) + COINBASE_FLAGS;
-#ifdef _MSC_VER
-    bool
-        fTest = (pblock->vtx[0].vin[0].scriptSig.size() <= 100);
-    #ifdef _DEBUG
-    assert(fTest);
-    #else
-    if( !fTest )
-        releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
-    #endif
-#else
-    assert(pblock->vtx[0].vin[0].scriptSig.size() <= 100);
-#endif
-
+    Yassert(pblock->vtx[0].vin[0].scriptSig.size() <= 100);
     pblock->hashMerkleRoot = pblock->BuildMerkleTree();
 }
 
@@ -1118,7 +1118,7 @@ static void YacoinMiner(CWallet *pwallet)  // here fProofOfStake is always false
                IsInitialBlockDownload() || 
                (
                 vNodes.empty() 
-                //&& !fTestNet               //TestNet can mine stand alone!
+                && !fTestNet               //TestNet can mine stand alone!
                )
               )
         {
@@ -1202,7 +1202,7 @@ static void YacoinMiner(CWallet *pwallet)  // here fProofOfStake is always false
                      "Starting mining loop\n"
                     );
 #endif
-        while( true )        //loop
+        while( fGenerateBitcoins )        //loop
         {
             unsigned int nHashesDone = 0;
             unsigned int nNonceFound;
@@ -1225,8 +1225,6 @@ static void YacoinMiner(CWallet *pwallet)  // here fProofOfStake is always false
                 {   // Found a solution
                     //pblock->nNonce = nNonceFound;
 #ifdef _MSC_VER
-                    bool
-                        fTest = (result == pblock->GetHash());
     #ifdef NDEBUG
                     (void)printf(
                         "target:      %s\n", hashTarget.ToString().c_str()
@@ -1234,14 +1232,9 @@ static void YacoinMiner(CWallet *pwallet)  // here fProofOfStake is always false
                     (void)printf(
                         "result:      %s\n", result.ToString().c_str()
                                 );
-                    if( !fTest )
-                        releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
-    #else
-                    assert(fTest);
     #endif
-#else
-                    assert(result == pblock->GetHash());
 #endif
+                    Yassert(result == pblock->GetHash());
                     if (!pblock->SignBlock(*pwalletMain))   // wallet is locked
                     {
                         strMintWarning = strMintMessage;
@@ -1343,8 +1336,6 @@ static void YacoinMiner(CWallet *pwallet)  // here fProofOfStake is always false
             if (pblock->GetBlockTime() >= ((::int64_t)pblock->vtx[0].nTime + nMaxClockDrift))
                 break;  // need to update coinbase timestamp
         }
-        if (!fGenerateBitcoins) //<<<<<<<<<<< test
-            break;
     }   
 //    scrypt_buffer_free(scratchbuf);
 }

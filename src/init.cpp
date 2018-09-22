@@ -53,6 +53,8 @@ bool fUseFastStakeMiner;
 bool fUseMemoryLog;
 enum Checkpoints::CPMode CheckpointsMode;
 
+static bool fExit;
+
 // Ping and address broadcast intervals
 extern ::int64_t nPingInterval;
 extern ::int64_t nBroadcastInterval;
@@ -70,10 +72,6 @@ void ExitTimeout(void* parg)
 //    ExitProcess(0);
 #endif
 }
-
-
-static bool 
-    fExit;
     
 #ifndef TESTS_ENABLED
 void StartShutdown()

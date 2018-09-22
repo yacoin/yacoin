@@ -1119,6 +1119,11 @@ void ThreadRPCServer3(void* parg)
             ErrorReply(conn->stream(), objError, jreq.id);
             break;
         }
+        catch (const std::invalid_argument& ia) 
+        {
+            ErrorReply(conn->stream(), JSONRPCError(RPC_PARSE_ERROR, ia.what()), jreq.id);
+            break;
+        }
         catch (std::exception& e)
         {
             ErrorReply(conn->stream(), JSONRPCError(RPC_PARSE_ERROR, e.what()), jreq.id);
@@ -1162,6 +1167,10 @@ json_spirit::Value CRPCTable::execute(const std::string &strMethod, const json_s
             }
         }
         return result;
+    }
+    catch (std::invalid_argument& ia)
+    {
+        throw JSONRPCError(RPC_MISC_ERROR, ia.what());
     }
     catch (std::exception& e)
     {
@@ -1387,6 +1396,16 @@ int CommandLineRPC(int argc, char *argv[])
             PrintException(NULL, "CommandLineRPC()");
             nRet = 88;
         }
+    }
+    catch (const std::runtime_error& e) 
+    {
+        strPrint = string("error: ") + e.what();
+        nRet = 85;  //WTFK
+    }
+    catch (const std::invalid_argument& ia) 
+    {
+        strPrint = string("error: ") + ia.what();
+        nRet = 86;  //WTFK
     }
     catch (std::exception& e)
     {

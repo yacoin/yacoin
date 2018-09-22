@@ -107,6 +107,12 @@ private:
     QAction *changePassphraseAction;
     QAction *aboutQtAction;
     QAction *openRPCConsoleAction;
+    QAction *explorerAction;        // new
+
+    QAction *explorerActionButton;
+    //QAction *explorerActionOldMenu;
+    QAction *explorerActionNewMenu;
+    QAction *explorerLaunch;
 
     QAction *explorerActionButton;
     //QAction *explorerActionOldMenu;
