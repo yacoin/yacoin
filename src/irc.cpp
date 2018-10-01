@@ -8,10 +8,21 @@
     #include "msvc_warnings.push.h"
 #endif
 
-#include "irc.h"
-#include "strlcpy.h"
-#include "base58.h"
-#include "net.h"
+#ifndef BITCOIN_IRC_H
+ #include "irc.h"
+#endif
+
+#ifndef BITCOIN_STRLCPY_H
+ #include "strlcpy.h"
+#endif
+
+#ifndef BITCOIN_BASE58_H
+ #include "base58.h"
+#endif
+
+#ifndef BITCOIN_NET_H
+ #include "net.h"
+#endif
 
 using namespace boost;
 

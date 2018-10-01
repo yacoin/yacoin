@@ -1,0 +1,49 @@
+########################################################################################
+# libevent
+
+if [ -z "$YOS" ]; then
+echo -e "\n\n\nYOS not set.\nAborting build\n\n\n"
+else
+
+[ -d "$YEVT" ] || export YEVT=$YSW/`pwd | xargs basename`
+
+if [ "$1" == "check" ]; then
+############################ Check if exists
+case $YOS in
+  linux*) [ -d "$YEVT/lib" ] && [ -f "`find $YEVT/lib/* -prune -name "*.so" | head -1`" ] && echo "found";;
+  *) [ -d "$YEVT/lib" ] && [ -f "`find $YEVT/lib/* -prune -name "*.a" ! -name "*.dll.a" | head -1`" ] && echo "found";;
+esac
+
+else
+############################ Build
+case $YOS in
+########################################## Linux
+linux*)
+
+./configure --enable-static --enable-shared --prefix=$YEVT
+make && make install
+
+;;
+########################################## Mac OSX
+darwin*)
+
+CFLAGS="-isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.6.sdk -mmacosx-version-min=10.6" \
+./configure --disable-shared --enable-static --prefix=$YEVT
+make && make install
+
+;;
+########################################## Windows
+*)
+
+./configure LDFLAGS='-static -static-libgcc -s' --disable-shared --enable-static --prefix=$YEVT
+sed -i 's/\/usr\/bin\///' Makefile
+make && make install
+
+;;
+
+esac
+
+if ! grep YEVT $YSW/yconf > /dev/null; then echo "YEVT=$YEVT" >> $YSW/yconf; fi
+fi
+fi
+

@@ -214,18 +214,7 @@ public:
         // passed queue is supposed to be unused, or NULL
         if (pqueue != NULL) {
             bool isIdle = pqueue->IsIdle();
-#ifdef _MSC_VER
-            bool
-                fTest = (isIdle);
-    #ifdef _DEBUG
-            assert(fTest);
-    #else
-            if( !fTest )
-                releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
-    #endif
-#else
-            assert(isIdle);
-#endif
+            Yassert(isIdle);
         }
     }
 

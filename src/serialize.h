@@ -27,9 +27,12 @@
 #ifdef _MSC_VER
     #include "stdint.h"
     #include "inttypes.h"
-    #include "JustInCase.h"
 #else
 #include <inttypes.h>
+#endif
+
+#ifndef YACOIN_YASSERT_H
+ #include "Yassert.h"
 #endif
 
 #ifndef BITCOIN_ALLOCATORS_H
@@ -82,7 +85,7 @@ enum
         const bool fRead = false;               \
         unsigned int nSerSize = 0;              \
         ser_streamplaceholder s;                \
-        assert(fGetSize||fWrite||fRead); /* suppress warning */ \
+        Yassert(fGetSize||fWrite||fRead); /* suppress warning */ \
         s.nType = nType;                        \
         s.nVersion = nVersion;                  \
         std::map<int, int>  mapUnkIds;          \
@@ -97,7 +100,7 @@ enum
         const bool fWrite = true;               \
         const bool fRead = false;               \
         unsigned int nSerSize = 0;              \
-        assert(fGetSize||fWrite||fRead); /* suppress warning */ \
+        Yassert(fGetSize||fWrite||fRead); /* suppress warning */ \
     std::map<int, int>  mapUnkIds;  \
         {statements}                            \
     }                                           \
@@ -110,7 +113,7 @@ enum
         const bool fRead = true;                \
         unsigned int nSerSize = 0;              \
     std::map<int, int>  mapUnkIds;  \
-        assert(fGetSize||fWrite||fRead); /* suppress warning */ \
+        Yassert(fGetSize||fWrite||fRead); /* suppress warning */ \
         {statements}                            \
     }
 
@@ -125,7 +128,7 @@ enum
         const bool fRead = false;               \
         unsigned int nSerSize = 0;              \
         ser_streamplaceholder s;                \
-        assert(fGetSize||fWrite||fRead); /* suppress warning */ \
+        Yassert(fGetSize||fWrite||fRead); /* suppress warning */ \
         s.nType = nType;                        \
         s.nVersion = nVersion;                  \
         {statements}                            \
@@ -139,7 +142,7 @@ enum
         const bool fWrite = true;               \
         const bool fRead = false;               \
         unsigned int nSerSize = 0;              \
-        assert(fGetSize||fWrite||fRead); /* suppress warning */ \
+        Yassert(fGetSize||fWrite||fRead); /* suppress warning */ \
         {statements}                            \
     }                                           \
     template<typename Stream>                   \
@@ -150,7 +153,7 @@ enum
         const bool fWrite = false;              \
         const bool fRead = true;                \
         unsigned int nSerSize = 0;              \
-        assert(fGetSize||fWrite||fRead); /* suppress warning */ \
+        Yassert(fGetSize||fWrite||fRead); /* suppress warning */ \
         {statements}                            \
     }
 
@@ -968,18 +971,7 @@ public:
 #ifdef _MSC_VER
     void insert(iterator it, const_iterator first, const_iterator last)
     {
-#ifdef _MSC_VER
-        bool
-            fTest = (last - first >= 0);
-    #ifdef _DEBUG
-        assert(fTest);
-    #else
-        if( !fTest )
-            releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
-    #endif
-#else
-        assert(last - first >= 0);
-#endif
+        Yassert(last - first >= 0);
         if (it == vch.begin() + nReadPos && (unsigned int)(last - first) <= nReadPos)
         {
             // special case for inserting at the front when there's room
@@ -994,18 +986,7 @@ public:
 //#ifndef _MSC_VER
     void insert(iterator it, std::vector<char>::const_iterator first, std::vector<char>::const_iterator last)
     {
-#ifdef _MSC_VER
-        bool
-            fTest = (last - first >= 0);
-    #ifdef _DEBUG
-        assert(fTest);
-    #else
-        if( !fTest )
-            releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
-    #endif
-#else
-        assert(last - first >= 0);
-#endif
+        Yassert(last - first >= 0);
         if (it == vch.begin() + nReadPos && (unsigned int)(last - first) <= nReadPos)
         {
             // special case for inserting at the front when there's room
@@ -1020,18 +1001,7 @@ public:
 #if !defined(_MSC_VER) || _MSC_VER >= 1300
     void insert(iterator it, const char* first, const char* last)
     {
-#ifdef _MSC_VER
-        bool
-            fTest = (last - first >= 0);
-    #ifdef _DEBUG
-        assert(fTest);
-    #else
-        if( !fTest )
-            releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
-    #endif
-#else
-        assert(last - first >= 0);
-#endif
+        Yassert(last - first >= 0);
         if (it == vch.begin() + nReadPos && (unsigned int)(last - first) <= nReadPos)
         {
             // special case for inserting at the front when there's room
@@ -1125,18 +1095,7 @@ public:
     CDataStream& read(char* pch, int nSize)
     {
         // Read from the beginning of the buffer
-#ifdef _MSC_VER
-        bool
-            fTest = (nSize >= 0);
-    #ifdef _DEBUG
-        assert(fTest);
-    #else
-        if( !fTest )
-            releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
-    #endif
-#else
-        assert(nSize >= 0);
-#endif
+        Yassert(nSize >= 0);
         unsigned int nReadPosNext = nReadPos + nSize;
         if (nReadPosNext >= vch.size())
         {
@@ -1159,18 +1118,7 @@ public:
     CDataStream& ignore(int nSize)
     {
         // Ignore from the beginning of the buffer
-#ifdef _MSC_VER
-        bool
-            fTest = (nSize >= 0);
-    #ifdef _DEBUG
-        assert(fTest);
-    #else
-        if( !fTest )
-            releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
-    #endif
-#else
-        assert(nSize >= 0);
-#endif
+        Yassert(nSize >= 0);
         unsigned int nReadPosNext = nReadPos + nSize;
         if (nReadPosNext >= vch.size())
         {
@@ -1190,18 +1138,7 @@ public:
     CDataStream& write(const char* pch, int nSize)
     {
         // Write to the end of the buffer
-#ifdef _MSC_VER
-        bool
-            fTest = (nSize >= 0);
-    #ifdef _DEBUG
-        assert(fTest);
-    #else
-        if( !fTest )
-            releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
-    #endif
-#else
-        assert(nSize >= 0);
-#endif
+        Yassert(nSize >= 0);
         vch.insert(vch.end(), pch, pch + nSize);
         return (*this);
     }

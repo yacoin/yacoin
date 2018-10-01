@@ -10,13 +10,17 @@
 
 #include <boost/assign/list_of.hpp>
 
-#include "base58.h"
-#include "bitcoinrpc.h"
-#include "txdb.h"
-#include "init.h"
-#include "main.h"
-#include "net.h"
-#include "wallet.h"
+#ifndef _BITCOINRPC_H_
+ #include "bitcoinrpc.h"
+#endif
+
+#ifndef BITCOIN_TXDB_H
+ #include "txdb.h"
+#endif
+ 
+#ifndef BITCOIN_INIT_H
+ #include "init.h"
+#endif
 
 using namespace boost;
 using namespace boost::assign;

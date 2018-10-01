@@ -91,9 +91,11 @@ extern const uint256
 extern int 
     nConsecutiveStakeSwitchHeight;  // see timesamps.h = 420000;
 
-static const ::int64_t nMaxClockDrift = 2 * 60 * 60;        // two hours
-inline ::int64_t PastDrift(::int64_t nTime)   { return nTime - 2 * 60 * 60; } // up to 2 hours from the past
-inline ::int64_t FutureDrift(::int64_t nTime) { return nTime + 2 * 60 * 60; } // up to 2 hours from the future
+const ::int64_t nMaxClockDrift = nTwoHoursInSeconds;
+inline ::int64_t PastDrift(::int64_t nTime)   
+    { return nTime - nMaxClockDrift; } // up to 2 hours from the past
+inline ::int64_t FutureDrift(::int64_t nTime) 
+    { return nTime + nMaxClockDrift; } // up to 2 hours from the future
 
 extern const ::int64_t 
     nChainStartTime,

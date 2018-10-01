@@ -1,0 +1,54 @@
+########################################################################################
+# zlib
+
+if [ -z "$YOS" ]; then
+echo -e "\n\n\nYOS not set.\nAborting build\n\n\n"
+else
+
+[ -d "$YZLIB" ] || export YZLIB=$YSW/`pwd | xargs basename`
+
+if [ "$1" == "check" ]; then
+############################ Check if exists
+case $YOS in
+  linux*) [ -d "$YZLIB" ] && [ -f "`find $YZLIB/lib/* -prune -name "*.so" | head -1`" ] && echo "found";;
+  *) [ -d "$YZLIB" ] && [ -f "$YZLIB/lib/libz.a" ] && echo "found";;
+esac
+
+else
+############################ Build
+
+case $YOS in
+########################################## Linux
+linux*)
+
+./configure --prefix=$YZLIB
+make
+make install
+cp *.h *.c *.a *.so $YZLIB
+;;
+########################################## Mac OSX
+darwin*)
+
+#CC=gcc-4.8 CXX=g++-4.8 LDFLAGS="-static-libgcc -static-libstdc++" \
+CFLAGS="-isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.6.sdk -mmacosx-version-min=10.6" \
+./configure --static --prefix=$YZLIB
+make
+make install
+cp *.h *.c libz.a $YZLIB
+;;
+########################################## Windows
+*)
+
+make -f win32/Makefile.gcc libz.a
+mkdir -p $YZLIB/include $YZLIB/lib
+cp zconf.h  zlib.h  $YZLIB/include
+cp libz.a $YZLIB/lib
+cp *.h *.c libz.a $YZLIB
+
+;;
+
+esac
+
+if ! grep YZLIB $YSW/yconf > /dev/null; then echo "YZLIB=$YZLIB" >> $YSW/yconf; fi
+fi
+fi

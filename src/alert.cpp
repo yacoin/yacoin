@@ -12,11 +12,25 @@
 #include <boost/foreach.hpp>
 #include <map>
 
-#include "alert.h"
-#include "key.h"
-#include "net.h"
-#include "sync.h"
-#include "ui_interface.h"
+#ifndef _BITCOINALERT_H_
+ #include "alert.h"
+#endif
+
+#ifndef BITCOIN_KEY_H
+ #include "key.h"
+#endif
+
+#ifndef BITCOIN_NET_H
+ #include "net.h"
+#endif
+
+#ifndef BITCOIN_SYNC_H
+ #include "sync.h"
+#endif
+
+#ifndef BITCOIN_UI_INTERFACE_H
+ #include "ui_interface.h"
+#endif
 
 using std::make_pair;
 using std::map;

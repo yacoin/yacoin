@@ -6,7 +6,6 @@
     #include <stdint.h>
 
     #include "msvc_warnings.push.h"
-    #include "JustInCase.h"
 #endif
 
 #ifndef _BITCOINALERT_H_
@@ -1163,8 +1162,8 @@ unsigned char GetNfactor(::int64_t nTimestamp)
         return minNfactor;
 
     ::int64_t 
-        nAgeOfBlockOrTxInSeconds = nTimestamp - (fTestNet? nChainStartTimeTestNet: nChainStartTime),  //nChainStartTime,
-        nSavedAgeOfBlockOrTxInSeconds = nAgeOfBlockOrTxInSeconds;
+        nAgeOfBlockOrTxInSeconds = nTimestamp - (fTestNet? nChainStartTimeTestNet: nChainStartTime);
+        //nChainStartTime, nSavedAgeOfBlockOrTxInSeconds = nAgeOfBlockOrTxInSeconds;
 
     while ((nAgeOfBlockOrTxInSeconds >> 1) > 3)     // nAgeOfBlockOrTxInSeconds / 2 is 4 or more
     {
@@ -1180,7 +1179,7 @@ unsigned char GetNfactor(::int64_t nTimestamp)
         n = 0;
     if (n > 255)
       //printf("GetNfactor(%ld) - something wrong(n == %d)\n", nTimestamp, n);
-        printf("GetNfactor(%"PRI64d") - something wrong(n == %d)\n", nTimestamp, n); // for g++
+        printf("GetNfactor(%"PRId64") - something wrong(n == %d)\n", nTimestamp, n); // for g++
 
     // so n is between 0 and 0xff
     unsigned char N = (unsigned char)n;
@@ -1192,7 +1191,7 @@ unsigned char GetNfactor(::int64_t nTimestamp)
       )
     {
         printf(
-                "GetNfactor: %"PRI64d" -> %d %"PRI64d" : %d / %d\n", 
+                "GetNfactor: %"PRI64d" -> %d %"PRId64" : %d / %d\n", 
                 nTimestamp - (fTestNet? nChainStartTimeTestNet: nChainStartTime), //nChainStartTime,   // 64 bit int
                 nBitCount, 
                 nAgeOfBlockOrTxInSeconds, 
@@ -1353,7 +1352,7 @@ CBigNum inline GetProofOfStakeLimit(int nHeight, unsigned int nTime)
     ::int64_t 
         nSubsidy = nCoinAge * 33 / (365 * 33 + 8) * nRewardCoinYear;
     if (fDebug && GetBoolArg("-printcreation"))
-        printf("GetProofOfStakeReward(): create=%s nCoinAge=%"PRI64d"\n", FormatMoney(nSubsidy).c_str(), nCoinAge);
+        printf("GetProofOfStakeReward(): create=%s nCoinAge=%"PRId64"\n", FormatMoney(nSubsidy).c_str(), nCoinAge);
     return nSubsidy;
 }
 // miner's coin stake reward based on nBits and coin age spent (coin-days)
@@ -1540,7 +1539,7 @@ const CBlockIndex* GetLastBlockIndex(const CBlockIndex* pindex, bool fProofOfSta
 {
     while (
            pindex &&                                    // there is a block
-           pindex->pprev &&                             // there ia a previous block 
+           pindex->pprev &&                             // there is a previous block 
            (pindex->IsProofOfStake() != fProofOfStake)  // the block is a !fProofOfStake
           )
         pindex = pindex->pprev;                         // go back
@@ -1985,18 +1984,7 @@ bool CTransaction::FetchInputs(CTxDB& txdb, const map<uint256, CTxIndex>& mapTes
     for (unsigned int i = 0; i < vin.size(); i++)
     {
         const COutPoint prevout = vin[i].prevout;
-#ifdef _MSC_VER
-        bool
-            fTest = (inputsRet.count(prevout.hash) != 0);
-    #ifdef _DEBUG
-        assert(fTest);
-    #else
-        if( !fTest )
-            releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
-    #endif
-#else
-        assert(inputsRet.count(prevout.hash) != 0);
-#endif
+        Yassert(inputsRet.count(prevout.hash) != 0);
         const CTxIndex& txindex = inputsRet[prevout.hash].first;
         const CTransaction& txPrev = inputsRet[prevout.hash].second;
         if (prevout.n >= txPrev.vout.size() || prevout.n >= txindex.vSpent.size())
@@ -2102,18 +2090,7 @@ bool CTransaction::ConnectInputs(
         {
             COutPoint 
                 prevout = vin[i].prevout;
-#ifdef _MSC_VER
-            bool
-                fTest = (inputs.count(prevout.hash) > 0);
-    #ifdef _DEBUG
-            assert(fTest);
-    #else
-            if( !fTest )
-                releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
-    #endif
-#else
-            assert(inputs.count(prevout.hash) > 0);
-#endif
+            Yassert(inputs.count(prevout.hash) > 0);
             CTxIndex
                 & txindex = inputs[prevout.hash].first;
             CTransaction
@@ -2157,18 +2134,7 @@ bool CTransaction::ConnectInputs(
         {
             COutPoint 
                 prevout = vin[i].prevout;
-#ifdef _MSC_VER
-            bool
-                fTest = (inputs.count(prevout.hash) > 0);
-    #ifdef _DEBUG
-            assert(fTest);
-    #else
-            if( !fTest )
-                releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
-    #endif
-#else
-            assert(inputs.count(prevout.hash) > 0);
-#endif
+            Yassert(inputs.count(prevout.hash) > 0);
             CTxIndex
                 & txindex = inputs[prevout.hash].first;
             CTransaction
@@ -2977,6 +2943,10 @@ bool CBlock::CheckBlock(bool fCheckPOW, bool fCheckMerkleRoot, bool fCheckSig) c
         if (GetBlockTime() != (::int64_t)vtx[1].nTime)
             return DoS(50, error("CheckBlock() : coinstake timestamp violation nTimeBlock=%" PRId64 " nTimeTx=%u", GetBlockTime(), vtx[1].nTime));
 
+        // Check timestamp  06/04/2018 missing test in this 0.4.5-0.48 code.  Thanks Joe! ;>
+        if (GetBlockTime() > FutureDrift(GetAdjustedTime()))
+            return error("CheckBlock() : block timestamp too far in the future");
+
         // NovaCoin: check proof-of-stake block signature
         if (fCheckSig && !CheckBlockSignature())
         {
@@ -3083,22 +3053,27 @@ bool CBlock::AcceptBlock()
 
     ::int64_t 
         nMedianTimePast = pindexPrev->GetMedianTimePast();
-    int 
-        nMaxOffset = 12 * nSecondsPerHour; // 12 hours
+//    int 
+//      //nMaxOffset = 12 * nSecondsPerHour; // 12 hours
+//        nMaxOffset = 7 * nSecondsPerDay; // One week (test)
 
-    if (fTestNet)   // || pindexPrev->nTime < 1450569600)
-        nMaxOffset = 7 * 7 * nSecondsPerDay; // One week (permanently on testNet
+//    if (fTestNet)   // || pindexPrev->nTime < 1450569600)
+//        nMaxOffset = 7 * 7 * nSecondsPerDay; // 7 weeks on testNet
 
 // Check timestamp against prev
-    if (GetBlockTime() <= pindexPrev->GetMedianTimePast() || FutureDrift(GetBlockTime()) < pindexPrev->GetBlockTime())
+    if (
+        GetBlockTime() <= pindexPrev->GetMedianTimePast()
+        ||
+        FutureDrift(GetBlockTime()) < pindexPrev->GetBlockTime()
+       )
         return error("AcceptBlock() : block's timestamp is too early");
-
+/******* removed since it does't exist in <=0.4.4 code.  Thanks again, Joe ;>
     if (
         (pindexPrev->nHeight > 1) && 
         ( (nMedianTimePast + nMaxOffset) < GetBlockTime() )
        )
         return error("AcceptBlock() : block's timestamp is too far in the future");
-
+*******/
     // Check that all transactions are finalized
     BOOST_FOREACH(const CTransaction& tx, vtx)
         if (!tx.IsFinal(nHeight, GetBlockTime()))
@@ -3183,7 +3158,7 @@ bool CBlock::AcceptBlock()
 // yacoin2015: ProofOfWork/ProofOfStake block ratio
 double CBlockIndex::GetPoWPoSRatio() const
 {
-    assert ( nPosBlockCount > 0 );
+    Yassert ( nPosBlockCount > 0 );
     return (double)( nHeight - nPosBlockCount ) / (double) nPosBlockCount;
 }
 
@@ -3971,53 +3946,15 @@ bool LoadBlockIndex(bool fAllowNew)
         printf("block.nBits ==\n%s\n", the_target.ToString().c_str());
         printf("block.hashMerkleRoot ==\n%s\n", block.hashMerkleRoot.ToString().c_str());
 
-#ifdef _MSC_VER
-        bool
-            fTest = (
-                     block.hashMerkleRoot == 
-                     uint256(
-                             fTestNet?
-                             "0x29c97b046f12638bb31918e42ee10a16ca7d325a2af255e8a503248a1f04e2d2":
-                             "0x678b76419ff06676a591d3fa9d57d7f7b26d8021b7cc69dde925f39d4cf2244f"
-                            )
-                    );
-    #ifdef _DEBUG
-        assert(fTest);
-    #else
-        if( !fTest )
-            releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
-    #endif
-#else
-        assert(block.hashMerkleRoot == uint256(
+        Yassert(block.hashMerkleRoot == uint256(
                             fTestNet?
                             "0x29c97b046f12638bb31918e42ee10a16ca7d325a2af255e8a503248a1f04e2d2":
                             "0x678b76419ff06676a591d3fa9d57d7f7b26d8021b7cc69dde925f39d4cf2244f"
                                               )
               );
-#endif
         block.print();
-#ifdef _MSC_VER
-        fTest = (block.GetHash() == (!fTestNet ? hashGenesisBlock : hashGenesisBlockTestNet));
-    #ifdef _DEBUG
-        assert(fTest);
-    #else
-        if( !fTest )
-            releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
-    #endif
-#else
-        assert(block.GetHash() == (!fTestNet ? hashGenesisBlock : hashGenesisBlockTestNet));
-#endif
-#ifdef _MSC_VER
-        fTest = (block.CheckBlock());
-    #ifdef _DEBUG
-        assert(fTest);
-    #else
-        if( !fTest )
-            releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
-    #endif
-#else
-        assert(block.CheckBlock());
-#endif
+        Yassert(block.GetHash() == (!fTestNet ? hashGenesisBlock : hashGenesisBlockTestNet));
+        Yassert(block.CheckBlock());
         // Start new block file
         unsigned int nFile;
         unsigned int nBlockPos;
@@ -4290,18 +4227,7 @@ string GetWarnings(string strFor)
         return strStatusBar;
     else if (strFor == "rpc")
         return strRPC;
-#ifdef _MSC_VER
-    bool
-        fTest = (!"GetWarnings() : invalid parameter");
-    #ifdef _DEBUG
-    assert(fTest);
-    #else
-    if( !fTest )
-        releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
-    #endif
-#else
-    assert(!"GetWarnings() : invalid parameter");
-#endif
+    Yassert(!"GetWarnings() : invalid parameter");
     return "error";
 }
 
@@ -5730,23 +5656,31 @@ public:
 #endif
     }
 } instance_of_cmaincleanup;
+//_____________________________________________________________________________
 
-#ifdef _MSC_VER
-void releaseModeAssertionfailure( const char* pFileName, const int nL, const std::string strFunctionName )
-{
+void releaseModeAssertionfailure( 
+                                 const char* pFileName, 
+                                 const int nL, 
+                                 const std::string strFunctionName,
+                                 const char * booleanExpression 
+                                )
+{   //Assertion failed: (fAssertBoolean), file l:\backups\senadjyac045.2\yacoin\src\init.cpp, line 1368
     (void)printf( 
                  "\n"
-                 "file:%s, line#%d, function %s()"
-                 "\n"
-                 "release mode assertion failure!?"
+                 "Release mode\n"
+                 "Assertion failed: (%s), file %s, line %d,\n"
+                 "function %s()"
                  "\n"
                  "\n"
                  ""
+                 , booleanExpression
                  , pFileName                //__FILE__
                  , nL                       //__LINE__
-                 , strFunctionName.c_str()  // __PRETTY_FUNCTION__
+                 , strFunctionName.c_str()  // __FUNCTION__
                 );
     StartShutdown();    // maybe there are other ways??
 }
+//_____________________________________________________________________________
+#ifdef _MSC_VER
     #include "msvc_warnings.pop.h"
 #endif

@@ -8,10 +8,21 @@
     #include "msvc_warnings.push.h"
 #endif
 
-#include "netbase.h"
-#include "util.h"
-#include "sync.h"
-#include "hash.h"
+#ifndef BITCOIN_NETBASE_H
+// #include "netbase.h"
+#endif
+
+#ifndef BITCOIN_UTIL_H
+ #include "util.h"
+#endif
+
+#ifndef BITCOIN_SYNC_H
+ #include "sync.h"
+#endif
+
+#ifndef BITCOIN_HASH_H
+ #include "hash.h"
+#endif
 
 #ifndef WIN32
 #ifdef ANDROID
@@ -22,7 +33,6 @@
 #endif
 
 #ifdef _MSC_VER
-#include <BaseTsd.h>
 typedef SSIZE_T ssize_t;
 #endif
 
@@ -114,35 +124,13 @@ bool static LookupIntern(const char *pszName, std::vector<CNetAddr>& vIP, unsign
         switch (aiTrav->ai_family)
         {
             case (AF_INET):
-#ifdef _MSC_VER
-                bool
-                    fTest = (aiTrav->ai_addrlen >= sizeof(sockaddr_in));
-    #ifdef _DEBUG
-                assert(fTest);
-    #else
-                if( !fTest )
-                    releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
-    #endif
-#else
-                assert(aiTrav->ai_addrlen >= sizeof(sockaddr_in));
-#endif
+                Yassert(aiTrav->ai_addrlen >= sizeof(sockaddr_in));
                 vIP.push_back(CNetAddr(((struct sockaddr_in*)(aiTrav->ai_addr))->sin_addr));
             break;
 
 #ifdef USE_IPV6
             case (AF_INET6):
-#ifdef _MSC_VER
-                bool
-                    fTest = (aiTrav->ai_addrlen >= sizeof(sockaddr_in6));
-    #ifdef _DEBUG
-                assert(fTest);
-    #else
-                if( !fTest )
-                    releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
-    #endif
-#else
-                assert(aiTrav->ai_addrlen >= sizeof(sockaddr_in6));
-#endif
+                Yassert(aiTrav->ai_addrlen >= sizeof(sockaddr_in6));
                 vIP.push_back(CNetAddr(((struct sockaddr_in6*)(aiTrav->ai_addr))->sin6_addr));
             break;
 #endif
@@ -600,18 +588,7 @@ bool static ConnectSocketDirectly(const CService &addrConnect, SOCKET& hSocketRe
 
 bool SetProxy(enum Network net, CService addrProxy, int nSocksVersion) 
 {
-#ifdef _MSC_VER
-    bool
-        fTest = (net >= 0 && net < NET_MAX);
-    #ifdef _DEBUG
-    assert(fTest);
-    #else
-    if( !fTest )
-        releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
-    #endif
-#else
-    assert(net >= 0 && net < NET_MAX);
-#endif
+    Yassert(net >= 0 && net < NET_MAX);
     if (nSocksVersion != 0 && nSocksVersion != 4 && nSocksVersion != 5)
         return false;
     if (nSocksVersion != 0 && !addrProxy.IsValid())
@@ -623,18 +600,7 @@ bool SetProxy(enum Network net, CService addrProxy, int nSocksVersion)
 
 bool GetProxy(enum Network net, proxyType &proxyInfoOut) 
 {
-#ifdef _MSC_VER
-    bool
-        fTest = (net >= 0 && net < NET_MAX);
-    #ifdef _DEBUG
-    assert(fTest);
-    #else
-    if( !fTest )
-        releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
-    #endif
-#else
-    assert(net >= 0 && net < NET_MAX);
-#endif
+    Yassert(net >= 0 && net < NET_MAX);
     LOCK(cs_proxyInfos);
     if (!proxyInfo[net].second)
         return false;
@@ -1232,35 +1198,13 @@ CService::CService(const struct in6_addr& ipv6Addr, unsigned short portIn) : CNe
 
 CService::CService(const struct sockaddr_in& addr) : CNetAddr(addr.sin_addr), port(ntohs(addr.sin_port))
 {
-#ifdef _MSC_VER
-    bool
-        fTest = (addr.sin_family == AF_INET);
-    #ifdef _DEBUG
-    assert(fTest);
-    #else
-    if( !fTest )
-        releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
-    #endif
-#else
-    assert(addr.sin_family == AF_INET);
-#endif
+    Yassert(addr.sin_family == AF_INET);
 }
 
 #ifdef USE_IPV6
 CService::CService(const struct sockaddr_in6 &addr) : CNetAddr(addr.sin6_addr), port(ntohs(addr.sin6_port))
 {
-#ifdef _MSC_VER
-    bool
-        fTest = (addr.sin6_family == AF_INET6);
-    #ifdef _DEBUG
-    assert(fTest);
-    #else
-    if( !fTest )
-        releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
-    #endif
-#else
-    assert(addr.sin6_family == AF_INET6);
-#endif
+    Yassert(addr.sin6_family == AF_INET6);
 }
 #endif
 

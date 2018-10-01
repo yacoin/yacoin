@@ -9,16 +9,16 @@
     #include "msvc_warnings.push.h"
 #endif
 
-#ifndef PPCOIN_KERNEL_H
- #include "kernel.h"
-#endif
-
 #ifndef BITCOIN_CHECKPOINT_H
  #include "checkpoints.h"
 #endif
 
 #ifndef BITCOIN_TXDB_H
  #include "txdb.h"
+#endif
+
+#ifndef PPCOIN_KERNEL_H
+ #include "kernel.h"
 #endif
 
 #include <map>
@@ -85,18 +85,7 @@ void init_blockindex(leveldb::Options& options, bool fRemoveOld = false) {
 // we shouldn't treat this as a free operations.
 CTxDB::CTxDB(const char* pszMode)
 {
-#ifdef _MSC_VER
-    bool
-        fTest = (pszMode);
-    #ifdef _DEBUG
-    assert(fTest);
-    #else
-    if( !fTest )
-        releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
-    #endif
-#else
-    assert(pszMode);
-#endif
+    Yassert(pszMode);
     activeBatch = NULL;
     fReadOnly = (!strchr(pszMode, '+') && !strchr(pszMode, 'w'));
 
@@ -163,36 +152,14 @@ void CTxDB::Close()
 
 bool CTxDB::TxnBegin()
 {
-#ifdef _MSC_VER
-    bool
-        fTest = (!activeBatch);
-    #ifdef _DEBUG
-    assert(fTest);
-    #else
-    if( !fTest )
-        releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
-    #endif
-#else
-    assert(!activeBatch);
-#endif
+    Yassert(!activeBatch);
     activeBatch = new leveldb::WriteBatch();
     return true;
 }
 
 bool CTxDB::TxnCommit()
 {
-#ifdef _MSC_VER
-    bool
-        fTest = (activeBatch);
-    #ifdef _DEBUG
-    assert(fTest);
-    #else
-    if( !fTest )
-        releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
-    #endif
-#else
-    assert(activeBatch);
-#endif
+    Yassert(activeBatch);
     leveldb::Status status = pdb->Write(leveldb::WriteOptions(), activeBatch);
     delete activeBatch;
     activeBatch = NULL;
@@ -234,18 +201,7 @@ public:
 // to change that assumption in future and avoid the performance hit, though in
 // practice it does not appear to be large.
 bool CTxDB::ScanBatch(const CDataStream &key, string *value, bool *deleted) const {
-#ifdef _MSC_VER
-    bool
-        fTest = (activeBatch);
-    #ifdef _DEBUG
-    assert(fTest);
-    #else
-    if( !fTest )
-        releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
-    #endif
-#else
-    assert(activeBatch);
-#endif
+    Yassert(activeBatch);
     *deleted = false;
     CBatchScanner scanner;
     scanner.needle = key.str();
@@ -260,53 +216,20 @@ bool CTxDB::ScanBatch(const CDataStream &key, string *value, bool *deleted) cons
 
 bool CTxDB::ReadTxIndex(uint256 hash, CTxIndex& txindex)
 {
-#ifdef _MSC_VER
-    bool
-        fTest = (!fClient);
-    #ifdef _DEBUG
-    assert(fTest);
-    #else
-    if( !fTest )
-        releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
-    #endif
-#else
-    assert(!fClient);
-#endif
+    Yassert(!fClient);
     txindex.SetNull();
     return Read(make_pair(string("tx"), hash), txindex);
 }
 
 bool CTxDB::UpdateTxIndex(uint256 hash, const CTxIndex& txindex)
 {
-#ifdef _MSC_VER
-    bool
-        fTest = (!fClient);
-    #ifdef _DEBUG
-    assert(fTest);
-    #else
-    if( !fTest )
-        releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
-    #endif
-#else
-    assert(!fClient);
-#endif
+    Yassert(!fClient);
     return Write(make_pair(string("tx"), hash), txindex);
 }
 
 bool CTxDB::AddTxIndex(const CTransaction& tx, const CDiskTxPos& pos, int nHeight)
 {
-#ifdef _MSC_VER
-    bool
-        fTest = (!fClient);
-    #ifdef _DEBUG
-    assert(fTest);
-    #else
-    if( !fTest )
-        releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
-    #endif
-#else
-    assert(!fClient);
-#endif
+    Yassert(!fClient);
     // Add to tx index
     uint256 hash = tx.GetHash();
     CTxIndex txindex(pos, tx.vout.size());
@@ -315,18 +238,7 @@ bool CTxDB::AddTxIndex(const CTransaction& tx, const CDiskTxPos& pos, int nHeigh
 
 bool CTxDB::EraseTxIndex(const CTransaction& tx)
 {
-#ifdef _MSC_VER
-    bool
-        fTest = (!fClient);
-    #ifdef _DEBUG
-    assert(fTest);
-    #else
-    if( !fTest )
-        releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
-    #endif
-#else
-    assert(!fClient);
-#endif
+    Yassert(!fClient);
     uint256 hash = tx.GetHash();
 
     return Erase(make_pair(string("tx"), hash));
@@ -334,35 +246,13 @@ bool CTxDB::EraseTxIndex(const CTransaction& tx)
 
 bool CTxDB::ContainsTx(uint256 hash)
 {
-#ifdef _MSC_VER
-    bool
-        fTest = (!fClient);
-    #ifdef _DEBUG
-    assert(fTest);
-    #else
-    if( !fTest )
-        releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
-    #endif
-#else
-    assert(!fClient);
-#endif
+    Yassert(!fClient);
     return Exists(make_pair(string("tx"), hash));
 }
 
 bool CTxDB::ReadDiskTx(uint256 hash, CTransaction& tx, CTxIndex& txindex)
 {
-#ifdef _MSC_VER
-    bool
-        fTest = (!fClient);
-    #ifdef _DEBUG
-    assert(fTest);
-    #else
-    if( !fTest )
-        releaseModeAssertionfailure( __FILE__, __LINE__, __PRETTY_FUNCTION__ );
-    #endif
-#else
-    assert(!fClient);
-#endif
+    Yassert(!fClient);
     tx.SetNull();
     if (!ReadTxIndex(hash, txindex))
         return false;
@@ -470,19 +360,17 @@ bool CTxDB::LoadBlockIndex()
         return true;
     }
 #ifdef WIN32
-    int
-        nMaxHeightGuess = 0,
-        nCounter = 0,
-    #ifdef _DEBUG
-        nRefresh = 2000;    // generally resfresh rates are chosen to give ~1 update/sec
-    #else
+    const int
+  #ifdef _DEBUG
+        nREFRESH = 2000;    // generally resfresh rates are chosen to give ~1 update/sec
+  #else
         // seems to be slowing down??
-        #ifdef QT_GUI
-        nRefresh = 8000;
-        #else
-        nRefresh = 8000;    // 15000;    //10000;
-        #endif
-    #endif
+        nREFRESH = 12000;
+  #endif
+    int
+        nMaxHeightGuess = 1,
+        nCounter = 0,
+        nRefresh = nREFRESH;
     ::int64_t
         n64MsStartTime = GetTimeMillis();
 #endif
@@ -640,7 +528,9 @@ bool CTxDB::LoadBlockIndex()
         // to "hone in on" the %age done.  
         // Towards the end it ought to be pretty accurate.
         if( nMaxHeightGuess < pindexNew->nHeight )
+        {
             nMaxHeightGuess = pindexNew->nHeight;
+        }
         if( 0 == ( nCounter % nRefresh ) )  // every nRefresh-th time through the loop
         {
             float                   // these #s are just to slosh the . around
@@ -649,24 +539,26 @@ bool CTxDB::LoadBlockIndex()
                 sGutsNoise = strprintf(
                             "%7d (%3.2f%%)"
                             "",
-                            pindexNew->nHeight,
+                            nCounter, //pindexNew->nHeight,
                             dEstimate > 100.0? 100.0: dEstimate
                                       );
             if (fPrintToConsole)
             {
+                /****************
                 (void)printf( 
                             "%s"
                             "   "
                             "",
                             sGutsNoise.c_str()
                             );
+                ****************/
                 DoProgress( nCounter, nMaxHeightGuess, n64MsStartTime );
-                (void)printf( 
-                            "\r"
-                            );
+                //(void)printf( 
+                //            "\r"
+                //            );
             }
     #ifdef QT_GUI
-            uiInterface.InitMessage( sGutsNoise.c_str() );
+        //    uiInterface.InitMessage( sGutsNoise.c_str() );
     #endif
         }
 #endif
@@ -733,6 +625,8 @@ bool CTxDB::LoadBlockIndex()
             (void)printf( "\ndone\nChecking stake checksums...\n" );
     #ifdef _DEBUG
         nUpdatePeriod /= 4; // speed up update for debug mode
+    #else
+        nUpdatePeriod *= 5; // slow down update for release mode
     #endif
     #ifdef QT_GUI
         uiInterface.InitMessage( _("done") );

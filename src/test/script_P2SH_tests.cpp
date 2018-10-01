@@ -13,8 +13,8 @@ using namespace std;
 
 // Test routines internal to script.cpp:
 extern uint256 SignatureHash(CScript scriptCode, const CTransaction& txTo, unsigned int nIn, int nHashType);
-extern bool VerifyScript(const CScript& scriptSig, const CScript& scriptPubKey, const CTransaction& txTo, unsigned int nIn,
-                         bool fValidatePayToScriptHash, int nHashType);
+// extern bool VerifyScript(const CScript& scriptSig, const CScript& scriptPubKey, const CTransaction& txTo, unsigned int nIn,
+//                          bool fValidatePayToScriptHash, int nHashType);
 
 // Helpers:
 static std::vector<unsigned char>
@@ -40,7 +40,9 @@ Verify(const CScript& scriptSig, const CScript& scriptPubKey, bool fStrict)
     txTo.vin[0].scriptSig = scriptSig;
     txTo.vout[0].nValue = 1;
 
-    return VerifyScript(scriptSig, scriptPubKey, txTo, 0, fStrict, 0);
+    unsigned int flags = SCRIPT_VERIFY_NONE;
+    if(fStrict) flags = STRICT_FLAGS;
+    return VerifyScript(scriptSig, scriptPubKey, txTo, 0, flags, 0);
 }
 
 
@@ -82,7 +84,8 @@ BOOST_AUTO_TEST_CASE(sign)
         txFrom.vout[i].scriptPubKey = evalScripts[i];
         txFrom.vout[i+4].scriptPubKey = standardScripts[i];
     }
-    BOOST_CHECK(txFrom.IsStandard());
+    std::string reasonStr;
+    BOOST_CHECK(txFrom.IsStandard(reasonStr));
 
     CTransaction txTo[8]; // Spending transactions
     for (int i = 0; i < 8; i++)
@@ -172,7 +175,8 @@ BOOST_AUTO_TEST_CASE(set)
     {
         txFrom.vout[i].scriptPubKey = outer[i];
     }
-    BOOST_CHECK(txFrom.IsStandard());
+    std::string reasonStr;
+    BOOST_CHECK(txFrom.IsStandard(reasonStr));
 
     CTransaction txTo[4]; // Spending transactions
     for (int i = 0; i < 4; i++)
@@ -187,8 +191,9 @@ BOOST_AUTO_TEST_CASE(set)
     }
     for (int i = 0; i < 4; i++)
     {
+        std::string reasonStr;
         BOOST_CHECK_MESSAGE(SignSignature(keystore, txFrom, txTo[i], 0), strprintf("SignSignature %d", i));
-        BOOST_CHECK_MESSAGE(txTo[i].IsStandard(), strprintf("txTo[%d].IsStandard", i));
+        BOOST_CHECK_MESSAGE(txTo[i].IsStandard(reasonStr), strprintf("txTo[%d].IsStandard", i));
     }
 }
 

@@ -13,10 +13,6 @@
  #include "txdb.h"
 #endif
 
-#ifndef BITCOIN_WALLETDB_H
- #include "walletdb.h"
-#endif
-
 #ifndef _BITCOINRPC_H_
  #include "bitcoinrpc.h"
 #endif
@@ -57,6 +53,8 @@ bool fUseFastStakeMiner;
 bool fUseMemoryLog;
 enum Checkpoints::CPMode CheckpointsMode;
 
+static bool fExit;
+
 // Ping and address broadcast intervals
 extern ::int64_t nPingInterval;
 extern ::int64_t nBroadcastInterval;
@@ -74,7 +72,8 @@ void ExitTimeout(void* parg)
 //    ExitProcess(0);
 #endif
 }
-
+    
+#ifndef TESTS_ENABLED
 void StartShutdown()
 {
 #ifdef QT_GUI
@@ -85,8 +84,6 @@ void StartShutdown()
     NewThread(Shutdown, NULL);
 #endif
 }
-static bool 
-    fExit;
 
 void Shutdown(void* parg)
 {
@@ -154,6 +151,7 @@ void Shutdown(void* parg)
         ExitThread(0);
     }
 }
+#endif
 
 void HandleSIGTERM(int)
 {
@@ -221,7 +219,7 @@ void HandleSIGHUP(int)
 //
 // Start
 //
-#if !defined(QT_GUI)
+#if !defined(QT_GUI) && !defined(TESTS_ENABLED)
 bool AppInit(int argc, char* argv[])
 {
     bool fRet = false;
@@ -407,7 +405,6 @@ std::string HelpMessage()
         "  -testnetnewlogicblocknumber=<number> " + _("New Logic starting at block = <number>") + "\n" +
         "  -debug                 " + _("Output extra debugging information. Implies all other -debug* options") + "\n" +
         "  -debugnet              " + _("Output extra network debugging information") + "\n" +
-        "  -logtimestamps         " + _("Prepend debug output with timestamp") + "\n" +
         "  -shrinkdebugfile       " + _("Shrink debug.log file on client startup (default: 1 when no -debug)") + "\n" +
         "  -printtoconsole        " + _("Send trace/debug info to console instead of debug.log file") + "\n" +
 #ifdef WIN32
@@ -455,6 +452,8 @@ std::string HelpMessage()
 
     return strUsage;
 }
+
+//_____________________________________________________________________________
 
 /** Initialize bitcoin.
  *  @pre Parameters should be parsed and config file should be read.
@@ -624,7 +623,6 @@ bool AppInit2()
 #endif
     fPrintToConsole = GetBoolArg("-printtoconsole");
     fPrintToDebugger = GetBoolArg("-printtodebugger");
-    fLogTimestamps = GetBoolArg("-logtimestamps");
 
     if (mapArgs.count("-timeout"))
     {
@@ -827,8 +825,7 @@ bool AppInit2()
     if( nV > nCutoffVersion )
         fNewerOpenSSL = true;
 
-    if (!fLogTimestamps)
-        printf("Startup time: %s\n", DateTimeStrFormat("%x %H:%M:%S", GetTime()).c_str());
+    printf("Startup time: %s\n", DateTimeStrFormat("%x %H:%M:%S", GetTime()).c_str());
     printf("Default data directory %s\n", GetDefaultDataDir().string().c_str());
     printf("Used data directory %s\n", strDataDir.c_str());
     std::ostringstream 
@@ -1071,6 +1068,13 @@ bool AppInit2()
 
     BOOST_FOREACH(string strDest, mapMultiArgs["-seednode"])
         AddOneShot(strDest);
+
+//test for https, before loading block index, so as to test with fast turn around
+// until done, then remove
+//#ifdef _DEBUG
+//    do_https_test();
+//#endif
+    //fRequestShutdown = true;
 
     // ********************************************************* Step 7: load blockchain
 
@@ -1350,6 +1354,7 @@ bool AppInit2()
     if (!strErrors.str().empty())
         return InitError(strErrors.str());
 
+    //Yassert( false );   //test
 #ifdef _MSC_VER
     #ifdef _DEBUG
         printf("\a" );    // just to call me back after a long debug startup!
