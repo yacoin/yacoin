@@ -1481,18 +1481,18 @@ CBigNum inline GetProofOfStakeLimit(int nHeight, unsigned int nTime)
 }
 
 static const ::int64_t nTargetTimespan = 7 * 24 * 60 * 60;  // one week
-static const ::int64_t nTargetSpacingWorkMax = 12 * nStakeTargetSpacing; // 2-hour
+static const ::int64_t nTargetSpacingWorkMax = 12 * nStakeTargetSpacing; // 12 minutes
 
 // get proof of work blocks max spacing according to hard-coded conditions
 ::int64_t inline GetTargetSpacingWorkMax(int nHeight, unsigned int nTime)
 {
     if(nTime > TARGETS_SWITCH_TIME)
-        return 3 * nStakeTargetSpacing; // 30 minutes on mainNet since 20 Jul 2013 00:00:00
+        return 3 * nStakeTargetSpacing; // 3 minutes on mainNet since 20 Jul 2013 00:00:00
 
     if(fTestNet)
-        return 3 * nStakeTargetSpacing; // 15 minutes on testNet
+        return 3 * nStakeTargetSpacing; // 3 minutes on testNet
 
-    return 12 * nStakeTargetSpacing; // 2 hours otherwise
+    return 12 * nStakeTargetSpacing; // 12 minutes otherwise
 }
 
 //
