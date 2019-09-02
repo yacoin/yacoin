@@ -33,15 +33,14 @@ install:
   - travis_retry sudo apt-get install ca-certificates -y
   - echo "Done"
 
-script: 
-  - java -version
-  - cat /home/travis/.sonarscanner/sonar-scanner-3.0.3.778/bin/sonar-scanner
-  - sonar-scanner
+script:
   - ./autogen.sh
-  - ./configure --enable-tests 
-  - make
-  - cd src
-  - mkdir unittestresults
-  - ./yacoin_test > ./unittestresults/unittestresults.txt
+  - ./configure --enable-tests
+  - make clean
+  - build-wrapper-linux-x86-64 --out-dir bwout make
+  - sonar-scanner
+#  - cd src
+#  - mkdir unittestresults
+#  - ./yacoin_test > ./unittestresults/unittestresults.txt
 #  - cd ../test/functional
 #  - python3 test_runner.py
