@@ -38,7 +38,7 @@ script:
   - ./configure --enable-tests
   - make clean
   - build-wrapper-linux-x86-64 --out-dir bwout make
-  - sonar-scanner
+  - sonar-scanner -X
 #  - cd src
 #  - mkdir unittestresults
 #  - ./yacoin_test > ./unittestresults/unittestresults.txt
