@@ -1,7 +1,7 @@
 sudo: required
 dist: trusty
 os: linux
-language: minimal
+language: java
 cache:
   directories:
   - depends/built
