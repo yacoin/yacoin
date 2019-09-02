@@ -34,9 +34,11 @@ install:
   - echo "Done"
 
 script: 
+  - java -version
+  - cat /home/travis/.sonarscanner/sonar-scanner-3.0.3.778/bin/sonar-scanner
+  - sonar-scanner
   - ./autogen.sh
   - ./configure --enable-tests 
-  - sudo sonar-scanner
   - make
   - cd src
   - mkdir unittestresults
