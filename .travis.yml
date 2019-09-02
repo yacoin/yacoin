@@ -8,6 +8,12 @@ cache:
   - depends/sdk-sources
   - $HOME/.ccache
 
+addons:
+  sonarcloud:
+    organization: "dev34253"
+#    token:
+#      secure: ""
+
 git:
   depth: false
   
@@ -31,6 +37,7 @@ script:
   - ./autogen.sh
   - ./configure --enable-tests 
   - make
+  - sonar-scanner
   - cd src
   - mkdir unittestresults
   - ./yacoin_test > ./unittestresults/unittestresults.txt
