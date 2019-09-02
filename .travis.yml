@@ -36,8 +36,8 @@ install:
 script: 
   - ./autogen.sh
   - ./configure --enable-tests 
+  - sudo sonar-scanner
   - make
-  - sonar-scanner
   - cd src
   - mkdir unittestresults
   - ./yacoin_test > ./unittestresults/unittestresults.txt
