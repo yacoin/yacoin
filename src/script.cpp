@@ -1925,9 +1925,9 @@ bool SignSignature(const CKeyStore &keystore, const CTransaction& txFrom, CTrans
 {
     Yassert(nIn < txTo.vin.size());
     CTxIn& txin = txTo.vin[nIn];
-    Yassert(txin.prevout.n < txFrom.vout.size());
-    Yassert(txin.prevout.hash == txFrom.GetHash());
-    const CTxOut& txout = txFrom.vout[txin.prevout.n];
+    Yassert(txin.prevout.COutPointGet_n() < txFrom.vout.size());
+    Yassert(txin.prevout.COutPointGetHash() == txFrom.GetHash());
+    const CTxOut& txout = txFrom.vout[txin.prevout.COutPointGet_n()];
 
     return SignSignature(keystore, txout.scriptPubKey, txTo, nIn, nHashType);
 }

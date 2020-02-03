@@ -24,10 +24,6 @@
  #include "net.h"
 #endif
 
-#ifndef BITCOIN_SYNC_H
- #include "sync.h"
-#endif
-
 #ifndef BITCOIN_UI_INTERFACE_H
  #include "ui_interface.h"
 #endif
