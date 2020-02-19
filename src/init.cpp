@@ -7,6 +7,10 @@
 
     #include <stdio.h>
     #include "msvc_warnings.push.h"
+#else
+    #ifndef BITCOIN_UTIL_H
+        #include "util.h"
+    #endif
 #endif
 
 #ifndef BITCOIN_TXDB_H
@@ -53,8 +57,6 @@ bool fUseFastStakeMiner;
 bool fUseMemoryLog;
 enum Checkpoints::CPMode CheckpointsMode;
 
-static bool fExit;
-
 // Ping and address broadcast intervals
 extern ::int64_t nPingInterval;
 extern ::int64_t nBroadcastInterval;
@@ -72,7 +74,7 @@ void ExitTimeout(void* parg)
 //    ExitProcess(0);
 #endif
 }
-    
+
 #ifndef TESTS_ENABLED
 void StartShutdown()
 {
@@ -84,10 +86,13 @@ void StartShutdown()
     NewThread(Shutdown, NULL);
 #endif
 }
+static bool 
+    fExit;
 
 void Shutdown(void* parg)
 {
-    printf("Shutdown : In progress...\n");
+    if (fDebug)
+        printf("Shutdown : In progress...\n");
     
     static CCriticalSection 
         cs_Shutdown;
@@ -132,7 +137,8 @@ void Shutdown(void* parg)
         delete pwalletMain;
         NewThread(ExitTimeout, NULL);
         Sleep(50);
-        printf("Yacoin exited\n\n");
+        if (fDebug)
+            printf("Yacoin exited\n\n");
         fExit = true;
 #ifndef QT_GUI
         // ensure non-UI client gets exited here, but let yacoin-qt reach 'return 0;' in bitcoin.cpp
@@ -230,12 +236,23 @@ bool AppInit(int argc, char* argv[])
         //
         // If Qt is used, parameters/bitcoin.conf are parsed in qt/bitcoin.cpp's main()
         ParseParameters(argc, argv);
-        if (!boost::filesystem::is_directory(GetDataDir(false)))
+        bool 
+            fTest_or_Main_Net_is_decided = false;
+
+        if (!boost::filesystem::is_directory(GetDataDir(fTest_or_Main_Net_is_decided)))
         {
             fprintf(stderr, "Error: Specified directory does not exist\n");
             Shutdown(NULL);
         }
-        ReadConfigFile(mapArgs, mapMultiArgs);
+        ReadConfigFile(mapArgs, mapMultiArgs);  // now two things have happened:
+                                                // testnet/mainnet has been decided, and
+                                                // the 'data directory' has been set
+                                                // either by command line arguments or in
+                                                // the configuration file.
+                                                // this means that fTestNet should be tested 
+                                                // first, before GetDataDir() is called next
+                                                
+                                                // this is documentation!
 
         if (mapArgs.count("-?") || mapArgs.count("--h") || mapArgs.count("--help"))
         {
@@ -362,7 +379,6 @@ std::string HelpMessage()
         "  -tor=<ip:port>         " + _("Use proxy to reach tor hidden services (default: same as -proxy)") + "\n"
         "  -torname=<host.onion>  " + _("Send the specified hidden service name when connecting to Tor nodes (default: none)") + "\n"
         "  -dns                   " + _("Allow DNS lookups for -addnode, -seednode and -connect") + "\n" +
-        "  -port=<port>           " + _("Listen for connections on <port> (default: 7688 or testnet: 17688)") + "\n" +
         "  -maxconnections=<n>    " + _("Maintain at most <n> connections to peers (default: 125)") + "\n" +
         "  -addnode=<ip>          " + _("Add a node to connect to and attempt to keep the connection open") + "\n" +
         "  -connect=<ip>          " + _("Connect only to the specified node(s)") + "\n" +
@@ -405,6 +421,7 @@ std::string HelpMessage()
         "  -testnetnewlogicblocknumber=<number> " + _("New Logic starting at block = <number>") + "\n" +
         "  -debug                 " + _("Output extra debugging information. Implies all other -debug* options") + "\n" +
         "  -debugnet              " + _("Output extra network debugging information") + "\n" +
+        "  -logtimestamps         " + _("Prepend debug output with timestamp") + "\n" +
         "  -shrinkdebugfile       " + _("Shrink debug.log file on client startup (default: 1 when no -debug)") + "\n" +
         "  -printtoconsole        " + _("Send trace/debug info to console instead of debug.log file") + "\n" +
 #ifdef WIN32
@@ -426,7 +443,14 @@ std::string HelpMessage()
         "                         see https://www.cryptsy.com/pages/publicapi" + "\n" +
         "  -rpcuser=<user>        " + _("Username for JSON-RPC connections") + "\n" +
         "  -rpcpassword=<pw>      " + _("Password for JSON-RPC connections") + "\n" +
+#if defined(Yac1dot0)
+        "  -port=<port>           " + _("Listen for connections on <port> (default: 7788 or testnet: 17788)") + "\n" +
+        "  -rpcport=<port>        " + _("Listen for JSON-RPC connections on <port> (default: 7787 or testnet: 17787)") + "\n" +
+#else
+        "  -port=<port>           " + _("Listen for connections on <port> (default: 7688 or testnet: 17688)") + "\n" +
         "  -rpcport=<port>        " + _("Listen for JSON-RPC connections on <port> (default: 7687 or testnet: 17687)") + "\n" +
+#endif
+
         "  -rpcallowip=<ip>       " + _("Allow JSON-RPC connections from specified IP address") + "\n" +
         "  -rpcconnect=<ip>       " + _("Send commands to node running on <ip> (default: 127.0.0.1)") + "\n" +
         "  -blocknotify=<cmd>     " + _("Execute command when the best block changes (%s in cmd is replaced by block hash)") + "\n" +
@@ -545,9 +569,20 @@ bool AppInit2()
         CheckpointsMode = Checkpoints::PERMISSIVE;
     }
 
+#ifndef Yac1dot0
+    return InitError( _("This must be compiled for Yac1.0.") );
+#endif
+
+    // Good that testnet is tested here, but closer to AppInit() => ReadConfigFile() would be better
     fTestNet = GetBoolArg("-testnet");
-    if (fTestNet) {
+    // now the program is definitively running MainNet or TestNet.
+    if (fTestNet)
+    {
         SoftSetBoolArg("-irc", true);
+    }
+    else    // not Test Net
+    {
+        return InitError( _("Yac1.0 must be set for testNet.") );
     }
 
     if (mapArgs.count("-bind")) {
@@ -620,9 +655,12 @@ bool AppInit2()
     /* force fServer when running without GUI */
 #if !defined(QT_GUI)
     fServer = true;
-#endif
     fPrintToConsole = GetBoolArg("-printtoconsole");
+#else
+    fPrintToConsole = false;
+#endif
     fPrintToDebugger = GetBoolArg("-printtodebugger");
+    fLogTimestamps = GetBoolArg("-logtimestamps");
 
     if (mapArgs.count("-timeout"))
     {
@@ -656,7 +694,7 @@ bool AppInit2()
 
     // ********************************************************* Step 4: application initialization: dir lock, daemonize, pidfile, debug log
 
-    std::string 
+    std::string // note fTestNet has been set and finally we 'discover' the 'data directory'!
         strDataDir = GetDataDir().string();
 
     strWalletFileName = GetArg("-wallet", "wallet.dat");
@@ -729,6 +767,21 @@ bool AppInit2()
     }
     printf("\n" );
 
+//    if (fDebug)
+    {
+#if defined( USE_IPV6 )
+        (void)printf( "USE_IPV6 is defined\n" );
+#endif
+#if defined( USE_ASM )
+        (void)printf( "USE_ASM is defined\n" );
+#endif
+#if defined( USE_UPNP )
+        (void)printf( "USE_UPNP is defined\n" );
+#endif
+#if defined( USE_LEVELDB )
+        (void)printf( "USE_LEVELDB is defined\n" );
+#endif
+    }
     printf("Using Boost version %1d.%d.%d\n",         // miiill (most, insignificant, least) digits
             BOOST_VERSION / 100000,
             (BOOST_VERSION / 100) % 1000,
@@ -825,9 +878,10 @@ bool AppInit2()
     if( nV > nCutoffVersion )
         fNewerOpenSSL = true;
 
-    printf("Startup time: %s\n", DateTimeStrFormat("%x %H:%M:%S", GetTime()).c_str());
-    printf("Default data directory %s\n", GetDefaultDataDir().string().c_str());
-    printf("Used data directory %s\n", strDataDir.c_str());
+    if (!fLogTimestamps)
+        printf("Startup time: %s\n", DateTimeStrFormat("%x %H:%M:%S", GetTime()).c_str());
+    printf("The Default data directory is %s\n", GetDefaultDataDir().string().c_str());
+    printf("Using data directory %s\n", strDataDir.c_str());
     std::ostringstream 
         strErrors;
 
@@ -1076,7 +1130,52 @@ bool AppInit2()
 //#endif
     //fRequestShutdown = true;
 
-    // ********************************************************* Step 7: load blockchain
+    // ********************************************************* Step 7 was Step 8: load wallet
+
+    uiInterface.InitMessage(_("<b>Loading wallet...</b>"));
+    printf("Loading wallet...\n");
+    nStart = GetTimeMillis();
+    bool fFirstRun = true;
+    pwalletMain = new CWallet(strWalletFileName);
+    DBErrors nLoadWalletRet = pwalletMain->LoadWallet(fFirstRun);
+    if (nLoadWalletRet != DB_LOAD_OK)
+    {
+        if (nLoadWalletRet == DB_CORRUPT)
+            strErrors << _("Error loading wallet.dat: Wallet corrupted") << "\n";
+        else if (nLoadWalletRet == DB_NONCRITICAL_ERROR)
+        {
+            string msg(_("Warning: error reading wallet.dat! All keys read correctly, but transaction data"
+                         " or address book entries might be missing or incorrect."));
+            uiInterface.ThreadSafeMessageBox(msg, _("Yacoin"), CClientUIInterface::OK | CClientUIInterface::ICON_EXCLAMATION | CClientUIInterface::MODAL);
+        }
+        else if (nLoadWalletRet == DB_TOO_NEW)
+            strErrors << _("Error loading wallet.dat: Wallet requires newer version of Yacoin") << "\n";
+        else if (nLoadWalletRet == DB_NEED_REWRITE)
+        {
+            strErrors << _("Wallet needed to be rewritten: restart Yacoin to complete") << "\n";
+            printf("%s", strErrors.str().c_str());
+            return InitError(strErrors.str());
+        }
+        else
+            strErrors << _("Error loading wallet.dat") << "\n";
+    }
+
+    if (GetBoolArg("-upgradewallet", fFirstRun))
+    {
+        int nMaxVersion = (int)(GetArg("-upgradewallet", 0));
+        if (nMaxVersion == 0) // the -upgradewallet without argument case
+        {
+            printf("Performing wallet upgrade to %i\n", FEATURE_LATEST);
+            nMaxVersion = CLIENT_VERSION;
+            pwalletMain->SetMinVersion(FEATURE_LATEST); // permanently upgrade the wallet immediately
+        }
+        else
+            printf("Allowing wallet upgrade up to %i\n", nMaxVersion);
+        if (nMaxVersion < pwalletMain->GetVersion())
+            strErrors << _("Cannot downgrade wallet") << "\n";
+        pwalletMain->SetMaxVersion(nMaxVersion);
+    }
+    // ********************************************************* Step 8 was Step 7: load blockchain
 
     if (!bitdb.Open(GetDataDir()))
     {
@@ -1143,12 +1242,12 @@ bool AppInit2()
     }
     printf(" block index %15" PRId64 "ms\n", GetTimeMillis() - nStart);
 
-    nTestNetNewLogicBlockNumber = GetArg("-testnetnewlogicblocknumber", 0);
+    nTestNetNewLogicBlockNumber = GetArg("-testnetNewLogicBlockNumber", 0);
     if (0 == nTestNetNewLogicBlockNumber)
         nTestNetNewLogicBlockNumber = pindexBest->nHeight;
     if (fDebug)
     {
-    #ifdef WIN32
+#ifdef WIN32
         (void)printf(
                      "\n"
                      "nTestNetNewLogicBlockNumber is \n"
@@ -1156,7 +1255,7 @@ bool AppInit2()
                      "\n"
                      , nTestNetNewLogicBlockNumber
                     );
-    #endif
+#endif
     }
 
     (void)HaveWeSwitchedToNewLogicRules( fUseOld044Rules );
@@ -1190,51 +1289,6 @@ bool AppInit2()
         return false;
     }
 
-    // ********************************************************* Step 8: load wallet
-
-    uiInterface.InitMessage(_("<b>Loading wallet...</b>"));
-    printf("Loading wallet...\n");
-    nStart = GetTimeMillis();
-    bool fFirstRun = true;
-    pwalletMain = new CWallet(strWalletFileName);
-    DBErrors nLoadWalletRet = pwalletMain->LoadWallet(fFirstRun);
-    if (nLoadWalletRet != DB_LOAD_OK)
-    {
-        if (nLoadWalletRet == DB_CORRUPT)
-            strErrors << _("Error loading wallet.dat: Wallet corrupted") << "\n";
-        else if (nLoadWalletRet == DB_NONCRITICAL_ERROR)
-        {
-            string msg(_("Warning: error reading wallet.dat! All keys read correctly, but transaction data"
-                         " or address book entries might be missing or incorrect."));
-            uiInterface.ThreadSafeMessageBox(msg, _("Yacoin"), CClientUIInterface::OK | CClientUIInterface::ICON_EXCLAMATION | CClientUIInterface::MODAL);
-        }
-        else if (nLoadWalletRet == DB_TOO_NEW)
-            strErrors << _("Error loading wallet.dat: Wallet requires newer version of Yacoin") << "\n";
-        else if (nLoadWalletRet == DB_NEED_REWRITE)
-        {
-            strErrors << _("Wallet needed to be rewritten: restart Yacoin to complete") << "\n";
-            printf("%s", strErrors.str().c_str());
-            return InitError(strErrors.str());
-        }
-        else
-            strErrors << _("Error loading wallet.dat") << "\n";
-    }
-
-    if (GetBoolArg("-upgradewallet", fFirstRun))
-    {
-        int nMaxVersion = (int)(GetArg("-upgradewallet", 0));
-        if (nMaxVersion == 0) // the -upgradewallet without argument case
-        {
-            printf("Performing wallet upgrade to %i\n", FEATURE_LATEST);
-            nMaxVersion = CLIENT_VERSION;
-            pwalletMain->SetMinVersion(FEATURE_LATEST); // permanently upgrade the wallet immediately
-        }
-        else
-            printf("Allowing wallet upgrade up to %i\n", nMaxVersion);
-        if (nMaxVersion < pwalletMain->GetVersion())
-            strErrors << _("Cannot downgrade wallet") << "\n";
-        pwalletMain->SetMaxVersion(nMaxVersion);
-    }
 
     if (fFirstRun)
     {
@@ -1318,7 +1372,7 @@ bool AppInit2()
     nStart = GetTimeMillis();
 
     {
-        CAddrDB adb;
+        CAddrDB adb;    // does a GetDataDir() in ctor for "peers.dat"
         if (!adb.Read(addrman))
             printf("Invalid or missing peers.dat; recreating\n");
     }
@@ -1339,6 +1393,7 @@ bool AppInit2()
     printf("setKeyPool.size() = %" PRIszu "\n",      pwalletMain->setKeyPool.size());
     printf("mapWallet.size() = %" PRIszu "transactiions\n",       pwalletMain->mapWallet.size());
     printf("mapAddressBook.size() = %" PRIszu "\n",  pwalletMain->mapAddressBook.size());
+
 
     if (!NewThread(StartNode, NULL))
         InitError(_("Error: could not start node"));

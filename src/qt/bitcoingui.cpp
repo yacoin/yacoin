@@ -38,7 +38,7 @@
 
 #include <QApplication>
 #if QT_VERSION < 0x050000
-#include <QMainWindow>
+    #include <QMainWindow>
 #endif
 #include <QMenuBar>
 #include <QMenu>
@@ -816,7 +816,13 @@ void BitcoinGUI::setNumConnections(int count)
 void BitcoinGUI::setNumBlocks(int count, int nTotalBlocks)
 {
     // don't show / hide progress bar and its label if we have no connection to the network
-    if (!clientModel || clientModel->getNumConnections() == 0)
+    if (
+        (!clientModel) 
+        || 
+        (
+         (clientModel->getNumConnections() == 0) && (!fTestNet)
+        )
+       )
     {
         progressBarLabel->setVisible(false);
         progressBar->setVisible(false);

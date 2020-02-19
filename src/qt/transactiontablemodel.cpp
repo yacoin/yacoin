@@ -399,7 +399,7 @@ QString TransactionTableModel::formatTxType(const TransactionRecord *wtx) const
     case TransactionRecord::SendToSelf:
         return tr("Payment to yourself");
     case TransactionRecord::Generated:
-        return tr("Minted");
+        return tr("Mined");
     case TransactionRecord::Mined:
         return tr("Mined");
     default:

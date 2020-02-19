@@ -6,7 +6,7 @@
 #ifndef BITCOIN_TXDB_BDB_H
 #define BITCOIN_TXDB_BDB_H
 
-
+#ifndef USE_LEVELDB
 /** Access to the transaction database (blkindex.dat) */
 class CTxDB : public CDB
 {
@@ -42,4 +42,5 @@ private:
     bool LoadBlockIndexGuts();
 };
 
+#endif
 #endif

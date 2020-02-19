@@ -1,160 +1,294 @@
 # Copyright (c) 2009-2010 Satoshi Nakamoto
 # Distributed under the MIT/X11 software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
-include $(YDIR)/sw/yconf
 
 CC ?= g++
 CXX ?= g++
 
+###############################################################################
+#UPnP configuration
+#
+# choose either
 USE_UPNP:=1
-USE_IPV6:=0
-USE_ASM:=1
+#or 
+#USE_UPNP:=-
+###############################################################################
 
-BOOST_INCLUDE_PATH=$(YBOO)/include
-BOOST_LIB_PATH=$(YBOO)/lib
-BDB_INCLUDE_PATH=$(YBDB)/include
-BDB_LIB_PATH=$(YBDB)/lib
-OPENSSL_INCLUDE_PATH=$(YOSSL)/include
-OPENSSL_LIB_PATH=$(YOSSL)/lib
-MINIUPNPC_INCLUDE_PATH=$(YUPNP)/include
-MINIUPNPC_LIB_PATH=$(YUPNP)/lib
+###############################################################################
+#IPV6 configuration
+#
+# choose either
+#USE_IPV6:=-
+#or 
+USE_IPV6:=1
+###############################################################################
+
+###############################################################################
+# USE_ASM configuration
+#
+# choose either
+USE_ASM:=1
+#or no USE_ASM
+###############################################################################
+
+###############################################################################
+# USE_LEVELDB configuration
+# this REQUIRES file additions or removals from the source file list
+#
+# choose either
+USE_LEVELDB:=1
+#or no USE_LEVELDB
+###############################################################################
+
+BOOST_SUFFIX?=-mgw48-mt-sd-1_55
 
 INCLUDEPATHS= \
- -I"$(CURDIR)" \
- -I"$(CURDIR)/obj" \
- -I"$(CURDIR)/scrypt-jane" \
- -I$(BOOST_INCLUDE_PATH) \
- -I$(BDB_INCLUDE_PATH) \
- -I$(OPENSSL_INCLUDE_PATH) \
- -I$(MINIUPNPC_INCLUDE_PATH) \
- -I./leveldb/include \
- -I./leveldb/helpers
-
-LIBS= \
-  -Wl, -Bstatic \
-  -lminiupnpc -liphlpapi \
-  -lleveldb \
-  -lmemenv \
-  -lssl \
-  -lcrypto \
-  -ldb_cxx-4.8 \
-  -lws2_32 -lshlwapi -lmswsock -lole32 -loleaut32 -luuid -lgdi32 \
-  -lboost_system -lboost_filesystem -lboost_program_options -lboost_thread \
-  -lboost_chrono -Wl,-Bstatic -lpthread
+-I"$(CURDIR)" \
+-I"$(CURDIR)/scrypt-jane" \
+-I'./leveldb/include' \
+-I'./leveldb/helpers' \
+-I'../../../sw/boost_1_58_0/include' \
+-I'../../../sw/db-4.8.30.NC/include' \
+-I'../../../sw/openssl-1.0.1u/include' \
+-I'../../../sw/miniupnpc-1.9.20150206/include' \
+-I'../../../sw/qrencode-3.4.4/include'
 
 LIBPATHS= \
- -L$(OPENSSL_LIB_PATH) \
- -L$(BOOST_LIB_PATH) \
- -L$(BDB_LIB_PATH) \
- -L$(MINIUPNPC_LIB_PATH) \
- -L./leveldb
+-L'../../../sw/boost_1_58_0/lib' \
+-L'../../../sw/db-4.8.30.NC/lib' \
+-L'../../../sw/openssl-1.0.1u/lib' \
+-L'leveldb' \
+-L'../../../sw/miniupnpc-1.9.20150206/lib' \
+-L'../../../sw/qrencode-3.4.4/lib'
+
+LIBS= \
+-lmingw32 \
+-Wl,-Bstatic \
+-lqrencode \
+-liphlpapi \
+-lleveldb \
+-lmemenv \
+-lssl \
+-lcrypto \
+-ldb_cxx \
+-lboost_system \
+-lboost_filesystem \
+-lboost_program_options \
+-lboost_thread \
+-lboost_chrono \
+-Wl,-Bstatic \
+-lpthread \
+-lminiupnpc \
+-lshlwapi
+
+# -l boost_system$(BOOST_SUFFIX) \
+# -l boost_filesystem$(BOOST_SUFFIX) \
+# -l boost_program_options$(BOOST_SUFFIX) \
+# -l boost_thread$(BOOST_SUFFIX) \
+# -l boost_chrono$(BOOST_SUFFIX) \
+# -l db_cxx \
+# -l ssl \
+# -l crypto
+#
+#-DUSE_LEVELDB \
+#-DSTATICLIB \
+#
 
 DEFS= \
-    -DUSE_LEVELDB \
-	-DUSE_ASM \
-	-DWIN32 \
-	-D_WINDOWS \
-	-DBOOST_THREAD_USE_LIB \
-	-DBOOST_SPIRIT_THREADSAFE \
-	-DSCRYPT_CHACHA \
-	-DSCRYPT_KECCAK512 \
-	-DSCRYPT_CHOOSE_COMPILETIME \
-	-DHAVE_BUILD_INFO
+-D__STDC_FORMAT_MACROS \
+-DWIN32 \
+-D_WINDOWS                              \
+-DYac1dot0 \
+-DSTATICLIB \
+-DMINIUPNP_STATICLIB \
+-DBOOST_THREAD_USE_LIB \
+-DBOOST_SPIRIT_THREADSAFE \
+-DSCRYPT_CHACHA \
+-DSCRYPT_KECCAK512 \
+-DSCRYPT_CHOOSE_COMPILETIME \
+-DO2
 
+# choose
+#	-g
+# or
+#   -DNDEBUG
 DEBUGFLAGS=\
-	-g
+-DNDEBUG
 
 CFLAGS= \
-	-O2 \
-	-msse2 \
-	-w -Wall -Wextra -Wformat -Wformat-security -Wno-unused-parameter \
-	$(DEBUGFLAGS) \
-	$(DEFS) \
-	$(INCLUDEPATHS)
+-mthreads \
+-O2 \
+-msse2 \
+-w \
+-Wall \
+-Wextra \
+-Wformat \
+-Wformat-security \
+-Wno-unused-parameter \
+$(DEBUGFLAGS) \
+$(DEFS)
+
+#$(INCLUDEPATHS)
 
 LDFLAGS= \
-	-Wl,--dynamicbase \
-	-Wl,--nxcompat \
-	-Wl,--large-address-aware \
-	-static
+-Wl,--dynamicbase \
+-Wl,--nxcompat \
+-Wl,--large-address-aware \
+-static
 
 TESTDEFS = -DTEST_DATA_DIR=$(abspath test/data)
 
-ifndef USE_UPNP
-	override USE_UPNP = -
-endif
-ifneq (${USE_UPNP}, -)
- DEFS += -DSTATICLIB -DUSE_UPNP=$(USE_UPNP) -DMINIUPNP_STATICLIB
-endif
+all: yacoind.exe
 
-ifneq (${USE_IPV6}, -)
-	DEFS += -DUSE_IPV6=$(USE_IPV6)
+######################
+# DEFS += -DSTATICLIB -DUSE_UPNP
+########### plug and play stuff
+ifneq (${USE_UPNP}, -)
+ DEFS += -DUSE_UPNP
 endif
+######################
+
+######################
+########### IPV6 stuff
+ifneq (${USE_IPV6}, -)
+ DEFS += -DUSE_IPV6
+endif
+######################
+
+######################
+########### USE_ASM stuff
+ifdef USE_ASM
+ DEFS += -DUSE_ASM
+endif
+######################
+
+######################
+#
+# LevelDB support, with mingw shlwapi lib must come at the end! (Why?)
+#
+ifdef USE_LEVELDB
+DEFS += -DUSE_LEVELDB
+#leveldb/libleveldb.a:
+#	cd leveldb; TARGET_OS=NATIVE_WINDOWS make libleveldb.a libmemenv.a; cd ..
+#obj/txdb-leveldb.o	: txdb-leveldb.cpp
+#	g++ -c $(CFLAGS) -MMD -o $@ $<
+#	@echo TEST LEVELDB $(DEFS)
+else
+obj/txdb-bdb.o	: txdb-bdb.cpp
+	$(CC) -c $(CFLAGS) -MMD -o $@ $<
+endif
+######################
+
+LIBS += \
+-l kernel32 \
+-l user32 \
+-l gdi32 \
+-l comdlg32 \
+-l winspool \
+-l winmm \
+-l shell32 \
+-l comctl32 \
+-l ole32 \
+-l oleaut32 \
+-l uuid \
+-l rpcrt4 \
+-l advapi32 \
+-l ws2_32 \
+-l mswsock \
+-l iphlpapi \
+-l shlwapi
 
 # TODO: make the mingw builds smarter about dependencies, like the linux/osx builds are
 HEADERS = $(wildcard *.h)
 
 OBJS= \
-    obj/txdb-leveldb.o \
-    obj/alert.o \
-    obj/version.o \
-    obj/checkpoints.o \
-    obj/netbase.o \
-    obj/addrman.o \
-    obj/crypter.o \
-    obj/key.o \
-    obj/db.o \
-    obj/init.o \
-    obj/irc.o \
-    obj/keystore.o \
-    obj/stun.o \
-    obj/miner.o \
-    obj/main.o \
-    obj/net.o \
-    obj/protocol.o \
-    obj/bitcoinrpc.o \
-    obj/price.o \
-    obj/rpcdump.o \
-    obj/rpcnet.o \
-    obj/rpcmining.o \
-    obj/rpcwallet.o \
-    obj/rpcblockchain.o \
-    obj/rpcrawtransaction.o \
-    obj/script.o \
-    obj/sync.o \
-    obj/util.o \
-    obj/wallet.o \
-    obj/walletdb.o \
-    obj/noui.o \
-    obj/kernel.o \
-    obj/pbkdf2.o \
-    obj/scrypt.o \
-    obj/scrypt-x86.o \
-    obj/scrypt-x86_64.o \
-    obj/scrypt-jane.o
-
-all: yacoind.exe
+obj/alert.o \
+obj/addrman.o \
+obj/bitcoinrpc.o \
+obj/checkpoints.o \
+obj/crypter.o \
+obj/db.o \
+obj/init.o \
+obj/irc.o \
+obj/json_spirit_reader.o \
+obj/json_spirit_value.o \
+obj/kernel.o \
+obj/key.o \
+obj/keystore.o \
+obj/main.o \
+obj/miner.o \
+obj/net.o \
+obj/netbase.o \
+obj/noui.o \
+obj/pbkdf2.o \
+obj/price.o \
+obj/protocol.o \
+obj/random_nonce.o \
+obj/rpcblockchain.o \
+obj/rpcdump.o \
+obj/rpcmining.o \
+obj/rpcnet.o \
+obj/rpcrawtransaction.o \
+obj/rpcwallet.o \
+obj/script.o \
+obj/scrypt.o \
+obj/scrypt-arm.o \
+obj/scrypt-x86.o \
+obj/scrypt-x86_64.o \
+obj/scrypt-generic.o \
+obj/scrypt-jane.o \
+obj/stun.o \
+obj/sync.o \
+obj/txdb-bdb.o \
+obj/txdb-leveldb.o \
+obj/util.o \
+obj/version.o \
+obj/wallet.o \
+obj/walletdb.o
 
 test check: test_yacoin.exe FORCE
 	test_yacoin.exe
 
-DEFS += $(addprefix -I,c:/deps/openssl-1.0.1g/include)
+#.genjane:
+#	touch .genjane; gcc -c -O3 -DSCRYPT_CHACHA -DSCRYPT_KECCAK512 -DSCRYPT_CHOOSE_COMPILETIME -o obj/scrypt-jane.o scrypt-jane/scrypt-jane.c
 
-obj/scrypt-jane.o: scrypt-jane/scrypt-jane.c 
-	g++ -c -frandom-seed=$@ $(CFLAGS) -MMD -o $@ $<
+obj/scrypt-jane.o: scrypt-jane/scrypt-jane.c
+	$(CXX) -c -frandom-seed=$@ $(CFLAGS) $(INCLUDEPATHS) -MMD -o $@ $<
+
+obj/json_spirit_value.o: json/json_spirit_value.cpp
+	$(CXX) -c -frandom-seed=$@ $(CFLAGS) $(INCLUDEPATHS) -MMD -o $@ $<
+
+obj/json_spirit_reader.o: json/json_spirit_reader.cpp
+	$(CXX) -c -frandom-seed=$@ $(CFLAGS) $(INCLUDEPATHS) -MMD -o $@ $<
+
+obj/scrypt-generic.o: scrypt-generic.c
+	$(CXX) -c -frandom-seed=$@ $(CFLAGS) $(INCLUDEPATHS) -MMD -o $@ $<
+
+obj/scrypt-x86_64.o : scrypt-x86_64.S
+	$(CXX) -c -frandom-seed=$@ $(CFLAGS) $(INCLUDEPATHS) -MMD -o $@ $<
+
+obj/scrypt-x86.o : scrypt-x86.S
+	$(CXX) -c -frandom-seed=$@ $(CFLAGS) $(INCLUDEPATHS) -MMD -o $@ $<
+
+obj/scrypt-arm.o : scrypt-arm.S
+	$(CXX) -c -frandom-seed=$@ $(CFLAGS) $(INCLUDEPATHS) -MMD -o $@ $<	
 
 obj/%.o: %.cpp $(HEADERS)
-	g++ -c -frandom-seed=$@ $(CFLAGS) -o $@ $<
-
-obj/scrypt-x86.o: scrypt-x86.S
-	$(CXX) -c -frandom-seed=$@ $(xCXXFLAGS) -MMD -o $@ $<
-
-obj/scrypt-x86_64.o: scrypt-x86_64.S
-	$(CXX) -c -frandom-seed=$@ $(xCXXFLAGS) -MMD -o $@ $<
+	$(CXX) -c -frandom-seed=$@ $(CFLAGS) $(INCLUDEPATHS) -o $@ $<
 
 yacoind.exe: $(OBJS:obj/%=obj/%)
-	g++ $(CFLAGS) $(LDFLAGS) -o $@ $(LIBPATHS) $^ $(LIBS)
-	cp yacoind.exe ../release
+	$(CXX) $(CFLAGS) $(LDFLAGS) -o $@ $(LIBPATHS) $^ $(LIBS) -s
+	@echo	
+	@echo $(OBJS)
+	@echo
+	@echo $(DEFS)
+	@echo	
+	@echo $(INCLUDEPATHS)
+	@echo	
+	@echo $(LIBPATHS)
+	@echo	
+	@echo $(LIBS)
+	@echo	
 
 TESTOBJS := $(patsubst test/%.cpp,obj-test/%.o,$(wildcard test/*.cpp))
 
@@ -164,14 +298,11 @@ obj-test/%.o: test/%.cpp $(HEADERS)
 test_yacoin.exe: $(TESTOBJS) $(filter-out obj/init.o,$(OBJS:obj/%=obj/%))
 	g++ $(CFLAGS) $(LDFLAGS) -o $@ $(LIBPATHS) $^ -lboost_unit_test_framework$(BOOST_SUFFIX) $(LIBS)
 
-obj/build.h: FORCE
-	sh ../share/genbuild.sh obj/build.h
-
-version.cpp: obj/build.h
-
 clean:
-	del /Q yacoind test_yacoin
-	del /Q obj\*
-	del /Q obj-test\*
+	rm -f obj/*.d
+	rm -f obj/*.o
+	rm -f yacoind
+	rm -f obj-test/*.*
+	rm -f test_yacoin
 
 FORCE:
