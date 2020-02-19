@@ -4364,7 +4364,6 @@ bool LoadBlockIndex(bool fAllowNew)
     
         uint256
             the_hash = block.GetHash();
-#ifdef _MSC_VER
 
 ////////////////////////////////////
         ::uint32_t
@@ -4389,7 +4388,6 @@ bool LoadBlockIndex(bool fAllowNew)
                 nCount
               );		
 ////////////////////////////////////
-#endif
 
         // debug print
         printf("block.GetHash() ==\n%s\n", the_hash.ToString().c_str());

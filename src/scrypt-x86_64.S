@@ -24,7 +24,6 @@
  * SUCH DAMAGE.
  */
 
-#ifdef USE_ASM
 #if defined(__linux__) && defined(__ELF__)
 	.section .note.GNU-stack,"",%progbits
 #endif
@@ -756,5 +755,4 @@ scrypt_core_xmm_loop2:
 	scrypt_core_cleanup
 	ret
 
-#endif
 #endif

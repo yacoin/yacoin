@@ -1150,7 +1150,9 @@ static const CRPCCommand vRPCCommands[] =
     { "stop",                   &stop,                   true,   true },
     { "getbestblockhash",       &getbestblockhash,       true,   false },
     { "getblockcount",          &getblockcount,          true,   false },
+#ifdef WIN32
     { "getblockcountt",         &getcurrentblockandtime, true,   false },
+#endif
     { "getyacprice",            &getYACprice,            true,   false },
     { "getconnectioncount",     &getconnectioncount,     true,   false },
     { "getaddrmaninfo",         &getaddrmaninfo,         true,   false },

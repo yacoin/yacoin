@@ -26,7 +26,6 @@
  * This file was originally written by Colin Percival as part of the Tarsnap
  * online backup system.
  */
-#ifndef USE_ASM
 
 #include <stdlib.h>
 #include <stdint.h>
@@ -132,4 +131,3 @@ void scrypt_core(uint32_t *X, uint32_t *V)
         xor_salsa8( &X[ 16 ], &X[ 0 ] );
     }
 }   // Have you ever seen so many undocumented MAGIC #s!!
-#endif
