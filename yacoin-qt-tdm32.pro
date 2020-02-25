@@ -4,7 +4,7 @@ VERSION = 0.4.5
 INCLUDEPATH += src src/json src/qt
 QT += core gui network
 greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
-DEFINES += QT_GUI BOOST_THREAD_USE_LIB BOOST_SPIRIT_THREADSAFE __STDC_FORMAT_MACROS WIN32
+DEFINES += QT_GUI BOOST_THREAD_USE_LIB BOOST_SPIRIT_THREADSAFE __STDC_FORMAT_MACROS WIN32 Yac1dot0
 CONFIG += no_include_pwd
 CONFIG += thread
 CONFIG += static
@@ -13,12 +13,16 @@ CONFIG += warn_off
 
 BOOST_INCLUDE_PATH=$$YBOO/include
 BOOST_LIB_PATH=$$YBOO/lib
+
 BDB_INCLUDE_PATH=$$YBDB/include
 BDB_LIB_PATH=$$YBDB/lib
+
 OPENSSL_INCLUDE_PATH=$$YOSSL/include
 OPENSSL_LIB_PATH=$$YOSSL/lib
+
 MINIUPNPC_INCLUDE_PATH=$$YUPNP/include
 MINIUPNPC_LIB_PATH=$$YUPNP/lib
+
 QRENCODE_INCLUDE_PATH=$$YQR/include
 QRENCODE_LIB_PATH=$$YQR/lib
 
@@ -125,6 +129,7 @@ HEADERS += \
     src/strlcpy.h \
     src/main.h \
     src/miner.h \
+    src/random_nonce.h \
     src/net.h \
     src/ministun.h \
     src/key.h \
@@ -215,6 +220,7 @@ SOURCES += src/qt/bitcoin.cpp src/qt/bitcoingui.cpp \
     src/init.cpp \
     src/net.cpp \
     src/price.cpp \
+    src/random_nonce.cpp \
     src/stun.cpp \
     src/irc.cpp \
     src/checkpoints.cpp \
