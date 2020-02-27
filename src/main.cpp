@@ -1378,34 +1378,42 @@ CBigNum inline GetProofOfStakeLimit(int nHeight, unsigned int nTime)
     const int
         nAverageBlocksPerMinute = 1;
 #ifdef Yac1dot0
+    ::int64_t nBlockRewardNotFees;
     if(
        pindexBest->nHeight >= nYac20BlockNumber
       )
     {
-        const int 
-            nNumberOfDaysPerYear = 365,
-            nNumberOfBlocksPerYear = (nAverageBlocksPerMinute * 
-                                      nMinutesperHour * 
-                                      nHoursPerDay * 
-                                      nNumberOfDaysPerYear
-                                     ) +    // that 1/4 of a day for leap years
-                                     (nAverageBlocksPerMinute * 
-                                      nMinutesperHour * 
-                                      (nHoursPerDay/4)
-                                     );
-        const double
-            nInflation = 0.02;      // 2%
+        // Default: nAnEpoch = 21000 blocks, recalculated with each epoch
+        if (pindexBest->nHeight % nAnEpoch == 1)
+        {
+            // recalculated
+            const int
+                nNumberOfDaysPerYear = 365,
+                nNumberOfBlocksPerYear = (nAverageBlocksPerMinute *
+                                          nMinutesperHour *
+                                          nHoursPerDay *
+                                          nNumberOfDaysPerYear
+                                         ) +    // that 1/4 of a day for leap years
+                                         (nAverageBlocksPerMinute *
+                                          nMinutesperHour *
+                                          (nHoursPerDay/4)
+                                         );
+            const double
+                nInflation = 0.02;      // 2%
 
-        // PoW reward is 2%
-        ::int64_t
-            nBlockReward = (::int64_t)
-            (
-             (
-              (pindexBest->pprev? pindexBest->pprev->nMoneySupply: 0) / 
-              nNumberOfBlocksPerYear
-             ) * nInflation
-            ) + nFees;
-        return nBlockReward;
+            // PoW reward is 2%
+            nBlockRewardNotFees = (::int64_t)
+                (
+                  (pindexBest->pprev? pindexBest->pprev->nMoneySupply: 0) /
+                  nNumberOfBlocksPerYear
+                ) * nInflation;
+        } else
+        {
+            nBlockRewardNotFees = (::int64_t)
+                (pindexBest->pprev? pindexBest->pprev->nBlockRewardNotFees: 0);
+        }
+        pindexBest->nBlockRewardNotFees = nBlockRewardNotFees;
+        return nBlockRewardNotFees + nFees;
     }
 #endif
     CBigNum bnSubsidyLimit = MAX_MINT_PROOF_OF_WORK;
