@@ -14,5 +14,5 @@ steps:
     echo --------- dir
     dir
     echo --------- docker build
-    docker build -t yacoinbuild -f Dockerfile
+    docker build -t yacoinbuild -f Dockerfile .
   displayName: 'Build yacoin the painful way'
