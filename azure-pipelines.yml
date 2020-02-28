@@ -10,5 +10,7 @@ pool:
   vmImage: 'windows-latest'
 
 steps:
-- script: echo Hello, world!
-  displayName: 'Run a one-line script'
+- powershell: |
+    Get-Location
+    dir
+  displayName: 'Build yacoin the painful way'
