@@ -7,7 +7,7 @@ jobs:
 
     runs-on: ubuntu-latest
     
-    steps: |
+    steps:
       - name: pullyacoindocker
         run: docker pull dev34253/yacoind:0.4.9
       - name: buildyacoin
