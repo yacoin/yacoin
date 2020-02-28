@@ -11,6 +11,8 @@ pool:
 
 steps:
 - script: |
+    echo --------- dir
+    dir
     echo --------- docker build
-    docker build -t yacoinbuild .
+    docker build -t yacoinbuild -f Dockerfile
   displayName: 'Build yacoin the painful way'
