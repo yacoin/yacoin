@@ -10,7 +10,7 @@ pool:
   vmImage: 'windows-latest'
 
 steps:
-- powershell: |
+- script: |
     echo --------- docker build
     docker build -t yacoinbuild .
   displayName: 'Build yacoin the painful way'
