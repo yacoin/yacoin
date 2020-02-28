@@ -15,7 +15,6 @@ jobs:
           echo someoutput
           pwd
           echo $(pwd)
-          docker run -v $(pwd):/ysrc dev34253/yacoind:0.4.9 pwd
-          docker run -v $(pwd):/ysrc dev34253/yacoind:0.4.9 /bin/bash "cd /ysrc && pwd"
+          docker run -v $(pwd):/yacsrc dev34253/yacoind:0.4.9 /bin/bash "cd / && ls && cd /yacsrc && pwd"
       - name: buildyacoin
         run: docker run -v $(pwd):/ysrc dev34253/yacoind:0.4.9 /bin/bash -c "cd /ysrc && ./autogen.sh && ./configure && make"
