@@ -11,4 +11,4 @@ jobs:
       - name: pullyacoindocker
         run: docker pull dev34253/yacoind:0.4.9
       - name: buildyacoin
-        run: docker run -v $(pwd):/ysrc dev34253/yacoind:0.4.9 "cd /ysrc && ./autogen.sh && ./configure && make"
+        run: docker run -v $(pwd):/ysrc dev34253/yacoind:0.4.9 /bin/bash -c "cd /ysrc && ./autogen.sh && ./configure && make"
