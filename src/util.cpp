@@ -94,7 +94,7 @@ bool fTestNetNewLogic = false;
 ::int32_t nYac20BlockNumber = 0;
 ::int32_t nYac20BlockNumberTime = 0;
 // An epoch is a difficulty period. Right now on testnet, it is 21,000 blocks
-::uint32_t nAnEpoch = 21000;
+::uint32_t nEpochInterval = 21000;
 bool fPrintToConsole = false;
 bool fPrintToDebugger = false;
 bool fRequestShutdown = false;

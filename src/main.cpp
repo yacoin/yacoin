@@ -1375,45 +1375,31 @@ CBigNum inline GetProofOfStakeLimit(int nHeight, unsigned int nTime)
 {
     const ::int32_t
         nYac20BlockNumber = 0;  //2960;
-    const int
-        nAverageBlocksPerMinute = 1;
 #ifdef Yac1dot0
-    ::int64_t nBlockRewardNotFees;
+    ::int64_t nBlockRewardExcludeFees;
     if(
        pindexBest->nHeight >= nYac20BlockNumber
       )
     {
-        // Default: nAnEpoch = 21000 blocks, recalculated with each epoch
-        if (pindexBest->nHeight % nAnEpoch == 1)
+        // Default: nEpochInterval = 21000 blocks, recalculated with each epoch
+        if (pindexBest->nHeight % nEpochInterval == 0)
         {
-            // recalculated
-            const int
-                nNumberOfDaysPerYear = 365,
-                nNumberOfBlocksPerYear = (nAverageBlocksPerMinute *
-                                          nMinutesperHour *
-                                          nHoursPerDay *
-                                          nNumberOfDaysPerYear
-                                         ) +    // that 1/4 of a day for leap years
-                                         (nAverageBlocksPerMinute *
-                                          nMinutesperHour *
-                                          (nHoursPerDay/4)
-                                         );
-            const double
-                nInflation = 0.02;      // 2%
-
-            // PoW reward is 2%
-            nBlockRewardNotFees = (::int64_t)
+            // // recalculated
+                // PoW reward is 2%
+            nBlockRewardExcludeFees = (::int64_t)
                 (
-                  (pindexBest->pprev? pindexBest->pprev->nMoneySupply: 0) /
-                  nNumberOfBlocksPerYear
+                (pindexBest->pprev? pindexBest->pprev->nMoneySupply:
+                    nSimulatedMOneySupplyAtFork) /
+                    nNumberOfBlocksPerYear
                 ) * nInflation;
         } else
         {
-            nBlockRewardNotFees = (::int64_t)
-                (pindexBest->pprev? pindexBest->pprev->nBlockRewardNotFees: 0);
+            nBlockRewardExcludeFees = (::int64_t)
+                (pindexBest->pprev? pindexBest->pprev->nBlockRewardExcludeFees: 0);
         }
-        pindexBest->nBlockRewardNotFees = nBlockRewardNotFees;
-        return nBlockRewardNotFees + nFees;
+
+        pindexBest->nBlockRewardExcludeFees = nBlockRewardExcludeFees;
+        return nBlockRewardExcludeFees + nFees;
     }
 #endif
     CBigNum bnSubsidyLimit = MAX_MINT_PROOF_OF_WORK;
@@ -3269,7 +3255,10 @@ bool CBlock::AddToBlockIndex(unsigned int nFile, unsigned int nBlockPos)
 
     if( 0 == pindexNew->nHeight )
     {
-        pindexNew->nMoneySupply = pindexNew->nMint = nSimulatedMOneySupplyAtFork;
+        pindexNew->nBlockRewardExcludeFees = (nSimulatedMOneySupplyAtFork /
+                                              nNumberOfBlocksPerYear) *
+                                              nInflation;
+        pindexNew->nMoneySupply = pindexNew->nMint = nSimulatedMOneySupplyAtFork + pindexNew->nBlockRewardExcludeFees;
     }
     // Write to disk block index
     CTxDB txdb;
