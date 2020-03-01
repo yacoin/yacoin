@@ -22,8 +22,23 @@ jobs:
       - name: pullyacoindocker
         run: |
           docker pull dev34253/yacoin-build:ubuntu.18.04
-          docker run -v /home/runner/work/yacoin/yacoin:/src dev34253/yacoin-build:ubuntu.18  .04
+          docker run -v /home/runner/work/yacoin/yacoin:/src dev34253/yacoin-build:ubuntu.18.04
       - uses: actions/upload-artifact@v1
         with:
           name: yacoind-ubuntu-18.04
           path: /home/runner/work/yacoin/yacoin/src/yacoind
+  build-windows:
+    runs-on: windows-latest  
+    steps:
+      - uses: actions/checkout@v2
+      - name: pullyacoindocker
+        run: |
+          docker pull dev34253/yacoin-build:windows
+          docker run -v %CD%:/src dev34253/yacoin-build:windows
+          dir
+          dir src
+      - uses: actions/upload-artifact@v1
+        with:
+          name: yacoind-windows
+          path: ./src/yacoind
+  
