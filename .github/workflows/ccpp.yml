@@ -8,13 +8,11 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
+      - uses: actions/checkout@v2
       - name: pullyacoindocker
-        run: docker pull dev34253/yacoind:0.4.9
-      - name: debugging some
         run: |
           echo someoutput
           pwd
           echo $(pwd)
-          docker run -v $(pwd):/yacsrc dev34253/yacoind:0.4.9 /bin/bash "cd / && ls && cd /yacsrc && pwd"
-      - name: buildyacoin
-        run: docker run -v $(pwd):/ysrc dev34253/yacoind:0.4.9 /bin/bash -c "cd /ysrc && ./autogen.sh && ./configure && make"
+          docker pull dev34253/yacoin-build:ubuntu.16.04
+          docker run -v ${pwd}:/src dev34253/yacoin-build:ubuntu.16.04
