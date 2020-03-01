@@ -61,6 +61,14 @@ contains(USE_IPV6, -) {
     DEFINES += USE_IPV6=$$USE_IPV6
 }
 
+contains(USE_ASM, 1) {
+    message(Using optimized scrypt core implementation)
+    SOURCES += src/scrypt-arm.S src/scrypt-x86.S src/scrypt-x86_64.S
+    DEFINES += USE_ASM
+} else {
+    message(Using generic scrypt core implementation)
+    SOURCES += src/scrypt-generic.c
+}
 
 genjane.target = .genjane
 genjane.commands = touch .genjane; gcc -c -O3 -DSCRYPT_CHACHA -DSCRYPT_KECCAK512 -DSCRYPT_CHOOSE_COMPILETIME -o $$OBJECTS_DIR/scrypt-jane.o src/scrypt-jane/scrypt-jane.c
@@ -267,9 +275,7 @@ SOURCES += src/qt/bitcoin.cpp src/qt/bitcoingui.cpp \
     src/pbkdf2.cpp \
     src/qt/multisigaddressentry.cpp \
     src/qt/multisiginputentry.cpp \
-    src/qt/multisigdialog.cpp \
-	src/scrypt-x86.S \
-	src/scrypt-x86_64.S
+    src/qt/multisigdialog.cpp
 #	 src/scrypt-jane/scrypt-jane.c
 
 RESOURCES += \
