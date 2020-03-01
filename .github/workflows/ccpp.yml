@@ -3,29 +3,27 @@ name: C/C++ CI
 on: [push]
 
 jobs:
-  build:
-
-    runs-on: ubuntu-latest
-    
+  build-ubuntu-1604:
+    runs-on: ubuntu-latest  
     steps:
       - uses: actions/checkout@v2
       - name: pullyacoindocker
         run: |
-          echo ==== shell
-          echo $0
-          echo ==== debug
-          echo someoutput
-          pwd
-          echo $(pwd)
-          ls
-          echo ==== pull
           docker pull dev34253/yacoin-build:ubuntu.16.04
-          echo ==== ls
-          ls ${pwd}
-          echo ==== docker pwd
-          docker run -v $(pwd):/src --entrypoint "pwd" dev34253/yacoin-build:ubuntu.16.04
-          echo ==== docker ls
-          docker run -v /home/runner/work/yacoin/yacoin:/src --entrypoint "ls" dev34253/yacoin-build:ubuntu.16.04 "/src"
-          echo ==== docker run
           docker run -v /home/runner/work/yacoin/yacoin:/src dev34253/yacoin-build:ubuntu.16.04
-          echo ==== done
+      - uses: actions/upload-artifact@v1
+        with:
+          name: yacoind-ubuntu-16.04
+          path: /home/runner/work/yacoin/yacoin/src/yacoind
+  build-ubuntu-1804:
+    runs-on: ubuntu-latest  
+    steps:
+      - uses: actions/checkout@v2
+      - name: pullyacoindocker
+        run: |
+          docker pull dev34253/yacoin-build:ubuntu.18.04
+          docker run -v /home/runner/work/yacoin/yacoin:/src dev34253/yacoin-build:ubuntu.18  .04
+      - uses: actions/upload-artifact@v1
+          with:
+            name: yacoind-ubuntu-18.04
+            path: /home/runner/work/yacoin/yacoin/src/yacoind
