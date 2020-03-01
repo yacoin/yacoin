@@ -14,9 +14,14 @@ jobs:
           echo someoutput
           pwd
           echo $(pwd)
+          ls
           docker pull dev34253/yacoin-build:ubuntu.16.04
           echo ==== ls
           ls ${pwd}
+          echo ==== docker pwd
+          docker run -v $(pwd):/src --entrypoint "pwd" dev34253/yacoin-build:ubuntu.16.04
           echo ==== docker ls
-          docker run -v ${pwd}:/src --entrypoint "ls" dev34253/yacoin-build:ubuntu.16.04 "/src"
+          docker run -v /home/runner/work/yacoin/yacoin:/src --entrypoint "ls" dev34253/yacoin-build:ubuntu.16.04 "/src"
+          echo ==== docker run
+          docker run -v home/runner/work/yacoin/yacoin:/src dev34253/yacoin-build:ubuntu.16.04
           echo ==== done
