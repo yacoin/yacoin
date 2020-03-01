@@ -11,10 +11,6 @@ jobs:
         run: |
           docker pull dev34253/yacoin-build:ubuntu.16.04
           docker run -v /home/runner/work/yacoin/yacoin:/src dev34253/yacoin-build:ubuntu.16.04
-      - uses: actions/upload-artifact@v1
-        with:
-          name: yacoind-ubuntu-16.04
-          path: /home/runner/work/yacoin/yacoin/src/yacoind
   build-ubuntu-1804:
     runs-on: ubuntu-latest  
     steps:
@@ -27,6 +23,10 @@ jobs:
         with:
           name: yacoind-ubuntu-18.04
           path: /home/runner/work/yacoin/yacoin/src/yacoind
+      - uses: actions/upload-artifact@v1
+      with:
+        name: yacoin-qt-ubuntu-18.04
+        path: /home/runner/work/yacoin/yacoin/src/qt/yacoin-qt
   build-windows:
     runs-on: windows-latest  
     steps:
@@ -37,8 +37,14 @@ jobs:
           docker run -v %CD%:/src dev34253/yacoin-build:windows
           dir
           dir src
+          cd src
+          dir qt
       - uses: actions/upload-artifact@v1
         with:
           name: yacoind-windows
           path: ./src/yacoind
-  
+      - uses: actions/upload-artifact@v1
+      with:
+        name: yacoin-qt-windows
+        path: ./src/yacoin/qt/yacoin-qt
+    
