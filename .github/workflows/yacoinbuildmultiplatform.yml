@@ -34,7 +34,7 @@ jobs:
       - name: pullyacoindocker
         run: |
           docker pull dev34253/yacoin-build:windows
-          docker run -v %CD%:/src dev34253/yacoin-build:windows
+          docker run -v %CD%:c:\src dev34253/yacoin-build:windows.latest
           dir
           dir src
           cd src
