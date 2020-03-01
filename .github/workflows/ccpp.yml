@@ -24,6 +24,6 @@ jobs:
           docker pull dev34253/yacoin-build:ubuntu.18.04
           docker run -v /home/runner/work/yacoin/yacoin:/src dev34253/yacoin-build:ubuntu.18  .04
       - uses: actions/upload-artifact@v1
-          with:
-            name: yacoind-ubuntu-18.04
-            path: /home/runner/work/yacoin/yacoin/src/yacoind
+        with:
+          name: yacoind-ubuntu-18.04
+          path: /home/runner/work/yacoin/yacoin/src/yacoind
