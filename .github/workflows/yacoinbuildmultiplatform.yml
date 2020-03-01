@@ -1,4 +1,4 @@
-name: C/C++ CI
+name: Yacoin multi platform build
 
 on: [push]
 
