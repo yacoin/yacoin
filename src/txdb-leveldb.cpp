@@ -434,31 +434,37 @@ bool CTxDB::LoadBlockIndex()
     // Now read each entry.
     while (iterator->Valid())   //what is so slow in this loop of all PoW blocks?
     {                           // 5 minutes for 1400 blocks, ~300 blocks/min or ~5/sec
+#ifdef WIN32
         n64timeStart = GetTimeMillis(); 
+#endif
 
         // Unpack keys and values.
         CDataStream 
             ssKey(SER_DISK, CLIENT_VERSION);
 
+#ifdef WIN32
         n64timeStart1 = GetTimeMillis(); 
         nDelta1 += (n64timeStart1 - n64timeStart);
-
+#endif
         ssKey.write(iterator->key().data(), iterator->key().size());
 
+#ifdef WIN32
         n64timeStart2 = GetTimeMillis(); 
         nDelta2 += (n64timeStart2 - n64timeStart1);
-
+#endif
         CDataStream 
             ssValue(SER_DISK, CLIENT_VERSION);
 
+#ifdef WIN32
         n64timeStart3 = GetTimeMillis(); 
         nDelta3 += (n64timeStart3 - n64timeStart2);
-
+#endif
         ssValue.write(iterator->value().data(), iterator->value().size());
-        
+
+#ifdef WIN32
         n64timeStart4 = GetTimeMillis(); 
         nDelta4 += (n64timeStart4 - n64timeStart3);
-
+#endif
         string 
             strType;
 
@@ -467,20 +473,23 @@ bool CTxDB::LoadBlockIndex()
         if (fRequestShutdown || strType != "blockindex")
             break;
         
+#ifdef WIN32
         n64timeStart5 = GetTimeMillis(); 
         nDelta5 += (n64timeStart5 - n64timeStart4);
-
+#endif
         CDiskBlockIndex 
             diskindex;
 
+#ifdef WIN32
         n64timeStart6 = GetTimeMillis(); 
         nDelta6 += (n64timeStart6 - n64timeStart5);
-
+#endif
         ssValue >> diskindex;
 
+#ifdef WIN32
         n64timeStart7 = GetTimeMillis(); 
         nDelta7 += (n64timeStart7 - n64timeStart6);
-
+#endif
         uint256 
             blockHash = diskindex.GetBlockHash();   // the slow poke!
 
@@ -497,9 +506,10 @@ bool CTxDB::LoadBlockIndex()
 
         }
 
+#ifdef WIN32
         n64timeStart8 = GetTimeMillis(); 
         nDelta8 += (n64timeStart8 - n64timeStart7);
-
+#endif
         // Construct block index object
         CBlockIndex
             * pindexNew    = InsertBlockIndex(blockHash);
@@ -517,14 +527,16 @@ bool CTxDB::LoadBlockIndex()
         }
         pindexNew->pprev          = InsertBlockIndex(diskindex.hashPrev);
 
+#ifdef WIN32
         n64timeStart9 = GetTimeMillis(); 
         nDelta9 += (n64timeStart9 - n64timeStart8);
-
+#endif
         pindexNew->pnext          = InsertBlockIndex(diskindex.hashNext);
 
+#ifdef WIN32
         n64timeStart10 = GetTimeMillis(); 
         nDelta10 += (n64timeStart10 - n64timeStart9);
-
+#endif
         pindexNew->nFile          = diskindex.nFile;
         pindexNew->nBlockPos      = diskindex.nBlockPos;
         pindexNew->nHeight        = diskindex.nHeight;
@@ -541,11 +553,12 @@ bool CTxDB::LoadBlockIndex()
         pindexNew->nBits          = diskindex.nBits;
         pindexNew->nNonce         = diskindex.nNonce;
 
+#ifdef WIN32
         n64timeStart11 = GetTimeMillis(); 
         nDelta11 += (n64timeStart11 - n64timeStart10);
 
         n64deltaT += n64timeStart11 - n64timeStart;
-
+#endif
         // Watch for genesis block
         if( 
             (0 == diskindex.nHeight) &&

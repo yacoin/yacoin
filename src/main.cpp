@@ -4364,9 +4364,13 @@ bool LoadBlockIndex(bool fAllowNew)
     
         uint256
             the_hash = block.GetHash();
-#ifdef _MSC_VER
-
 ////////////////////////////////////
+// This little section of code allows any node to create a genesis block
+// Is this too much?  Will this causes forks from block 0?
+// Or should only one node create a single block 0, and all others must 
+// use that one block 0?
+// if all block 0s created from this code are identical, then there should 
+// be no problem!
         ::uint32_t
             nCount = 0;
 		while( the_hash > the_target )
@@ -4389,7 +4393,6 @@ bool LoadBlockIndex(bool fAllowNew)
                 nCount
               );		
 ////////////////////////////////////
-#endif
 
         // debug print
         printf("block.GetHash() ==\n%s\n", the_hash.ToString().c_str());
