@@ -22,11 +22,11 @@ jobs:
       - uses: actions/upload-artifact@v1
         with:
           name: yacoind-ubuntu-18.04
-          path: /home/runner/work/yacoin/yacoin/src/yacoind
+          path: /home/runner/work/yacoin/yacoin/release/yacoind
       - uses: actions/upload-artifact@v1
         with:
           name: yacoin-qt-ubuntu-18.04
-          path: /home/runner/work/yacoin/yacoin/src/qt/yacoin-qt
+          path: /home/runner/work/yacoin/yacoin/release/yacoin-qt
   build-windows:
     runs-on: windows-latest  
     steps:
