@@ -43,5 +43,5 @@ jobs:
       - uses: actions/upload-artifact@v1
         with:
           name: yacoin-qt-windows
-          path: ./release/yacoin-qt
+          path: release/yacoin-qt.exe
     
