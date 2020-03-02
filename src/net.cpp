@@ -38,10 +38,10 @@
 #endif
 
 #ifdef USE_UPNP
-#include <miniupnpc.h>
+#include <miniupnpc/miniupnpc.h>
 //#include <miniwget.h> 
-#include <upnpcommands.h>
-#include <upnperrors.h>
+#include <miniupnpc/upnpcommands.h>
+#include <miniupnpc/upnperrors.h>
 #endif
 
 using namespace boost;
