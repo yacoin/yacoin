@@ -42,10 +42,6 @@ jobs:
         shell: cmd
       - uses: actions/upload-artifact@v1
         with:
-          name: yacoind-windows
-          path: ./src/yacoind
-      - uses: actions/upload-artifact@v1
-        with:
           name: yacoin-qt-windows
-          path: ./src/yacoin/qt/yacoin-qt
+          path: ./src/yacoin/release/yacoin-qt
     
