@@ -131,6 +131,11 @@ $(BITCOIND_BIN): FORCE
 $(BITCOIN_TEST_BIN): FORCE
 	$(MAKE) -C src $(@F)
 
+release: all-recursive
+	$(MKDIR_P) $(top_builddir)/release
+	$(STRIP) $(BITCOIND_BIN) -o $(top_builddir)/release/yacoind
+	$(STRIP) $(BITCOIN_QT_BIN) -o $(top_builddir)/release/yacoin-qt
+
 # $(BITCOIN_CLI_BIN): FORCE
 # 	$(MAKE) -C src $(@F)
 
