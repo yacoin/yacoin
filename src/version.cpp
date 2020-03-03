@@ -3,6 +3,8 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 // 0.4.9.02     8/27/2018 reordered CProvider aBTCtoYACProviders[] in price.cpp
+// 0.4.9.03     9/14/2018 allowed testnet solo mining
+// 0.4.9.04     9/28/2018 changed fUseOld044Rules to true for testnet testing of old code
 
 #include <string>
 
@@ -11,13 +13,17 @@
 #endif
 
 #define DISPLAY_VERSION_MAJOR       0
+<<<<<<< HEAD
 #define DISPLAY_VERSION_MINOR       4
 #define DISPLAY_VERSION_REVISION    9
-#define DISPLAY_VERSION_BUILD       02
-#define DISPLAY_VERSION_TESTING     1
+                                    // 5 for #define DEBUG_LOCKORDER
+                                    // 5 for #define DEBUG_LOCKORDER
+                                    // 6     20160 block length
+#define DISPLAY_VERSION_BUILD       2
+#define DISPLAY_VERSION_TESTING     01
+>>>>>>> ef7c8faba40da4338f099cdd999aa8b2aa53b371
 
 const int
-    DISPLAY_VERSION_MAJOR_for_Qt    = DISPLAY_VERSION_MAJOR   ,
     DISPLAY_VERSION_MINOR_for_Qt    = DISPLAY_VERSION_MINOR   ,
     DISPLAY_VERSION_REVISION_for_Qt = DISPLAY_VERSION_REVISION,
     DISPLAY_VERSION_BUILD_for_Qt    = DISPLAY_VERSION_BUILD   ,
@@ -29,13 +35,28 @@ const int
 // Name of client reported in the 'version' message. Report the same name
 // for both yacoind and yacoin-qt, to make it harder for attackers to
 // target servers or GUI users specifically.
-const std::string 
-#ifdef _MSC_VER
-    CLIENT_NAME("Yacoin-WM MSVC++");
-#else
-    CLIENT_NAME("Yacoin-WM");
-#endif
 
+// this is a TestNet only version
+const std::string 
+    #ifdef QT_GUI
+        #ifdef _MSC_VER
+            CLIENT_NAME("Yacoin-WM MSVC++ Qt");
+        #else
+            CLIENT_NAME("Yacoin-WM Qt");
+        #endif
+    #else
+        #ifdef _MSC_VER
+            CLIENT_NAME("Yacoin-WM MSVC++ daemon");
+        #else
+            CLIENT_NAME("Yacoin-WM daemon");
+        #endif
+    #endif
+//    #ifdef _MSC_VER
+//        CLIENT_NAME("Yacoin-WM MSVC++");
+//    #else
+//        CLIENT_NAME("Yacoin-WM");
+//    #endif
+//}
 // Client version number
 #ifdef USE_LEVELDB
 #define CLIENT_VERSION_SUFFIX   "-leveldb"

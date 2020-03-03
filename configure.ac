@@ -711,6 +711,7 @@ AC_CHECK_LIB([crypto],[RAND_egd],[],[
   )
 ])
 
+CRYPTO_CFLAGS="-DYac1dot0"
 CFLAGS_TEMP="$CFLAGS"
 LIBS_TEMP="$LIBS"
 CFLAGS="$CFLAGS $SSL_CFLAGS $CRYPTO_CFLAGS"
@@ -798,6 +799,7 @@ else
     if test x$use_upnp_default != xno; then
       use_upnp_default=yes
       upnp_setting=1
+      CRYPTO_CFLAGS="$CRYPTO_CFLAGS -DUSE_UPNP"
     fi
     AC_MSG_RESULT($use_upnp_default)
     AC_DEFINE_UNQUOTED([USE_UPNP],[$upnp_setting],[UPnP support not compiled if undefined, otherwise value (0 or 1) determines default state])

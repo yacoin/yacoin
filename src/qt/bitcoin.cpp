@@ -220,6 +220,7 @@ int main(int argc, char *argv[])
     if (GetBoolArg("-splash", true) && !GetBoolArg("-min"))
     {
         splash.show();
+        splash.move( 200, 200 );
         splash.setAutoFillBackground(true);
         splashref = &splash;
     }

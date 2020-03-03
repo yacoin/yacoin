@@ -38,14 +38,24 @@ extern "C" {
 #include "scrypt-jane/scrypt-jane.h"
 }
 
-#include "scrypt.h"
-#include "pbkdf2.h"
+#ifndef SCRYPT_H
+ #include "scrypt.h"
+#endif
 
-#include "util.h"
-//#include "net.h"
-#include "main.h"
+#ifndef PBKDF2_H
+ #include "pbkdf2.h"
+#endif
+
+#ifndef YACOIN_RANDOM_NONCE_H
+ #include "random_nonce.h"
+#endif
+
+#ifndef BITCOIN_MAIN_H
+ #include "main.h"
+#endif
 
 #define SCRYPT_BUFFER_SIZE (131072 + 63)
+//                          (1<<17) + ((1<<6) -1) representing what, exactly??????
 
 extern "C" void scrypt_core(unsigned int *X, unsigned int *V);
 
@@ -151,9 +161,11 @@ void scrypt_buffer_free(void *scratchpad)
     free(scratchpad);
 }
 
+//_____________________________________________________________________________
 unsigned int scanhash_scrypt(
+
                             block_header *pdata,
-                            ::uint32_t max_nonce, 
+                            //::uint32_t max_nonce, 
                             ::uint32_t &hash_count,
                             void *result, 
                             block_header *res_header, 
@@ -162,24 +174,58 @@ unsigned int scanhash_scrypt(
                             , uint256 *phashTarget
                             )
 {
-    hash_count = 0;
     const ::uint32_t
-        nArbitraryHashCount = 70;
+#ifdef _DEBUG
+        nTunedTo5seconds = 15;
+#else
+        nTunedTo5seconds = 100;
+#endif
+const ::uint32_t
+    NArbitraryHashCount = nTunedTo5seconds;   
+                                // this is a function of the actual hps, 
+                                // which will vary from cpu to cpu, etc.
+                                // trying for ~5 seconds, noting that
+                                // one minute is the average block period
+
+    //hash_count = 0;
     block_header 
         data = *pdata;
     ::uint32_t 
-        hash[8];
-    unsigned char 
-        *hashc = (unsigned char *) &hash;
-    ::uint32_t  // really any random uint32_t
-        n = (::uint32_t)GetRand( (::uint64_t)UINT_MAX );
+        hash[8],
+        &n = data.nonce;        // really any random uint32_t
+    uint256
+        nT = *phashTarget;
+    unsigned char
+      //hashTarget = (CBigNum().SetCompact(pdata->nBits)).getuint256(); // PoW hashTarget
+        //*pTestHash = (unsigned char *)&nPoWeasiestTargetLimitTestNet,
+        *hasht = (unsigned char *) &nT,
+        *hashc = (unsigned char *) &hash,
+      //highestZeroBitsSet = 0xe0;
+        nMask = 0x00,
+        highestZeroBitsSet = ~(hasht[ 31 ]),
+        nMaskPattern = 0x80;
+
+    while( 0x80 == ( 0x80 & highestZeroBitsSet) )
+    {
+        nMask |= nMaskPattern;
+        highestZeroBitsSet <<= 1;
+        nMaskPattern >>= 1;
+    }
+
+    highestZeroBitsSet <<= 1;
+#ifdef Yac1dot0
+    (void)printf(
+                 "test mask %02x\n"
+                 ""
+                 , nMask
+                );
+#endif
+    // here we should have already seeked to a random position in the file
     while (true) 
     {
-        if( UINT_MAX == n ) // not allowed as a nonce
-        {
-            ++n;
-        }
-        data.nonce = n;
+        //++n;
+        n = Big.get_a_nonce( n );
+        //data.nonce = n;
 
         scrypt(
                (const unsigned char*)&data, 
@@ -189,30 +235,34 @@ unsigned int scanhash_scrypt(
                Nfactor, 
                0, 
                0, 
-               (unsigned char*)hash, 
+               (unsigned char*)&hash, 
                32
               );
         ++hash_count;
-        if (
-            (   0 == (        hashc[31]))
-            && (0 == ( 0xfe & hashc[30]))
-            && (0 == ( 0xc0 & hashc[29]))
+        if (            
+            ( 0 == ( nMask & hashc[31]))
            ) 
         {
-            memcpy(result, hash, 32);
-            return data.nonce;
+            //memcpy(result, hash, 32);
+            //return data.nonce;
+            break;
         }
-        if( 0 == (hash_count % nArbitraryHashCount) )
-        {   // really we should hash for a while, then check
-            if (
-                (pindexPrev != pindexBest) ||
-                fShutdown
-               )
-                break;
+        if( 0 == (hash_count % NArbitraryHashCount) )
+        {               // really we should hash for a while, then check
+#ifdef Yac1dot0
+    #ifdef _DEBUG
+            (void)printf(
+                         "hash count is %d\n"
+                         ""
+                         , hash_count
+                        );
+    #endif
+#endif
+            break;
         }
-        ++n;
     }
-    return UINT_MAX;
+    memcpy(result, hash, 32);
+    return data.nonce;
 }
 #ifdef _MSC_VER
     #include "msvc_warnings.pop.h"
