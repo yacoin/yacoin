@@ -580,11 +580,11 @@ bool CheckStakeKernelHash(
             mapBlockIndex[blockFrom.GetHash()]->nHeight,
             DateTimeStrFormat(blockFrom.GetBlockTime()).c_str());
         printf(
-<<<<<<< HEAD
-            "CheckStakeKernelHash() : pass protocol=%s "
-=======
             "CheckStakeKernelHash () : pass protocol=%s "
+            "modifier=0x%016" PRIx64 " "
+            "nTimeBlockFrom=%u "
             "nTxPrevOffset=%u "
+            "nTimeTxPrev=%u "
             "nPrevout=%u "
             "nTimeTx=%u "
             "hashProof=%s"
@@ -875,12 +875,6 @@ bool CheckProofOfStake(const CTransaction& tx, unsigned int nBits, uint256& hash
 // Get stake modifier checksum
 uint32_t GetStakeModifierChecksum(const CBlockIndex* pindex)
 {
-<<<<<<< HEAD
-    Yassert(
-            pindex->pprev || 
-            pindex->GetBlockHash() == (!fTestNet ? hashGenesisBlock : hashGenesisBlockTestNet)
-           );
-=======
     if( 0 < pindex->nHeight )
     {
         Yassert( pindex->pprev );
@@ -889,7 +883,6 @@ uint32_t GetStakeModifierChecksum(const CBlockIndex* pindex)
     {
         Yassert( pindex->GetBlockHash() == (!fTestNet ? hashGenesisBlock : hashGenesisBlockTestNet) );
     }
->>>>>>> ef7c8faba40da4338f099cdd999aa8b2aa53b371
     // Hash previous checksum with flags, hashProofOfStake and nStakeModifier
     CDataStream ss(SER_GETHASH, 0);
     if (pindex->pprev)

@@ -23,10 +23,6 @@
  #include "Yassert.h"
 #endif
 
-#ifndef YACOIN_YASSERT_H
- #include "Yassert.h"
-#endif
-
 #ifndef BITCOIN_MRUSET_H
  #include "mruset.h"
 #endif

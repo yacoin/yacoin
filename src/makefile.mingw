@@ -1,7 +1,6 @@
 # Copyright (c) 2009-2010 Satoshi Nakamoto
 # Distributed under the MIT/X11 software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
-include $(YDIR)/sw/yconf
 
 CC ?= g++
 CXX ?= g++
@@ -277,9 +276,6 @@ obj/scrypt-arm.o : scrypt-arm.S
 obj/%.o: %.cpp $(HEADERS)
 	$(CXX) -c -frandom-seed=$@ $(CFLAGS) $(INCLUDEPATHS) -o $@ $<
 
-obj/scrypt-x86_64.o: scrypt-x86_64.S
-	$(CXX) -c -frandom-seed=$@ $(xCXXFLAGS) -MMD -o $@ $<
-
 yacoind.exe: $(OBJS:obj/%=obj/%)
 	$(CXX) $(CFLAGS) $(LDFLAGS) -o $@ $(LIBPATHS) $^ $(LIBS) -s
 	@echo	
@@ -301,11 +297,6 @@ obj-test/%.o: test/%.cpp $(HEADERS)
 
 test_yacoin.exe: $(TESTOBJS) $(filter-out obj/init.o,$(OBJS:obj/%=obj/%))
 	g++ $(CFLAGS) $(LDFLAGS) -o $@ $(LIBPATHS) $^ -lboost_unit_test_framework$(BOOST_SUFFIX) $(LIBS)
-
-obj/build.h: FORCE
-	sh ../share/genbuild.sh obj/build.h
-
-version.cpp: obj/build.h
 
 clean:
 	rm -f obj/*.d

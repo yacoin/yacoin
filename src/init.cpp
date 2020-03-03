@@ -57,8 +57,6 @@ bool fUseFastStakeMiner;
 bool fUseMemoryLog;
 enum Checkpoints::CPMode CheckpointsMode;
 
-static bool fExit;
-
 // Ping and address broadcast intervals
 extern ::int64_t nPingInterval;
 extern ::int64_t nBroadcastInterval;
@@ -76,11 +74,7 @@ void ExitTimeout(void* parg)
 //    ExitProcess(0);
 #endif
 }
-<<<<<<< HEAD
-    
-=======
 
->>>>>>> ef7c8faba40da4338f099cdd999aa8b2aa53b371
 #ifndef TESTS_ENABLED
 void StartShutdown()
 {
@@ -92,6 +86,8 @@ void StartShutdown()
     NewThread(Shutdown, NULL);
 #endif
 }
+static bool 
+    fExit;
 
 void Shutdown(void* parg)
 {
@@ -258,7 +254,7 @@ bool AppInit(int argc, char* argv[])
                                                 
                                                 // this is documentation!
 
-        if (mapArgs.count("-?") || mapArgs.count("-h") || mapArgs.count("--help"))
+        if (mapArgs.count("-?") || mapArgs.count("--h") || mapArgs.count("--help"))
         {
             // First part of help message is specific to yacoind / RPC client
             std::string strUsage = _("Yacoin version") + " " + FormatFullVersion() + "\n\n" +
@@ -275,7 +271,7 @@ bool AppInit(int argc, char* argv[])
             fRet = false;
             //Shutdown(NULL);
 #else
-            exit(0);
+            return false;
 #endif
         }
         else
@@ -425,6 +421,7 @@ std::string HelpMessage()
         "  -testnetnewlogicblocknumber=<number> " + _("New Logic starting at block = <number>") + "\n" +
         "  -debug                 " + _("Output extra debugging information. Implies all other -debug* options") + "\n" +
         "  -debugnet              " + _("Output extra network debugging information") + "\n" +
+        "  -logtimestamps         " + _("Prepend debug output with timestamp") + "\n" +
         "  -shrinkdebugfile       " + _("Shrink debug.log file on client startup (default: 1 when no -debug)") + "\n" +
         "  -printtoconsole        " + _("Send trace/debug info to console instead of debug.log file") + "\n" +
 #ifdef WIN32
@@ -663,6 +660,7 @@ bool AppInit2()
     fPrintToConsole = false;
 #endif
     fPrintToDebugger = GetBoolArg("-printtodebugger");
+    fLogTimestamps = GetBoolArg("-logtimestamps");
 
     if (mapArgs.count("-timeout"))
     {

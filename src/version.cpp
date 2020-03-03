@@ -13,17 +13,17 @@
 #endif
 
 #define DISPLAY_VERSION_MAJOR       0
-<<<<<<< HEAD
-#define DISPLAY_VERSION_MINOR       4
-#define DISPLAY_VERSION_REVISION    9
+#define DISPLAY_VERSION_MINOR       5
+#define DISPLAY_VERSION_REVISION    7
+                                    // 4 for new versioning to be more aligned with btc standards
                                     // 5 for #define DEBUG_LOCKORDER
                                     // 5 for #define DEBUG_LOCKORDER
                                     // 6     20160 block length
 #define DISPLAY_VERSION_BUILD       2
 #define DISPLAY_VERSION_TESTING     01
->>>>>>> ef7c8faba40da4338f099cdd999aa8b2aa53b371
 
 const int
+    DISPLAY_VERSION_MAJOR_for_Qt    = DISPLAY_VERSION_MAJOR   ,
     DISPLAY_VERSION_MINOR_for_Qt    = DISPLAY_VERSION_MINOR   ,
     DISPLAY_VERSION_REVISION_for_Qt = DISPLAY_VERSION_REVISION,
     DISPLAY_VERSION_BUILD_for_Qt    = DISPLAY_VERSION_BUILD   ,

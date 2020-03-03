@@ -73,15 +73,13 @@ CProvider aBTCtoYACProviders[] =
     };
 CProvider aCurrencyToBTCProviders[] = 
     {
-<<<<<<< HEAD
-        {   //http://api.coinmarketcap.com/v1/ticker/bitcoin/
-            "api.coinmarketcap.com",
+        {   //https://yobit.net/api/3/ticker/btc_usd
+            "yobit.net",
             "last",
+            "/api/3/ticker/btc_usd",
             nUnusualCharacterOffset,
             DEFAULT_HTTPS_PORT
         },
-<<<<<<< HEAD
-=======
         {   //https://api.coinmarketcap.com/v1/ticker/bitcoin/
             "api.coinmarketcap.com",
             "price_usd",
@@ -89,7 +87,6 @@ CProvider aCurrencyToBTCProviders[] =
             nSpecialCharacterOffset,
             DEFAULT_HTTPS_PORT
         },
->>>>>>> ef7c8faba40da4338f099cdd999aa8b2aa53b371
         {   //https://api.cryptonator.com/api/ticker/btc-usd "price", (3)
             "api.cryptonator.com", 
             "price", 

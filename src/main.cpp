@@ -3354,10 +3354,6 @@ bool CBlock::CheckBlock(bool fCheckPOW, bool fCheckMerkleRoot, bool fCheckSig) c
         if (GetBlockTime() > FutureDrift(GetAdjustedTime()))
             return error("CheckBlock () : block timestamp too far in the future");
 
-        // Check timestamp  06/04/2018 missing test in this 0.4.5-0.48 code.  Thanks Joe! ;>
-        if (GetBlockTime() > FutureDrift(GetAdjustedTime()))
-            return error("CheckBlock() : block timestamp too far in the future");
-
         // NovaCoin: check proof-of-stake block signature
         if (fCheckSig && !CheckBlockSignature())
         {
@@ -3483,11 +3479,11 @@ bool CBlock::AcceptBlock()
         (pindexPrev->nHeight > 1) && 
         ( (nMedianTimePast + nMaxOffset) < GetBlockTime() )
        )
-<<<<<<< HEAD
-        return error("AcceptBlock() : block's timestamp is too far in the future");
-=======
         return error("AcceptBlock () : block's timestamp is too far in the future");
+*******/
+    // Check that all transactions are finalized
     BOOST_FOREACH(const CTransaction& tx, vtx)
+        if (!tx.IsFinal(nHeight, GetBlockTime()))
             return DoS(10, error("AcceptBlock () : contains a non-final transaction"));
 
     // Check that the block chain matches the known block chain up to a checkpoint
@@ -4409,10 +4405,7 @@ bool LoadBlockIndex(bool fAllowNew)
                             hashGenesisMerkleRootMainNet
                                                )
               );
-<<<<<<< HEAD
-=======
         block.SignBlock(*pwalletMain);
->>>>>>> ef7c8faba40da4338f099cdd999aa8b2aa53b371
         block.print();
         Yassert(block.GetHash() == (!fTestNet ? hashGenesisBlock : hashGenesisBlockTestNet));
         Yassert(block.CheckBlock());

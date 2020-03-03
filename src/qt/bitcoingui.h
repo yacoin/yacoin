@@ -118,11 +118,6 @@ private:
     QAction *explorerActionNewMenu;
     QAction *explorerLaunch;
 
-    QAction *explorerActionButton;
-    //QAction *explorerActionOldMenu;
-    QAction *explorerActionNewMenu;
-    QAction *explorerLaunch;
-
     QSystemTrayIcon *trayIcon;
     Notificator *notificator;
     TransactionView *transactionView;

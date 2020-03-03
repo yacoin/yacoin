@@ -388,10 +388,10 @@ bool CTxDB::LoadBlockIndex()
         // seems to be slowing down??
         nREFRESH = 12000;
   #endif
-<<<<<<< HEAD
-=======
 #endif
+    int
         nMaxHeightGuess = 1,
+        nCounter = 0,
         nRefresh = nREFRESH;
     ::int64_t
         n64timeStart, 
@@ -645,11 +645,7 @@ bool CTxDB::LoadBlockIndex()
                             "%7d (%3.2f%%)"
                             "",
                             nCounter, //pindexNew->nHeight,
-<<<<<<< HEAD
-                            dEstimate > 100.0? 100.0: dEstimate
-=======
                             dEstimate >= 100.0? 100.0: dEstimate
->>>>>>> ef7c8faba40da4338f099cdd999aa8b2aa53b371
                                       );
             if (fPrintToConsole)
             {
