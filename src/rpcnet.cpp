@@ -34,23 +34,25 @@ Value getconnectioncount(const Array& params, bool fHelp)
         throw runtime_error(
             "getconnectioncount\n"
             "Returns the number of connections to other nodes.");
-
-    LOCK(cs_vNodes);
-    return (int)vNodes.size();
+    {{
+        LOCK(cs_vNodes);
+        return (int)vNodes.size();
+    }}
 }
 
 static void CopyNodeStats(std::vector<CNodeStats>& vstats)
 {
     vstats.clear();
-
-    LOCK(cs_vNodes);
-    vstats.reserve(vNodes.size());
-    BOOST_FOREACH(CNode* pnode, vNodes) 
-    {
-        CNodeStats stats;
-        pnode->copyStats(stats);
-        vstats.push_back(stats);
-    }
+    {{
+        LOCK(cs_vNodes);
+        vstats.reserve(vNodes.size());
+        BOOST_FOREACH(CNode* pnode, vNodes) 
+        {
+            CNodeStats stats;
+            pnode->copyStats(stats);
+            vstats.push_back(stats);
+        }
+    }}
 }
 
 struct addrManItemSort 
@@ -283,7 +285,8 @@ Value getaddednodeinfo(const Array& params, bool fHelp)
         }
 
     LOCK(cs_vNodes);
-    for (list<pair<string, vector<CService> > >::iterator it = laddedAddreses.begin(); it != laddedAddreses.end(); it++)
+  //for (list<pair<string, vector<CService> > >::iterator it = laddedAddreses.begin(); it != laddedAddreses.end(); it++)
+    for (list<pair<string, vector<CService> > >::iterator it = laddedAddreses.begin(); it != laddedAddreses.end(); ++it )
     {
         Object obj;
         obj.push_back(Pair("addednode", it->first));
@@ -363,11 +366,11 @@ Value sendalert(const Array& params, bool fHelp)
         throw runtime_error(
             "Failed to process alert.\n");
     // Relay alert
-    {
+    {{
         LOCK(cs_vNodes);
         BOOST_FOREACH(CNode* pnode, vNodes)
             alert.RelayTo(pnode);
-    }
+    }}
 
     Object result;
     result.push_back(Pair("strStatusBar", alert.strStatusBar));

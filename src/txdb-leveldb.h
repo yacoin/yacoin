@@ -6,6 +6,8 @@
 #ifndef BITCOIN_LEVELDB_H
 #define BITCOIN_LEVELDB_H
 
+#ifdef USE_LEVELDB
+
 #ifndef BITCOIN_MAIN_H
  #include "main.h"
 #endif
@@ -246,5 +248,5 @@ public:
     bool LoadBlockIndex();
 };
 
-
+#endif
 #endif // BITCOIN_DB_H

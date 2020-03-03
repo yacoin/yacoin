@@ -270,7 +270,11 @@ bool CTxDB::LoadBlockIndex()
                 if (ReadTxIndex(hashTx, txindex))
                 {
                     // check level 3: checker transaction hashes
-                    if (nCheckLevel>2 || pindex->nFile != txindex.pos.nFile || pindex->nBlockPos != txindex.pos.nBlockPos)
+                    if (
+                        nCheckLevel>2 || 
+                        pindex->nFile != txindex.pos.Get_CDiskTxPos_nFile() || 
+                        pindex->nBlockPos != txindex.pos.Get_CDiskTxPos_nBlockPos()
+                       )
                     {
                         // either an error or a duplicate transaction
                         CTransaction txFound;
@@ -294,7 +298,7 @@ bool CTxDB::LoadBlockIndex()
                         {
                             if (!txpos.IsNull())
                             {
-                                pair<unsigned int, unsigned int> posFind = make_pair(txpos.nFile, txpos.nBlockPos);
+                                pair<unsigned int, unsigned int> posFind = make_pair(txpos.Get_CDiskTxPos_nFile(), txpos.Get_CDiskTxPos_nBlockPos());
                                 if (!mapBlockPos.count(posFind))
                                 {
                                     printf("LoadBlockIndex(): *** found bad spend at %d, hashBlock=%s, hashTx=%s\n", pindex->nHeight, pindex->GetBlockHash().ToString().c_str(), hashTx.ToString().c_str());
