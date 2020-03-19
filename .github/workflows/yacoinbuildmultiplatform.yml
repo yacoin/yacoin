@@ -11,6 +11,8 @@ jobs:
         run: |
           docker pull dev34253/yacoin-build:ubuntu.16.04
           docker run -v /home/runner/work/yacoin/yacoin:/src dev34253/yacoin-build:ubuntu.16.04
+          cd test
+          python3 test_runner.py feature_help
   build-ubuntu-1804:
     runs-on: ubuntu-latest  
     steps:
