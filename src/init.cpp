@@ -236,8 +236,7 @@ bool AppInit(int argc, char* argv[])
         //
         // If Qt is used, parameters/bitcoin.conf are parsed in qt/bitcoin.cpp's main()
         ParseParameters(argc, argv);
-        bool 
-            fTest_or_Main_Net_is_decided = false;
+        bool fTest_or_Main_Net_is_decided = false;
 
         if (!boost::filesystem::is_directory(GetDataDir(fTest_or_Main_Net_is_decided)))
         {
@@ -251,10 +250,12 @@ bool AppInit(int argc, char* argv[])
                                                 // the configuration file.
                                                 // this means that fTestNet should be tested 
                                                 // first, before GetDataDir() is called next
-                                                
                                                 // this is documentation!
-
-        if (mapArgs.count("-?") || mapArgs.count("--h") || mapArgs.count("--help"))
+        if(mapArgs.count("-version") || mapArgs.count("-v")){
+            std::string msg = "Yacoin version: " + FormatFullVersion() + "\n\n";
+            fprintf(stdout, "%s", msg.c_str());
+            exit(0);
+        } else if (mapArgs.count("-?") || mapArgs.count("-h") || mapArgs.count("--help"))
         {
             // First part of help message is specific to yacoind / RPC client
             std::string strUsage = _("Yacoin version") + " " + FormatFullVersion() + "\n\n" +
@@ -269,9 +270,8 @@ bool AppInit(int argc, char* argv[])
             fprintf(stdout, "%s", strUsage.c_str());
 #ifdef _MSC_VER
             fRet = false;
-            //Shutdown(NULL);
 #else
-            return false;
+            exit(0);
 #endif
         }
         else
@@ -367,6 +367,7 @@ std::string HelpMessage()
 {
     string strUsage = _("Options:") + "\n" +
         "  -?                     " + _("This help message") + "\n" +
+        "  -v                     " + _("Yacoin version") + "\n" +
         "  -conf=<file>           " + _("Specify configuration file (default: yacoin.conf)") + "\n" +
         "  -pid=<file>            " + _("Specify pid file (default: yacoind.pid)") + "\n" +
         "  -datadir=<dir>         " + _("Specify data directory") + "\n" +
