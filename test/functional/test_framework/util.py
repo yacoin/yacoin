@@ -308,17 +308,21 @@ def initialize_datadir(dirname, n, chain):
     else:
         chain_name_conf_arg = chain
         chain_name_conf_section = chain
-    with open(os.path.join(datadir, "bitcoin.conf"), 'w', encoding='utf8') as f:
-        f.write("{}=1\n".format(chain_name_conf_arg))
-        f.write("[{}]\n".format(chain_name_conf_section))
+    with open(os.path.join(datadir, "yacoin.conf"), 'w', encoding='utf8') as f:
+        # f.write("{}=1\n".format(chain_name_conf_arg))
+        # f.write("[{}]\n".format(chain_name_conf_section))
+        f.write("rpcuser=yacoinuser\n")
+        f.write("rpcpassword=yacoinpwd\n")
         f.write("port=" + str(p2p_port(n)) + "\n")
         f.write("rpcport=" + str(rpc_port(n)) + "\n")
-        f.write("fallbackfee=0.0002\n")
+        f.write("rpcpallowip=127.0.0.1\n")
+        f.write("checkblocks=8\n")
+        f.write("irc=0\n")
         f.write("server=1\n")
-        f.write("keypool=1\n")
+        f.write("daemon=0\n")
+        # f.write("keypool=1\n")
         f.write("discover=0\n")
         f.write("dnsseed=0\n")
-        f.write("listenonion=0\n")
         f.write("printtoconsole=0\n")
         f.write("upnp=0\n")
         f.write("shrinkdebugfile=0\n")
@@ -330,15 +334,15 @@ def get_datadir_path(dirname, n):
     return os.path.join(dirname, "node" + str(n))
 
 def append_config(datadir, options):
-    with open(os.path.join(datadir, "bitcoin.conf"), 'a', encoding='utf8') as f:
+    with open(os.path.join(datadir, "yacoin.conf"), 'a', encoding='utf8') as f:
         for option in options:
             f.write(option + "\n")
 
 def get_auth_cookie(datadir, chain):
     user = None
     password = None
-    if os.path.isfile(os.path.join(datadir, "bitcoin.conf")):
-        with open(os.path.join(datadir, "bitcoin.conf"), 'r', encoding='utf8') as f:
+    if os.path.isfile(os.path.join(datadir, "yacoin.conf")):
+        with open(os.path.join(datadir, "yacoin.conf"), 'r', encoding='utf8') as f:
             for line in f:
                 if line.startswith("rpcuser="):
                     assert user is None  # Ensure that there is only one rpcuser line

@@ -581,10 +581,10 @@ bool AppInit2()
     {
         SoftSetBoolArg("-irc", true);
     }
-    else    // not Test Net
-    {
-        return InitError( _("Yac1.0 must be set for testNet.") );
-    }
+    // else    // not Test Net
+    // {
+    //     return InitError( _("Yac1.0 must be set for testNet.") );
+    // }
 
     if (mapArgs.count("-bind")) {
         // when specifying an explicit binding address, you want to listen on it

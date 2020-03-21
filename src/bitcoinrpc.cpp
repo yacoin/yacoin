@@ -883,12 +883,16 @@ void JSONRequest::parse(const Value& valRequest)
 
     // Parse params
     Value valParams = find_value(request, "params");
-    if (valParams.type() == array_type)
+    if (valParams.type() == array_type) {
         params = valParams.get_array();
-    else if (valParams.type() == null_type)
+    } else if (valParams.type() == null_type) {
         params = Array();
-    else
+    } else if (valParams.type() == obj_type) {
+        params = Array();
+        params.push_back(valParams);
+    } else {
         throw JSONRPCError(RPC_INVALID_REQUEST, "Params must be an array");
+    }
 }
 
 static Object JSONRPCExecOne(const Value& req)
