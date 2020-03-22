@@ -1384,8 +1384,8 @@ CBigNum inline GetProofOfStakeLimit(int nHeight, unsigned int nTime)
         // Default: nEpochInterval = 21000 blocks, recalculated with each epoch
         if (pindexBest->nHeight % nEpochInterval == 0)
         {
-            // // recalculated
-                // PoW reward is 2%
+            // recalculated
+            // PoW reward is 2%
             nBlockRewardExcludeFees = (::int64_t)
                 (
                 (pindexBest->pprev? pindexBest->pprev->nMoneySupply:
@@ -3258,7 +3258,7 @@ bool CBlock::AddToBlockIndex(unsigned int nFile, unsigned int nBlockPos)
         pindexNew->nBlockRewardExcludeFees = (nSimulatedMOneySupplyAtFork /
                                               nNumberOfBlocksPerYear) *
                                               nInflation;
-        pindexNew->nMoneySupply = pindexNew->nMint = nSimulatedMOneySupplyAtFork + pindexNew->nBlockRewardExcludeFees;
+        pindexNew->nMoneySupply = pindexNew->nMint = nSimulatedMOneySupplyAtFork;
     }
     // Write to disk block index
     CTxDB txdb;
