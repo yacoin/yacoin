@@ -3255,9 +3255,6 @@ bool CBlock::AddToBlockIndex(unsigned int nFile, unsigned int nBlockPos)
 
     if( 0 == pindexNew->nHeight )
     {
-        pindexNew->nBlockRewardExcludeFees = (nSimulatedMOneySupplyAtFork /
-                                              nNumberOfBlocksPerYear) *
-                                              nInflation;
         pindexNew->nMoneySupply = pindexNew->nMint = nSimulatedMOneySupplyAtFork;
     }
     // Write to disk block index
