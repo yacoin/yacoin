@@ -1364,7 +1364,16 @@ CBigNum inline GetProofOfStakeLimit(int nHeight, unsigned int nTime)
 
 ::int64_t GetMaxSize(enum GetMaxSize_mode mode)
 {
-    ::int64_t nMaxSize = GetProofOfWorkReward() / MIN_TX_FEE;
+    ::int64_t nMaxSize = 0;
+    if (pindexGenesisBlock == NULL)
+    {
+        nMaxSize = MAX_GENESIS_BLOCK_SIZE;
+    }
+    else
+    {
+        nMaxSize = GetProofOfWorkReward() / MIN_TX_FEE;
+    }
+
     switch (mode)
     {
         case MAX_BLOCK_SIZE_GEN:
