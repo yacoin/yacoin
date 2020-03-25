@@ -202,10 +202,10 @@ CBlock* CreateNewBlock(CWallet* pwallet, bool fProofOfStake)
 
     // Largest block you're willing to create:
     unsigned int 
-        nBlockMaxSize = GetArg("-blockmaxsize", MAX_BLOCK_SIZE_GEN/2);
+        nBlockMaxSize = GetArg("-blockmaxsize", GetMaxSize(MAX_BLOCK_SIZE_GEN)/2);
 
     // Limit to betweeen 1K and MAX_BLOCK_SIZE-1K for sanity:
-    nBlockMaxSize = std::max((unsigned int)1000, std::min((unsigned int)(MAX_BLOCK_SIZE-1000), nBlockMaxSize));
+    nBlockMaxSize = std::max((unsigned int)1000, std::min((unsigned int)(GetMaxSize(MAX_BLOCK_SIZE)-1000), nBlockMaxSize));
 
     // How much of the block should be dedicated to high-priority transactions,
     // included regardless of the fees they pay
@@ -448,7 +448,7 @@ CBlock* CreateNewBlock(CWallet* pwallet, bool fProofOfStake)
                 // Legacy limits on sigOps:
                 unsigned int 
                     nTxSigOps = tx.GetLegacySigOpCount();
-                if (nBlockSigOps + nTxSigOps >= MAX_BLOCK_SIGOPS)
+                if (nBlockSigOps + nTxSigOps >= GetMaxSize(MAX_BLOCK_SIGOPS))
                     continue;
 
                 // Timestamp limit
@@ -502,7 +502,7 @@ CBlock* CreateNewBlock(CWallet* pwallet, bool fProofOfStake)
                     continue;
 
                 nTxSigOps += tx.GetP2SHSigOpCount(mapInputs);
-                if ((nBlockSigOps + nTxSigOps) >= MAX_BLOCK_SIGOPS)
+                if ((nBlockSigOps + nTxSigOps) >= GetMaxSize(MAX_BLOCK_SIGOPS))
                     continue;
 
                 if (!tx.ConnectInputs(txdb, mapInputs, mapTestPoolTmp, CDiskTxPos(1,1,1), pindexPrev, false, true))
@@ -691,7 +691,7 @@ CBlock* CreateNewBlock(CWallet* pwallet, bool fProofOfStake)
 
             // Legacy limits on sigOps:
             unsigned int nTxSigOps = tx.GetLegacySigOpCount();
-            if (nBlockSigOps + nTxSigOps >= MAX_BLOCK_SIGOPS)
+            if (nBlockSigOps + nTxSigOps >= GetMaxSize(MAX_BLOCK_SIGOPS))
                 continue;
 
             // Timestamp limit
@@ -733,7 +733,7 @@ CBlock* CreateNewBlock(CWallet* pwallet, bool fProofOfStake)
                 continue;
 
             nTxSigOps += tx.GetP2SHSigOpCount(mapInputs);
-            if (nBlockSigOps + nTxSigOps >= MAX_BLOCK_SIGOPS)
+            if (nBlockSigOps + nTxSigOps >= GetMaxSize(MAX_BLOCK_SIGOPS))
                 continue;
 
             if (!tx.ConnectInputs(txdb, mapInputs, mapTestPoolTmp, CDiskTxPos(1,1,1), pindexPrev, false, true, true, MANDATORY_SCRIPT_VERIFY_FLAGS))

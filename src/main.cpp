@@ -674,7 +674,7 @@ bool CTransaction::CheckTransaction() const
     if (vout.empty())
         return DoS(10, error("CTransaction::CheckTransaction() : vout empty"));
     // Size limits
-    if (::GetSerializeSize(*this, SER_NETWORK, PROTOCOL_VERSION) > MAX_BLOCK_SIZE)
+    if (::GetSerializeSize(*this, SER_NETWORK, PROTOCOL_VERSION) > GetMaxSize(MAX_BLOCK_SIZE))
         return DoS(100, error("CTransaction::CheckTransaction() : size limits failed"));
 
     // Check for negative or overflow output values
@@ -767,9 +767,9 @@ bool CTransaction::CheckTransaction() const
             nMinFee += nBaseFee;
 
     // Raise the price as the block approaches full
-    if (nBlockSize != 1 && nNewBlockSize >= MAX_BLOCK_SIZE_GEN/2)
+    if (nBlockSize != 1 && nNewBlockSize >= GetMaxSize(MAX_BLOCK_SIZE_GEN)/2)
     {
-        if (nNewBlockSize >= MAX_BLOCK_SIZE_GEN)
+        if (nNewBlockSize >= GetMaxSize(MAX_BLOCK_SIZE_GEN))
             return MAX_MONEY;
         nMinFee *= MAX_BLOCK_SIZE_GEN / (MAX_BLOCK_SIZE_GEN - nNewBlockSize);
     }
@@ -1436,6 +1436,30 @@ CBigNum inline GetProofOfStakeLimit(int nHeight, unsigned int nTime)
         printf("GetProofOfWorkReward() : create=%s nBits=0x%08x nSubsidy=%" PRId64 "\n", FormatMoney(nSubsidy).c_str(), nBits, nSubsidy);
 
     return min(nSubsidy, MAX_MINT_PROOF_OF_WORK) + nFees;
+}
+
+::int64_t GetMaxSize(enum GetMaxSize_mode mode)
+{
+    ::int64_t nMaxSize = GetProofOfWorkReward() / MIN_TX_FEE;
+    switch (mode)
+    {
+        case MAX_BLOCK_SIZE_GEN:
+            nMaxSize /= 2;
+            break;
+
+        case MAX_BLOCK_SIGOPS:
+            nMaxSize /= 50;
+            break;
+
+        case MAX_ORPHAN_TRANSACTIONS:
+            nMaxSize /= 100;
+            break;
+
+        case MAX_BLOCK_SIZE:
+        default:
+            break;
+    }
+    return nMaxSize;
 }
 
 // ppcoin: miner's coin stake is rewarded based on coin age spent (coin-days)
@@ -2756,7 +2780,7 @@ bool CBlock::ConnectBlock(CTxDB& txdb, CBlockIndex* pindex, bool fJustCheck)
         }
 
         nSigOps += tx.GetLegacySigOpCount();
-        if (nSigOps > MAX_BLOCK_SIGOPS)
+        if (nSigOps > GetMaxSize(MAX_BLOCK_SIGOPS))
             return DoS(100, error("ConnectBlock() : too many sigops"));
 
         CDiskTxPos posThisTx(pindex->nFile, pindex->nBlockPos, nTxPos);
@@ -2776,7 +2800,7 @@ bool CBlock::ConnectBlock(CTxDB& txdb, CBlockIndex* pindex, bool fJustCheck)
             // this is to prevent a "rogue miner" from creating
             // an incredibly-expensive-to-validate block.
             nSigOps += tx.GetP2SHSigOpCount(mapInputs);
-            if (nSigOps > MAX_BLOCK_SIGOPS)
+            if (nSigOps > GetMaxSize(MAX_BLOCK_SIGOPS))
                 return DoS(100, error("ConnectBlock() : too many sigops"));
 
             ::int64_t nTxValueIn = tx.GetValueIn(mapInputs);
@@ -3312,7 +3336,7 @@ bool CBlock::CheckBlock(bool fCheckPOW, bool fCheckMerkleRoot, bool fCheckSig) c
         nSigOps = 0; // total sigops
 
     // Size limits
-    if (vtx.empty() || vtx.size() > MAX_BLOCK_SIZE || ::GetSerializeSize(*this, SER_NETWORK, PROTOCOL_VERSION) > MAX_BLOCK_SIZE)
+    if (vtx.empty() || vtx.size() > GetMaxSize(MAX_BLOCK_SIZE) || ::GetSerializeSize(*this, SER_NETWORK, PROTOCOL_VERSION) > GetMaxSize(MAX_BLOCK_SIZE))
         return DoS(100, error("CheckBlock () : size limits failed"));
 
     bool fProofOfStake = IsProofOfStake();
@@ -3424,7 +3448,7 @@ bool CBlock::CheckBlock(bool fCheckPOW, bool fCheckMerkleRoot, bool fCheckSig) c
         return DoS(100, error("CheckBlock () : duplicate transaction"));
 
     // Reject block if validation would consume too much resources.
-    if (nSigOps > MAX_BLOCK_SIGOPS)
+    if (nSigOps > GetMaxSize(MAX_BLOCK_SIGOPS))
         return DoS(100, error("CheckBlock () : out-of-bounds SigOpCount"));
 
     // Check merkle root
@@ -4588,7 +4612,7 @@ bool LoadExternalBlockFile(FILE* fileIn)
                 unsigned int nSize;
                 blkdat >> nSize;
                 if (
-                    (nSize > 0) && (nSize <= MAX_BLOCK_SIZE)
+                    (nSize > 0) && (nSize <= GetMaxSize(MAX_BLOCK_SIZE))
                    )
                 {
                     CBlock block;
@@ -5453,7 +5477,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
             AddOrphanTx(tx);
 
             // DoS prevention: do not allow mapOrphanTransactions to grow unbounded
-            unsigned int nEvicted = LimitOrphanTxSize(MAX_ORPHAN_TRANSACTIONS);
+            unsigned int nEvicted = LimitOrphanTxSize(GetMaxSize(MAX_ORPHAN_TRANSACTIONS));
             if (nEvicted > 0)
                 printf("mapOrphan overflow, removed %u tx\n", nEvicted);
         }

@@ -1943,7 +1943,7 @@ bool CWallet::CreateTransaction(const vector<pair<CScript, int64_t> >& vecSend, 
 
                 // Limit size
                 unsigned int nBytes = ::GetSerializeSize(*(CTransaction*)&wtxNew, SER_NETWORK, PROTOCOL_VERSION);
-                if (nBytes >= (2*MAX_BLOCK_SIZE_GEN/3) )    // was MAX_BLOCK_SIZE_GEN/5 why????????????
+                if (nBytes >= (2*GetMaxSize(MAX_BLOCK_SIZE_GEN)/3) )    // was MAX_BLOCK_SIZE_GEN/5 why????????????
                     return false;
                 dPriority /= nBytes;
 
@@ -2090,7 +2090,7 @@ bool CWallet::MergeCoins(const int64_t& nAmount, const int64_t& nMinValue, const
         int64_t nMinFee = wtxNew.GetMinFee(1, fAllowFree, GMF_SEND, nBytes);
 
         // Prepare transaction for commit if sum is enough ot its size is too big
-        if (nBytes >= MAX_BLOCK_SIZE_GEN/6 || wtxNew.vout[0].nValue >= nOutputValue)
+        if (nBytes >= GetMaxSize(MAX_BLOCK_SIZE_GEN)/6 || wtxNew.vout[0].nValue >= nOutputValue)
         {
             wtxNew.vout[0].nValue -= nMinFee; // Set actual fee
 
@@ -2539,7 +2539,7 @@ bool CWallet::CreateCoinStake(
         unsigned int 
             nBytes = ::GetSerializeSize(txNew, SER_NETWORK, PROTOCOL_VERSION);
 
-        if (nBytes >= MAX_BLOCK_SIZE_GEN/5)
+        if (nBytes >= GetMaxSize(MAX_BLOCK_SIZE_GEN)/5)
             return error("CreateCoinStake : exceeded coinstake size limit");
 
         // Check enough fee is paid
@@ -2816,7 +2816,7 @@ bool CWallet::CreateCoinStake(
 
         // Limit size
         unsigned int nBytes = ::GetSerializeSize(txNew, SER_NETWORK, PROTOCOL_VERSION);
-        if (nBytes >= MAX_BLOCK_SIZE_GEN/5)
+        if (nBytes >= GetMaxSize(MAX_BLOCK_SIZE_GEN)/5)
             return error("CreateCoinStake : exceeded coinstake size limit");
 
         // Check enough fee is paid
