@@ -733,6 +733,11 @@ bool CTransaction::CheckTransaction() const
         nMinFee = nMinTxFee * (double(nBytes) / 1000.0);
         return nMinFee;
     }
+    else (mode == GMF_RELAY)
+    {
+        nMinFee = nMinRelayTxFee * (double(nBytes) / 1000.0);
+        return nMinFee;
+    }
 
     // Base fee is either nMinTxFee or nMinRelayTxFee
     ::int64_t nBaseFee = (mode == GMF_RELAY) ? nMinRelayTxFee : nMinTxFee;
@@ -871,36 +876,11 @@ bool CTxMemPool::accept(CTxDB& txdb, CTransaction &tx, bool fCheckInputs,
         unsigned int nSize = ::GetSerializeSize(tx, SER_NETWORK, PROTOCOL_VERSION);
 
         // Don't accept it if it can't get into a block
-        ::int64_t txMinFee = tx.GetMinFee(1000, true, GMF_RELAY, nSize);
+        ::int64_t txMinFee = tx.GetMinFee(1000, false, GMF_RELAY, nSize);
         if (nFees < txMinFee)
             return error("CTxMemPool::accept() : not enough fees %s, %" PRId64 " < %" PRId64,
                          hash.ToString().c_str(),
                          nFees, txMinFee);
-
-        // Continuously rate-limit free transactions
-        // This mitigates 'penny-flooding' -- sending thousands of free transactions just to
-        // be annoying or make others' transactions take longer to confirm.
-        if (nFees < MIN_RELAY_TX_FEE)
-        {
-            static CCriticalSection cs;
-            static double dFreeCount;
-            static ::int64_t nLastTime;
-            ::int64_t nNow = GetTime();
-
-            {
-                LOCK(cs);
-                // Use an exponentially decaying ~10-minute window:
-                dFreeCount *= pow(1.0 - 1.0/600.0, (double)(nNow - nLastTime));
-                nLastTime = nNow;
-                // -limitfreerelay unit is thousand-bytes-per-minute
-                // At default rate it would take over a month to fill 1GB
-                if (dFreeCount > GetArg("-limitfreerelay", 15)*10*1000 && !IsFromMe(tx))
-                    return error("CTxMemPool::accept() : free transaction rejected by rate limiter");
-                if (fDebug)
-                    printf("Rate limit dFreeCount: %g => %g\n", dFreeCount, dFreeCount+nSize);
-                dFreeCount += nSize;
-            }
-        }
 
         // Check against previous transactions
         // This is done last to help prevent CPU exhaustion denial-of-service attacks.
