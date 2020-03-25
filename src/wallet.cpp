@@ -1949,7 +1949,7 @@ bool CWallet::CreateTransaction(const vector<pair<CScript, int64_t> >& vecSend, 
                 // 1) Set with option "paytxfee" in yacoin.conf
                 // 2) Set with rpc command "settxfee"
                 int64_t nPayFee = nTransactionFee * (1 + (int64_t)nBytes / 1000);
-                int64_t nMinFee = wtxNew.GetMinFee(1, false, GMF_SEND, nBytes);
+                int64_t nMinFee = wtxNew.GetMinFee(nBytes);
 
                 printf("TACA ===> CWallet::CreateTransaction, nBytes = %d, "
                        "nPayFee = %ld, "
@@ -2086,7 +2086,7 @@ bool CWallet::MergeCoins(const int64_t& nAmount, const int64_t& nMinValue, const
         int64_t nBytes = ::GetSerializeSize(*(CTransaction*)&wtxNew, SER_NETWORK, PROTOCOL_VERSION) + wtxNew.vin.size() * 110;
 
         // Get actual transaction fee according to its estimated size
-        int64_t nMinFee = wtxNew.GetMinFee(1, false, GMF_SEND, nBytes);
+        int64_t nMinFee = wtxNew.GetMinFee(nBytes);
 
         // Prepare transaction for commit if sum is enough ot its size is too big
         if (nBytes >= GetMaxSize(MAX_BLOCK_SIZE_GEN)/6 || wtxNew.vout[0].nValue >= nOutputValue)
@@ -2119,7 +2119,7 @@ bool CWallet::MergeCoins(const int64_t& nAmount, const int64_t& nMinValue, const
         int64_t nBytes = ::GetSerializeSize(*(CTransaction*)&wtxNew, SER_NETWORK, PROTOCOL_VERSION) + wtxNew.vin.size() * 110;
 
         // Get actual transaction fee according to its size and priority
-        int64_t nMinFee = wtxNew.GetMinFee(1, false, GMF_SEND, nBytes);
+        int64_t nMinFee = wtxNew.GetMinFee(nBytes);
 
         wtxNew.vout[0].nValue -= nMinFee; // Set actual fee
 
@@ -2539,9 +2539,9 @@ bool CWallet::CreateCoinStake(
             return error("CreateCoinStake : exceeded coinstake size limit");
 
         // Check enough fee is paid
-        if (nMinFee < txNew.GetMinFee() - MIN_TX_FEE)
+        if (nMinFee < txNew.GetMinFee(nBytes))
         {
-            nMinFee = txNew.GetMinFee() - MIN_TX_FEE;
+            nMinFee = txNew.GetMinFee(nBytes);
             continue; // try signing again
         }
         else
@@ -2816,9 +2816,9 @@ bool CWallet::CreateCoinStake(
             return error("CreateCoinStake : exceeded coinstake size limit");
 
         // Check enough fee is paid
-        if (nMinFee < txNew.GetMinFee(1, false, GMF_BLOCK, nBytes) - CENT)
+        if (nMinFee < txNew.GetMinFee(nBytes))
         {
-            nMinFee = txNew.GetMinFee(1, false, GMF_BLOCK, nBytes) - CENT;
+            nMinFee = txNew.GetMinFee(nBytes);
             continue; // try signing again
         }
         else

@@ -62,7 +62,7 @@ extern int
 static const unsigned int MAX_INV_SZ = 50000;
 
 static const ::int64_t MIN_TX_FEE = CENT;
-static const ::int64_t MIN_RELAY_TX_FEE = CENT/50;
+static const ::int64_t MIN_RELAY_TX_FEE = MIN_TX_FEE;
 
 static const ::int64_t MAX_MONEY = 2000000000 * COIN;
 static const ::int64_t MAX_MINT_PROOF_OF_WORK = 100 * COIN;
@@ -501,16 +501,6 @@ public:
     }
 };
 
-
-
-
-enum GetMinFee_mode
-{
-    GMF_BLOCK,
-    GMF_RELAY,
-    GMF_SEND,
-};
-
 typedef std::map<uint256, std::pair<CTxIndex, CTransaction> > MapPrevTx;
 
 /** The basic transaction that is broadcasted on the network and contained in
@@ -694,7 +684,7 @@ public:
         return dPriority > COIN * 144 / 250;
     }
 
-    ::int64_t GetMinFee(unsigned int nBlockSize=1, bool fAllowFree=false, enum GetMinFee_mode mode=GMF_BLOCK, unsigned int nBytes = 0) const;
+    ::int64_t GetMinFee(unsigned int nBytes = 0) const;
 
     bool ReadFromDisk(CDiskTxPos pos, FILE** pfileRet=NULL)
     {

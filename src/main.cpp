@@ -724,64 +724,9 @@ bool CTransaction::CheckTransaction() const
     return true;
 }
 
-::int64_t CTransaction::GetMinFee(unsigned int nBlockSize, bool fAllowFree, enum GetMinFee_mode mode, unsigned int nBytes) const
+::int64_t CTransaction::GetMinFee(unsigned int nBytes) const
 {
-    ::int64_t nMinFee = 0, nMinTxFee = MIN_TX_FEE, nMinRelayTxFee = MIN_RELAY_TX_FEE;
-
-    if (mode == GMF_SEND)
-    {
-        nMinFee = nMinTxFee * (double(nBytes) / 1000.0);
-        return nMinFee;
-    }
-    else (mode == GMF_RELAY)
-    {
-        nMinFee = nMinRelayTxFee * (double(nBytes) / 1000.0);
-        return nMinFee;
-    }
-
-    // Base fee is either nMinTxFee or nMinRelayTxFee
-    ::int64_t nBaseFee = (mode == GMF_RELAY) ? nMinRelayTxFee : nMinTxFee;
-
-    unsigned int nNewBlockSize = nBlockSize + nBytes;
-    nMinFee = (1 + (::int64_t)nBytes / 1000) * nBaseFee;
-
-    if (fAllowFree)
-    {
-        if (nBlockSize == 1)
-        {
-            // Transactions under 1K are free
-            if (nBytes < 1000)
-                nMinFee = 0;
-        }
-        else
-        {
-            // Free transaction area
-            if (nNewBlockSize < 27000)
-                nMinFee = 0;
-        }
-    }
-
-    // To limit dust spam, require additional MIN_TX_FEE/MIN_RELAY_TX_FEE for
-    //    each non empty output which is less than 0.01
-    //
-    // It's safe to ignore empty outputs here, because these inputs are allowed
-    //     only for coinbase and coinstake transactions.
-    BOOST_FOREACH(const CTxOut& txout, vout)
-        if (txout.nValue < CENT && !txout.IsEmpty())
-            nMinFee += nBaseFee;
-
-    // Raise the price as the block approaches full
-    if (nBlockSize != 1 && nNewBlockSize >= GetMaxSize(MAX_BLOCK_SIZE_GEN)/2)
-    {
-        if (nNewBlockSize >= GetMaxSize(MAX_BLOCK_SIZE_GEN))
-            return MAX_MONEY;
-        nMinFee *= MAX_BLOCK_SIZE_GEN / (MAX_BLOCK_SIZE_GEN - nNewBlockSize);
-    }
-
-    if (!MoneyRange(nMinFee))
-        nMinFee = MAX_MONEY;
-
-    return nMinFee;
+    return MIN_TX_FEE * (double(nBytes) / 1000.0);
 }
 
 
@@ -876,7 +821,7 @@ bool CTxMemPool::accept(CTxDB& txdb, CTransaction &tx, bool fCheckInputs,
         unsigned int nSize = ::GetSerializeSize(tx, SER_NETWORK, PROTOCOL_VERSION);
 
         // Don't accept it if it can't get into a block
-        ::int64_t txMinFee = tx.GetMinFee(1000, false, GMF_RELAY, nSize);
+        ::int64_t txMinFee = tx.GetMinFee(nSize);
         if (nFees < txMinFee)
             return error("CTxMemPool::accept() : not enough fees %s, %" PRId64 " < %" PRId64,
                          hash.ToString().c_str(),
@@ -2594,7 +2539,7 @@ bool CTransaction::ConnectInputs(
                                                             pindexBlock->nBits, 
                                                             nTime
                                                          ) - 
-                                    GetMinFee(1, false, GMF_BLOCK, nTxSize) + 
+                                    GetMinFee(nTxSize) +
                                     CENT;
 
             if (nReward > nCalculatedReward)
