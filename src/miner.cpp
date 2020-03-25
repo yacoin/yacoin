@@ -201,25 +201,7 @@ CBlock* CreateNewBlock(CWallet* pwallet, bool fProofOfStake)
     pblock->vtx.push_back(txNew);
 
     // Largest block you're willing to create:
-    unsigned int 
-        nBlockMaxSize = GetArg("-blockmaxsize", GetMaxSize(MAX_BLOCK_SIZE_GEN)/2);
-
-    // Limit to betweeen 1K and MAX_BLOCK_SIZE-1K for sanity:
-    nBlockMaxSize = std::max((unsigned int)1000, std::min((unsigned int)(GetMaxSize(MAX_BLOCK_SIZE)-1000), nBlockMaxSize));
-
-    // How much of the block should be dedicated to high-priority transactions,
-    // included regardless of the fees they pay
-    unsigned int 
-        nBlockPrioritySize = GetArg("-blockprioritysize", 27000);
-
-    nBlockPrioritySize = std::min(nBlockMaxSize, nBlockPrioritySize);
-
-    // Minimum block size you want to create; block will be filled with free transactions
-    // until there are no more or the block reaches this size:
-    unsigned int 
-        nBlockMinSize = GetArg("-blockminsize", 0);
-
-    nBlockMinSize = std::min(nBlockMaxSize, nBlockMinSize);
+    unsigned int nBlockMaxSize = GetMaxSize(MAX_BLOCK_SIZE);
 
     // Fee-per-kilobyte amount considered the same as "free"
     // Be careful setting this: if you set it to zero then
@@ -228,9 +210,6 @@ CBlock* CreateNewBlock(CWallet* pwallet, bool fProofOfStake)
     // cost to you of processing a transaction.
     int64_t 
         nMinTxFee = MIN_TX_FEE;
-
-    if (mapArgs.count("-mintxfee"))
-        ParseMoney(mapArgs["-mintxfee"], nMinTxFee);
 
     CBlockIndex
         * pindexPrev = pindexBest;
@@ -419,8 +398,12 @@ CBlock* CreateNewBlock(CWallet* pwallet, bool fProofOfStake)
                 nBlockTx = 0;
             int 
                 nBlockSigOps = 100;
+
+            // From yacoin 1.0.0, the order of transaction included to a block is
+            // based on FeePerKb by default. If FeePerKb are equal between transactions,
+            // coin-age could then take priority
             bool 
-                fSortedByFee = (nBlockPrioritySize <= 0);   // is usually 27,000
+                fSortedByFee = true;
 
             TxPriorityCompare 
                 comparer(fSortedByFee);
@@ -458,32 +441,9 @@ CBlock* CreateNewBlock(CWallet* pwallet, bool fProofOfStake)
                    )
                     continue;
 
-                // ppcoin: simplify transaction fee - allow free = false
-                ::int64_t 
-                    nMinFee = tx.GetMinFee(nBlockSize, false, GMF_BLOCK);
-
-                // Skip free transactions if we're past the minimum block size:
-                if (
-                    fSortedByFee && 
-                    (dFeePerKb < nMinTxFee) && 
-                    ((nBlockSize + nTxSize) >= nBlockMinSize)
-                   )
+                // Never include transactions with fee < min fee
+                if (dFeePerKb < nMinTxFee) // nMinTxFee = 0.01 YAC/kb
                     continue;
-
-                // Prioritize by fee once past the priority size or we run out of high-priority
-                // transactions:
-                if (
-                    !fSortedByFee &&
-                    (
-                     ((nBlockSize + nTxSize) >= nBlockPrioritySize) || 
-                     (dPriority < (COIN * 144 / 250))
-                    )
-                   )
-                {
-                    fSortedByFee = true;
-                    comparer = TxPriorityCompare(fSortedByFee);
-                    std::make_heap(vecPriority.begin(), vecPriority.end(), comparer);
-                }
 
                 // Connecting shouldn't fail due to dependency on other memory pool transactions
                 // because we're already processing them in order of dependency
@@ -498,8 +458,6 @@ CBlock* CreateNewBlock(CWallet* pwallet, bool fProofOfStake)
 
                 ::int64_t 
                     nTxFees = tx.GetValueIn(mapInputs)-tx.GetValueOut();
-                if (nTxFees < nMinFee)
-                    continue;
 
                 nTxSigOps += tx.GetP2SHSigOpCount(mapInputs);
                 if ((nBlockSigOps + nTxSigOps) >= GetMaxSize(MAX_BLOCK_SIGOPS))
@@ -669,7 +627,7 @@ CBlock* CreateNewBlock(CWallet* pwallet, bool fProofOfStake)
         uint64_t nBlockSize = 1000;
         uint64_t nBlockTx = 0;
         int nBlockSigOps = 100;
-        bool fSortedByFee = (nBlockPrioritySize <= 0);
+        bool fSortedByFee = true;
 
         TxPriorityCompare comparer(fSortedByFee);
         std::make_heap(vecPriority.begin(), vecPriority.end(), comparer);
@@ -698,27 +656,9 @@ CBlock* CreateNewBlock(CWallet* pwallet, bool fProofOfStake)
             if (tx.nTime > GetAdjustedTime() || (fProofOfStake && tx.nTime > pblock->vtx[0].nTime))
                 continue;
 
-            // Simplify transaction fee - allow free = false
-            int64_t nMinFee = tx.GetMinFee(nBlockSize, true, GMF_BLOCK, nTxSize);
-
-            // Skip free transactions if we're past the minimum block size:
-            if (fSortedByFee && (dFeePerKb < nMinTxFee) && (nBlockSize + nTxSize >= nBlockMinSize))
+            // Never include transactions with fee < min fee
+            if (dFeePerKb < nMinTxFee) // nMinTxFee = 0.01 YAC/kb
                 continue;
-
-            // Prioritize by fee once past the priority size or we run out of high-priority
-            // transactions:
-            if (
-                !fSortedByFee &&
-                (
-                 ((nBlockSize + nTxSize) >= nBlockPrioritySize) || 
-                 (dPriority < (COIN * 144 / 250))
-                )               // what is this double < some int64 / mean?
-               )
-            {
-                fSortedByFee = true;
-                comparer = TxPriorityCompare(fSortedByFee);
-                std::make_heap(vecPriority.begin(), vecPriority.end(), comparer);
-            }
 
             // Connecting shouldn't fail due to dependency on other memory pool transactions
             // because we're already processing them in order of dependency
@@ -729,8 +669,6 @@ CBlock* CreateNewBlock(CWallet* pwallet, bool fProofOfStake)
                 continue;
 
             int64_t nTxFees = tx.GetValueIn(mapInputs)-tx.GetValueOut();
-            if (nTxFees < nMinFee)
-                continue;
 
             nTxSigOps += tx.GetP2SHSigOpCount(mapInputs);
             if (nBlockSigOps + nTxSigOps >= GetMaxSize(MAX_BLOCK_SIGOPS))
