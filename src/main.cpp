@@ -726,20 +726,19 @@ bool CTransaction::CheckTransaction() const
 
 ::int64_t CTransaction::GetMinFee(unsigned int nBlockSize, bool fAllowFree, enum GetMinFee_mode mode, unsigned int nBytes) const
 {
-    ::int64_t nMinTxFee = MIN_TX_FEE, nMinRelayTxFee = MIN_RELAY_TX_FEE;
+    ::int64_t nMinFee = 0, nMinTxFee = MIN_TX_FEE, nMinRelayTxFee = MIN_RELAY_TX_FEE;
 
-    if(IsCoinStake())
+    if (mode == GMF_SEND)
     {
-        // Enforce 0.01 as minimum fee for old approach or coinstake
-        nMinTxFee = CENT;
-        nMinRelayTxFee = CENT;
+        nMinFee = nMinTxFee * (double(nBytes) / 1000.0);
+        return nMinFee;
     }
 
     // Base fee is either nMinTxFee or nMinRelayTxFee
     ::int64_t nBaseFee = (mode == GMF_RELAY) ? nMinRelayTxFee : nMinTxFee;
 
     unsigned int nNewBlockSize = nBlockSize + nBytes;
-    ::int64_t nMinFee = (1 + (::int64_t)nBytes / 1000) * nBaseFee;
+    nMinFee = (1 + (::int64_t)nBytes / 1000) * nBaseFee;
 
     if (fAllowFree)
     {
