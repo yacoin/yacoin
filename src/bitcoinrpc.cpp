@@ -855,10 +855,27 @@ public:
 
     JSONRequest() { id = Value::null; }
     void parse(const Value& valRequest);
+    void convertParameterObjectToArray(string method, Value& valParams);
 };
+
+void JSONRequest::convertParameterObjectToArray(string method, Value& valParams){
+    printf("rpc.convert\n");
+    params = Array();
+    printf("Converting to array\n");
+    if(method == "importprivkey"){
+        printf("params privkey\n");
+        params.push_back(find_value(valParams.get_obj(), "privkey"));
+        printf("params label\n");
+        params.push_back(find_value(valParams.get_obj(), "label"));
+        printf("params done\n");
+    } else if (method == "getblockcount" || method == "getwalletinfo" || method == "stop") {
+        printf("params empty array\n");
+    }
+}
 
 void JSONRequest::parse(const Value& valRequest)
 {
+    printf("rpc.parse\n");
     // Parse request
     if (valRequest.type() != obj_type)
         throw JSONRPCError(RPC_INVALID_REQUEST, "Invalid Request object");
@@ -883,13 +900,12 @@ void JSONRequest::parse(const Value& valRequest)
 
     // Parse params
     Value valParams = find_value(request, "params");
-    if (valParams.type() == array_type) {
+    if(valParams.type() == obj_type) {
+        convertParameterObjectToArray(valMethod.get_str(), valParams);
+    } else if (valParams.type() == array_type) {
         params = valParams.get_array();
     } else if (valParams.type() == null_type) {
         params = Array();
-    } else if (valParams.type() == obj_type) {
-        params = Array();
-        params.push_back(valParams);
     } else {
         throw JSONRPCError(RPC_INVALID_REQUEST, "Params must be an array");
     }
@@ -1157,6 +1173,7 @@ static const CRPCCommand vRPCCommands[] =
 #ifdef WIN32
     { "getblockcountt",         &getcurrentblockandtime, true,   false },
 #endif
+    { "getwalletinfo",          &getwalletinfo,          true,  false },
     { "getyacprice",            &getYACprice,            true,   false },
     { "getconnectioncount",     &getconnectioncount,     true,   false },
     { "getaddrmaninfo",         &getaddrmaninfo,         true,   false },

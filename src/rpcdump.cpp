@@ -42,6 +42,7 @@ public:
 
 Value importprivkey(const Array& params, bool fHelp)
 {
+    printf("rpc.importprivkey\n");
     if (fHelp || params.size() < 1 || params.size() > 2)
         throw runtime_error(
             "importprivkey <yacoinprivkey> [label]\n"

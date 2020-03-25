@@ -182,8 +182,8 @@ class BitcoinTestFramework(metaclass=BitcoinTestMetaClass):
         self.config = config
         #self.options.bitcoind = os.getenv("BITCOIND", default=config["environment"]["BUILDDIR"] + '/src/bitcoind' + config["environment"]["EXEEXT"])
         #self.options.bitcoincli = os.getenv("BITCOINCLI", default=config["environment"]["BUILDDIR"] + '/src/bitcoin-cli' + config["environment"]["EXEEXT"])
-        self.options.bitcoind = os.getenv("BITCOIND", default='/yacoin/src/yacoind')
-        self.options.bitcoincli = os.getenv("BITCOINCLI", default='/yacoin/src/yacoin-cli')
+        self.options.bitcoind = os.getenv("BITCOIND", default='/home/art/projects/yacoin/dev34253/yacoin/src/yacoind')
+        self.options.bitcoincli = os.getenv("BITCOINCLI", default='/home/art/projects/yacoin/dev34253/yacoin/src/yacoin-cli')
 
         os.environ['PATH'] = os.pathsep.join([
             os.path.join(config['environment']['BUILDDIR'], 'src'),
@@ -486,7 +486,9 @@ class BitcoinTestFramework(metaclass=BitcoinTestMetaClass):
         sync_blocks(nodes or self.nodes, **kwargs)
 
     def sync_mempools(self, nodes=None, **kwargs):
-        sync_mempools(nodes or self.nodes, **kwargs)
+        # TODO sync mempools in Yacoin. Not now.
+        # sync_mempools(nodes or self.nodes, **kwargs)
+        pass
 
     def sync_all(self, nodes=None, **kwargs):
         self.sync_blocks(nodes, **kwargs)

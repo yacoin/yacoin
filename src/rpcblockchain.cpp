@@ -163,7 +163,7 @@ Object blockToJSON(const CBlock& block, const CBlockIndex* blockindex, bool fPri
 
 Value getbestblockhash(const Array& params, bool fHelp)
 {
-    if (fHelp || params.size() != 0)
+    if (fHelp)
         throw runtime_error(
             "getbestblockhash\n"
             "Returns the hash of the best block in the longest block chain.");
@@ -173,12 +173,40 @@ Value getbestblockhash(const Array& params, bool fHelp)
 
 Value getblockcount(const Array& params, bool fHelp)
 {
-    if (fHelp || params.size() != 0)
+    if (fHelp)
         throw runtime_error(
             "getblockcount\n"
             "Returns the number of blocks in the longest block chain.");
 
     return nBestHeight;
+}
+
+Value getwalletinfo(const Array& params, bool fHelp)
+{
+    printf("rpc.getwalletinfo\n");
+    if (fHelp)
+        throw runtime_error(
+            "getwalletinfo\n"
+            "Returns wallet information:\n"
+            "walletname\n"
+            "walletversion\n"
+            "balance\n"
+            "unconfirmed_balance\n"
+            "immature_balance\n"
+            "txcount\n"
+            "keypoololdest\n"
+            "keypoolsize\n");
+
+    Object obj;
+    obj.push_back(Pair("walletname", "YacoinWallet"));
+    obj.push_back(Pair("walletversion", (int)1));
+    obj.push_back(Pair("balance", (int)10));
+    obj.push_back(Pair("unconfirmed_balance",(int)1));
+    obj.push_back(Pair("immature_balance", (int)1));
+    obj.push_back(Pair("txcount", (int)1));
+    obj.push_back(Pair("keypoololdest", (int64_t)1));
+    obj.push_back(Pair("keypoolsize",   (int64_t)1));
+    return obj;
 }
 
 double doGetYACprice()
@@ -490,12 +518,7 @@ Value getdifficulty(const Array& params, bool fHelp)
     obj.push_back(Pair("proof-of-work",        GetDifficulty()));
     obj.push_back(Pair("proof-of-stake",       GetDifficulty(GetLastBlockIndex(pindexBest, true))));
     obj.push_back(Pair("search-interval",      (int)nLastCoinStakeSearchInterval));
-    obj.push_back(
-                  Pair(
-                        "target",
-                        nTarget.ToString().substr(0,16).c_str() 
-                      ) 
-                 );
+    obj.push_back(Pair("target",nTarget.ToString().substr(0,16).c_str() ) );
     return obj;
 }
 
