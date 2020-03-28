@@ -1362,16 +1362,16 @@ CBigNum inline GetProofOfStakeLimit(int nHeight, unsigned int nTime)
     return min(nSubsidy, MAX_MINT_PROOF_OF_WORK) + nFees;
 }
 
-::int64_t GetMaxSize(enum GetMaxSize_mode mode)
+::uint64_t GetMaxSize(enum GetMaxSize_mode mode)
 {
-    ::int64_t nMaxSize = 0;
+    ::uint64_t nMaxSize = 0;
     if (pindexGenesisBlock == NULL)
     {
         nMaxSize = MAX_GENESIS_BLOCK_SIZE;
     }
     else
     {
-        nMaxSize = GetProofOfWorkReward() / MIN_TX_FEE;
+        nMaxSize = (GetProofOfWorkReward() / MIN_TX_FEE) * 1000;
     }
 
     switch (mode)
@@ -1381,11 +1381,7 @@ CBigNum inline GetProofOfStakeLimit(int nHeight, unsigned int nTime)
             break;
 
         case MAX_BLOCK_SIGOPS:
-            nMaxSize /= 50;
-            break;
-
-        case MAX_ORPHAN_TRANSACTIONS:
-            nMaxSize /= 100;
+            nMaxSize = max(nMaxSize, (::uint64_t)DEFAULT_MAX_BLOCK_SIGOPS);
             break;
 
         case MAX_BLOCK_SIZE:
@@ -5410,7 +5406,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
             AddOrphanTx(tx);
 
             // DoS prevention: do not allow mapOrphanTransactions to grow unbounded
-            unsigned int nEvicted = LimitOrphanTxSize(GetMaxSize(MAX_ORPHAN_TRANSACTIONS));
+            unsigned int nEvicted = LimitOrphanTxSize(MAX_ORPHAN_TRANSACTIONS);
             if (nEvicted > 0)
                 printf("mapOrphan overflow, removed %u tx\n", nEvicted);
         }

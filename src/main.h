@@ -60,6 +60,8 @@ extern int
     nStatisticsNumberOfBlocks;
 
 static const unsigned int MAX_GENESIS_BLOCK_SIZE = 1000000;
+static const unsigned int MAX_ORPHAN_TRANSACTIONS = 10000;
+static const unsigned int DEFAULT_MAX_BLOCK_SIGOPS = 20000;
 static const unsigned int MAX_INV_SZ = 50000;
 
 static const ::int64_t MIN_TX_FEE = CENT;
@@ -143,7 +145,6 @@ enum GetMaxSize_mode
     MAX_BLOCK_SIZE,
     MAX_BLOCK_SIZE_GEN,
     MAX_BLOCK_SIGOPS,
-    MAX_ORPHAN_TRANSACTIONS,
 };
 
 class CReserveKey;
@@ -178,7 +179,7 @@ unsigned int GetNextTargetRequired(const CBlockIndex* pindexLast, bool fProofOfS
 ::int64_t GetProofOfStakeReward(::int64_t nCoinAge, unsigned int nBits, ::int64_t nTime, bool bCoinYearOnly=false);
 
 ::int64_t GetProofOfStakeReward(::int64_t nCoinAge);
-::int64_t GetMaxSize(enum GetMaxSize_mode mode);
+::uint64_t GetMaxSize(enum GetMaxSize_mode mode);
 
 unsigned int ComputeMinWork(unsigned int nBase, ::int64_t nTime);
 unsigned int ComputeMinStake(unsigned int nBase, ::int64_t nTime, unsigned int nBlockTime);
