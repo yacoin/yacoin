@@ -10,10 +10,10 @@
  #include "version.h"
 #endif
 
-#define DISPLAY_VERSION_MAJOR       0
-#define DISPLAY_VERSION_MINOR       4
-#define DISPLAY_VERSION_REVISION    9
-#define DISPLAY_VERSION_BUILD       02
+#define DISPLAY_VERSION_MAJOR       1
+#define DISPLAY_VERSION_MINOR       0
+#define DISPLAY_VERSION_REVISION    0
+#define DISPLAY_VERSION_BUILD       01
 #define DISPLAY_VERSION_TESTING     1
 
 const int
