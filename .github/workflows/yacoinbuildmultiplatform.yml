@@ -1,0 +1,47 @@
+name: Yacoin multi platform build
+
+on: [push]
+
+jobs:
+  build-ubuntu-1604:
+    runs-on: ubuntu-latest  
+    steps:
+      - uses: actions/checkout@v2
+      - name: pullyacoindocker
+        run: |
+          docker pull dev34253/yacoin-build:ubuntu.16.04
+          docker run -v /home/runner/work/yacoin/yacoin:/src dev34253/yacoin-build:ubuntu.16.04          
+  build-ubuntu-1804:
+    runs-on: ubuntu-latest  
+    steps:
+      - uses: actions/checkout@v2
+      - name: pullyacoindocker
+        run: |
+          docker pull dev34253/yacoin-build:ubuntu.18.04
+          docker run -v /home/runner/work/yacoin/yacoin:/src dev34253/yacoin-build:ubuntu.18.04
+      - uses: actions/upload-artifact@v1
+        with:
+          name: yacoind-ubuntu-18.04
+          path: /home/runner/work/yacoin/yacoin/release/yacoind
+      - uses: actions/upload-artifact@v1
+        with:
+          name: yacoin-qt-ubuntu-18.04
+          path: /home/runner/work/yacoin/yacoin/release/yacoin-qt
+  build-windows:
+    runs-on: windows-latest  
+    steps:
+      - uses: actions/checkout@v2
+      - name: pullyacoindocker
+        run: |
+          docker pull dev34253/yacoin-build:windows.2
+          docker run -v %CD%:c:\src dev34253/yacoin-build:windows.2
+          dir
+          dir src
+          cd src
+          dir qt
+        shell: cmd
+      - uses: actions/upload-artifact@v1
+        with:
+          name: yacoin-qt-windows
+          path: release/yacoin-qt.exe
+    
