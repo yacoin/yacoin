@@ -2,6 +2,8 @@ configure
 config.log
 config.status
 libtool
+test/functional/test_framework/__pycache__/*
+src/data/*
 src/*.exe
 src/yacoin
 src/yacoind
