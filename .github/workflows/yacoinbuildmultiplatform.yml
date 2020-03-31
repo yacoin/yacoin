@@ -7,7 +7,7 @@ jobs:
     runs-on: ubuntu-latest  
     steps:
       - uses: actions/checkout@v2
-      - name: pullyacoindocker
+      - name: build
         run: |
           docker pull dev34253/yacoin-build:ubuntu.16.04
           docker run -v /home/runner/work/yacoin/yacoin:/src dev34253/yacoin-build:ubuntu.16.04
@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest  
     steps:
       - uses: actions/checkout@v2
-      - name: pullyacoindocker
+      - name: build
         run: |
           docker pull dev34253/yacoin-build:ubuntu.18.04
           docker run -v /home/runner/work/yacoin/yacoin:/src dev34253/yacoin-build:ubuntu.18.04
@@ -31,7 +31,7 @@ jobs:
     runs-on: windows-latest  
     steps:
       - uses: actions/checkout@v2
-      - name: pullyacoindocker
+      - name: build
         run: |
           docker pull dev34253/yacoin-build:windows.2
           docker run -v %CD%:c:\src dev34253/yacoin-build:windows.2
