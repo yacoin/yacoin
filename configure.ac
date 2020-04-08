@@ -711,6 +711,7 @@ AC_CHECK_LIB([crypto],[RAND_egd],[],[
   )
 ])
 
+CRYPTO_CFLAGS="-DYac1dot0"
 CFLAGS_TEMP="$CFLAGS"
 LIBS_TEMP="$LIBS"
 CFLAGS="$CFLAGS $SSL_CFLAGS $CRYPTO_CFLAGS"
@@ -798,6 +799,7 @@ else
     if test x$use_upnp_default != xno; then
       use_upnp_default=yes
       upnp_setting=1
+      CRYPTO_CFLAGS="$CRYPTO_CFLAGS -DUSE_UPNP"
     fi
     AC_MSG_RESULT($use_upnp_default)
     AC_DEFINE_UNQUOTED([USE_UPNP],[$upnp_setting],[UPnP support not compiled if undefined, otherwise value (0 or 1) determines default state])
@@ -910,7 +912,7 @@ AC_SUBST(MINIUPNPC_LIBS)
 # AC_CONFIG_FILES([Makefile src/Makefile share/setup.nsi share/qt/Info.plist src/test/buildenv.py])
 # AC_CONFIG_FILES([qa/pull-tester/run-bitcoind-for-test.sh],[chmod +x qa/pull-tester/run-bitcoind-for-test.sh])
 # AC_CONFIG_FILES([qa/pull-tester/tests-config.sh],[chmod +x qa/pull-tester/tests-config.sh])
-AC_CONFIG_FILES([Makefile src/Makefile])
+AC_CONFIG_FILES([Makefile src/Makefile test/config.ini])
 
 dnl boost's m4 checks do something really nasty: they export these vars. As a
 dnl result, they leak into secp256k1's configure and crazy things happen.

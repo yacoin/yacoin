@@ -267,13 +267,13 @@ bool CTxDB::ReadDiskTx(uint256 hash, CTransaction& tx)
 
 bool CTxDB::ReadDiskTx(COutPoint outpoint, CTransaction& tx, CTxIndex& txindex)
 {
-    return ReadDiskTx(outpoint.hash, tx, txindex);
+    return ReadDiskTx(outpoint.COutPointGetHash(), tx, txindex);
 }
 
 bool CTxDB::ReadDiskTx(COutPoint outpoint, CTransaction& tx)
 {
     CTxIndex txindex;
-    return ReadDiskTx(outpoint.hash, tx, txindex);
+    return ReadDiskTx(outpoint.COutPointGetHash(), tx, txindex);
 }
 
 bool CTxDB::WriteBlockIndex(const CDiskBlockIndex& blockindex)
@@ -332,11 +332,11 @@ bool CTxDB::WriteModifierUpgradeTime(const unsigned int& nUpgradeTime)
 }
 
 static CBlockIndex *InsertBlockIndex(uint256 hash)
-{
+{   // this is the slow poke in start up load block index
     if (hash == 0)
         return NULL;
 
-    // Return existing
+    // Return existing, presume this is slow?
     map<uint256, CBlockIndex*>::iterator mi = mapBlockIndex.find(hash);
     if (mi != mapBlockIndex.end())
         return (*mi).second;
@@ -345,6 +345,7 @@ static CBlockIndex *InsertBlockIndex(uint256 hash)
     CBlockIndex* pindexNew = new CBlockIndex();
     if (!pindexNew)
         throw runtime_error("LoadBlockIndex() : new CBlockIndex failed");
+
     mi = mapBlockIndex.insert(make_pair(hash, pindexNew)).first;
     pindexNew->phashBlock = &((*mi).first);
 
@@ -353,25 +354,71 @@ static CBlockIndex *InsertBlockIndex(uint256 hash)
 
 bool CTxDB::LoadBlockIndex()
 {
-    if (mapBlockIndex.size() > 0) 
-    {
-        // Already loaded once in this session. It can happen during migration
-        // from BDB.
+    if (
+        !(mapBlockIndex.empty())
+       ) 
+    {   // Already loaded. But, it can happen during migration from BDB.
         return true;
     }
+    // need a RAII class to fiddle fPrintToConsole to true if QT_GUI is defined
+    // saving it and restoring it at function exit
+     #ifdef QT_GUI
+     class QCtFiddlefPTC
+     {
+     public:
+        QCtFiddlefPTC() : fSaved( fPrintToConsole ) { fPrintToConsole = true;}
+        ~QCtFiddlefPTC(){ fPrintToConsole = fSaved; }
+     private:
+        bool fSaved;
+     } Junk;
+     #endif
 #ifdef WIN32
     const int
+#ifdef Yac1dot0
+  #ifdef _DEBUG
+        nREFRESH = 10;    // generally resfresh rates are chosen to give ~1 update/sec
+  #else
+        // seems to be slowing down??
+        nREFRESH = 20;
+  #endif
+#else
   #ifdef _DEBUG
         nREFRESH = 2000;    // generally resfresh rates are chosen to give ~1 update/sec
   #else
         // seems to be slowing down??
         nREFRESH = 12000;
   #endif
+#endif
     int
         nMaxHeightGuess = 1,
         nCounter = 0,
         nRefresh = nREFRESH;
     ::int64_t
+        n64timeStart, 
+        nDelta1 = 0,
+        n64timeStart1, 
+        nDelta2 = 0,
+        n64timeStart2, 
+        nDelta3 = 0,
+        n64timeStart3, 
+        nDelta4 = 0,
+        n64timeStart4, 
+        nDelta5 = 0,
+        n64timeStart5, 
+        nDelta6 = 0,
+        n64timeStart6, 
+        nDelta7 = 0,
+        n64timeStart7, 
+        nDelta8 = 0,
+        n64timeStart8, 
+        nDelta9 = 0,
+        n64timeStart9, 
+        nDelta10 = 0,
+        n64timeStart10, 
+        nDelta11 = 0,
+        n64timeStart11, 
+        n64timeEnd, 
+        n64deltaT = 0,
         n64MsStartTime = GetTimeMillis();
 #endif
     // The block index is an in-memory structure that maps hashes to on-disk
@@ -385,19 +432,39 @@ bool CTxDB::LoadBlockIndex()
     ssStartKey << make_pair(string("blockindex"), uint256(0));
     iterator->Seek(ssStartKey.str());
     // Now read each entry.
-    while (iterator->Valid())
-    {
+    while (iterator->Valid())   //what is so slow in this loop of all PoW blocks?
+    {                           // 5 minutes for 1400 blocks, ~300 blocks/min or ~5/sec
+#ifdef WIN32
+        n64timeStart = GetTimeMillis(); 
+#endif
+
         // Unpack keys and values.
         CDataStream 
             ssKey(SER_DISK, CLIENT_VERSION);
 
+#ifdef WIN32
+        n64timeStart1 = GetTimeMillis(); 
+        nDelta1 += (n64timeStart1 - n64timeStart);
+#endif
         ssKey.write(iterator->key().data(), iterator->key().size());
-        
+
+#ifdef WIN32
+        n64timeStart2 = GetTimeMillis(); 
+        nDelta2 += (n64timeStart2 - n64timeStart1);
+#endif
         CDataStream 
             ssValue(SER_DISK, CLIENT_VERSION);
 
+#ifdef WIN32
+        n64timeStart3 = GetTimeMillis(); 
+        nDelta3 += (n64timeStart3 - n64timeStart2);
+#endif
         ssValue.write(iterator->value().data(), iterator->value().size());
-        
+
+#ifdef WIN32
+        n64timeStart4 = GetTimeMillis(); 
+        nDelta4 += (n64timeStart4 - n64timeStart3);
+#endif
         string 
             strType;
 
@@ -406,13 +473,25 @@ bool CTxDB::LoadBlockIndex()
         if (fRequestShutdown || strType != "blockindex")
             break;
         
+#ifdef WIN32
+        n64timeStart5 = GetTimeMillis(); 
+        nDelta5 += (n64timeStart5 - n64timeStart4);
+#endif
         CDiskBlockIndex 
             diskindex;
 
+#ifdef WIN32
+        n64timeStart6 = GetTimeMillis(); 
+        nDelta6 += (n64timeStart6 - n64timeStart5);
+#endif
         ssValue >> diskindex;
 
+#ifdef WIN32
+        n64timeStart7 = GetTimeMillis(); 
+        nDelta7 += (n64timeStart7 - n64timeStart6);
+#endif
         uint256 
-            blockHash = diskindex.GetBlockHash();
+            blockHash = diskindex.GetBlockHash();   // the slow poke!
 
         if ( 0 == blockHash )
         {
@@ -426,18 +505,38 @@ bool CTxDB::LoadBlockIndex()
             continue;   //?
 
         }
+
+#ifdef WIN32
+        n64timeStart8 = GetTimeMillis(); 
+        nDelta8 += (n64timeStart8 - n64timeStart7);
+#endif
         // Construct block index object
         CBlockIndex
             * pindexNew    = InsertBlockIndex(blockHash);
         // what if null? Can't be, since blockhash is known to be != 0
-        //if( NULL == pindexNew ) // ???
-        //{
-        //    iterator->Next();        
-        //    continue;
-        //}
+        if( NULL == pindexNew ) // ???
+        {
+            if (fPrintToConsole)
+                (void)printf( 
+                            "Error? InsertBlockIndex(...) failed"
+                            "\n"
+                            ""
+                            );
+            iterator->Next();        
+            continue;
+        }
         pindexNew->pprev          = InsertBlockIndex(diskindex.hashPrev);
+
+#ifdef WIN32
+        n64timeStart9 = GetTimeMillis(); 
+        nDelta9 += (n64timeStart9 - n64timeStart8);
+#endif
         pindexNew->pnext          = InsertBlockIndex(diskindex.hashNext);
 
+#ifdef WIN32
+        n64timeStart10 = GetTimeMillis(); 
+        nDelta10 += (n64timeStart10 - n64timeStart9);
+#endif
         pindexNew->nFile          = diskindex.nFile;
         pindexNew->nBlockPos      = diskindex.nBlockPos;
         pindexNew->nHeight        = diskindex.nHeight;
@@ -454,6 +553,12 @@ bool CTxDB::LoadBlockIndex()
         pindexNew->nBits          = diskindex.nBits;
         pindexNew->nNonce         = diskindex.nNonce;
 
+#ifdef WIN32
+        n64timeStart11 = GetTimeMillis(); 
+        nDelta11 += (n64timeStart11 - n64timeStart10);
+
+        n64deltaT += n64timeStart11 - n64timeStart;
+#endif
         // Watch for genesis block
         if( 
             (0 == diskindex.nHeight) &&
@@ -540,7 +645,7 @@ bool CTxDB::LoadBlockIndex()
                             "%7d (%3.2f%%)"
                             "",
                             nCounter, //pindexNew->nHeight,
-                            dEstimate > 100.0? 100.0: dEstimate
+                            dEstimate >= 100.0? 100.0: dEstimate
                                       );
             if (fPrintToConsole)
             {
@@ -570,13 +675,60 @@ bool CTxDB::LoadBlockIndex()
         return true;
 #ifdef WIN32
     if (fPrintToConsole)
+    {
+        DoProgress( nCounter, nCounter, n64MsStartTime );
         (void)printf( "\n" );
-
+    }
     #ifdef QT_GUI
     uiInterface.InitMessage(_("<b>...done.</b>"));
     #endif
 #endif
 
+#ifdef WIN32
+    if (fPrintToConsole) 
+    {
+        (void)printf(
+            "delta times"
+            "\n1 %" 
+            PRId64 
+            "\n2 %" 
+            PRId64 
+            "\n3 %" 
+            PRId64 
+            "\n4 %" 
+            PRId64 
+            "\n5 %" 
+            PRId64 
+            "\n6 %" 
+            PRId64 
+            "\n7 %" 
+            PRId64  
+            "\n8 %" 
+            PRId64 
+            "\n9 %" 
+            PRId64 
+            "\n10 %" 
+            PRId64 
+            "\n11 %" 
+            PRId64 
+            "\nt %" 
+            PRId64 
+            "\n",
+        nDelta1,
+        nDelta2,
+        nDelta3,
+        nDelta4,
+        nDelta5,
+        nDelta6,
+        nDelta7,
+        nDelta8,
+        nDelta9,
+        nDelta10,
+        nDelta11,
+        n64deltaT 
+                   );
+    }
+#endif
 // <<<<<<<<<
 
 #ifdef WIN32
@@ -634,6 +786,8 @@ bool CTxDB::LoadBlockIndex()
     #endif
         nCounter = 0;
 #endif
+#ifdef Yac1dot0
+#else
         BOOST_FOREACH(const PAIRTYPE(int, CBlockIndex*)& item, vSortedByHeight)
         {
             CBlockIndex* pindex = item.second;
@@ -657,6 +811,7 @@ bool CTxDB::LoadBlockIndex()
             }
 #endif        
         }
+#endif
     }
 
 #ifdef WIN32
@@ -762,7 +917,7 @@ bool CTxDB::LoadBlockIndex()
                 if (ReadTxIndex(hashTx, txindex))
                 {
                     // check level 3: checker transaction hashes
-                    if (nCheckLevel>2 || pindex->nFile != txindex.pos.nFile || pindex->nBlockPos != txindex.pos.nBlockPos)
+                    if (nCheckLevel>2 || pindex->nFile != txindex.pos.Get_CDiskTxPos_nFile() || pindex->nBlockPos != txindex.pos.Get_CDiskTxPos_nBlockPos())
                     {
                         // either an error or a duplicate transaction
                         CTransaction txFound;
@@ -787,7 +942,7 @@ bool CTxDB::LoadBlockIndex()
                         {
                             if (!txpos.IsNull())
                             {
-                                pair<unsigned int, unsigned int> posFind = make_pair(txpos.nFile, txpos.nBlockPos);
+                                pair<unsigned int, unsigned int> posFind = make_pair(txpos.Get_CDiskTxPos_nFile(), txpos.Get_CDiskTxPos_nBlockPos());
                                 if (!mapBlockPos.count(posFind))
                                 {
                                     printf("LoadBlockIndex(): *** found bad spend at %d, hashBlock=%s, hashTx=%s\n", pindex->nHeight, pindex->GetBlockHash().ToString().c_str(), hashTx.ToString().c_str());
@@ -811,7 +966,7 @@ bool CTxDB::LoadBlockIndex()
                                     {
                                         bool fFound = false;
                                         BOOST_FOREACH(const CTxIn &txin, txSpend.vin)
-                                            if (txin.prevout.hash == hashTx && txin.prevout.n == nOutput)
+                                            if (txin.prevout.COutPointGetHash() == hashTx && txin.prevout.COutPointGet_n() == nOutput)
                                                 fFound = true;
                                         if (!fFound)
                                         {
@@ -831,10 +986,10 @@ bool CTxDB::LoadBlockIndex()
                      BOOST_FOREACH(const CTxIn &txin, tx.vin)
                      {
                           CTxIndex txindex;
-                          if (ReadTxIndex(txin.prevout.hash, txindex))
-                              if (txindex.vSpent.size()-1 < txin.prevout.n || txindex.vSpent[txin.prevout.n].IsNull())
+                          if (ReadTxIndex(txin.prevout.COutPointGetHash(), txindex))
+                              if (txindex.vSpent.size()-1 < txin.prevout.COutPointGet_n() || txindex.vSpent[txin.prevout.COutPointGet_n()].IsNull())
                               {
-                                  printf("LoadBlockIndex(): *** found unspent prevout %s:%i in %s\n", txin.prevout.hash.ToString().c_str(), txin.prevout.n, hashTx.ToString().c_str());
+                                  printf("LoadBlockIndex(): *** found unspent prevout %s:%i in %s\n", txin.prevout.COutPointGetHash().ToString().c_str(), txin.prevout.COutPointGet_n(), hashTx.ToString().c_str());
                                   pindexFork = pindex->pprev;
                               }
                      }

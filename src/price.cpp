@@ -35,18 +35,18 @@ static const int
     nUnusualCharacterOffset = 2;
 CProvider aBTCtoYACProviders[] = 
     {    
-        {   //https://api.coinmarketcap.com/v1/ticker/yacoin/
-            "api.coinmarketcap.com",
-            "price_btc",    //"price_usd",
-            "/v1/ticker/yacoin/",
-            nSpecialCharacterOffset,
-            DEFAULT_HTTPS_PORT
-        },
         {   //https://yobit.net/api/3/ticker/yac_btc
             "yobit.net",
             "avg",
             "/api/3/ticker/yac_btc",
             nUnusualCharacterOffset,
+            DEFAULT_HTTPS_PORT
+        },
+        {   //https://api.coinmarketcap.com/v1/ticker/yacoin/
+            "api.coinmarketcap.com",
+            "price_btc",    //"price_usd",
+            "/v1/ticker/yacoin/",
+            nSpecialCharacterOffset,
             DEFAULT_HTTPS_PORT
         },
         {   
@@ -73,18 +73,18 @@ CProvider aBTCtoYACProviders[] =
     };
 CProvider aCurrencyToBTCProviders[] = 
     {
-        {   //http://api.coinmarketcap.com/v1/ticker/bitcoin/
-            "api.coinmarketcap.com",
-            "price_usd",
-            "/v1/ticker/bitcoin/",
-            nSpecialCharacterOffset,
-            DEFAULT_HTTPS_PORT
-        },
-        {   //https://yobit.net/api/3/ticker/btc_usd (2)
+        {   //https://yobit.net/api/3/ticker/btc_usd
             "yobit.net",
             "last",
             "/api/3/ticker/btc_usd",
             nUnusualCharacterOffset,
+            DEFAULT_HTTPS_PORT
+        },
+        {   //https://api.coinmarketcap.com/v1/ticker/bitcoin/
+            "api.coinmarketcap.com",
+            "price_usd",
+            "/v1/ticker/bitcoin/",
+            nSpecialCharacterOffset,
             DEFAULT_HTTPS_PORT
         },
         {   //https://api.cryptonator.com/api/ticker/btc-usd "price", (3)

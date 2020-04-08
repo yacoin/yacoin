@@ -101,6 +101,35 @@ Value getsubsidy(const Array& params, bool fHelp)
     return (Value_type)GetProofOfWorkReward(nBits);
 }
 
+Value generatetoaddress(const Array& params, bool fHelp){
+    if (fHelp || params.size() == 0 || params.size() > 3)
+            throw runtime_error(
+                "generatetoaddress\n"
+                "nblocks - How many blocks are generated immediately.\n"
+                "address - The address to send the newly generated bitcoin to.\n"
+                "maxtries - How many iterations to try.");
+    int nblocks = params[0].get_int();
+    std::string address = "";
+    int maxtries = -1;
+    if(params.size()>1) {
+        address = params[1].get_str();
+    }
+    if(params.size()>2) {
+        maxtries = params[2].get_int();
+    }
+    
+    Array res;
+    // for(int i=0;i<nblocks;i++){
+    //     std::string hash = mineSingleBlock(address, maxtries);
+    //     res.push_back(hash);
+    // }
+    mapArgs["-gen"] = "1";
+    mapArgs["-genproclimit"]="1";
+    GenerateYacoins(true, pwalletMain, nblocks);
+    mapArgs["-gen"] = "0";
+    return res;
+}
+
 Value getmininginfo(const Array& params, bool fHelp)
 {
     if (fHelp || params.size() != 0)

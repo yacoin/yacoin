@@ -80,17 +80,72 @@ public:
         BN_clear_free(this);
     }
 
-    CBigNum(::int8_t  n)  { BN_init(this); if (n >= 0) setuint32(n); else setint64(n); }
-    CBigNum(::int16_t n)  { BN_init(this); if (n >= 0) setuint32(n); else setint64(n); }
-    CBigNum(::int32_t n)  { BN_init(this); if (n >= 0) setuint32(n); else setint64(n); }
-    CBigNum(::int64_t n)  { BN_init(this); if (n >= 0) setuint64(n); else setint64(n); }
+    CBigNum(::int8_t  n)  
+    { 
+        BN_init(this); 
+        if (n >= 0) 
+            setuint32(n); 
+        else 
+            setint64(n); 
+    }
 
-    CBigNum(::uint8_t  n) { BN_init(this); setuint32(n); }
-    CBigNum(::uint16_t n) { BN_init(this); setuint32(n); }
-    CBigNum(::uint32_t n) { BN_init(this); setuint32(n); }
-    CBigNum(::uint64_t n) { BN_init(this); setuint64(n); }
+    CBigNum(::int16_t n)  
+    { 
+        BN_init(this); 
+        if (n >= 0) 
+            setuint32(n); 
+        else 
+            setint64(n); 
+    }
 
-    explicit CBigNum(uint256 n) { BN_init(this); setuint256(n); }
+    CBigNum(::int32_t n)  
+    { 
+        BN_init(this); 
+        if (n >= 0) 
+            setuint32(n); 
+        else 
+            setint64(n); 
+    }
+
+    CBigNum(::int64_t n)  
+    { 
+        BN_init(this); 
+        if (n >= 0) 
+            setuint64(n); 
+        else 
+            setint64(n); 
+    }
+
+    CBigNum(::uint8_t  n) 
+    { 
+        BN_init(this); 
+        setuint32(n); 
+    }
+
+    CBigNum(::uint16_t n) 
+    { 
+        BN_init(this); 
+        setuint32(n); 
+    }
+
+    CBigNum(::uint32_t n) 
+    { 
+        BN_init(this); 
+        setuint32(n); 
+    }
+
+    CBigNum(::uint64_t n) 
+    { 
+        BN_init(this); 
+        setuint64(n); 
+    }
+
+    explicit CBigNum(uint256 n) 
+    { 
+        BN_init(this); 
+        setuint256(n); 
+    }
+
     explicit CBigNum(const std::vector< ::uint8_t>& vch)
     {
         BN_init(this);
@@ -144,19 +199,29 @@ public:
 
     ::int32_t getint32() const
     {
-        ::uint64_t n = BN_get_word(this);
+        ::uint64_t 
+            n = BN_get_word(this);
+
         if (!BN_is_negative(this))
-            return (n > (::uint64_t)std::numeric_limits< ::int32_t>::max() ? std::numeric_limits< ::int32_t>::max() : (::int32_t)n);
+            return (n > (::uint64_t)std::numeric_limits< ::int32_t>::max() ? 
+                         std::numeric_limits< ::int32_t>::max() : 
+                         (::int32_t)n);
         else
-            return (n > (::uint64_t)std::numeric_limits< ::int32_t>::max() ? std::numeric_limits< ::int32_t>::min() : -(::int32_t)n);
+            return (n > (::uint64_t)std::numeric_limits< ::int32_t>::max() ? 
+                         std::numeric_limits< ::int32_t>::min() :
+                         -(::int32_t)n);
     }
 
     void setint64(::int64_t sn)
     {
-        ::uint8_t pch[sizeof(sn) + 6];
-        ::uint8_t* p = pch + 4;
-        bool fNegative;
-        ::uint64_t n;
+        ::uint8_t 
+            pch[sizeof(sn) + 6];
+        ::uint8_t
+            *p = pch + 4;
+        bool 
+            fNegative;
+        ::uint64_t 
+            n;
 
         if (sn < (::int64_t)0)
         {
@@ -169,10 +234,14 @@ public:
             fNegative = false;
         }
 
-        bool fLeadingZeroes = true;
+        bool 
+            fLeadingZeroes = true;
+
         for (int i = 0; i < 8; i++)
         {
-            ::uint8_t c = (n >> 56) & 0xff;
+            ::uint8_t 
+                c = (n >> 56) & 0xff;
+
             n <<= 8;
             if (fLeadingZeroes)
             {
@@ -186,7 +255,9 @@ public:
             }
             *p++ = c;
         }
-        ::uint32_t nSize = (::uint32_t) (p - (pch + 4));
+        ::uint32_t 
+            nSize = (::uint32_t) (p - (pch + 4));
+
         pch[0] = (nSize >> 24) & 0xff;
         pch[1] = (nSize >> 16) & 0xff;
         pch[2] = (nSize >> 8) & 0xff;
@@ -196,14 +267,21 @@ public:
 
     ::uint64_t getuint64()
     {
-        size_t nSize = BN_bn2mpi(this, NULL);
+        size_t 
+            nSize = BN_bn2mpi(this, NULL);
+
         if (nSize < 4)
             return 0;
+        
         std::vector< ::uint8_t> vch(nSize);
+
         BN_bn2mpi(this, &vch[0]);
         if (vch.size() > 4)
             vch[4] &= 0x7f;
-        ::uint64_t n = 0;
+
+        ::uint64_t 
+            n = 0;
+
         for (size_t i = 0, j = vch.size()-1; i < sizeof(n) && j >= 4; i++, j--)
             ((::uint8_t*)&n)[i] = vch[j];
         return n;

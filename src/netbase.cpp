@@ -58,7 +58,7 @@ enum Network ParseNetwork(std::string net) {
     if (net == "i2p")  return NET_I2P;
     return NET_UNROUTABLE;
 }
-//CCriticalSection cs_net;
+CCriticalSection cs_net;
 
 void SplitHostPort(std::string in, int &portOut, std::string &hostOut) {
     size_t colon = in.find_last_of(':');
@@ -359,7 +359,7 @@ bool static Socks5(std::string strDest, int port, SOCKET& hSocket)
 
 bool static ConnectSocketDirectly(const CService &addrConnect, SOCKET& hSocketRet, int nTimeout)
 {
-//    LOCK(cs_net);
+    LOCK(cs_net);
     {
     hSocketRet = INVALID_SOCKET;
 

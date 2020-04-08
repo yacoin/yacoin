@@ -223,7 +223,7 @@ void ThreadIRCSeed(void* parg)
 
 void ThreadIRCSeed2(void* parg)
 {
-//    LOCK(cs_net);
+    LOCK(cs_net);
     {
     // Don't connect to IRC if we won't use IPv4 connections.
     if (IsLimited(NET_IPV4))
@@ -244,6 +244,11 @@ void ThreadIRCSeed2(void* parg)
 
     while (!fShutdown)
     {
+        if( fDebug )
+            (void)printf(
+                         "ThreadIRCSeed2 is looping" 
+                         "\n"
+                        );
         CService addrConnect("92.243.23.21", 6667); // irc.lfnet.org
 
         CService addrIRC("irc.lfnet.org", 6667, true);

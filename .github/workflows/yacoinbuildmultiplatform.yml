@@ -7,15 +7,18 @@ jobs:
     runs-on: ubuntu-latest  
     steps:
       - uses: actions/checkout@v2
-      - name: pullyacoindocker
+      - name: build
         run: |
           docker pull dev34253/yacoin-build:ubuntu.16.04
-          docker run -v /home/runner/work/yacoin/yacoin:/src dev34253/yacoin-build:ubuntu.16.04          
+          docker run -v /home/runner/work/yacoin/yacoin:/src dev34253/yacoin-build:ubuntu.16.04
+          docker run -v /home/runner/work/yacoin/yacoin:/src --entrypoint /src/test/functional/test_runner.py dev34253/yacoin-build:ubuntu.16.04 /src/test/functional/feature_help.py
+          docker run -v /home/runner/work/yacoin/yacoin:/src --entrypoint /src/test/functional/test_runner.py dev34253/yacoin-build:ubuntu.16.04 /src/test/functional/interface_rpc.py
+          docker run -v /home/runner/work/yacoin/yacoin:/src --entrypoint /src/test/functional/test_runner.py dev34253/yacoin-build:ubuntu.16.04 /src/test/functional/mining_basic.py
   build-ubuntu-1804:
     runs-on: ubuntu-latest  
     steps:
       - uses: actions/checkout@v2
-      - name: pullyacoindocker
+      - name: build
         run: |
           docker pull dev34253/yacoin-build:ubuntu.18.04
           docker run -v /home/runner/work/yacoin/yacoin:/src dev34253/yacoin-build:ubuntu.18.04
@@ -31,14 +34,10 @@ jobs:
     runs-on: windows-latest  
     steps:
       - uses: actions/checkout@v2
-      - name: pullyacoindocker
+      - name: build
         run: |
           docker pull dev34253/yacoin-build:windows.2
           docker run -v %CD%:c:\src dev34253/yacoin-build:windows.2
-          dir
-          dir src
-          cd src
-          dir qt
         shell: cmd
       - uses: actions/upload-artifact@v1
         with:
