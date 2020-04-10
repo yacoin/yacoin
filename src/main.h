@@ -129,6 +129,7 @@ extern CCriticalSection cs_setpwalletRegistered;
 extern std::set<CWallet*> setpwalletRegistered;
 extern unsigned char pchMessageStart[4];
 extern std::map<uint256, CBlock*> mapOrphanBlocks;
+extern ::uint32_t nMinEase; // minimum ease corresponds to highest difficulty
 
 // Settings
 extern ::int64_t nTransactionFee;
