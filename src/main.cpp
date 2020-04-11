@@ -1668,9 +1668,10 @@ static unsigned int CalculateNextWorkRequired(const CBlockIndex* pindexLast, ::i
     bnPrevTarget /= nNominalTimespan;
 
     // Calculate maximum target of all blocks, it corresponds to 1/3 highest difficulty (or 3 minimum ease)
-    uint256 bnMaximum = CBigNum().SetCompact(3 * nMinEase).getuint256();
+    uint256 bnMaximum = CBigNum().SetCompact(nMinEase).getuint256();
     CBigNum bnMaximumTarget;
     bnMaximumTarget.setuint256(bnMaximum);
+    bnMaximumTarget *= 3;
 
     // Choose higher difficulty (higher difficulty have smaller target)
     CBigNum bnNewTarget = min(bnPrevTarget, bnMaximumTarget);
