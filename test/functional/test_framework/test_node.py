@@ -261,6 +261,7 @@ class TestNode():
             # Do not use wait argument when testing older nodes, e.g. in feature_backwards_compatibility.py
             if self.version is None or self.version >= 180000:
                 self.stop(wait=wait)
+                self.close()
             else:
                 self.stop()
         except http.client.CannotSendRequest:

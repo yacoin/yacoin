@@ -1384,6 +1384,8 @@ Array RPCConvertValues(std::string &strMethod, const std::vector<std::string> &s
     if (strMethod == "keypoolrefill"          && n > 0) ConvertTo<boost::int64_t>(params[0]);
     if (strMethod == "keypoolreset"           && n > 0) ConvertTo<boost::int64_t>(params[0]);
     if (strMethod == "importaddress"          && n > 2) ConvertTo<bool>(params[2]);
+    if (strMethod == "generatetoaddress"      && n > 2) ConvertTo<int>(params[0]);
+    if (strMethod == "generatetoaddress"      && n > 2) ConvertTo<int>(params[2]);    
 
     return params;
 }

@@ -363,7 +363,7 @@ bool CWallet::EncryptWallet(const SecureString& strWalletPassphrase)
             // perhaps just
             return false;   // looking at what encryptwallet() in rpcwallet.cpp does
 #else
-            exit(1); 
+            exit(23); 
 #endif
             //We now probably have half of our keys encrypted in memory, 
             //and half not...die and let the user reload their unencrypted wallet.
@@ -375,7 +375,7 @@ bool CWallet::EncryptWallet(const SecureString& strWalletPassphrase)
         if (fFileBacked)
         {
             if (!pwalletdbEncryption->TxnCommit())
-                exit(1); //We now have keys encrypted in memory, but no on disk...die to avoid confusion and let the user reload their unencrypted wallet.
+            exit(24); //We now have keys encrypted in memory, but no on disk...die to avoid confusion and let the user reload their unencrypted wallet.
 
             delete pwalletdbEncryption;
             pwalletdbEncryption = NULL;
@@ -427,7 +427,7 @@ bool CWallet::DecryptWallet(const SecureString& strWalletPassphrase)
         {
             if (fFileBacked)
                 pwalletdbDecryption->TxnAbort();
-            exit(1); //We now probably have half of our keys decrypted in memory, and half not...die and let the user reload their encrypted wallet.
+            exit(25); //We now probably have half of our keys decrypted in memory, and half not...die and let the user reload their encrypted wallet.
         }
 
         if (fFileBacked)
@@ -452,7 +452,7 @@ bool CWallet::DecryptWallet(const SecureString& strWalletPassphrase)
             }
 
             if (!pwalletdbDecryption->TxnCommit())
-                exit(1); //We now have keys decrypted in memory, but no on disk...die to avoid confusion and let the user reload their encrypted wallet.
+                exit(26); //We now have keys decrypted in memory, but no on disk...die to avoid confusion and let the user reload their encrypted wallet.
 
             delete pwalletdbDecryption;
             pwalletdbDecryption = NULL;
