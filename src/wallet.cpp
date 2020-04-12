@@ -1948,10 +1948,10 @@ bool CWallet::CreateTransaction(const vector<pair<CScript, int64_t> >& vecSend, 
                 // nPayFee is the min transaction fee is set by user. There are two methods to set nPayFee:
                 // 1) Set with option "paytxfee" in yacoin.conf
                 // 2) Set with rpc command "settxfee"
-                int64_t nPayFee = nTransactionFee * (1 + (int64_t)nBytes / 1000);
+                int64_t nPayFee = (nBytes * nTransactionFee) / 1000;
                 int64_t nMinFee = wtxNew.GetMinFee(nBytes);
 
-                printf("TACA ===> CWallet::CreateTransaction, nBytes = %d, "
+                printf("CWallet::CreateTransaction, nBytes = %d, "
                        "nPayFee = %ld, "
                        "nMinFee = %ld\n",
                        nBytes, nPayFee, nMinFee);
@@ -1960,6 +1960,14 @@ bool CWallet::CreateTransaction(const vector<pair<CScript, int64_t> >& vecSend, 
                     nFeeRet = max(nPayFee, nMinFee);
                     continue;
                 }
+
+                printf("CWallet::CreateTransaction, nBytes = %d, "
+                                               "total UTXO value = %ld, "
+                                               "send %ld, "
+                                               "change %ld, "
+                                               "expected fee = %ld, "
+                                               "nFeeRet = %ld\n",
+                       nBytes, nValueIn, nValue, nChange, nValueIn - nValue - nChange, nFeeRet);
 
                 // Fill vtxPrev by copying from previous transactions vtxPrev
                 wtxNew.AddSupportingTransactions(txdb);

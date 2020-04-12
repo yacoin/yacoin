@@ -726,7 +726,7 @@ bool CTransaction::CheckTransaction() const
 
 ::int64_t CTransaction::GetMinFee(unsigned int nBytes) const
 {
-    return MIN_TX_FEE * (double(nBytes) / 1000.0);
+    return (nBytes * MIN_TX_FEE) / 1000;
 }
 
 
