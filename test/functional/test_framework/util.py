@@ -322,6 +322,7 @@ def initialize_datadir(dirname, n, chain):
         f.write("daemon=0\n")
         f.write("debug=1\n")
         f.write("logtimestamps=1\n")
+        f.write("epochinterval=10\n")
         # f.write("keypool=1\n")
         # f.write("discover=0\n")
         f.write("dnsseed=0\n")
