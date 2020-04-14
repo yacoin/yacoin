@@ -108,7 +108,7 @@ block.hashMerkleRoot ==
 */
 //
 const int
-    nBigLinearTrailingAverageLength = 21000, // arbitrary but 35 hours
+    nBigLinearTrailingAverageLength = 2100, // arbitrary but 35 hours
     nNewBigLinearTrailingAverageLength = 10 * nBigLinearTrailingAverageLength, // 21000 arbitrary but 350 hours!!
     nExponentialTrailingAverageLength = 8;  //arbitrary
 int 
