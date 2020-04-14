@@ -2654,7 +2654,6 @@ void ThreadMessageHandler2(void* parg)
         }
 
         {
-            
             {
             LOCK(cs_vNodes);    //<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
                 BOOST_FOREACH(CNode* pnode, vNodesCopy)
@@ -2668,7 +2667,7 @@ void ThreadMessageHandler2(void* parg)
         --vnThreadsRunning[THREAD_MESSAGEHANDLER];
         if (fRequestShutdown)
             StartShutdown();
-        Sleep( nOneHundredMilliseconds );         // again, ????
+        //Sleep( nOneHundredMilliseconds );         // again, ????
         ++vnThreadsRunning[THREAD_MESSAGEHANDLER];
         if (fShutdown)
         {
@@ -2681,7 +2680,7 @@ void ThreadMessageHandler2(void* parg)
             }
             return;
         }
-        // Sleep( 100 * nMillisecondsPerSecond );
+        Sleep( nMillisecondsPerSecond );
     }
     if( fDebug )
     {

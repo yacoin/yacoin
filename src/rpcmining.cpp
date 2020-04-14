@@ -186,6 +186,7 @@ Value getmininginfo(const Array& params, bool fHelp)
 #endif    
     obj.push_back( Pair( "Nfactor", Nfactor ) );
     obj.push_back( Pair( "N", (Value_type)N ) );
+    obj.push_back( Pair( "Epoch Interval", (Value_type)nEpochInterval ) );
 
     return obj;
 }

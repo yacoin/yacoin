@@ -64,7 +64,7 @@ using std::multimap;
 
 const ::int64_t 
     nSimulatedMOneySupplyAtFork = 124460820773591,  //124,460,820.773591 YAC
-    nChainStartTime = 1367991200, // 1296688602           // unix time???? ~ Wed May 08 2013 05:33:20
+    nChainStartTime = 1367991200,           // unix time???? ~ Wed May 08 2013 05:33:20
     //nChainStartTimeTestNet = 1464123328;    //Tue, 24 May 2016 20:55:28 GMT
                                             // 1464373956  Fri, 27 May 2016 18:32:36 GMT
     nChainStartTimeTestNet = 1546300800;    // 1546116950 ~12/29/2018
@@ -134,7 +134,7 @@ map<uint256, CBlockIndex*> mapBlockIndex;
 set<pair<COutPoint, unsigned int> > setStakeSeen;
 
 // are all of these undocumented numbers a function of Nfactor?  Cpu power? Other???
-CBigNum bnProofOfWorkLimit(~uint256(0) >> 3); 
+CBigNum bnProofOfWorkLimit(~uint256(0) >> 3);  // TODO verify why the original value >> 20 is not working
 
 CBigNum bnProofOfStakeLegacyLimit(~uint256(0) >> 24); 
 CBigNum bnProofOfStakeLimit(~uint256(0) >> 27); 
@@ -1378,37 +1378,31 @@ CBigNum inline GetProofOfStakeLimit(int nHeight, unsigned int nTime)
 {
     const ::int32_t
         nYac20BlockNumber = 0;  //2960;
-    const int
-        nAverageBlocksPerMinute = 1;
 #ifdef Yac1dot0
+    ::int64_t nBlockRewardExcludeFees;
     if(
        pindexBest->nHeight >= nYac20BlockNumber
       )
     {
-        const int 
-            nNumberOfDaysPerYear = 365,
-            nNumberOfBlocksPerYear = (nAverageBlocksPerMinute * 
-                                      nMinutesperHour * 
-                                      nHoursPerDay * 
-                                      nNumberOfDaysPerYear
-                                     ) +    // that 1/4 of a day for leap years
-                                     (nAverageBlocksPerMinute * 
-                                      nMinutesperHour * 
-                                      (nHoursPerDay/4)
-                                     );
-        const double
-            nInflation = 0.02;      // 2%
+        // Default: nEpochInterval = 21000 blocks, recalculated with each epoch
+        if (pindexBest->nHeight % nEpochInterval == 0)
+        {
+            // recalculated
+            // PoW reward is 2%
+            nBlockRewardExcludeFees = (::int64_t)
+                (
+                (pindexBest->pprev? pindexBest->pprev->nMoneySupply:
+                    nSimulatedMOneySupplyAtFork) /
+                    nNumberOfBlocksPerYear
+                ) * nInflation;
+        } else
+        {
+            nBlockRewardExcludeFees = (::int64_t)
+                (pindexBest->pprev? pindexBest->pprev->nBlockRewardExcludeFees: 0);
+        }
 
-        // PoW reward is 2%
-        ::int64_t
-            nBlockReward = (::int64_t)
-            (
-             (
-              (pindexBest->pprev? pindexBest->pprev->nMoneySupply: 0) / 
-              nNumberOfBlocksPerYear
-             ) * nInflation
-            ) + nFees;
-        return nBlockReward;
+        pindexBest->nBlockRewardExcludeFees = nBlockRewardExcludeFees;
+        return nBlockRewardExcludeFees + nFees;
     }
 #endif
     CBigNum bnSubsidyLimit = MAX_MINT_PROOF_OF_WORK;
@@ -2147,8 +2141,12 @@ bool CheckProofOfWork(uint256 hash, unsigned int nBits)
 
     printf("CheckProofOfWork: nBits: %d\n",nBits);
     // Check range
-    if ((bnTarget <= 0 )|| (bnTarget > ( fTestNet? bnProofOfWorkLimitTestNet: bnProofOfWorkLimit) ))
-        return error("CheckProofOfWork() : nBits %d below minimum work", nBits);
+    if (
+        (bnTarget <= 0 )
+        || 
+        (bnTarget > ( fTestNet? bnProofOfWorkLimitTestNet: bnProofOfWorkLimit) )
+       )
+        return error("CheckProofOfWork() : nBits below minimum work");
     // Check proof of work matches claimed amount
     if (hash > bnTarget.getuint256())
         return error("CheckProofOfWork() : hash > target nBits");

@@ -898,8 +898,14 @@ void JSONRequest::convertParameterObjectToArray(string method, Value& valParams)
         params.push_back(find_value(valParams.get_obj(), "label"));
     } else if(method == "generatetoaddress"){
         params.push_back(find_value(valParams.get_obj(), "nblocks"));
-        params.push_back(find_value(valParams.get_obj(), "address"));
-        params.push_back(find_value(valParams.get_obj(), "maxtries"));
+        Value addressValue = find_value(valParams.get_obj(), "address");
+        if(!addressValue.is_null()){
+            params.push_back(addressValue);
+        }        
+        Value maxtriesValue = find_value(valParams.get_obj(), "maxtries");
+        if(!maxtriesValue.is_null()){
+            params.push_back(maxtriesValue);
+        }
     } else if (method == "getblockcount" || method == "getwalletinfo" || method == "stop") {
         // these methods do not require any parameter
     }

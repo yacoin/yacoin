@@ -988,12 +988,18 @@ public:
     //static const int 
     //    CURRENT_VERSION_previous = VERSION_of_block_for_yac_044_old;
 
+    // Block header
     ::int32_t nVersion;
     uint256 hashPrevBlock;
     uint256 hashMerkleRoot;
     ::uint32_t nTime;
     ::uint32_t nBits;
     ::uint32_t nNonce;
+
+    // Store following info to avoid calculating hash many times
+    mutable block_header previousBlockHeader;
+    mutable uint256 blockHash;
+    mutable uint256 blockYacoinHash;
 
     // network and disk
     std::vector<CTransaction> vtx;
@@ -1048,6 +1054,9 @@ public:
         vchBlockSig.clear();
         vMerkleTree.clear();
         nDoS = 0;
+        blockHash = 0;
+        blockYacoinHash = 0;
+        memset(UVOIDBEGIN(previousBlockHeader), 0, sizeof(block_header));
     }
 
     bool IsNull() const
@@ -1056,7 +1065,7 @@ public:
     }
 
     // yacoin2015 update
-    uint256 GetHash() const
+    uint256 CalculateHash() const
     {
         const ::uint64_t
             nSpanOf4  = 1368515488 - nChainStartTime,                           
@@ -1147,15 +1156,51 @@ public:
 		return thash;
     }
 
+    bool IsHeaderDifferent() const
+    {
+        if((nVersion == previousBlockHeader.version)
+            && (hashPrevBlock == previousBlockHeader.prev_block)
+            && (hashMerkleRoot == previousBlockHeader.merkle_root)
+            && (nTime == previousBlockHeader.timestamp)
+            && (nBits == previousBlockHeader.bits)
+            && (nNonce == previousBlockHeader.nonce))
+        {
+            return false;
+        }
+        return true;
+    }
+
+    uint256 GetHash() const
+    {
+        if(blockHash == 0 || IsHeaderDifferent())
+        {
+            blockHash = CalculateHash();
+            memcpy(UVOIDBEGIN(previousBlockHeader), CVOIDBEGIN(nVersion), sizeof(block_header));
+        }
+        return blockHash;
+    }
+
     // yacoin2015
-    uint256 GetYacoinHash() const
+    uint256 CalculateYacoinHash() const
     {
         uint256 
             thash;
 
-        scrypt_hash(CVOIDBEGIN(nVersion), sizeof(block_header), UINTBEGIN(thash), GetNfactor(nTime));
+        unsigned char
+            nfactor = GetNfactor(nTime);
+        scrypt_hash(CVOIDBEGIN(nVersion), sizeof(block_header), UINTBEGIN(thash), nfactor);
 
         return thash;
+    }
+
+    uint256 GetYacoinHash() const
+    {
+        if(blockYacoinHash == 0 || IsHeaderDifferent())
+        {
+            blockYacoinHash = CalculateYacoinHash();
+            memcpy(UVOIDBEGIN(previousBlockHeader), CVOIDBEGIN(nVersion), sizeof(block_header));
+        }
+        return blockYacoinHash;
     }
 
     ::int64_t GetBlockTime() const
@@ -1415,6 +1460,8 @@ public:
     ::int64_t nMint;
     ::int64_t nMoneySupply;
 
+    ::int64_t nBlockRewardExcludeFees;
+
     ::uint32_t nFlags;  // ppcoin: block index flags
     enum  
     {
@@ -1437,6 +1484,8 @@ public:
     ::uint32_t nTime;
     ::uint32_t nBits;
     ::uint32_t nNonce;
+
+    ::uint256 blockHash; // store hash to avoid calculating many times
 public:
     CBlockIndex()
     {
@@ -1451,6 +1500,7 @@ public:
         bnChainTrust = CBigNum(0);
         nMint = 0;
         nMoneySupply = 0;
+        nBlockRewardExcludeFees = 0;
         nFlags = 0;
         nStakeModifier = 0;
         nStakeModifierChecksum = 0;
@@ -1463,6 +1513,7 @@ public:
         nTime          = 0;
         nBits          = 0;
         nNonce         = 0;
+        blockHash      = 0;
     }
 
     CBlockIndex(unsigned int nFileIn, unsigned int nBlockPosIn, CBlock& block)
@@ -1478,6 +1529,7 @@ public:
         bnChainTrust = CBigNum(0);
         nMint = 0;
         nMoneySupply = 0;
+        nBlockRewardExcludeFees = 0;
         nFlags = 0;
         nStakeModifier = 0;
         nStakeModifierChecksum = 0;
@@ -1499,6 +1551,7 @@ public:
         nTime          = block.nTime;
         nBits          = block.nBits;
         nNonce         = block.nNonce;
+        blockHash      = block.blockHash;
     }
 
     CBlock GetBlockHeader() const
@@ -1640,9 +1693,6 @@ public:
 /** Used to marshal pointers into hashes for db storage. */
 class CDiskBlockIndex : public CBlockIndex
 {
-private:
-    uint256 blockHash;
-
 public:
     uint256 hashPrev;
     uint256 hashNext;
@@ -1651,7 +1701,6 @@ public:
     {
         hashPrev = 0;
         hashNext = 0;
-        blockHash = 0;
     }
 
     explicit CDiskBlockIndex(CBlockIndex* pindex) : CBlockIndex(*pindex)
@@ -1671,6 +1720,7 @@ public:
         READWRITE(nHeight);
         READWRITE(nMint);
         READWRITE(nMoneySupply);
+        READWRITE(nBlockRewardExcludeFees);
         READWRITE(nFlags);
         READWRITE(nStakeModifier);
         if (IsProofOfStake())

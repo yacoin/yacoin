@@ -435,7 +435,7 @@ bool CTxDB::LoadBlockIndex()
     while (iterator->Valid())   //what is so slow in this loop of all PoW blocks?
     {                           // 5 minutes for 1400 blocks, ~300 blocks/min or ~5/sec
 #ifdef WIN32
-        n64timeStart = GetTimeMillis(); 
+        n64timeStart = GetTimeMillis();
 #endif
 
         // Unpack keys and values.
@@ -542,6 +542,7 @@ bool CTxDB::LoadBlockIndex()
         pindexNew->nHeight        = diskindex.nHeight;
         pindexNew->nMint          = diskindex.nMint;
         pindexNew->nMoneySupply   = diskindex.nMoneySupply;
+        pindexNew->nBlockRewardExcludeFees = diskindex.nBlockRewardExcludeFees;
         pindexNew->nFlags         = diskindex.nFlags;
         pindexNew->nStakeModifier = diskindex.nStakeModifier;
         pindexNew->prevoutStake   = diskindex.prevoutStake;

@@ -189,6 +189,8 @@ extern ::int32_t
     nTestNetNewLogicBlockNumber,
     nYac20BlockNumber,
     nYac20BlockNumberTime;
+extern ::uint32_t
+    nEpochInterval;
 extern std::string strMiscWarning;
 
 #ifdef WIN32

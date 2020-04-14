@@ -667,6 +667,8 @@ bool AppInit2()
     fPrintToDebugger = GetBoolArg("-printtodebugger");
     fLogTimestamps = GetBoolArg("-logtimestamps");
 
+    nEpochInterval = (uint32_t)(GetArg("-epochinterval", 21000));
+
     if (mapArgs.count("-timeout"))
     {
         int nNewTimeout = (int)(GetArg("-timeout", 5000));

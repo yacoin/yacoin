@@ -75,6 +75,22 @@ const ::uint32_t
     nHoursPerDay = 24,
     nSecondsPerDay = nHoursPerDay * nSecondsPerHour;
 
+const int
+    nAverageBlocksPerMinute = 1,
+    nNumberOfDaysPerYear = 365,
+    nNumberOfBlocksPerYear = (nAverageBlocksPerMinute *
+                              nMinutesperHour *
+                              nHoursPerDay *
+                              nNumberOfDaysPerYear
+                             ) +    // that 1/4 of a day for leap years
+                              (nAverageBlocksPerMinute *
+                               nMinutesperHour *
+                              (nHoursPerDay/4)
+                            );
+
+const double
+    nInflation = 0.02;      // 2%
+
 extern const unsigned int 
     nStakeMaxAge,
     nOnedayOfAverageBlocks;

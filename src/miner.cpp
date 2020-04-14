@@ -1180,7 +1180,6 @@ static void YacoinMiner(CWallet *pwallet)  // here fProofOfStake is always false
                 , pblock->vtx.size() > 1? "s": ""
                 , ::GetSerializeSize(*pblock, SER_NETWORK, PROTOCOL_VERSION)
               );
-printf("5\n");
         //
         // Pre-build hash buffers
         //
@@ -1387,7 +1386,7 @@ printf("5\n");
                )
             {
                 return;
-            } 
+            }
             //if (nBlockNonce >= 0xffff0000)
             //    break;
 
