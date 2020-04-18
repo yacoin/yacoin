@@ -329,7 +329,7 @@ int main(int argc, char* argv[])
 
     fRet = AppInit(argc, argv);
 
-    if (fRet && fDaemon)
+    if (fRet)
         return 0;
 
     return 1;
