@@ -591,8 +591,8 @@ Value getblocktemplate(const Array& params, bool fHelp)
     result.push_back(Pair("mintime", (Value_type)pindexPrev->GetMedianTimePast()+1));
     result.push_back(Pair("mutable", aMutable));
     result.push_back(Pair("noncerange", "00000000ffffffff"));
-    result.push_back(Pair("sigoplimit", (Value_type)MAX_BLOCK_SIGOPS));
-    result.push_back(Pair("sizelimit", (Value_type)MAX_BLOCK_SIZE));
+    result.push_back(Pair("sigoplimit", (Value_type)GetMaxSize(MAX_BLOCK_SIGOPS)));
+    result.push_back(Pair("sizelimit", (Value_type)GetMaxSize(MAX_BLOCK_SIZE)));
     result.push_back(Pair("curtime", (Value_type)pblock->nTime));
     result.push_back(Pair("bits", HexBits(pblock->nBits)));
     result.push_back(Pair("height", (Value_type)(pindexPrev->nHeight+1)));

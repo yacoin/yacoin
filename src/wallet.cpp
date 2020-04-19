@@ -1880,7 +1880,6 @@ bool CWallet::CreateTransaction(const vector<pair<CScript, int64_t> >& vecSend, 
                 wtxNew.fFromMe = true;
 
                 int64_t nTotalValue = nValue + nFeeRet;
-                double dPriority = 0;
                 // vouts to the payees
                 BOOST_FOREACH (const PAIRTYPE(CScript, int64_t)& s, vecSend)
                     wtxNew.vout.push_back(CTxOut(s.second, s.first));
@@ -1893,7 +1892,6 @@ bool CWallet::CreateTransaction(const vector<pair<CScript, int64_t> >& vecSend, 
                 BOOST_FOREACH(PAIRTYPE(const CWalletTx*, unsigned int) pcoin, setCoins)
                 {
                     int64_t nCredit = pcoin.first->vout[pcoin.second].nValue;
-                    dPriority += (double)nCredit * pcoin.first->GetDepthInMainChain();
                 }
 
                 int64_t nChange = nValueIn - nValue - nFeeRet;
@@ -1943,20 +1941,33 @@ bool CWallet::CreateTransaction(const vector<pair<CScript, int64_t> >& vecSend, 
 
                 // Limit size
                 unsigned int nBytes = ::GetSerializeSize(*(CTransaction*)&wtxNew, SER_NETWORK, PROTOCOL_VERSION);
-                if (nBytes >= (2*MAX_BLOCK_SIZE_GEN/3) )    // was MAX_BLOCK_SIZE_GEN/5 why????????????
+                if (nBytes >= (2*GetMaxSize(MAX_BLOCK_SIZE_GEN)/3) )    // was MAX_BLOCK_SIZE_GEN/5 why????????????
                     return false;
-                dPriority /= nBytes;
 
                 // Check that enough fee is included
-                bool fAllowFree = CTransaction::AllowFree(dPriority);
-                int64_t nPayFee = nTransactionFee * (1 + (int64_t)nBytes / 1000);
-                int64_t nMinFee = wtxNew.GetMinFee(1, fAllowFree, GMF_SEND, nBytes);
+                // nPayFee is the min transaction fee is set by user. There are two methods to set nPayFee:
+                // 1) Set with option "paytxfee" in yacoin.conf
+                // 2) Set with rpc command "settxfee"
+                int64_t nPayFee = (nBytes * nTransactionFee) / 1000;
+                int64_t nMinFee = wtxNew.GetMinFee(nBytes);
 
+                printf("CWallet::CreateTransaction, nBytes = %d, "
+                       "nPayFee = %ld, "
+                       "nMinFee = %ld\n",
+                       nBytes, nPayFee, nMinFee);
                 if (nFeeRet < max(nPayFee, nMinFee))
                 {
                     nFeeRet = max(nPayFee, nMinFee);
                     continue;
                 }
+
+                printf("CWallet::CreateTransaction, nBytes = %d, "
+                                               "total UTXO value = %ld, "
+                                               "send %ld, "
+                                               "change %ld, "
+                                               "expected fee = %ld, "
+                                               "nFeeRet = %ld\n",
+                       nBytes, nValueIn, nValue, nChange, nValueIn - nValue - nChange, nFeeRet);
 
                 // Fill vtxPrev by copying from previous transactions vtxPrev
                 wtxNew.AddSupportingTransactions(txdb);
@@ -2081,16 +2092,12 @@ bool CWallet::MergeCoins(const int64_t& nAmount, const int64_t& nMinValue, const
 
         // Assuming that average scriptsig size is 110 bytes
         int64_t nBytes = ::GetSerializeSize(*(CTransaction*)&wtxNew, SER_NETWORK, PROTOCOL_VERSION) + wtxNew.vin.size() * 110;
-        dWeight += (double)nCredit * pcoin.first->GetDepthInMainChain();
 
-        double dFinalPriority = dWeight /= nBytes;
-        bool fAllowFree = CTransaction::AllowFree(dFinalPriority);
-
-        // Get actual transaction fee according to its estimated size and priority
-        int64_t nMinFee = wtxNew.GetMinFee(1, fAllowFree, GMF_SEND, nBytes);
+        // Get actual transaction fee according to its estimated size
+        int64_t nMinFee = wtxNew.GetMinFee(nBytes);
 
         // Prepare transaction for commit if sum is enough ot its size is too big
-        if (nBytes >= MAX_BLOCK_SIZE_GEN/6 || wtxNew.vout[0].nValue >= nOutputValue)
+        if (nBytes >= GetMaxSize(MAX_BLOCK_SIZE_GEN)/6 || wtxNew.vout[0].nValue >= nOutputValue)
         {
             wtxNew.vout[0].nValue -= nMinFee; // Set actual fee
 
@@ -2119,11 +2126,8 @@ bool CWallet::MergeCoins(const int64_t& nAmount, const int64_t& nMinValue, const
     if (wtxNew.vout[0].nValue > 0) {
         int64_t nBytes = ::GetSerializeSize(*(CTransaction*)&wtxNew, SER_NETWORK, PROTOCOL_VERSION) + wtxNew.vin.size() * 110;
 
-        double dFinalPriority = dWeight /= nBytes;
-        bool fAllowFree = CTransaction::AllowFree(dFinalPriority);
-
         // Get actual transaction fee according to its size and priority
-        int64_t nMinFee = wtxNew.GetMinFee(1, fAllowFree, GMF_SEND, nBytes);
+        int64_t nMinFee = wtxNew.GetMinFee(nBytes);
 
         wtxNew.vout[0].nValue -= nMinFee; // Set actual fee
 
@@ -2539,13 +2543,13 @@ bool CWallet::CreateCoinStake(
         unsigned int 
             nBytes = ::GetSerializeSize(txNew, SER_NETWORK, PROTOCOL_VERSION);
 
-        if (nBytes >= MAX_BLOCK_SIZE_GEN/5)
+        if (nBytes >= GetMaxSize(MAX_BLOCK_SIZE_GEN)/5)
             return error("CreateCoinStake : exceeded coinstake size limit");
 
         // Check enough fee is paid
-        if (nMinFee < txNew.GetMinFee() - MIN_TX_FEE)
+        if (nMinFee < txNew.GetMinFee(nBytes))
         {
-            nMinFee = txNew.GetMinFee() - MIN_TX_FEE;
+            nMinFee = txNew.GetMinFee(nBytes);
             continue; // try signing again
         }
         else
@@ -2816,13 +2820,13 @@ bool CWallet::CreateCoinStake(
 
         // Limit size
         unsigned int nBytes = ::GetSerializeSize(txNew, SER_NETWORK, PROTOCOL_VERSION);
-        if (nBytes >= MAX_BLOCK_SIZE_GEN/5)
+        if (nBytes >= GetMaxSize(MAX_BLOCK_SIZE_GEN)/5)
             return error("CreateCoinStake : exceeded coinstake size limit");
 
         // Check enough fee is paid
-        if (nMinFee < txNew.GetMinFee(1, false, GMF_BLOCK, nBytes) - CENT)
+        if (nMinFee < txNew.GetMinFee(nBytes))
         {
-            nMinFee = txNew.GetMinFee(1, false, GMF_BLOCK, nBytes) - CENT;
+            nMinFee = txNew.GetMinFee(nBytes);
             continue; // try signing again
         }
         else

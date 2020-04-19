@@ -59,14 +59,13 @@ extern int
     nStatisticsNumberOfBlocks100,
     nStatisticsNumberOfBlocks;
 
-static const unsigned int MAX_BLOCK_SIZE = 1000000;
-static const unsigned int MAX_BLOCK_SIZE_GEN = MAX_BLOCK_SIZE/2;
-static const unsigned int MAX_BLOCK_SIGOPS = MAX_BLOCK_SIZE/50;
-static const unsigned int MAX_ORPHAN_TRANSACTIONS = MAX_BLOCK_SIZE/100;
+static const unsigned int MAX_GENESIS_BLOCK_SIZE = 1000000;
+static const unsigned int MAX_ORPHAN_TRANSACTIONS = 10000;
+static const unsigned int DEFAULT_MAX_BLOCK_SIGOPS = 20000;
 static const unsigned int MAX_INV_SZ = 50000;
 
 static const ::int64_t MIN_TX_FEE = CENT;
-static const ::int64_t MIN_RELAY_TX_FEE = CENT/50;
+static const ::int64_t MIN_RELAY_TX_FEE = MIN_TX_FEE;
 
 static const ::int64_t MAX_MONEY = 2000000000 * COIN;
 static const ::int64_t MAX_MINT_PROOF_OF_WORK = 100 * COIN;
@@ -144,6 +143,13 @@ extern const uint256 entropyStore[38];
 // Minimum disk space required - used in CheckDiskSpace()
 static const ::uint64_t nMinDiskSpace = 52428800;
 
+enum GetMaxSize_mode
+{
+    MAX_BLOCK_SIZE,
+    MAX_BLOCK_SIZE_GEN,
+    MAX_BLOCK_SIGOPS,
+};
+
 class CReserveKey;
 class CTxDB;
 class CTxIndex;
@@ -172,10 +178,11 @@ void ThreadScriptCheckQuit();
 
 bool CheckProofOfWork(uint256 hash, unsigned int nBits);
 unsigned int GetNextTargetRequired(const CBlockIndex* pindexLast, bool fProofOfStake);
-::int64_t GetProofOfWorkReward(unsigned int nBits, ::int64_t nFees=0);
+::int64_t GetProofOfWorkReward(unsigned int nBits=0, ::int64_t nFees=0);
 ::int64_t GetProofOfStakeReward(::int64_t nCoinAge, unsigned int nBits, ::int64_t nTime, bool bCoinYearOnly=false);
 
 ::int64_t GetProofOfStakeReward(::int64_t nCoinAge);
+::uint64_t GetMaxSize(enum GetMaxSize_mode mode);
 
 unsigned int ComputeMinWork(unsigned int nBase, ::int64_t nTime);
 unsigned int ComputeMinStake(unsigned int nBase, ::int64_t nTime, unsigned int nBlockTime);
@@ -499,16 +506,6 @@ public:
     }
 };
 
-
-
-
-enum GetMinFee_mode
-{
-    GMF_BLOCK,
-    GMF_RELAY,
-    GMF_SEND,
-};
-
 typedef std::map<uint256, std::pair<CTxIndex, CTransaction> > MapPrevTx;
 
 /** The basic transaction that is broadcasted on the network and contained in
@@ -692,7 +689,7 @@ public:
         return dPriority > COIN * 144 / 250;
     }
 
-    ::int64_t GetMinFee(unsigned int nBlockSize=1, bool fAllowFree=false, enum GetMinFee_mode mode=GMF_BLOCK, unsigned int nBytes = 0) const;
+    ::int64_t GetMinFee(unsigned int nBytes = 0) const;
 
     bool ReadFromDisk(CDiskTxPos pos, FILE** pfileRet=NULL)
     {
