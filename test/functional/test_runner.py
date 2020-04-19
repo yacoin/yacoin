@@ -66,14 +66,24 @@ if os.name != 'nt' or sys.getwindowsversion() >= (10, 0, 14393):
 TEST_EXIT_PASSED = 0
 TEST_EXIT_SKIPPED = 77
 
-EXTENDED_SCRIPTS = [
+BASE_SCRIPTS = [
+    'feature_help.py',    
+    'interface_rpc.py',
+    'mining_basic.py',
+    'feature_block_reward.py',
+    'rpc_check.py'
+]
+
+EXTENDED_SCRIPTS = []
+
+ALL_EXTENDED_SCRIPTS = [
     # These tests are not run by default.
     # Longest test should go first, to favor running tests in parallel
     'feature_pruning.py',
     'feature_dbcrash.py',
 ]
 
-BASE_SCRIPTS = [
+ALL_BASE_SCRIPTS = [
     # Scripts that are run by default.
     # Longest test should go first, to favor running tests in parallel
     'wallet_hd.py',
