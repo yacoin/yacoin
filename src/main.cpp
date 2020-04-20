@@ -146,6 +146,7 @@ CBigNum bnProofOfStakeHardLimit(~uint256(0) >> 30); // fix minimal proof of stak
                                             // this is the number used by TestNet 0.5.0.x
 const uint256 nPoWeasiestTargetLimitTestNet = ((~uint256( 0 )) >> 3 );
 CBigNum bnProofOfWorkLimitTestNet( nPoWeasiestTargetLimitTestNet );
+::int64_t nBlockRewardPrev = 0;
 //YACOIN TODO
 
 static CBigNum bnProofOfStakeTestnetLimit(~uint256(0) >> 20);
@@ -1392,13 +1393,11 @@ CBigNum inline GetProofOfStakeLimit(int nHeight, unsigned int nTime)
                     nSimulatedMOneySupplyAtFork) /
                     nNumberOfBlocksPerYear
                 ) * nInflation;
+            nBlockRewardPrev = nBlockRewardExcludeFees;
         } else
         {
-            nBlockRewardExcludeFees = (::int64_t)
-                (pindexBest->pprev? pindexBest->pprev->nBlockRewardExcludeFees: 0);
+            nBlockRewardExcludeFees = nBlockRewardPrev;
         }
-
-        pindexBest->nBlockRewardExcludeFees = nBlockRewardExcludeFees;
         return nBlockRewardExcludeFees + nFees;
     }
 #endif
