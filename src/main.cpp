@@ -675,7 +675,7 @@ bool CTransaction::CheckTransaction() const
     if (vout.empty())
         return DoS(10, error("CTransaction::CheckTransaction() : vout empty"));
     // Size limits
-    if (::GetSerializeSize(*this, SER_NETWORK, PROTOCOL_VERSION) > MAX_BLOCK_SIZE)
+    if (::GetSerializeSize(*this, SER_NETWORK, PROTOCOL_VERSION) > GetMaxSize(MAX_BLOCK_SIZE))
         return DoS(100, error("CTransaction::CheckTransaction() : size limits failed"));
 
     // Check for negative or overflow output values
@@ -725,60 +725,9 @@ bool CTransaction::CheckTransaction() const
     return true;
 }
 
-::int64_t CTransaction::GetMinFee(unsigned int nBlockSize, bool fAllowFree, enum GetMinFee_mode mode, unsigned int nBytes) const
+::int64_t CTransaction::GetMinFee(unsigned int nBytes) const
 {
-    ::int64_t nMinTxFee = MIN_TX_FEE, nMinRelayTxFee = MIN_RELAY_TX_FEE;
-
-    if(IsCoinStake())
-    {
-        // Enforce 0.01 as minimum fee for old approach or coinstake
-        nMinTxFee = CENT;
-        nMinRelayTxFee = CENT;
-    }
-
-    // Base fee is either nMinTxFee or nMinRelayTxFee
-    ::int64_t nBaseFee = (mode == GMF_RELAY) ? nMinRelayTxFee : nMinTxFee;
-
-    unsigned int nNewBlockSize = nBlockSize + nBytes;
-    ::int64_t nMinFee = (1 + (::int64_t)nBytes / 1000) * nBaseFee;
-
-    if (fAllowFree)
-    {
-        if (nBlockSize == 1)
-        {
-            // Transactions under 1K are free
-            if (nBytes < 1000)
-                nMinFee = 0;
-        }
-        else
-        {
-            // Free transaction area
-            if (nNewBlockSize < 27000)
-                nMinFee = 0;
-        }
-    }
-
-    // To limit dust spam, require additional MIN_TX_FEE/MIN_RELAY_TX_FEE for
-    //    each non empty output which is less than 0.01
-    //
-    // It's safe to ignore empty outputs here, because these inputs are allowed
-    //     only for coinbase and coinstake transactions.
-    BOOST_FOREACH(const CTxOut& txout, vout)
-        if (txout.nValue < CENT && !txout.IsEmpty())
-            nMinFee += nBaseFee;
-
-    // Raise the price as the block approaches full
-    if (nBlockSize != 1 && nNewBlockSize >= MAX_BLOCK_SIZE_GEN/2)
-    {
-        if (nNewBlockSize >= MAX_BLOCK_SIZE_GEN)
-            return MAX_MONEY;
-        nMinFee *= MAX_BLOCK_SIZE_GEN / (MAX_BLOCK_SIZE_GEN - nNewBlockSize);
-    }
-
-    if (!MoneyRange(nMinFee))
-        nMinFee = MAX_MONEY;
-
-    return nMinFee;
+    return (nBytes * MIN_TX_FEE) / 1000;
 }
 
 
@@ -873,36 +822,11 @@ bool CTxMemPool::accept(CTxDB& txdb, CTransaction &tx, bool fCheckInputs,
         unsigned int nSize = ::GetSerializeSize(tx, SER_NETWORK, PROTOCOL_VERSION);
 
         // Don't accept it if it can't get into a block
-        ::int64_t txMinFee = tx.GetMinFee(1000, true, GMF_RELAY, nSize);
+        ::int64_t txMinFee = tx.GetMinFee(nSize);
         if (nFees < txMinFee)
             return error("CTxMemPool::accept() : not enough fees %s, %" PRId64 " < %" PRId64,
                          hash.ToString().c_str(),
                          nFees, txMinFee);
-
-        // Continuously rate-limit free transactions
-        // This mitigates 'penny-flooding' -- sending thousands of free transactions just to
-        // be annoying or make others' transactions take longer to confirm.
-        if (nFees < MIN_RELAY_TX_FEE)
-        {
-            static CCriticalSection cs;
-            static double dFreeCount;
-            static ::int64_t nLastTime;
-            ::int64_t nNow = GetTime();
-
-            {
-                LOCK(cs);
-                // Use an exponentially decaying ~10-minute window:
-                dFreeCount *= pow(1.0 - 1.0/600.0, (double)(nNow - nLastTime));
-                nLastTime = nNow;
-                // -limitfreerelay unit is thousand-bytes-per-minute
-                // At default rate it would take over a month to fill 1GB
-                if (dFreeCount > GetArg("-limitfreerelay", 15)*10*1000 && !IsFromMe(tx))
-                    return error("CTxMemPool::accept() : free transaction rejected by rate limiter");
-                if (fDebug)
-                    printf("Rate limit dFreeCount: %g => %g\n", dFreeCount, dFreeCount+nSize);
-                dFreeCount += nSize;
-            }
-        }
 
         // Check against previous transactions
         // This is done last to help prevent CPU exhaustion denial-of-service attacks.
@@ -1435,6 +1359,35 @@ CBigNum inline GetProofOfStakeLimit(int nHeight, unsigned int nTime)
         printf("GetProofOfWorkReward() : create=%s nBits=0x%08x nSubsidy=%" PRId64 "\n", FormatMoney(nSubsidy).c_str(), nBits, nSubsidy);
 
     return min(nSubsidy, MAX_MINT_PROOF_OF_WORK) + nFees;
+}
+
+::uint64_t GetMaxSize(enum GetMaxSize_mode mode)
+{
+    ::uint64_t nMaxSize = 0;
+    if (pindexGenesisBlock == NULL)
+    {
+        nMaxSize = MAX_GENESIS_BLOCK_SIZE;
+    }
+    else
+    {
+        nMaxSize = (GetProofOfWorkReward() / MIN_TX_FEE) * 1000;
+    }
+
+    switch (mode)
+    {
+        case MAX_BLOCK_SIZE_GEN:
+            nMaxSize /= 2;
+            break;
+
+        case MAX_BLOCK_SIGOPS:
+            nMaxSize = max(nMaxSize, (::uint64_t)DEFAULT_MAX_BLOCK_SIGOPS);
+            break;
+
+        case MAX_BLOCK_SIZE:
+        default:
+            break;
+    }
+    return nMaxSize;
 }
 
 // ppcoin: miner's coin stake is rewarded based on coin age spent (coin-days)
@@ -2590,7 +2543,7 @@ bool CTransaction::ConnectInputs(
                                                             pindexBlock->nBits, 
                                                             nTime
                                                          ) - 
-                                    GetMinFee(1, false, GMF_BLOCK, nTxSize) + 
+                                    GetMinFee(nTxSize) +
                                     CENT;
 
             if (nReward > nCalculatedReward)
@@ -2755,7 +2708,7 @@ bool CBlock::ConnectBlock(CTxDB& txdb, CBlockIndex* pindex, bool fJustCheck)
         }
 
         nSigOps += tx.GetLegacySigOpCount();
-        if (nSigOps > MAX_BLOCK_SIGOPS)
+        if (nSigOps > GetMaxSize(MAX_BLOCK_SIGOPS))
             return DoS(100, error("ConnectBlock() : too many sigops"));
 
         CDiskTxPos posThisTx(pindex->nFile, pindex->nBlockPos, nTxPos);
@@ -2775,7 +2728,7 @@ bool CBlock::ConnectBlock(CTxDB& txdb, CBlockIndex* pindex, bool fJustCheck)
             // this is to prevent a "rogue miner" from creating
             // an incredibly-expensive-to-validate block.
             nSigOps += tx.GetP2SHSigOpCount(mapInputs);
-            if (nSigOps > MAX_BLOCK_SIGOPS)
+            if (nSigOps > GetMaxSize(MAX_BLOCK_SIGOPS))
                 return DoS(100, error("ConnectBlock() : too many sigops"));
 
             ::int64_t nTxValueIn = tx.GetValueIn(mapInputs);
@@ -3311,7 +3264,7 @@ bool CBlock::CheckBlock(bool fCheckPOW, bool fCheckMerkleRoot, bool fCheckSig) c
         nSigOps = 0; // total sigops
 
     // Size limits
-    if (vtx.empty() || vtx.size() > MAX_BLOCK_SIZE || ::GetSerializeSize(*this, SER_NETWORK, PROTOCOL_VERSION) > MAX_BLOCK_SIZE)
+    if (vtx.empty() || vtx.size() > GetMaxSize(MAX_BLOCK_SIZE) || ::GetSerializeSize(*this, SER_NETWORK, PROTOCOL_VERSION) > GetMaxSize(MAX_BLOCK_SIZE))
         return DoS(100, error("CheckBlock () : size limits failed"));
 
     bool fProofOfStake = IsProofOfStake();
@@ -3423,7 +3376,7 @@ bool CBlock::CheckBlock(bool fCheckPOW, bool fCheckMerkleRoot, bool fCheckSig) c
         return DoS(100, error("CheckBlock () : duplicate transaction"));
 
     // Reject block if validation would consume too much resources.
-    if (nSigOps > MAX_BLOCK_SIGOPS)
+    if (nSigOps > GetMaxSize(MAX_BLOCK_SIGOPS))
         return DoS(100, error("CheckBlock () : out-of-bounds SigOpCount"));
 
     // Check merkle root
@@ -4592,7 +4545,7 @@ bool LoadExternalBlockFile(FILE* fileIn)
                 unsigned int nSize;
                 blkdat >> nSize;
                 if (
-                    (nSize > 0) && (nSize <= MAX_BLOCK_SIZE)
+                    (nSize > 0) && (nSize <= GetMaxSize(MAX_BLOCK_SIZE))
                    )
                 {
                     CBlock block;

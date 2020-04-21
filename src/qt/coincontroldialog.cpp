@@ -495,7 +495,7 @@ void CoinControlDialog::updateLabels(WalletModel *model, QWidget* dialog)
         // Fee
         int64_t nFee = nTransactionFee * (1 + (int64_t)nBytes / 1000);
         // Min Fee
-        int64_t nMinFee = txDummy.GetMinFee(1, fAllowFree, GMF_SEND, nBytes);
+        int64_t nMinFee = txDummy.GetMinFee(nBytes);
 
         nPayFee = max(nFee, nMinFee);
 
