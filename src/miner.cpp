@@ -40,6 +40,7 @@ using std::string;
 //
 
 extern unsigned int nMinerSleep;
+int nBlocksToGenerate = -10;
 
 int static FormatHashBlocks(void* pbuffer, unsigned int len)
 {
@@ -1051,13 +1052,13 @@ static void YacoinMiner(CWallet *pwallet)  // here fProofOfStake is always false
     unsigned int 
         nExtraNonce = 0;
 
-    while ( fGenerateBitcoins )
+    while ( fGenerateBitcoins && nBlocksToGenerate!=0)
     {
-        while (
-               IsInitialBlockDownload() || 
+        while (IsInitialBlockDownload() 
+               || 
                (
                 vNodes.empty() 
-                //&& !fTestNet               //TestNet can mine stand alone!
+                && !fTestNet               //TestNet can mine stand alone!
                 // could be that if there is more than one stand alone mining
                 // forks on the blockchain can't be resolved?
                )
@@ -1085,7 +1086,6 @@ static void YacoinMiner(CWallet *pwallet)  // here fProofOfStake is always false
             Sleep(nMillisecondsPerSecond);
         }
         strMintWarning = "";
-
         //
         // Create new block
         //
@@ -1118,7 +1118,6 @@ static void YacoinMiner(CWallet *pwallet)  // here fProofOfStake is always false
                 , pblock->vtx.size() > 1? "s": ""
                 , ::GetSerializeSize(*pblock, SER_NETWORK, PROTOCOL_VERSION)
               );
-
         //
         // Pre-build hash buffers
         //
@@ -1163,7 +1162,7 @@ static void YacoinMiner(CWallet *pwallet)  // here fProofOfStake is always false
                      "Starting mining loop\n"
                     );
 #endif
-        while( fGenerateBitcoins )
+        while( fGenerateBitcoins && nBlocksToGenerate!=0)
         {
             unsigned int nNonceFound;
 
@@ -1216,6 +1215,10 @@ static void YacoinMiner(CWallet *pwallet)  // here fProofOfStake is always false
                             "", 
                             pblock->GetHash().ToString().c_str()
                           ); 
+                    if(nBlocksToGenerate>0) {
+                        nBlocksToGenerate--;
+                        printf("Remaining blocks to mine %d\n",nBlocksToGenerate);
+                    }
                 }
                 SetThreadPriority(THREAD_PRIORITY_LOWEST);
                     break;
@@ -1382,7 +1385,7 @@ void static ThreadYacoinMiner(void* parg)
 //_____________________________________________________________________________
 
 // here we add the missing PoW mining code from 0.4.4
-void GenerateYacoins(bool fGenerate, CWallet* pwallet)
+void GenerateYacoins(bool fGenerate, CWallet* pwallet, int nblocks)
 {
     fGenerateBitcoins = fGenerate;
     nLimitProcessors = GetArg("-genproclimit", -1);
@@ -1392,6 +1395,7 @@ void GenerateYacoins(bool fGenerate, CWallet* pwallet)
 
     if (fGenerate)
     {
+        nBlocksToGenerate = nblocks;
         int 
             nProcessors = boost::thread::hardware_concurrency();
 
@@ -1415,6 +1419,10 @@ void GenerateYacoins(bool fGenerate, CWallet* pwallet)
             if (!NewThread(ThreadYacoinMiner, pwallet))
                 printf("Error: NewThread(ThreadBitcoinMiner) failed\n");
             Sleep( nTenMilliseconds );
+        }
+
+        while(nBlocksToGenerate>0) {
+            Sleep(nMillisecondsPerSecond);
         }
     }
 }

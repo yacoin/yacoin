@@ -121,7 +121,7 @@ static void handleRunawayException(std::exception *e)
                           QString("\n\n") + 
                           QString::fromStdString(strMiscWarning)
                          );
-    exit(1);
+    exit(20);
 }
 
 #ifndef BITCOIN_QT_TEST

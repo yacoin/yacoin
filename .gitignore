@@ -1,7 +1,15 @@
+peers.dat
 configure
 config.log
 config.status
 libtool
+Code Cache/*
+Cache/*
+GPUCache/*
+test/config.ini
+test/cache/*
+test/functional/test_framework/__pycache__/*
+src/data/*
 src/*.exe
 src/yacoin
 src/yacoind
@@ -55,3 +63,4 @@ Makefile.Debug
 Makefile.release
 object_script.yacoin-qt.Debug
 object_script.yacoin-qt.Release
+*.pyc

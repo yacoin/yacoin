@@ -2144,8 +2144,8 @@ void ThreadOpenConnections2(void* parg)
         if (fShutdown)
             return;
 
-        // Add seed nodes if IRC isn't working
-        if (
+        // Add seed nodes if IRC isn't working        
+        if ( false && // AO: Don't add seed nodes for evaluating tests.
             !IsLimited(NET_IPV4) && 
             addrman.size()==0 && 
             (GetTime() - nStart > 60) &&    // why 60? 60 what?
@@ -2585,17 +2585,13 @@ void ThreadMessageHandler2(void* parg)
 {
     printf("ThreadMessageHandler2 started\n");
     SetThreadPriority(THREAD_PRIORITY_BELOW_NORMAL);
-    int
-        nLoopCounter = 0;
+    int nLoopCounter = 0;
     while (!fShutdown)
-    {
-        if( fDebug )
-        {
-               (void)printf(
-                             "ThreadMessageHandler2 is looping"
-                             "\n"
-                            );
+    {        
+        if( fDebug && nLoopCounter%100 == 0) {
+            printf("ThreadMessageHandler2 is looping\n");
         }
+        nLoopCounter++;
         bool fHaveSyncNode = false;
         vector<CNode*> vNodesCopy;
         {
@@ -2615,8 +2611,7 @@ void ThreadMessageHandler2(void* parg)
             StartSync(vNodesCopy);
 *******************/
         // Poll the connected nodes for messages
-        CNode
-            * pnodeTrickle = NULL;
+        CNode* pnodeTrickle = NULL;
 
         if (!vNodesCopy.empty())
             pnodeTrickle = vNodesCopy[GetRand(vNodesCopy.size())];
@@ -2685,7 +2680,7 @@ void ThreadMessageHandler2(void* parg)
             }
             return;
         }
-        Sleep( nOneHundredMilliseconds );
+        Sleep( nMillisecondsPerSecond );
     }
     if( fDebug )
     {

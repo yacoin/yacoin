@@ -11,6 +11,7 @@ jobs:
         run: |
           docker pull dev34253/yacoin-build:ubuntu.16.04
           docker run -v /home/runner/work/yacoin/yacoin:/src dev34253/yacoin-build:ubuntu.16.04
+          docker run -v /home/runner/work/yacoin/yacoin:/src --entrypoint /src/test/functional/test_runner.py dev34253/yacoin-build:ubuntu.16.04 -j 1
   build-ubuntu-1804:
     runs-on: ubuntu-latest  
     steps:
@@ -35,10 +36,6 @@ jobs:
         run: |
           docker pull dev34253/yacoin-build:windows.2
           docker run -v %CD%:c:\src dev34253/yacoin-build:windows.2
-          dir
-          dir src
-          cd src
-          dir qt
         shell: cmd
       - uses: actions/upload-artifact@v1
         with:

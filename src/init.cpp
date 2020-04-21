@@ -254,7 +254,11 @@ bool AppInit(int argc, char* argv[])
                                                 
                                                 // this is documentation!
 
-        if (mapArgs.count("-?") || mapArgs.count("--h") || mapArgs.count("--help"))
+        if(mapArgs.count("--version") || mapArgs.count("-v")){
+            std::string msg = "Yacoin version: " + FormatFullVersion() + "\n\n";
+            fprintf(stdout, "%s", msg.c_str());
+            exit(0);
+        } else if (mapArgs.count("-?") || mapArgs.count("-h") || mapArgs.count("--help"))
         {
             // First part of help message is specific to yacoind / RPC client
             std::string strUsage = _("Yacoin version") + " " + FormatFullVersion() + "\n\n" +
@@ -270,8 +274,8 @@ bool AppInit(int argc, char* argv[])
 #ifdef _MSC_VER
             fRet = false;
             //Shutdown(NULL);
-#else
-            return false;
+#else            
+            exit(0);
 #endif
         }
         else
@@ -367,6 +371,7 @@ std::string HelpMessage()
 {
     string strUsage = _("Options:") + "\n" +
         "  -?                     " + _("This help message") + "\n" +
+        "  -v                     " + _("Yacoin version") + "\n" +
         "  -conf=<file>           " + _("Specify configuration file (default: yacoin.conf)") + "\n" +
         "  -pid=<file>            " + _("Specify pid file (default: yacoind.pid)") + "\n" +
         "  -datadir=<dir>         " + _("Specify data directory") + "\n" +
@@ -576,10 +581,10 @@ bool AppInit2()
     {
         SoftSetBoolArg("-irc", true);
     }
-    else    // not Test Net
-    {
-        return InitError( _("Yac1.0 must be set for testNet.") );
-    }
+    // else    // not Test Net
+    // {
+    //     return InitError( _("Yac1.0 must be set for testNet.") );
+    // }
 
     if (mapArgs.count("-bind")) {
         // when specifying an explicit binding address, you want to listen on it
