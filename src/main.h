@@ -131,6 +131,7 @@ extern unsigned char pchMessageStart[4];
 extern std::map<uint256, CBlock*> mapOrphanBlocks;
 extern ::int64_t nBlockRewardPrev;
 extern const ::int64_t nSimulatedMOneySupplyAtFork;
+extern ::uint32_t nMinEase; // minimum ease corresponds to highest difficulty
 
 // Settings
 extern ::int64_t nTransactionFee;

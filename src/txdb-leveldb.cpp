@@ -561,6 +561,12 @@ bool CTxDB::LoadBlockIndex()
                     nNumberOfBlocksPerYear
                 ) * nInflation;
         }
+        // Find the minimum ease (highest difficulty) when starting node
+        // It will be used to calculate min difficulty (maximum ease)
+        if (nMinEase > pindexNew->nBits)
+        {
+            nMinEase = pindexNew->nBits;
+        }
 
 #ifdef WIN32
         n64timeStart11 = GetTimeMillis(); 
