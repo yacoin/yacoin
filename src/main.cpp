@@ -152,7 +152,7 @@ CBigNum bnProofOfWorkLimitTestNet( nPoWeasiestTargetLimitTestNet );
 
 // YACOIN TODO
 ::int64_t nBlockRewardPrev = 0;
-::uint32_t nMinEase = std::numeric_limits<::uint32_t>::max();
+::uint32_t nMinEase = std::numeric_limits< ::uint32_t>::max();
 
 
 static CBigNum bnProofOfStakeTestnetLimit(~uint256(0) >> 20);
