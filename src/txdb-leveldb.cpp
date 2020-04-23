@@ -542,7 +542,6 @@ bool CTxDB::LoadBlockIndex()
         pindexNew->nHeight        = diskindex.nHeight;
         pindexNew->nMint          = diskindex.nMint;
         pindexNew->nMoneySupply   = diskindex.nMoneySupply;
-        pindexNew->nBlockRewardExcludeFees = diskindex.nBlockRewardExcludeFees;
         pindexNew->nFlags         = diskindex.nFlags;
         pindexNew->nStakeModifier = diskindex.nStakeModifier;
         pindexNew->prevoutStake   = diskindex.prevoutStake;
@@ -553,6 +552,21 @@ bool CTxDB::LoadBlockIndex()
         pindexNew->nTime          = diskindex.nTime;
         pindexNew->nBits          = diskindex.nBits;
         pindexNew->nNonce         = diskindex.nNonce;
+
+        if (pindexNew->nHeight % nEpochInterval == 0) {
+            nBlockRewardPrev = (::int64_t)
+                (
+                (pindexNew->pprev? pindexNew->pprev->nMoneySupply:
+                    nSimulatedMOneySupplyAtFork) /
+                    nNumberOfBlocksPerYear
+                ) * nInflation;
+        }
+        // Find the minimum ease (highest difficulty) when starting node
+        // It will be used to calculate min difficulty (maximum ease)
+        if (nMinEase > pindexNew->nBits)
+        {
+            nMinEase = pindexNew->nBits;
+        }
 
 #ifdef WIN32
         n64timeStart11 = GetTimeMillis(); 

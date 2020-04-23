@@ -132,6 +132,9 @@ extern CCriticalSection cs_setpwalletRegistered;
 extern std::set<CWallet*> setpwalletRegistered;
 extern unsigned char pchMessageStart[4];
 extern std::map<uint256, CBlock*> mapOrphanBlocks;
+extern ::int64_t nBlockRewardPrev;
+extern const ::int64_t nSimulatedMOneySupplyAtFork;
+extern ::uint32_t nMinEase; // minimum ease corresponds to highest difficulty
 
 // Settings
 extern ::int64_t nTransactionFee;
@@ -1457,8 +1460,6 @@ public:
     ::int64_t nMint;
     ::int64_t nMoneySupply;
 
-    ::int64_t nBlockRewardExcludeFees;
-
     ::uint32_t nFlags;  // ppcoin: block index flags
     enum  
     {
@@ -1497,7 +1498,6 @@ public:
         bnChainTrust = CBigNum(0);
         nMint = 0;
         nMoneySupply = 0;
-        nBlockRewardExcludeFees = 0;
         nFlags = 0;
         nStakeModifier = 0;
         nStakeModifierChecksum = 0;
@@ -1526,7 +1526,6 @@ public:
         bnChainTrust = CBigNum(0);
         nMint = 0;
         nMoneySupply = 0;
-        nBlockRewardExcludeFees = 0;
         nFlags = 0;
         nStakeModifier = 0;
         nStakeModifierChecksum = 0;
@@ -1717,7 +1716,6 @@ public:
         READWRITE(nHeight);
         READWRITE(nMint);
         READWRITE(nMoneySupply);
-        READWRITE(nBlockRewardExcludeFees);
         READWRITE(nFlags);
         READWRITE(nStakeModifier);
         if (IsProofOfStake())

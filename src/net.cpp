@@ -3047,7 +3047,8 @@ bool StopNode()
     while (
         (vnThreadsRunning[THREAD_MESSAGEHANDLER] > 0) || 
         (vnThreadsRunning[THREAD_RPCHANDLER] > 0) || 
-        (vnThreadsRunning[THREAD_SCRIPTCHECK] > 0)
+        (vnThreadsRunning[THREAD_SCRIPTCHECK] > 0) ||
+        (vnThreadsRunning[THREAD_ADDEDCONNECTIONS] > 0)
           )
       //Sleep(20);      // again, related to above?  Or not? Or ...???
         Sleep(2 * nTenMilliseconds);      // again, related to above?  Or not? Or ...???
