@@ -7,6 +7,9 @@
     #include "msvc_warnings.push.h"
 #endif
 
+//#define DEBUG_LOCKORDER
+//#define DEBUG_LOCKCONTENTION
+
 #ifndef BITCOIN_SYNC_H
  #include "sync.h"
 #endif

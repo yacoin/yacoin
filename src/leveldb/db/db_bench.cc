@@ -698,7 +698,7 @@ class Benchmark {
     Status s = DB::Open(options, FLAGS_db, &db_);
     if (!s.ok()) {
       fprintf(stderr, "open error: %s\n", s.ToString().c_str());
-      exit(1);
+      exit(11);
     }
   }
 
@@ -734,7 +734,7 @@ class Benchmark {
       s = db_->Write(write_options_, &batch);
       if (!s.ok()) {
         fprintf(stderr, "put error: %s\n", s.ToString().c_str());
-        exit(1);
+        exit(12);
       }
     }
     thread->stats.AddBytes(bytes);
@@ -843,7 +843,7 @@ class Benchmark {
       s = db_->Write(write_options_, &batch);
       if (!s.ok()) {
         fprintf(stderr, "del error: %s\n", s.ToString().c_str());
-        exit(1);
+        exit(13);
       }
     }
   }
@@ -877,7 +877,7 @@ class Benchmark {
         Status s = db_->Put(write_options_, key, gen.Generate(value_size_));
         if (!s.ok()) {
           fprintf(stderr, "put error: %s\n", s.ToString().c_str());
-          exit(1);
+          exit(14);
         }
       }
 
@@ -961,7 +961,7 @@ int main(int argc, char** argv) {
       FLAGS_db = argv[i] + 5;
     } else {
       fprintf(stderr, "Invalid flag '%s'\n", argv[i]);
-      exit(1);
+      exit(15);
     }
   }
 

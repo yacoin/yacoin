@@ -257,7 +257,7 @@ void MintingTableModel::update()
                 {
                     BOOST_FOREACH(const CTxIn& txin, wtx.vin)
                     {
-                        updated.append(txin.prevout.hash);
+                        updated.append(txin.prevout.COutPointGetHash());
                     }
                 }
             }

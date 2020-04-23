@@ -49,15 +49,23 @@ class CNode;
 //
 // Global state
 //
+#if defined(Yac1dot0)
+       const ::uint32_t Nfactor_1dot0 = 17;
+#endif
+extern int 
+    nStatisticsNumberOfBlocks2000,
+    nStatisticsNumberOfBlocks1000,
+    nStatisticsNumberOfBlocks200,
+    nStatisticsNumberOfBlocks100,
+    nStatisticsNumberOfBlocks;
 
-static const unsigned int MAX_BLOCK_SIZE = 1000000;
-static const unsigned int MAX_BLOCK_SIZE_GEN = MAX_BLOCK_SIZE/2;
-static const unsigned int MAX_BLOCK_SIGOPS = MAX_BLOCK_SIZE/50;
-static const unsigned int MAX_ORPHAN_TRANSACTIONS = MAX_BLOCK_SIZE/100;
+static const unsigned int MAX_GENESIS_BLOCK_SIZE = 1000000;
+static const unsigned int MAX_ORPHAN_TRANSACTIONS = 10000;
+static const unsigned int DEFAULT_MAX_BLOCK_SIGOPS = 20000;
 static const unsigned int MAX_INV_SZ = 50000;
 
 static const ::int64_t MIN_TX_FEE = CENT;
-static const ::int64_t MIN_RELAY_TX_FEE = CENT/50;
+static const ::int64_t MIN_RELAY_TX_FEE = MIN_TX_FEE;
 
 static const ::int64_t MAX_MONEY = 2000000000 * COIN;
 static const ::int64_t MAX_MINT_PROOF_OF_WORK = 100 * COIN;
@@ -76,22 +84,23 @@ static const unsigned int LOCKTIME_THRESHOLD = 500000000; // Tue Nov  5 00:53:20
 // Maximum number of script-checking threads allowed
 static const int MAX_SCRIPTCHECK_THREADS = 16;
 
-#ifdef USE_UPNP
-static const int fHaveUPnP = true;
-#else
-static const int fHaveUPnP = false;
-#endif
-
 static const uint256 
-    hashGenesisBlock("0x0000060fc90618113cde415ead019a1052a9abc43afcccff38608ff8751353e5");
+    // hashGenesisBlock("0x0000060fc90618113cde415ead019a1052a9abc43afcccff38608ff8751353e5");
+    // hashGenesisBlock("0x00000f3f5eac1539c4e9216e17c74ff387ac1629884d2f97a3144dc32bf67bda");
+    // hashGenesisBlock("0x0ea17bb85e10d8c6ded6783a4ce8f79e75d49b439ff41f55d274e6b15612fff9");
+    hashGenesisBlock("0x03f09b4d52a5e4204306588aa0576713d59c3364c36d893dfe1b4129e0d13c52");
 extern const uint256 
-  //hashGenesisBlockTestNet("0xfe20c2c2fc02b36d2473e1f51dba1fb123d41ff42966e2a4edabb98fdd7107e6");
-    // change here           ^^^^^^^^^^^^^
+    nPoWeasiestTargetLimitTestNet,
     hashGenesisBlockTestNet;
 extern int 
     nConsecutiveStakeSwitchHeight;  // see timesamps.h = 420000;
 
-const ::int64_t nMaxClockDrift = nTwoHoursInSeconds;
+const ::int64_t 
+#ifdef Yac1dot0
+    nMaxClockDrift = 12 * nSecondsPerMinute;
+#else
+    nMaxClockDrift = nTwoHoursInSeconds;
+#endif
 inline ::int64_t PastDrift(::int64_t nTime)   
     { return nTime - nMaxClockDrift; } // up to 2 hours from the past
 inline ::int64_t FutureDrift(::int64_t nTime) 
@@ -123,6 +132,9 @@ extern CCriticalSection cs_setpwalletRegistered;
 extern std::set<CWallet*> setpwalletRegistered;
 extern unsigned char pchMessageStart[4];
 extern std::map<uint256, CBlock*> mapOrphanBlocks;
+extern ::int64_t nBlockRewardPrev;
+extern const ::int64_t nSimulatedMOneySupplyAtFork;
+extern ::uint32_t nMinEase; // minimum ease corresponds to highest difficulty
 
 // Settings
 extern ::int64_t nTransactionFee;
@@ -133,6 +145,13 @@ extern const uint256 entropyStore[38];
 
 // Minimum disk space required - used in CheckDiskSpace()
 static const ::uint64_t nMinDiskSpace = 52428800;
+
+enum GetMaxSize_mode
+{
+    MAX_BLOCK_SIZE,
+    MAX_BLOCK_SIZE_GEN,
+    MAX_BLOCK_SIGOPS,
+};
 
 class CReserveKey;
 class CTxDB;
@@ -162,10 +181,11 @@ void ThreadScriptCheckQuit();
 
 bool CheckProofOfWork(uint256 hash, unsigned int nBits);
 unsigned int GetNextTargetRequired(const CBlockIndex* pindexLast, bool fProofOfStake);
-::int64_t GetProofOfWorkReward(unsigned int nBits, ::int64_t nFees=0);
+::int64_t GetProofOfWorkReward(unsigned int nBits=0, ::int64_t nFees=0);
 ::int64_t GetProofOfStakeReward(::int64_t nCoinAge, unsigned int nBits, ::int64_t nTime, bool bCoinYearOnly=false);
 
 ::int64_t GetProofOfStakeReward(::int64_t nCoinAge);
+::uint64_t GetMaxSize(enum GetMaxSize_mode mode);
 
 unsigned int ComputeMinWork(unsigned int nBase, ::int64_t nTime);
 unsigned int ComputeMinStake(unsigned int nBase, ::int64_t nTime, unsigned int nBlockTime);
@@ -182,7 +202,7 @@ void ResendWalletTransactions();
 bool VerifySignature(const CTransaction& txFrom, const CTransaction& txTo, unsigned int nIn, unsigned int flags, int nHashType);
 
 // yacoin: calculate Nfactor using timestamp
-unsigned char GetNfactor(::int64_t nTimestamp);
+extern unsigned char GetNfactor(::int64_t nTimestamp, bool fNotYac1dot0BlockOrTx = false);
 
 // yacoin2015: GetProofOfWorkMA, GetProofOfWorkSMA
 unsigned int GetProofOfWorkMA(const CBlockIndex* pIndexLast);
@@ -197,11 +217,19 @@ unsigned int GetProofOfWorkSMA(const CBlockIndex* pIndexLast);
 /** Position on disk for a particular transaction. */
 class CDiskTxPos
 {
-public:
+//public:   // if the data isn't private this isn't more than a plain old C struct
+            // if private we can name the privates with no change to the code
+private:
     ::uint32_t nFile;
     ::uint32_t nBlockPos;
     ::uint32_t nTxPos;
-
+public:
+    ::uint32_t Get_CDiskTxPos_nFile() const { return nFile; }
+    ::uint32_t Get_CDiskTxPos_nBlockPos() const { return nBlockPos; }
+    ::uint32_t Get_CDiskTxPos_nTxPos() const { return nTxPos; }
+    // these 'getters' are most probably optimized compiles to the equivalent
+    // return of the variable, no different than if they were public, just read only
+    // this should/will be done for all these old fashioned classes with no privacy
     CDiskTxPos()
     {
         SetNull();
@@ -253,10 +281,12 @@ public:
 /** An inpoint - a combination of a transaction and an index n into its vin */
 class CInPoint
 {
-public:
+//public:
+private:
     CTransaction* ptx;
     ::uint32_t n;
-
+public:
+    CTransaction* GetPtx() const { return ptx; }
     CInPoint() { SetNull(); }
     CInPoint(CTransaction* ptxIn, unsigned int nIn) { ptx = ptxIn; n = nIn; }
     void SetNull() { ptx = NULL; n = (unsigned int) -1; }
@@ -268,10 +298,13 @@ public:
 /** An outpoint - a combination of a transaction hash and an index n into its vout */
 class COutPoint
 {
-public:
+//public:
+private:
     uint256 hash;
     ::uint32_t n;
-
+public:
+    uint256 COutPointGetHash() const { return hash; }
+    ::uint32_t COutPointGet_n() const { return n; }
     COutPoint() { SetNull(); }
     COutPoint(uint256 hashIn, unsigned int nIn) { hash = hashIn; n = nIn; }
     IMPLEMENT_SERIALIZE
@@ -366,7 +399,7 @@ public:
 
     std::string ToStringShort() const
     {
-        return strprintf(" %s %d", prevout.hash.ToString().c_str(), prevout.n);
+        return strprintf(" %s %d", prevout.COutPointGetHash().ToString().c_str(), prevout.COutPointGet_n());
     }
 
     std::string ToString() const
@@ -476,16 +509,6 @@ public:
     }
 };
 
-
-
-
-enum GetMinFee_mode
-{
-    GMF_BLOCK,
-    GMF_RELAY,
-    GMF_SEND,
-};
-
 typedef std::map<uint256, std::pair<CTxIndex, CTransaction> > MapPrevTx;
 
 /** The basic transaction that is broadcasted on the network and contained in
@@ -494,7 +517,14 @@ typedef std::map<uint256, std::pair<CTxIndex, CTransaction> > MapPrevTx;
 class CTransaction
 {
 public:
-    static const int CURRENT_VERSION_of_Tx=1;
+    static const int 
+        CURRENT_VERSION_of_Tx_for_yac_old = 1,      // this should be different for Yac1.0
+        CURRENT_VERSION_of_Tx_for_yac_new = 2;
+
+    static const int 
+      //CURRENT_VERSION_of_Tx = CURRENT_VERSION_of_Tx_for_yac_old;
+        CURRENT_VERSION_of_Tx = CURRENT_VERSION_of_Tx_for_yac_new;
+
     int nVersion;
     ::uint32_t nTime;
     std::vector<CTxIn> vin;
@@ -662,30 +692,35 @@ public:
         return dPriority > COIN * 144 / 250;
     }
 
-    ::int64_t GetMinFee(unsigned int nBlockSize=1, bool fAllowFree=false, enum GetMinFee_mode mode=GMF_BLOCK, unsigned int nBytes = 0) const;
+    ::int64_t GetMinFee(unsigned int nBytes = 0) const;
 
     bool ReadFromDisk(CDiskTxPos pos, FILE** pfileRet=NULL)
     {
-        CAutoFile filein = CAutoFile(OpenBlockFile(pos.nFile, 0, pfileRet ? "rb+" : "rb"), SER_DISK, CLIENT_VERSION);
+      //CAutoFile filein = CAutoFile(OpenBlockFile(pos.nFile, 0, pfileRet ? "rb+" : "rb"), SER_DISK, CLIENT_VERSION);
+        CAutoFile filein = CAutoFile(OpenBlockFile(pos.Get_CDiskTxPos_nFile(), 0, pfileRet ? "rb+" : "rb"), SER_DISK, CLIENT_VERSION);
         if (!filein)
             return error("CTransaction::ReadFromDisk() : OpenBlockFile failed");
 
         // Read transaction
-        if (fseek(filein, pos.nTxPos, SEEK_SET) != 0)
+      //if (fseek(filein, pos.nTxPos, SEEK_SET) != 0)
+        if (fseek(filein, pos.Get_CDiskTxPos_nTxPos(), SEEK_SET) != 0)
             return error("CTransaction::ReadFromDisk() : fseek failed");
 
         try {
             filein >> *this;
         }
-        catch (std::exception &e) {
-            (void)e;
+        catch (std::exception& e) 
+        //catch (...) 
+        {
+            //(void)e;
             return error("%s() : deserialize or I/O error", BOOST_CURRENT_FUNCTION);
         }
 
         // Return file pointer
         if (pfileRet)
         {
-            if (fseek(filein, pos.nTxPos, SEEK_SET) != 0)
+          //if (fseek(filein, pos.nTxPos, SEEK_SET) != 0)
+            if (fseek(filein, pos.Get_CDiskTxPos_nBlockPos(), SEEK_SET) != 0)
                 return error("CTransaction::ReadFromDisk() : second fseek failed");
             *pfileRet = filein.release();
         }
@@ -803,7 +838,7 @@ private:
 public:
     CScriptCheck() {}
     CScriptCheck(const CTransaction& txFromIn, const CTransaction& txToIn, unsigned int nInIn, unsigned int nFlagsIn, int nHashTypeIn) :
-        scriptPubKey(txFromIn.vout[txToIn.vin[nInIn].prevout.n].scriptPubKey),
+        scriptPubKey(txFromIn.vout[txToIn.vin[nInIn].prevout.COutPointGet_n()].scriptPubKey),
         ptxTo(&txToIn), nIn(nInIn), nFlags(nFlagsIn), nHashType(nHashTypeIn) { }
 
     bool operator()() const;
@@ -941,15 +976,30 @@ class CBlock
 {
 public:
     // header
-    static const int CURRENT_VERSION_of_block=6;
-    static const int CURRENT_VERSION_previous = 3;
+    static const int 
+        VERSION_of_block_for_yac_05x_new = 7,
+        VERSION_of_block_for_yac_049     = 6,
+        VERSION_of_block_for_yac_044_old = 3,
+#ifdef Yac1dot0
+        CURRENT_VERSION_of_block = VERSION_of_block_for_yac_05x_new;
+#else
+        CURRENT_VERSION_of_block = VERSION_of_block_for_yac_049;
+#endif
+    //static const int 
+    //    CURRENT_VERSION_previous = VERSION_of_block_for_yac_044_old;
 
+    // Block header
     ::int32_t nVersion;
     uint256 hashPrevBlock;
     uint256 hashMerkleRoot;
     ::uint32_t nTime;
     ::uint32_t nBits;
     ::uint32_t nNonce;
+
+    // Store following info to avoid calculating hash many times
+    mutable block_header previousBlockHeader;
+    mutable uint256 blockHash;
+    mutable uint256 blockYacoinHash;
 
     // network and disk
     std::vector<CTransaction> vtx;
@@ -1004,6 +1054,9 @@ public:
         vchBlockSig.clear();
         vMerkleTree.clear();
         nDoS = 0;
+        blockHash = 0;
+        blockYacoinHash = 0;
+        memset(UVOIDBEGIN(previousBlockHeader), 0, sizeof(block_header));
     }
 
     bool IsNull() const
@@ -1012,7 +1065,7 @@ public:
     }
 
     // yacoin2015 update
-    uint256 GetHash() const
+    uint256 CalculateHash() const
     {
         const ::uint64_t
             nSpanOf4  = 1368515488 - nChainStartTime,                           
@@ -1081,7 +1134,11 @@ public:
         }
         else    // is TestNet
         {
+#if defined(Yac1dot0)
+            nfactor = Nfactor_1dot0;
+#else
             nfactor = 4;
+#endif
         }
 
         if(
@@ -1099,15 +1156,51 @@ public:
 		return thash;
     }
 
+    bool IsHeaderDifferent() const
+    {
+        if((nVersion == previousBlockHeader.version)
+            && (hashPrevBlock == previousBlockHeader.prev_block)
+            && (hashMerkleRoot == previousBlockHeader.merkle_root)
+            && (nTime == previousBlockHeader.timestamp)
+            && (nBits == previousBlockHeader.bits)
+            && (nNonce == previousBlockHeader.nonce))
+        {
+            return false;
+        }
+        return true;
+    }
+
+    uint256 GetHash() const
+    {
+        if(blockHash == 0 || IsHeaderDifferent())
+        {
+            blockHash = CalculateHash();
+            memcpy(UVOIDBEGIN(previousBlockHeader), CVOIDBEGIN(nVersion), sizeof(block_header));
+        }
+        return blockHash;
+    }
+
     // yacoin2015
-    uint256 GetYacoinHash() const
+    uint256 CalculateYacoinHash() const
     {
         uint256 
             thash;
 
-        scrypt_hash(CVOIDBEGIN(nVersion), sizeof(block_header), UINTBEGIN(thash), GetNfactor(nTime));
+        unsigned char
+            nfactor = GetNfactor(nTime);
+        scrypt_hash(CVOIDBEGIN(nVersion), sizeof(block_header), UINTBEGIN(thash), nfactor);
 
         return thash;
+    }
+
+    uint256 GetYacoinHash() const
+    {
+        if(blockYacoinHash == 0 || IsHeaderDifferent())
+        {
+            blockYacoinHash = CalculateYacoinHash();
+            memcpy(UVOIDBEGIN(previousBlockHeader), CVOIDBEGIN(nVersion), sizeof(block_header));
+        }
+        return blockYacoinHash;
     }
 
     ::int64_t GetBlockTime() const
@@ -1256,8 +1349,10 @@ public:
         try {
             filein >> *this;
         }
-        catch (std::exception &e) {
-            (void)e;
+        catch (std::exception &e) 
+        //catch (...) 
+        {
+            //(void)e;
             return error("%s() : deserialize or I/O error", BOOST_CURRENT_FUNCTION);
         }
 
@@ -1339,9 +1434,18 @@ private:
  * main/longest chain.  A blockindex may have multiple pprev pointing back
  * to it, but pnext will only point forward to the longest branch, or will
  * be null if the block is not part of the longest chain.
+ *
+ * What about the top index? What is its pnext? NULL?
+ *
  */
 class CBlockIndex
 {
+//private:
+//public:
+
+//protected:
+//public:
+
 public:
     const uint256* phashBlock;
     CBlockIndex* pprev;
@@ -1379,6 +1483,8 @@ public:
     ::uint32_t nBits;
     ::uint32_t nNonce;
 
+    ::uint256 blockHash; // store hash to avoid calculating many times
+public:
     CBlockIndex()
     {
         phashBlock = NULL;
@@ -1404,6 +1510,7 @@ public:
         nTime          = 0;
         nBits          = 0;
         nNonce         = 0;
+        blockHash      = 0;
     }
 
     CBlockIndex(unsigned int nFileIn, unsigned int nBlockPosIn, CBlock& block)
@@ -1440,6 +1547,7 @@ public:
         nTime          = block.nTime;
         nBits          = block.nBits;
         nNonce         = block.nNonce;
+        blockHash      = block.blockHash;
     }
 
     CBlock GetBlockHeader() const
@@ -1581,9 +1689,6 @@ public:
 /** Used to marshal pointers into hashes for db storage. */
 class CDiskBlockIndex : public CBlockIndex
 {
-private:
-    uint256 blockHash;
-
 public:
     uint256 hashPrev;
     uint256 hashNext;
@@ -1592,7 +1697,6 @@ public:
     {
         hashPrev = 0;
         hashNext = 0;
-        blockHash = 0;
     }
 
     explicit CDiskBlockIndex(CBlockIndex* pindex) : CBlockIndex(*pindex)

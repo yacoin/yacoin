@@ -78,6 +78,7 @@ libyacoin_common_a_SOURCES= \
     protocol.cpp \
     bitcoinrpc.cpp \
     price.cpp \
+    random_nonce.cpp \
     rpcdump.cpp \
     rpcnet.cpp \
     rpcmining.cpp \
@@ -95,6 +96,7 @@ libyacoin_common_a_SOURCES= \
     scrypt.cpp \
     scrypt-x86.S \
     scrypt-x86_64.S \
+    scrypt-generic.c \
     scrypt-jane/scrypt-jane.c
 
 libyacoin_common_a_CPPFLAGS = $(BITCOIN_INCLUDES)

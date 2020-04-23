@@ -1,7 +1,13 @@
+peers.dat
 configure
 config.log
 config.status
 libtool
+Code Cache/*
+Cache/*
+GPUCache/*
+test/config.ini
+test/cache/*
 test/functional/test_framework/__pycache__/*
 src/data/*
 src/*.exe

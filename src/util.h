@@ -41,7 +41,7 @@
 
 static const ::int64_t COIN = 1000000;
 //THEREFORE
-       const int COINdecimalPower = 6;     // i.e. log10( COIN )
+       const int COINdecimalPower = 16;     // i.e. log10( COIN )
 static const ::int64_t CENT = 10000;
 
 #define BEGIN(a)            ((char*)&(a))
@@ -101,15 +101,10 @@ void LogStackTrace();
     #define PRI64d  "lld"
     #define PRI64u  "llu"
     #define PRI64x  "llx"
-#ifndef PRI64d
+
     #define PRId64  "lld"
-#endif
-#ifndef PRIu64
     #define PRIu64  "llu"
-#endif
-#ifndef PRIx64
     #define PRIx64  "llx"
-#endif
  #endif
   #define PRIszx    "zx"
   #define PRIszu    "zu"
@@ -174,23 +169,29 @@ inline void Sleep(::int64_t n)
 
 extern std::map<std::string, std::string> mapArgs;
 extern std::map<std::string, std::vector<std::string> > mapMultiArgs;
-extern bool fDebug;
-extern bool fDebugNet;
-extern bool fTestNetNewLogic;
-extern ::int32_t nTestNetNewLogicBlockNumber;
-extern ::int32_t nYac20BlockNumber;
-extern ::int32_t nYac20BlockNumberTime;
-extern bool fPrintToConsole;
-extern bool fPrintToDebugger;
-extern bool fRequestShutdown;
-extern bool fShutdown;
-extern bool fDaemon;
-extern bool fServer;
+extern bool 
+    fDebug,
+    fDebugNet,
+    f1dot0OnThisBlockOrTx,
+    fTestNetNewLogic,
+    fPrintToConsole,
+    fPrintToDebugger,
+    fRequestShutdown,
+    fShutdown,
+    fDaemon,
+    fServer,
+    fTestNet,
+    fUseOld044Rules,
+    fNoListen,
+    fLogTimestamps,
+    fReopenDebugLog;
+extern ::int32_t 
+    nTestNetNewLogicBlockNumber,
+    nYac20BlockNumber,
+    nYac20BlockNumberTime;
+extern ::uint32_t
+    nEpochInterval;
 extern std::string strMiscWarning;
-extern bool fTestNet;
-extern bool fUseOld044Rules;
-extern bool fNoListen;
-extern bool fReopenDebugLog;
 
 #ifdef WIN32
 extern void DoProgress( int nCount, int nTotalToScan, ::int64_t n64MsStartTime );
@@ -255,7 +256,8 @@ void FileCommit(FILE *fileout);
 int GetFilesize(FILE* file);
 bool RenameOver(boost::filesystem::path src, boost::filesystem::path dest);
 boost::filesystem::path GetDefaultDataDir();
-const boost::filesystem::path &GetDataDir(bool fNetSpecific = true);
+const boost::filesystem::path &GetDataDir(bool fTest_or_Main_Net_is_decided = true);
+std::string GetDebugLogPathName();
 boost::filesystem::path GetConfigFile();
 boost::filesystem::path GetPidFile();
 #ifndef WIN32

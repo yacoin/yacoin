@@ -95,7 +95,13 @@ bool CDBEnv::Open(boost::filesystem::path pathEnv_)
         pathErrorFile = pathDataDir / "BerkeleyDB_wallet_ErrorFile.log";   // call it what it is
 #else
     filesystem::path pathErrorFile = pathDataDir / "db.log";
-    printf("dbenv.open LogDir=%s ErrorFile=%s\n", pathLogDir.string().c_str(), pathErrorFile.string().c_str());
+    printf(
+            "dbenv.open\n"
+            "LogDir=%s\n"
+            "ErrorFile=%s\n"
+            , pathLogDir.string().c_str()
+            , pathErrorFile.string().c_str()
+          );
 #endif
 
     unsigned int nEnvFlags = 0;
@@ -504,7 +510,8 @@ void CDBEnv::Flush(bool fShutdown)
     ::int64_t nStart = GetTimeMillis();
     // Flush log data to the actual data file
     //  on all files that are not in use
-    printf("Flush(%s)%s\n", fShutdown ? "true" : "false", fDbEnvInit ? "" : " db not started");
+    if (fDebug)
+        printf("Flush(%s)%s\n", fShutdown ? "true" : "false", fDbEnvInit ? "" : " db not started");
     if (!fDbEnvInit)
         return;
     {

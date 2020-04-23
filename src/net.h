@@ -3,20 +3,20 @@
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 #ifndef BITCOIN_NET_H
-#define BITCOIN_NET_H
+ #define BITCOIN_NET_H
 
-#include <deque>
+ #include <deque>
 #ifndef Q_MOC_RUN
-#include <boost/array.hpp>
-#include <boost/foreach.hpp>
+ #include <boost/array.hpp>
+ #include <boost/foreach.hpp>
 #endif
 #include <openssl/rand.h>
 
 #ifdef _MSC_VER
-    #include <stdint.h>
+ #include <stdint.h>
 #endif
 #ifndef WIN32
-#include <arpa/inet.h>
+ #include <arpa/inet.h>
 #endif
 
 #ifndef YACOIN_YASSERT_H
@@ -48,7 +48,7 @@ class CNode;
 class CBlockIndex;
 extern int nBestHeight;
 
-//extern CCriticalSection cs_net;
+extern CCriticalSection cs_net;
 
 const ::int64_t
     nSecondsPerMinute = 60,
@@ -74,6 +74,22 @@ const ::uint32_t
     nSecondsPerHour = nSecondsperMinute * nMinutesperHour,
     nHoursPerDay = 24,
     nSecondsPerDay = nHoursPerDay * nSecondsPerHour;
+
+const int
+    nAverageBlocksPerMinute = 1,
+    nNumberOfDaysPerYear = 365,
+    nNumberOfBlocksPerYear = (nAverageBlocksPerMinute *
+                              nMinutesperHour *
+                              nHoursPerDay *
+                              nNumberOfDaysPerYear
+                             ) +    // that 1/4 of a day for leap years
+                              (nAverageBlocksPerMinute *
+                               nMinutesperHour *
+                              (nHoursPerDay/4)
+                            );
+
+const double
+    nInflation = 0.02;      // 2%
 
 extern const unsigned int 
     nStakeMaxAge,

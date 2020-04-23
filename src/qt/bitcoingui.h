@@ -1,7 +1,12 @@
 #ifndef BITCOINGUI_H
 #define BITCOINGUI_H
 
-#include <QMainWindow>
+#if QT_VERSION < 0x050000
+    #include <QMainWindow>
+#endif
+//#include "mainwindow.h"
+//#include "ui_mainwindow.h"
+
 #include <QSystemTrayIcon>
 
 class TransactionTableModel;
@@ -107,7 +112,6 @@ private:
     QAction *changePassphraseAction;
     QAction *aboutQtAction;
     QAction *openRPCConsoleAction;
-    QAction *explorerAction;        // new
 
     QAction *explorerActionButton;
     //QAction *explorerActionOldMenu;
@@ -122,8 +126,8 @@ private:
     AboutDialog *aboutDialog;
     OptionsDialog *optionsDialog;
     
-    ExplorerPage *pExplorerDialog = NULL;
-    ExplorerPage *pExplorerDialog2= NULL;
+    ExplorerPage *pExplorerDialog;  // = NULL;
+    ExplorerPage *pExplorerDialog2; //= NULL;
     //ExplorerPage *pExplorerView;
 
     QMovie *syncIconMovie;

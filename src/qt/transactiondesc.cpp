@@ -92,7 +92,7 @@ QString TransactionDesc::toHTML(CWallet *wallet, CWalletTx &wtx)
                                 {
                                     uint256 hash;
                                     const CTxIn& vin = wtx.vin[i];
-                                    hash.SetHex(vin.prevout.hash.ToString());
+                                    hash.SetHex(vin.prevout.COutPointGetHash().ToString());
                                     CTransaction wtxPrev;
                                     uint256 hashBlock = 0;
                                     if (!GetTransaction(hash, wtxPrev, hashBlock))
@@ -101,7 +101,7 @@ QString TransactionDesc::toHTML(CWallet *wallet, CWalletTx &wtx)
                                         continue; 
                                     }
                                     CTxDestination senderAddress;
-                                    if (!ExtractDestination(wtxPrev.vout[vin.prevout.n].scriptPubKey, senderAddress) )
+                                    if (!ExtractDestination(wtxPrev.vout[vin.prevout.COutPointGet_n()].scriptPubKey, senderAddress) )
                                     {
                                         strHTML += "<b>" + tr("From") + ":</b> " + tr("unknown") + "<br>";
                                     }
@@ -286,12 +286,12 @@ QString TransactionDesc::toHTML(CWallet *wallet, CWalletTx &wtx)
                     COutPoint prevout = txin.prevout;
 
                     CTransaction prev;
-                    if(txdb.ReadDiskTx(prevout.hash, prev))
+                    if(txdb.ReadDiskTx(prevout.COutPointGetHash(), prev))
                     {
-                        if (prevout.n < prev.vout.size())
+                        if (prevout.COutPointGet_n() < prev.vout.size())
                         {
                             strHTML += "<li>";
-                            const CTxOut &vout = prev.vout[prevout.n];
+                            const CTxOut &vout = prev.vout[prevout.COutPointGet_n()];
                             CTxDestination address;
                             if (ExtractDestination(vout.scriptPubKey, address))
                             {
