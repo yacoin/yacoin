@@ -17,12 +17,22 @@ typedef struct
     unsigned int version;
     uint256 prev_block;
     uint256 merkle_root;
-    unsigned int timestamp;
+    ::int64_t timestamp;
     unsigned int bits;
     unsigned int nonce;
 
 } block_header;
 
+typedef struct
+{
+    unsigned int version;
+    uint256 prev_block;
+    uint256 merkle_root;
+    unsigned int timestamp;
+    unsigned int bits;
+    unsigned int nonce;
+
+} old_block_header;
 
 uint256 scrypt_salted_multiround_hash(const void* input, size_t inputlen, const void* salt, size_t saltlen, const unsigned int nRounds);
 uint256 scrypt_salted_hash(const void* input, size_t inputlen, const void* salt, size_t saltlen);
@@ -34,7 +44,6 @@ unsigned int scanhash_scrypt(
                             block_header *pdata,
                             ::uint32_t &hash_count,
                             void *result, 
-                            block_header *res_header, 
                             unsigned char Nfactor
                             , CBlockIndex *pindexPrev
                             , uint256 *phashTarget

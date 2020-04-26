@@ -1149,9 +1149,6 @@ static void YacoinMiner(CWallet *pwallet)  // here fProofOfStake is always false
                      , hashTarget.GetHex().substr(0,16).c_str()
                     );
 
-        block_header 
-            res_header;
-
         uint256 
             result;
         unsigned int 
@@ -1171,7 +1168,6 @@ static void YacoinMiner(CWallet *pwallet)  // here fProofOfStake is always false
                                             //max_nonce,
                                             nHashesDone,
                                             UBEGIN(result),
-                                            &res_header,
                                             GetNfactor(pblock->nTime, fNotYac1dot0BlockOrTx)
                                             , pindexPrev
                                             , &hashTarget

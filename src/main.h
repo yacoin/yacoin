@@ -992,7 +992,7 @@ public:
     ::int32_t nVersion;
     uint256 hashPrevBlock;
     uint256 hashMerkleRoot;
-    ::int64_t nTime;
+    mutable ::int64_t nTime;
     ::uint32_t nBits;
     ::uint32_t nNonce;
 
@@ -1162,7 +1162,21 @@ public:
         uint256 
             thash;
 
-        scrypt_hash(CVOIDBEGIN(nVersion), sizeof(block_header), UINTBEGIN(thash), nfactor);
+        if (nVersion >= VERSION_of_block_for_yac_05x_new) // 64-bit nTime
+        {
+            scrypt_hash(CVOIDBEGIN(nVersion), sizeof(block_header), UINTBEGIN(thash), nfactor);
+        }
+        else // 32-bit nTime
+        {
+            old_block_header oldBlock;
+            oldBlock.version = nVersion;
+            oldBlock.prev_block = hashPrevBlock;
+            oldBlock.merkle_root = hashMerkleRoot;
+            oldBlock.timestamp = nTime;
+            oldBlock.bits = nBits;
+            oldBlock.nonce = nNonce;
+            scrypt_hash(CVOIDBEGIN(nVersion), sizeof(old_block_header), UINTBEGIN(thash), nfactor);
+        }
 		return thash;
     }
 
@@ -1198,7 +1212,22 @@ public:
 
         unsigned char
             nfactor = GetNfactor(nTime);
-        scrypt_hash(CVOIDBEGIN(nVersion), sizeof(block_header), UINTBEGIN(thash), nfactor);
+
+        if (nVersion >= VERSION_of_block_for_yac_05x_new) // 64-bit nTime
+        {
+            scrypt_hash(CVOIDBEGIN(nVersion), sizeof(block_header), UINTBEGIN(thash), nfactor);
+        }
+        else // 32-bit nTime
+        {
+            old_block_header oldBlock;
+            oldBlock.version = nVersion;
+            oldBlock.prev_block = hashPrevBlock;
+            oldBlock.merkle_root = hashMerkleRoot;
+            oldBlock.timestamp = nTime;
+            oldBlock.bits = nBits;
+            oldBlock.nonce = nNonce;
+            scrypt_hash(CVOIDBEGIN(nVersion), sizeof(old_block_header), UINTBEGIN(thash), nfactor);
+        }
 
         return thash;
     }
