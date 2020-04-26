@@ -78,6 +78,19 @@ static const unsigned char MAXIMUM_N_FACTOR = 25;  //30; since uint32_t fails on
 
 static const unsigned char YAC20_N_FACTOR = 16;
 
+// block version header
+static const int
+    VERSION_of_block_for_yac_05x_new = 7,
+    VERSION_of_block_for_yac_049     = 6,
+    VERSION_of_block_for_yac_044_old = 3,
+#ifdef Yac1dot0
+    CURRENT_VERSION_of_block = VERSION_of_block_for_yac_05x_new;
+#else
+    CURRENT_VERSION_of_block = VERSION_of_block_for_yac_049;
+#endif
+//static const int
+//    CURRENT_VERSION_previous = VERSION_of_block_for_yac_044_old;
+
 inline bool MoneyRange(::int64_t nValue) { return (nValue >= 0 && nValue <= MAX_MONEY); }
 // Threshold for nLockTime: below this value it is interpreted as block number, otherwise as UNIX timestamp.
 static const unsigned int LOCKTIME_THRESHOLD = 500000000; // Tue Nov  5 00:53:20 1985 UTC
@@ -975,19 +988,6 @@ public:
 class CBlock
 {
 public:
-    // header
-    static const int 
-        VERSION_of_block_for_yac_05x_new = 7,
-        VERSION_of_block_for_yac_049     = 6,
-        VERSION_of_block_for_yac_044_old = 3,
-#ifdef Yac1dot0
-        CURRENT_VERSION_of_block = VERSION_of_block_for_yac_05x_new;
-#else
-        CURRENT_VERSION_of_block = VERSION_of_block_for_yac_049;
-#endif
-    //static const int 
-    //    CURRENT_VERSION_previous = VERSION_of_block_for_yac_044_old;
-
     // Block header
     ::int32_t nVersion;
     uint256 hashPrevBlock;
@@ -1044,7 +1044,7 @@ public:
 
     void SetNull()
     {
-        nVersion = CBlock::CURRENT_VERSION_of_block;
+        nVersion = CURRENT_VERSION_of_block;
         hashPrevBlock = 0;
         hashMerkleRoot = 0;
         nTime = 0;
@@ -1479,7 +1479,7 @@ public:
     // block header
     ::int32_t  nVersion;
     uint256  hashMerkleRoot;
-    ::uint32_t nTime;
+    mutable ::int64_t nTime;
     ::uint32_t nBits;
     ::uint32_t nNonce;
 
@@ -1735,7 +1735,17 @@ public:
         READWRITE(this->nVersion);
         READWRITE(hashPrev);
         READWRITE(hashMerkleRoot);
-        READWRITE(nTime);
+        // nTime is extended to 64-bit since yacoin 1.0.0
+        if (this->nVersion >= VERSION_of_block_for_yac_05x_new) // 64-bit nTime
+        {
+            READWRITE(nTime);
+        }
+        else // 32-bit nTime
+        {
+            uint32_t time = (uint32_t)nTime; // needed for GetSerializeSize, Serialize function
+            READWRITE(time);
+            nTime = time; // needed for Unserialize function
+        }
         READWRITE(nBits);
         READWRITE(nNonce);
         READWRITE(blockHash);

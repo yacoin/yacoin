@@ -178,7 +178,7 @@ CBlock* CreateNewBlock(CWallet* pwallet, bool fProofOfStake)
     if( fUseOld044Rules )
     {
       //pblock->nVersion = CBlock::VERSION_of_block_for_yac_044_old;
-        pblock->nVersion = CBlock::CURRENT_VERSION_of_block;
+        pblock->nVersion = CURRENT_VERSION_of_block;
         // here we can fiddle with time to try to make block generation easier
     }
     // Create coinbase tx

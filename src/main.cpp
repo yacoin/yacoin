@@ -3067,12 +3067,12 @@ bool CBlock::SetBestChain(CTxDB& txdb, CBlockIndex* pindexNew)
         const CBlockIndex* pindex = pindexBest;
         for (int i = 0; i < 100 && pindex != NULL; ++i)
         {
-            if (pindex->nVersion > CBlock::CURRENT_VERSION_of_block)
+            if (pindex->nVersion > CURRENT_VERSION_of_block)
                 ++nUpgraded;
             pindex = pindex->pprev;
         }
         if (nUpgraded > 0)
-            printf("SetBestChain: %d of last 100 blocks above version %d\n", nUpgraded, CBlock::CURRENT_VERSION_of_block);
+            printf("SetBestChain: %d of last 100 blocks above version %d\n", nUpgraded, CURRENT_VERSION_of_block);
         if (nUpgraded > 100/2)
             // strMiscWarning is read by GetWarnings(), called by Qt and the JSON-RPC code to warn the user:
             strMiscWarning = _("Warning: This version is obsolete, upgrade required!");
@@ -4305,7 +4305,7 @@ bool LoadBlockIndex(bool fAllowNew)
         block.vtx.push_back(txNew);
         block.hashPrevBlock = 0;
         block.hashMerkleRoot = block.BuildMerkleTree();
-        block.nVersion = CBlock::CURRENT_VERSION_of_block;  // was 1; which is strange?
+        block.nVersion = CURRENT_VERSION_of_block;  // was 1; which is strange?
         block.nTime    = (::uint32_t)( fTestNet? 
                                        nChainStartTimeTestNet + 20: 
                                        nChainStartTime + 20 
