@@ -4306,7 +4306,7 @@ bool LoadBlockIndex(bool fAllowNew)
         block.hashPrevBlock = 0;
         block.hashMerkleRoot = block.BuildMerkleTree();
         block.nVersion = CURRENT_VERSION_of_block;  // was 1; which is strange?
-        block.nTime    = (::uint32_t)( fTestNet? 
+        block.nTime    = (::uint32_t)( fTestNet?
                                        nChainStartTimeTestNet + 20: 
                                        nChainStartTime + 20 
                                       );   // why + 20??

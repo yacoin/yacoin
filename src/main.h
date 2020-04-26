@@ -992,7 +992,7 @@ public:
     ::int32_t nVersion;
     uint256 hashPrevBlock;
     uint256 hashMerkleRoot;
-    ::uint32_t nTime;
+    ::int64_t nTime;
     ::uint32_t nBits;
     ::uint32_t nNonce;
 
@@ -1025,7 +1025,17 @@ public:
         nVersion = this->nVersion;
         READWRITE(hashPrevBlock);
         READWRITE(hashMerkleRoot);
-        READWRITE(nTime);
+        // nTime is extended to 64-bit since yacoin 1.0.0
+        if (this->nVersion >= VERSION_of_block_for_yac_05x_new) // 64-bit nTime
+        {
+               READWRITE(nTime);
+        }
+        else // 32-bit nTime
+        {
+               uint32_t time = (uint32_t)nTime; // needed for GetSerializeSize, Serialize function
+               READWRITE(time);
+               nTime = time; // needed for Unserialize function
+        }
         READWRITE(nBits);
         READWRITE(nNonce);
 
@@ -1218,7 +1228,7 @@ public:
             unsigned int nEntropyBit = ((GetHash().Get64()) & 1ULL);
             if (fDebug && GetBoolArg("-printstakemodifier"))
                 printf(
-                        "GetStakeEntropyBit: nTime=%u \nhashBlock=%s\nnEntropyBit=%u\n", 
+                        "GetStakeEntropyBit: nTime=%ld \nhashBlock=%s\nnEntropyBit=%u\n",
                         nTime, 
                         GetHash().ToString().c_str(), 
                         nEntropyBit
@@ -1379,7 +1389,7 @@ public:
                 "ver=%d,\n"
                 "hashPrevBlock=%s,\n"
                 "hashMerkleRoot=%s,\n"
-                "nTime=%u, "
+                "nTime=%ld, "
                 "nBits=%08x, "
                 "nNonce=%u, "
                 "vtx=%" PRIszu ",\n"

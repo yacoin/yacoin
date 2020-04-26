@@ -2380,7 +2380,7 @@ std::string BuildBlockinfoDetailsFrom(
                             sStandardItemModelElement.c_str()
                            );
     sStandardItemModelElement = strprintf(
-                        " %u (local %s)"
+                        " %ld (local %s)"
                         , block.nTime, sTime.c_str()
                                          );
     sTemp += sStandardItemModelElement + "<br />\n";
