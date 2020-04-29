@@ -187,6 +187,7 @@ Value getmininginfo(const Array& params, bool fHelp)
     obj.push_back( Pair( "Nfactor", Nfactor ) );
     obj.push_back( Pair( "N", (Value_type)N ) );
     obj.push_back( Pair( "Epoch Interval", (Value_type)nEpochInterval ) );
+    obj.push_back( Pair( "Difficulty Interval", (Value_type)nDifficultyInterval ) );
 
     return obj;
 }
