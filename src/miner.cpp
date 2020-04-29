@@ -774,7 +774,7 @@ void FormatHashBuffers(CBlock* pblock, char* pmidstate, char* pdata, char* phash
             int nVersion;
             uint256 hashPrevBlock;
             uint256 hashMerkleRoot;
-            unsigned int nTime;
+            ::int64_t nTime;
             unsigned int nBits;
             unsigned int nNonce;
         }
@@ -1127,10 +1127,10 @@ static void YacoinMiner(CWallet *pwallet)  // here fProofOfStake is always false
 
         FormatHashBuffers(pblock.get(), pmidstate, pdata, phash1);
 
+        ::int64_t
+            & nBlockTime = *(::int64_t*)(pdata + 64 + 4);
         unsigned int
-            & nBlockTime = *(unsigned int*)(pdata + 64 + 4);
-        unsigned int
-            & nBlockNonce = *(unsigned int*)(pdata + 64 + 12);
+            & nBlockNonce = *(unsigned int*)(pdata + 64 + 16);
 
         Big.randomize_the_nonce( nBlockNonce ); // lazy initialization performed here
 
