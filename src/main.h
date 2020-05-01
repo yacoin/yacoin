@@ -1185,7 +1185,7 @@ public:
             oldBlock.timestamp = nTime;
             oldBlock.bits = nBits;
             oldBlock.nonce = nNonce;
-            scrypt_hash(CVOIDBEGIN(nVersion), sizeof(old_block_header), UINTBEGIN(thash), nfactor);
+            scrypt_hash(CVOIDBEGIN(oldBlock), sizeof(old_block_header), UINTBEGIN(thash), nfactor);
         }
 		return thash;
     }
@@ -1236,7 +1236,7 @@ public:
             oldBlock.timestamp = nTime;
             oldBlock.bits = nBits;
             oldBlock.nonce = nNonce;
-            scrypt_hash(CVOIDBEGIN(nVersion), sizeof(old_block_header), UINTBEGIN(thash), nfactor);
+            scrypt_hash(CVOIDBEGIN(oldBlock), sizeof(old_block_header), UINTBEGIN(thash), nfactor);
         }
 
         return thash;
