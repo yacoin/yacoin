@@ -539,7 +539,7 @@ public:
         CURRENT_VERSION_of_Tx = CURRENT_VERSION_of_Tx_for_yac_new;
 
     int nVersion;
-    ::uint32_t nTime;
+    mutable ::int64_t nTime;
     std::vector<CTxIn> vin;
     std::vector<CTxOut> vout;
     ::uint32_t nLockTime;
@@ -557,7 +557,17 @@ public:
     (
         READWRITE(this->nVersion);
         nVersion = this->nVersion;
-        READWRITE(nTime);
+        // nTime is extended to 64-bit since yacoin 1.0.0
+        if (this->nVersion >= CURRENT_VERSION_of_Tx_for_yac_new) // 64-bit nTime
+        {
+			READWRITE(nTime);
+        }
+        else // 32-bit nTime
+        {
+			uint32_t time = (uint32_t)nTime; // needed for GetSerializeSize, Serialize function
+			READWRITE(time);
+			nTime = time; // needed for Unserialize function
+        }
         READWRITE(vin);
         READWRITE(vout);
         READWRITE(nLockTime);
@@ -566,7 +576,7 @@ public:
     void SetNull()
     {
         nVersion = CTransaction::CURRENT_VERSION_of_Tx;
-        nTime = (::uint32_t) GetAdjustedTime();
+        nTime = GetAdjustedTime();
         vin.clear();
         vout.clear();
         nLockTime = 0;
@@ -767,7 +777,7 @@ public:
         str += IsCoinBase()? "Coinbase" : (IsCoinStake()? "Coinstake" : "CTransaction");
         str += strprintf(
             "(hash=%s, "
-            "nTime=%d, "
+            "nTime=%ld, "
             "ver=%d, "
             "vin.size=%" PRIszu ", "
             "vout.size=%" PRIszu ", "
@@ -1279,7 +1289,7 @@ public:
 
     std::pair<COutPoint, unsigned int> GetProofOfStake() const
     {
-        return IsProofOfStake()? std::make_pair(vtx[1].vin[0].prevout, vtx[1].nTime) : std::make_pair(COutPoint(), (unsigned int)0);
+        return IsProofOfStake()? std::make_pair(vtx[1].vin[0].prevout, (unsigned int)vtx[1].nTime) : std::make_pair(COutPoint(), (unsigned int)0);
     }
 
     // ppcoin: get max transaction timestamp
