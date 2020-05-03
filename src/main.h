@@ -558,7 +558,8 @@ public:
         READWRITE(this->nVersion);
         nVersion = this->nVersion;
         // nTime is extended to 64-bit since yacoin 1.0.0
-        if (this->nVersion >= CURRENT_VERSION_of_Tx_for_yac_new) // 64-bit nTime
+        if ((this->nVersion >= CURRENT_VERSION_of_Tx_for_yac_new)
+                && (nTestNetNewLogicBlockNumber < nBestHeight)) // 64-bit nTime
         {
 			READWRITE(nTime);
         }
@@ -1036,7 +1037,8 @@ public:
         READWRITE(hashPrevBlock);
         READWRITE(hashMerkleRoot);
         // nTime is extended to 64-bit since yacoin 1.0.0
-        if (this->nVersion >= VERSION_of_block_for_yac_05x_new) // 64-bit nTime
+        if ((this->nVersion >= VERSION_of_block_for_yac_05x_new)
+                && (nTestNetNewLogicBlockNumber < nBestHeight)) // 64-bit nTime
         {
                READWRITE(nTime);
         }
@@ -1172,7 +1174,8 @@ public:
         uint256 
             thash;
 
-        if (nVersion >= VERSION_of_block_for_yac_05x_new) // 64-bit nTime
+        if ((nVersion >= VERSION_of_block_for_yac_05x_new)
+                && (nTestNetNewLogicBlockNumber < nBestHeight)) // 64-bit nTime
         {
             scrypt_hash(CVOIDBEGIN(nVersion), sizeof(block_header), UINTBEGIN(thash), nfactor);
         }
@@ -1223,7 +1226,8 @@ public:
         unsigned char
             nfactor = GetNfactor(nTime);
 
-        if (nVersion >= VERSION_of_block_for_yac_05x_new) // 64-bit nTime
+        if ((nVersion >= VERSION_of_block_for_yac_05x_new)
+                && (nTestNetNewLogicBlockNumber < nBestHeight)) // 64-bit nTime
         {
             scrypt_hash(CVOIDBEGIN(nVersion), sizeof(block_header), UINTBEGIN(thash), nfactor);
         }
@@ -1785,7 +1789,8 @@ public:
         READWRITE(hashPrev);
         READWRITE(hashMerkleRoot);
         // nTime is extended to 64-bit since yacoin 1.0.0
-        if (this->nVersion >= VERSION_of_block_for_yac_05x_new) // 64-bit nTime
+        if ((this->nVersion >= VERSION_of_block_for_yac_05x_new)
+                && (nTestNetNewLogicBlockNumber < nBestHeight)) // 64-bit nTime
         {
             READWRITE(nTime);
         }
