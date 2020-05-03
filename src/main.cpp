@@ -4275,7 +4275,6 @@ bool LoadBlockIndex(bool fAllowNew)
         CTransaction 
             txNew;
 
-        txNew.nVersion = CTransaction::CURRENT_VERSION_of_Tx_for_yac_old;
         txNew.nTime = (::uint32_t)( fTestNet? nChainStartTimeTestNet: nChainStartTime );
         txNew.vin.resize(1);
         txNew.vout.resize(1);
