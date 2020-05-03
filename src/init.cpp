@@ -1247,7 +1247,9 @@ bool AppInit2()
 
     nTestNetNewLogicBlockNumber = GetArg("-testnetNewLogicBlockNumber", 0);
     if (0 == nTestNetNewLogicBlockNumber)
-        nTestNetNewLogicBlockNumber = pindexBest->nHeight;
+    {
+        nTestNetNewLogicBlockNumber = pindexBest->nHeight ? pindexBest->nHeight : 1;
+    }
     if (fDebug)
     {
 #ifdef WIN32

@@ -90,7 +90,7 @@ map<string, vector<string> > mapMultiArgs;
 bool fDebug = false;
 bool fDebugNet = false;
 bool fTestNetNewLogic = false;
-::int32_t nTestNetNewLogicBlockNumber;
+::int32_t nTestNetNewLogicBlockNumber = 1;
 ::int32_t nYac20BlockNumber = 0;
 ::int32_t nYac20BlockNumberTime = 0;
 // Epoch interval is a difficulty period. Right now on testnet, it is 21,000 blocks
