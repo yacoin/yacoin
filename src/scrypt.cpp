@@ -245,11 +245,11 @@ const ::uint32_t
 
         if (new_block_data.version >= VERSION_of_block_for_yac_05x_new) // 64-bit nTime
         {
-            scrypt_hash(CVOIDBEGIN(data), sizeof(block_header), UINTBEGIN(hash), Nfactor);
+            scrypt_hash(data, sizeof(block_header), UINTBEGIN(hash), Nfactor);
         }
         else // 32-bit nTime
         {
-            scrypt_hash(CVOIDBEGIN(data), sizeof(old_block_header), UINTBEGIN(hash), Nfactor);
+            scrypt_hash(data, sizeof(old_block_header), UINTBEGIN(hash), Nfactor);
         }
         ++hash_count;
         if (            
