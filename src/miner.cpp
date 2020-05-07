@@ -1164,7 +1164,7 @@ static void YacoinMiner(CWallet *pwallet)  // here fProofOfStake is always false
             unsigned int nNonceFound;
 
             nNonceFound = scanhash_scrypt(
-                                            (block_header *)&pblock->nVersion,
+                                            (char *)&pblock->nVersion,
                                             //max_nonce,
                                             nHashesDone,
                                             UBEGIN(result),

@@ -12,7 +12,8 @@
  #include "net.h"
 #endif
 
-typedef struct
+#pragma pack(push, 1)
+struct block_header
 {
     unsigned int version;
     uint256 prev_block;
@@ -21,7 +22,8 @@ typedef struct
     unsigned int bits;
     unsigned int nonce;
 
-} block_header;
+};
+#pragma pack(pop)
 
 typedef struct
 {
@@ -41,7 +43,7 @@ uint256 scrypt_blockhash(const ::uint8_t* input);
 void *scrypt_buffer_alloc();
 void scrypt_buffer_free(void *scratchpad);
 unsigned int scanhash_scrypt(
-                            block_header *pdata,
+                            char *pdata,
                             ::uint32_t &hash_count,
                             void *result, 
                             unsigned char Nfactor

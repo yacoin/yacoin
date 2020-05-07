@@ -1008,7 +1008,7 @@ public:
     ::uint32_t nNonce;
 
     // Store following info to avoid calculating hash many times
-    mutable block_header previousBlockHeader;
+    mutable struct block_header previousBlockHeader;
     mutable uint256 blockHash;
     mutable uint256 blockYacoinHash;
 
@@ -1078,7 +1078,7 @@ public:
         nDoS = 0;
         blockHash = 0;
         blockYacoinHash = 0;
-        memset(UVOIDBEGIN(previousBlockHeader), 0, sizeof(block_header));
+        memset(UVOIDBEGIN(previousBlockHeader), 0, sizeof(struct block_header));
     }
 
     bool IsNull() const
@@ -1087,7 +1087,7 @@ public:
     }
 
     // yacoin2015 update
-    uint256 CalculateHash() const
+    uint256 CalculateHash(int blockHeight = 0) const
     {
         const ::uint64_t
             nSpanOf4  = 1368515488 - nChainStartTime,                           
@@ -1174,10 +1174,18 @@ public:
         uint256 
             thash;
 
+        int height = blockHeight ? blockHeight : nBestHeight;
         if ((nVersion >= VERSION_of_block_for_yac_05x_new)
-                && (nTestNetNewLogicBlockNumber < nBestHeight)) // 64-bit nTime
+                && (nTestNetNewLogicBlockNumber < height)) // 64-bit nTime
         {
-            scrypt_hash(CVOIDBEGIN(nVersion), sizeof(block_header), UINTBEGIN(thash), nfactor);
+            struct block_header block_data;
+            block_data.version = nVersion;
+            block_data.prev_block = hashPrevBlock;
+            block_data.merkle_root = hashMerkleRoot;
+            block_data.timestamp = nTime;
+            block_data.bits = nBits;
+            block_data.nonce = nNonce;
+            scrypt_hash(CVOIDBEGIN(block_data), sizeof(struct block_header), UINTBEGIN(thash), nfactor);
         }
         else // 32-bit nTime
         {
@@ -1207,18 +1215,23 @@ public:
         return true;
     }
 
-    uint256 GetHash() const
+    uint256 GetHash(int blockHeight = 0) const
     {
         if(blockHash == 0 || IsHeaderDifferent())
         {
-            blockHash = CalculateHash();
-            memcpy(UVOIDBEGIN(previousBlockHeader), CVOIDBEGIN(nVersion), sizeof(block_header));
+            blockHash = CalculateHash(blockHeight);
+            previousBlockHeader.version = nVersion;
+            previousBlockHeader.prev_block = hashPrevBlock;
+            previousBlockHeader.merkle_root = hashMerkleRoot;
+            previousBlockHeader.timestamp = nTime;
+            previousBlockHeader.bits = nBits;
+            previousBlockHeader.nonce = nNonce;
         }
         return blockHash;
     }
 
     // yacoin2015
-    uint256 CalculateYacoinHash() const
+    uint256 CalculateYacoinHash(int blockHeight = 0) const
     {
         uint256 
             thash;
@@ -1226,10 +1239,18 @@ public:
         unsigned char
             nfactor = GetNfactor(nTime);
 
+        int height = blockHeight ? blockHeight : nBestHeight;
         if ((nVersion >= VERSION_of_block_for_yac_05x_new)
-                && (nTestNetNewLogicBlockNumber < nBestHeight)) // 64-bit nTime
+                && (nTestNetNewLogicBlockNumber < height)) // 64-bit nTime
         {
-            scrypt_hash(CVOIDBEGIN(nVersion), sizeof(block_header), UINTBEGIN(thash), nfactor);
+            struct block_header block_data;
+            block_data.version = nVersion;
+            block_data.prev_block = hashPrevBlock;
+            block_data.merkle_root = hashMerkleRoot;
+            block_data.timestamp = nTime;
+            block_data.bits = nBits;
+            block_data.nonce = nNonce;
+            scrypt_hash(CVOIDBEGIN(block_data), sizeof(struct block_header), UINTBEGIN(thash), nfactor);
         }
         else // 32-bit nTime
         {
@@ -1246,12 +1267,17 @@ public:
         return thash;
     }
 
-    uint256 GetYacoinHash() const
+    uint256 GetYacoinHash(int blockHeight = 0) const
     {
         if(blockYacoinHash == 0 || IsHeaderDifferent())
         {
-            blockYacoinHash = CalculateYacoinHash();
-            memcpy(UVOIDBEGIN(previousBlockHeader), CVOIDBEGIN(nVersion), sizeof(block_header));
+            blockYacoinHash = CalculateYacoinHash(blockHeight);
+            previousBlockHeader.version = nVersion;
+            previousBlockHeader.prev_block = hashPrevBlock;
+            previousBlockHeader.merkle_root = hashMerkleRoot;
+            previousBlockHeader.timestamp = nTime;
+            previousBlockHeader.bits = nBits;
+            previousBlockHeader.nonce = nNonce;
         }
         return blockYacoinHash;
     }
@@ -1790,7 +1816,7 @@ public:
         READWRITE(hashMerkleRoot);
         // nTime is extended to 64-bit since yacoin 1.0.0
         if ((this->nVersion >= VERSION_of_block_for_yac_05x_new)
-                && (nTestNetNewLogicBlockNumber < nBestHeight)) // 64-bit nTime
+                && (nTestNetNewLogicBlockNumber < nHeight)) // 64-bit nTime
         {
             READWRITE(nTime);
         }
@@ -1805,7 +1831,7 @@ public:
         READWRITE(blockHash);
     )
 
-    uint256 GetBlockHash() const
+    uint256 GetBlockHash(bool loadedFromLevelDb = false) const
     {
         if (fUseFastIndex && (nTime < GetAdjustedTime() - 24 * 60 * 60) && blockHash != 0)
             return blockHash;
@@ -1818,7 +1844,8 @@ public:
         block.nBits           = nBits;
         block.nNonce          = nNonce;
 
-        const_cast<CDiskBlockIndex*>(this)->blockHash = block.GetHash();
+        int height = loadedFromLevelDb ? nHeight : 0;
+        const_cast<CDiskBlockIndex*>(this)->blockHash = block.GetHash(height);
 
         return blockHash;
     }

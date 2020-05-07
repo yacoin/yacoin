@@ -163,7 +163,7 @@ void scrypt_buffer_free(void *scratchpad)
 
 //_____________________________________________________________________________
 unsigned int scanhash_scrypt(
-                            block_header *pdata,
+                            char *pdata,
                             //::uint32_t max_nonce, 
                             ::uint32_t &hash_count,
                             void *result, 
@@ -186,13 +186,15 @@ const ::uint32_t
                                 // one minute is the average block period
 
     //hash_count = 0;
-    block_header 
-        new_block_data = *pdata;
+    struct block_header new_block_data;
+    char *pblockData = (char *) &new_block_data;
+    memcpy((void *)pblockData, (const void*)pdata, 68);
+    memcpy((void *)(pblockData+68), (const void*)(pdata+72), 16);
+    old_block_header old_block_data;
     ::uint32_t hash[8];
 
     void* data;
     ::uint32_t* nOnce; // really any random uint32_t
-    old_block_header old_block_data;
     if ((new_block_data.version >= VERSION_of_block_for_yac_05x_new)
             && (nTestNetNewLogicBlockNumber < nBestHeight)) // 64-bit nTime
     {
@@ -247,7 +249,7 @@ const ::uint32_t
         if ((new_block_data.version >= VERSION_of_block_for_yac_05x_new)
                 && (nTestNetNewLogicBlockNumber < nBestHeight)) // 64-bit nTime
         {
-            scrypt_hash(data, sizeof(block_header), UINTBEGIN(hash), Nfactor);
+            scrypt_hash(data, sizeof(struct block_header), UINTBEGIN(hash), Nfactor);
         }
         else // 32-bit nTime
         {
