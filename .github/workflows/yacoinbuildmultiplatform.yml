@@ -35,7 +35,7 @@ jobs:
       - name: build
         run: |
           docker pull dev34253/yacoin-build:windows.latest
-          docker run -v %CD%:c:\src dev34253/yacoin-build:windows.latest
+          docker run -v %CD%:c:\git\src dev34253/yacoin-build:windows.latest
         shell: cmd
       - uses: actions/upload-artifact@v1
         with:
