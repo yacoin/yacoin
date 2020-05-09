@@ -12,7 +12,15 @@ jobs:
           docker pull dev34253/yacoin-build:ubuntu.16.04
           docker run -v /home/runner/work/yacoin/yacoin:/src dev34253/yacoin-build:ubuntu.16.04
           docker run -v /home/runner/work/yacoin/yacoin:/src --entrypoint /src/test/functional/test_runner.py dev34253/yacoin-build:ubuntu.16.04 -j 1
-  build-ubuntu-1804:
+      - uses: actions/upload-artifact@v1
+        with:
+          name: yacoind-ubuntu-16.04
+          path: /home/runner/work/yacoin/yacoin/release/yacoind
+      - uses: actions/upload-artifact@v1
+        with:
+          name: yacoin-qt-ubuntu-16.04
+          path: /home/runner/work/yacoin/yacoin/release/yacoin-qt
+    build-ubuntu-1804:
     runs-on: ubuntu-latest  
     steps:
       - uses: actions/checkout@v2
