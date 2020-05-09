@@ -42,7 +42,7 @@ jobs:
           name: yacoin-qt-windows
           path: release/yacoin-qt.exe
       - uses: actions/upload-artifact@v1
-          with:
-            name: yacoind-windows
-            path: src/yacoind.exe
-     
+        with:
+          name: yacoind-windows
+          path: src/yacoind.exe
+    
