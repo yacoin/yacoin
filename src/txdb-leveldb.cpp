@@ -491,7 +491,7 @@ bool CTxDB::LoadBlockIndex()
         nDelta7 += (n64timeStart7 - n64timeStart6);
 #endif
         uint256 
-            blockHash = diskindex.GetBlockHash(true);   // the slow poke!
+            blockHash = diskindex.GetBlockHash();   // the slow poke!
 
         if ( 0 == blockHash )
         {

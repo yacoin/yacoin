@@ -428,7 +428,12 @@ bool CTransaction::ReadFromDisk(COutPoint prevout)
 
 bool CTransaction::oldIsStandard(string& strReason) const
 {
-    if (nVersion > CTransaction::CURRENT_VERSION_of_Tx)
+    // TODO: Temporary fix to avoid warning for yacoind 1.0.0. Because in yacoind 1.0.0, there are two times
+    // block version is upgraded:
+	// 1) At the time installing yacoind 1.0.0
+	// 2) At the time happening hardfork
+	// Need update this line at next yacoin version
+    if (nVersion > CTransaction::CURRENT_VERSION_of_Tx_for_time_extension)
     {
         strReason = "version";
         return false;
@@ -490,7 +495,12 @@ bool CTransaction::oldIsStandard(string& strReason) const
 
 bool CTransaction::IsStandard044( string& strReason ) const
 {
-    if (nVersion > CTransaction::CURRENT_VERSION_of_Tx) // same as in 0.4.4!?
+    // TODO: Temporary fix to avoid warning for yacoind 1.0.0. Because in yacoind 1.0.0, there are two times
+    // block version is upgraded:
+	// 1) At the time installing yacoind 1.0.0
+	// 2) At the time happening hardfork
+	// Need update this line at next yacoin version
+    if (nVersion > CTransaction::CURRENT_VERSION_of_Tx_for_time_extension) // same as in 0.4.4!?
     {                                                   // if we test differently,
         strReason = "version(in 0.4.4)";                // then shouldn't 0.4.5 be 
         return false;                                   // different?
@@ -3067,7 +3077,12 @@ bool CBlock::SetBestChain(CTxDB& txdb, CBlockIndex* pindexNew)
         const CBlockIndex* pindex = pindexBest;
         for (int i = 0; i < 100 && pindex != NULL; ++i)
         {
-            if (pindex->nVersion > CURRENT_VERSION_of_block)
+            // TODO: Temporary fix to avoid warning for yacoind 1.0.0. Because in yacoind 1.0.0, there are two times
+            // block version is upgraded:
+        	// 1) At the time installing yacoind 1.0.0
+        	// 2) At the time happening hardfork
+        	// Need update this line at next yacoin version
+            if (pindex->nVersion > VERSION_of_block_for_time_extension)
                 ++nUpgraded;
             pindex = pindex->pprev;
         }
@@ -3965,6 +3980,8 @@ bool CBlock::SignBlock(CWallet& wallet)
     // if we are doing 0.4.4 blocks, let's check using 0.4.4 code
     if( 
        !IsProofOfStake()    // i.e PoW then immaterial what version!
+       ||
+       (VERSION_of_block_for_time_extension == nVersion)
        ||
        (VERSION_of_block_for_yac_05x_new == nVersion)
        ||

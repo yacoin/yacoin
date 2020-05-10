@@ -178,7 +178,15 @@ CBlock* CreateNewBlock(CWallet* pwallet, bool fProofOfStake)
     if( fUseOld044Rules )
     {
       //pblock->nVersion = CBlock::VERSION_of_block_for_yac_044_old;
-        pblock->nVersion = CURRENT_VERSION_of_block;
+    	// TODO: Need update for mainet
+    	if (nBestHeight > nTestTimeExtensionBlockNumber)
+    	{
+            pblock->nVersion = VERSION_of_block_for_time_extension;
+    	}
+    	else
+    	{
+            pblock->nVersion = CURRENT_VERSION_of_block;
+    	}
         // here we can fiddle with time to try to make block generation easier
     }
     // Create coinbase tx

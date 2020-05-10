@@ -195,8 +195,7 @@ const ::uint32_t
 
     void* data;
     ::uint32_t* nOnce; // really any random uint32_t
-    if ((new_block_data.version >= VERSION_of_block_for_yac_05x_new)
-            && (nTestNetNewLogicBlockNumber < nBestHeight)) // 64-bit nTime
+    if (new_block_data.version >= VERSION_of_block_for_time_extension)  // 64-bit nTime
     {
         data = &new_block_data;
         nOnce = &new_block_data.nonce;
@@ -246,8 +245,7 @@ const ::uint32_t
         *nOnce = Big.get_a_nonce( *nOnce );
         //data.nonce = n;
 
-        if ((new_block_data.version >= VERSION_of_block_for_yac_05x_new)
-                && (nTestNetNewLogicBlockNumber < nBestHeight)) // 64-bit nTime
+        if (new_block_data.version >= VERSION_of_block_for_time_extension) // 64-bit nTime
         {
             scrypt_hash(data, sizeof(struct block_header), UINTBEGIN(hash), Nfactor);
         }

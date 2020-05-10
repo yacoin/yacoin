@@ -545,6 +545,7 @@ bool AppInit2()
 
     // ********************************************************* Step 2: parameter interactions
 
+    nTestTimeExtensionBlockNumber = GetArg("-testTimeExtensionBlockNumber", 2);
     nNodeLifespan = (unsigned int)(GetArg("-addrlifespan", 7));
     fUseFastIndex = GetBoolArg("-fastindex", true);
     fUseMemoryLog = GetBoolArg("-memorylog", true);
@@ -1248,7 +1249,7 @@ bool AppInit2()
     nTestNetNewLogicBlockNumber = GetArg("-testnetNewLogicBlockNumber", 0);
     if (0 == nTestNetNewLogicBlockNumber)
     {
-        nTestNetNewLogicBlockNumber = pindexBest->nHeight ? pindexBest->nHeight : 1;
+        nTestNetNewLogicBlockNumber = pindexBest->nHeight;
     }
     if (fDebug)
     {

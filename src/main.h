@@ -80,6 +80,7 @@ static const unsigned char YAC20_N_FACTOR = 16;
 
 // block version header
 static const int
+    VERSION_of_block_for_time_extension = 8,
     VERSION_of_block_for_yac_05x_new = 7,
     VERSION_of_block_for_yac_049     = 6,
     VERSION_of_block_for_yac_044_old = 3,
@@ -532,7 +533,8 @@ class CTransaction
 public:
     static const int 
         CURRENT_VERSION_of_Tx_for_yac_old = 1,      // this should be different for Yac1.0
-        CURRENT_VERSION_of_Tx_for_yac_new = 2;
+        CURRENT_VERSION_of_Tx_for_yac_new = 2,
+        CURRENT_VERSION_of_Tx_for_time_extension = 3;
 
     static const int 
       //CURRENT_VERSION_of_Tx = CURRENT_VERSION_of_Tx_for_yac_old;
@@ -558,8 +560,7 @@ public:
         READWRITE(this->nVersion);
         nVersion = this->nVersion;
         // nTime is extended to 64-bit since yacoin 1.0.0
-        if ((this->nVersion >= CURRENT_VERSION_of_Tx_for_yac_new)
-                && (nTestNetNewLogicBlockNumber < nBestHeight)) // 64-bit nTime
+        if (this->nVersion >= CURRENT_VERSION_of_Tx_for_time_extension) // 64-bit nTime
         {
 			READWRITE(nTime);
         }
@@ -576,7 +577,15 @@ public:
 
     void SetNull()
     {
-        nVersion = CTransaction::CURRENT_VERSION_of_Tx;
+        // TODO: Need update for mainet
+        if (nBestHeight != -1 && nBestHeight > nTestTimeExtensionBlockNumber)
+        {
+            nVersion = CTransaction::CURRENT_VERSION_of_Tx_for_time_extension;
+        }
+        else
+        {
+            nVersion = CTransaction::CURRENT_VERSION_of_Tx;
+        }
         nTime = GetAdjustedTime();
         vin.clear();
         vout.clear();
@@ -1037,8 +1046,7 @@ public:
         READWRITE(hashPrevBlock);
         READWRITE(hashMerkleRoot);
         // nTime is extended to 64-bit since yacoin 1.0.0
-        if ((this->nVersion >= VERSION_of_block_for_yac_05x_new)
-                && (nTestNetNewLogicBlockNumber < nBestHeight)) // 64-bit nTime
+        if (this->nVersion >= VERSION_of_block_for_time_extension) // 64-bit nTime
         {
                READWRITE(nTime);
         }
@@ -1087,7 +1095,7 @@ public:
     }
 
     // yacoin2015 update
-    uint256 CalculateHash(int blockHeight = 0) const
+    uint256 CalculateHash() const
     {
         const ::uint64_t
             nSpanOf4  = 1368515488 - nChainStartTime,                           
@@ -1174,9 +1182,7 @@ public:
         uint256 
             thash;
 
-        int height = blockHeight ? blockHeight : nBestHeight;
-        if ((nVersion >= VERSION_of_block_for_yac_05x_new)
-                && (nTestNetNewLogicBlockNumber < height)) // 64-bit nTime
+        if (nVersion >= VERSION_of_block_for_time_extension) // 64-bit nTime
         {
             struct block_header block_data;
             block_data.version = nVersion;
@@ -1219,7 +1225,7 @@ public:
     {
         if(blockHash == 0 || IsHeaderDifferent())
         {
-            blockHash = CalculateHash(blockHeight);
+            blockHash = CalculateHash();
             previousBlockHeader.version = nVersion;
             previousBlockHeader.prev_block = hashPrevBlock;
             previousBlockHeader.merkle_root = hashMerkleRoot;
@@ -1231,7 +1237,7 @@ public:
     }
 
     // yacoin2015
-    uint256 CalculateYacoinHash(int blockHeight = 0) const
+    uint256 CalculateYacoinHash() const
     {
         uint256 
             thash;
@@ -1239,9 +1245,7 @@ public:
         unsigned char
             nfactor = GetNfactor(nTime);
 
-        int height = blockHeight ? blockHeight : nBestHeight;
-        if ((nVersion >= VERSION_of_block_for_yac_05x_new)
-                && (nTestNetNewLogicBlockNumber < height)) // 64-bit nTime
+        if (nVersion >= VERSION_of_block_for_time_extension) // 64-bit nTime
         {
             struct block_header block_data;
             block_data.version = nVersion;
@@ -1271,7 +1275,7 @@ public:
     {
         if(blockYacoinHash == 0 || IsHeaderDifferent())
         {
-            blockYacoinHash = CalculateYacoinHash(blockHeight);
+            blockYacoinHash = CalculateYacoinHash();
             previousBlockHeader.version = nVersion;
             previousBlockHeader.prev_block = hashPrevBlock;
             previousBlockHeader.merkle_root = hashMerkleRoot;
@@ -1815,8 +1819,7 @@ public:
         READWRITE(hashPrev);
         READWRITE(hashMerkleRoot);
         // nTime is extended to 64-bit since yacoin 1.0.0
-        if ((this->nVersion >= VERSION_of_block_for_yac_05x_new)
-                && (nTestNetNewLogicBlockNumber < nHeight)) // 64-bit nTime
+        if (this->nVersion >= VERSION_of_block_for_time_extension) // 64-bit nTime
         {
             READWRITE(nTime);
         }
@@ -1831,7 +1834,7 @@ public:
         READWRITE(blockHash);
     )
 
-    uint256 GetBlockHash(bool loadedFromLevelDb = false) const
+    uint256 GetBlockHash() const
     {
         if (fUseFastIndex && (nTime < GetAdjustedTime() - 24 * 60 * 60) && blockHash != 0)
             return blockHash;
@@ -1844,8 +1847,7 @@ public:
         block.nBits           = nBits;
         block.nNonce          = nNonce;
 
-        int height = loadedFromLevelDb ? nHeight : 0;
-        const_cast<CDiskBlockIndex*>(this)->blockHash = block.GetHash(height);
+        const_cast<CDiskBlockIndex*>(this)->blockHash = block.GetHash();
 
         return blockHash;
     }
