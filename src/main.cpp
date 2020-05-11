@@ -1663,7 +1663,7 @@ static unsigned int CalculateNextWorkRequired(const CBlockIndex* pindexLast, ::i
 
     ::int64_t 
         nActualTimespan = pindexLast->GetBlockTime() - nFirstBlockTime,
-        nNominalTimespan = nNewBigLinearTrailingAverageLength * nAverageBlockperiod;
+        nNominalTimespan = nDifficultyInterval * nAverageBlockperiod;
 
     if (nActualTimespan < nNominalTimespan / 4)
         nActualTimespan = nNominalTimespan / 4;
@@ -1767,7 +1767,7 @@ static unsigned int GetNextTargetRequired044(const CBlockIndex* pindexLast, bool
 
 #ifdef Yac1dot0
     // From block 3, the target is only recalculated every 21000 blocks
-    int nBlocksToGo = (pindexLast->nHeight + 1) % nNewBigLinearTrailingAverageLength;
+    int nBlocksToGo = (pindexLast->nHeight + 1) % nDifficultyInterval;
     // Only change once per difficulty adjustment interval, first at block 21000
     if (0 != nBlocksToGo) // the btc-ltc 2016 blocks
     {                     // don't change the target
@@ -1778,7 +1778,7 @@ static unsigned int GetNextTargetRequired044(const CBlockIndex* pindexLast, bool
                      "%s to go)"
                      "\n"
                      "",
-                     nTarget.ToString().substr(0, 16).c_str(), (nNewBigLinearTrailingAverageLength - nBlocksToGo),
+                     nTarget.ToString().substr(0, 16).c_str(), (nDifficultyInterval - nBlocksToGo),
                      (1 != nBlocksToGo) ? "s" : "");
         return bnNewTarget.GetCompact();
     }
@@ -1787,9 +1787,9 @@ static unsigned int GetNextTargetRequired044(const CBlockIndex* pindexLast, bool
         // Go back by what we want to be 1.4 days worth of blocks
         const CBlockIndex* pindexFirst = pindexLast;
 
-        if (pindexLast->nHeight > nNewBigLinearTrailingAverageLength + 1)
+        if (pindexLast->nHeight > nDifficultyInterval + 1)
         {
-            for (int i = 0; pindexFirst && i < nNewBigLinearTrailingAverageLength; ++i)
+            for (int i = 0; pindexFirst && i < nDifficultyInterval; ++i)
                 pindexFirst = pindexFirst->pprev;
         }
         else // get block #1

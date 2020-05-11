@@ -191,6 +191,7 @@ extern ::int32_t
     nYac20BlockNumber,
     nYac20BlockNumberTime;
 extern ::uint32_t
+    nDifficultyInterval,
     nEpochInterval;
 extern std::string strMiscWarning;
 
