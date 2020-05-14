@@ -18,7 +18,7 @@ jobs:
           echo $GITHUB_EVENT_NAME
           echo $GITHUB_SHA
           docker pull dev34253/yacoin-build:ubuntu.16.04
-          docker run -v /home/runner/work/yacoin/yacoin:/src -e BUILDVERSION=$GITHUB_ACTION dev34253/yacoin-build:ubuntu.16.04
+          docker run -v /home/runner/work/yacoin/yacoin:/src -e BUILDVERSION=$GITHUB_RUN_NUMBER dev34253/yacoin-build:ubuntu.16.04
           docker run -v /home/runner/work/yacoin/yacoin:/src --entrypoint /src/test/functional/test_runner.py dev34253/yacoin-build:ubuntu.16.04 -j 1
       - uses: actions/upload-artifact@v1
         with:
