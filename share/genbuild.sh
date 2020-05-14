@@ -33,3 +33,7 @@ if [ "$INFO" != "$NEWINFO" ]; then
     echo "$NEWINFO" >"$FILE"
     echo "#define BUILD_DATE \"$TIME\"" >>"$FILE"
 fi
+
+if [ -n "$BUILDVERSION" ]; then
+    echo "#define DISPLAY_VERSION_BUILD $BUILDVERSION" >> "$FILE"
+fi
