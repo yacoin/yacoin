@@ -9,8 +9,16 @@ jobs:
       - uses: actions/checkout@v2
       - name: build
         run: |
+          echo $GITHUB_WORKFLOW
+          echo $GITHUB_RUN_ID
+          echo $GITHUB_RUN_NUMBER
+          echo $GITHUB_ACTION
+          echo $GITHUB_ACTOR
+          echo $GITHUB_REPOSITORY
+          echo $GITHUB_EVENT_NAME
+          echo $GITHUB_SHA
           docker pull dev34253/yacoin-build:ubuntu.16.04
-          docker run -v /home/runner/work/yacoin/yacoin:/src -e BUILDVERSION=$GITHUB_RUN_NUMBER dev34253/yacoin-build:ubuntu.16.04
+          docker run -v /home/runner/work/yacoin/yacoin:/src -e BUILDVERSION=$GITHUB_ACTION dev34253/yacoin-build:ubuntu.16.04
           docker run -v /home/runner/work/yacoin/yacoin:/src --entrypoint /src/test/functional/test_runner.py dev34253/yacoin-build:ubuntu.16.04 -j 1
       - uses: actions/upload-artifact@v1
         with:
