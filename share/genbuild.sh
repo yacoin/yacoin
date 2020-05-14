@@ -35,5 +35,5 @@ if [ "$INFO" != "$NEWINFO" ]; then
 fi
 
 if [ -n "$BUILDVERSION" ]; then
-    echo "#define DISPLAY_VERSION_BUILD \"$BUILDVERSION\"" >> "$FILE"
+    echo "#define DISPLAY_VERSION_BUILD $BUILDVERSION >> "$FILE"
 fi
