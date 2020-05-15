@@ -45,6 +45,7 @@ BOOST_SUFFIX?=-mgw48-mt-sd-1_55
 INCLUDEPATHS= \
 -I"$(CURDIR)" \
 -I"$(CURDIR)/scrypt-jane" \
+-I"$(CURDIR)/obj" \
 -I'./leveldb/include' \
 -I'./leveldb/helpers' \
 -I'$(YDIR)/sw/boost_1_58_0/include' \
