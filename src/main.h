@@ -1074,7 +1074,15 @@ public:
 
     void SetNull()
     {
-        nVersion = CURRENT_VERSION_of_block;
+        // TODO: Need update for mainnet
+        if (nBestHeight != -1 && nBestHeight > nTestTimeExtensionBlockNumber)
+        {
+            nVersion = VERSION_of_block_for_time_extension;
+        }
+        else
+        {
+            nVersion = CURRENT_VERSION_of_block;
+        }
         hashPrevBlock = 0;
         hashMerkleRoot = 0;
         nTime = 0;
