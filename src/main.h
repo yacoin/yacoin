@@ -78,6 +78,20 @@ static const unsigned char MAXIMUM_N_FACTOR = 25;  //30; since uint32_t fails on
 
 static const unsigned char YAC20_N_FACTOR = 16;
 
+// block version header
+static const int
+    VERSION_of_block_for_time_extension = 8,
+    VERSION_of_block_for_yac_05x_new = 7,
+    VERSION_of_block_for_yac_049     = 6,
+    VERSION_of_block_for_yac_044_old = 3,
+#ifdef Yac1dot0
+    CURRENT_VERSION_of_block = VERSION_of_block_for_yac_05x_new;
+#else
+    CURRENT_VERSION_of_block = VERSION_of_block_for_yac_049;
+#endif
+//static const int
+//    CURRENT_VERSION_previous = VERSION_of_block_for_yac_044_old;
+
 inline bool MoneyRange(::int64_t nValue) { return (nValue >= 0 && nValue <= MAX_MONEY); }
 // Threshold for nLockTime: below this value it is interpreted as block number, otherwise as UNIX timestamp.
 static const unsigned int LOCKTIME_THRESHOLD = 500000000; // Tue Nov  5 00:53:20 1985 UTC
@@ -519,14 +533,15 @@ class CTransaction
 public:
     static const int 
         CURRENT_VERSION_of_Tx_for_yac_old = 1,      // this should be different for Yac1.0
-        CURRENT_VERSION_of_Tx_for_yac_new = 2;
+        CURRENT_VERSION_of_Tx_for_yac_new = 2,
+        CURRENT_VERSION_of_Tx_for_time_extension = 3;
 
     static const int 
       //CURRENT_VERSION_of_Tx = CURRENT_VERSION_of_Tx_for_yac_old;
         CURRENT_VERSION_of_Tx = CURRENT_VERSION_of_Tx_for_yac_new;
 
     int nVersion;
-    ::uint32_t nTime;
+    mutable ::int64_t nTime;
     std::vector<CTxIn> vin;
     std::vector<CTxOut> vout;
     ::uint32_t nLockTime;
@@ -544,7 +559,17 @@ public:
     (
         READWRITE(this->nVersion);
         nVersion = this->nVersion;
-        READWRITE(nTime);
+        // nTime is extended to 64-bit since yacoin 1.0.0
+        if (this->nVersion >= CURRENT_VERSION_of_Tx_for_time_extension) // 64-bit nTime
+        {
+			READWRITE(nTime);
+        }
+        else // 32-bit nTime
+        {
+			uint32_t time = (uint32_t)nTime; // needed for GetSerializeSize, Serialize function
+			READWRITE(time);
+			nTime = time; // needed for Unserialize function
+        }
         READWRITE(vin);
         READWRITE(vout);
         READWRITE(nLockTime);
@@ -552,8 +577,16 @@ public:
 
     void SetNull()
     {
-        nVersion = CTransaction::CURRENT_VERSION_of_Tx;
-        nTime = (::uint32_t) GetAdjustedTime();
+        // TODO: Need update for mainet
+        if (nBestHeight != -1 && nBestHeight > nTestTimeExtensionBlockNumber)
+        {
+            nVersion = CTransaction::CURRENT_VERSION_of_Tx_for_time_extension;
+        }
+        else
+        {
+            nVersion = CTransaction::CURRENT_VERSION_of_Tx;
+        }
+        nTime = GetAdjustedTime();
         vin.clear();
         vout.clear();
         nLockTime = 0;
@@ -754,7 +787,7 @@ public:
         str += IsCoinBase()? "Coinbase" : (IsCoinStake()? "Coinstake" : "CTransaction");
         str += strprintf(
             "(hash=%s, "
-            "nTime=%d, "
+            "nTime=%ld, "
             "ver=%d, "
             "vin.size=%" PRIszu ", "
             "vout.size=%" PRIszu ", "
@@ -975,29 +1008,16 @@ public:
 class CBlock
 {
 public:
-    // header
-    static const int 
-        VERSION_of_block_for_yac_05x_new = 7,
-        VERSION_of_block_for_yac_049     = 6,
-        VERSION_of_block_for_yac_044_old = 3,
-#ifdef Yac1dot0
-        CURRENT_VERSION_of_block = VERSION_of_block_for_yac_05x_new;
-#else
-        CURRENT_VERSION_of_block = VERSION_of_block_for_yac_049;
-#endif
-    //static const int 
-    //    CURRENT_VERSION_previous = VERSION_of_block_for_yac_044_old;
-
     // Block header
     ::int32_t nVersion;
     uint256 hashPrevBlock;
     uint256 hashMerkleRoot;
-    ::uint32_t nTime;
+    mutable ::int64_t nTime;
     ::uint32_t nBits;
     ::uint32_t nNonce;
 
     // Store following info to avoid calculating hash many times
-    mutable block_header previousBlockHeader;
+    mutable struct block_header previousBlockHeader;
     mutable uint256 blockHash;
     mutable uint256 blockYacoinHash;
 
@@ -1025,7 +1045,17 @@ public:
         nVersion = this->nVersion;
         READWRITE(hashPrevBlock);
         READWRITE(hashMerkleRoot);
-        READWRITE(nTime);
+        // nTime is extended to 64-bit since yacoin 1.0.0
+        if (this->nVersion >= VERSION_of_block_for_time_extension) // 64-bit nTime
+        {
+               READWRITE(nTime);
+        }
+        else // 32-bit nTime
+        {
+               uint32_t time = (uint32_t)nTime; // needed for GetSerializeSize, Serialize function
+               READWRITE(time);
+               nTime = time; // needed for Unserialize function
+        }
         READWRITE(nBits);
         READWRITE(nNonce);
 
@@ -1044,7 +1074,15 @@ public:
 
     void SetNull()
     {
-        nVersion = CBlock::CURRENT_VERSION_of_block;
+        // TODO: Need update for mainnet
+        if (nBestHeight != -1 && nBestHeight > nTestTimeExtensionBlockNumber)
+        {
+            nVersion = VERSION_of_block_for_time_extension;
+        }
+        else
+        {
+            nVersion = CURRENT_VERSION_of_block;
+        }
         hashPrevBlock = 0;
         hashMerkleRoot = 0;
         nTime = 0;
@@ -1056,7 +1094,7 @@ public:
         nDoS = 0;
         blockHash = 0;
         blockYacoinHash = 0;
-        memset(UVOIDBEGIN(previousBlockHeader), 0, sizeof(block_header));
+        memset(UVOIDBEGIN(previousBlockHeader), 0, sizeof(struct block_header));
     }
 
     bool IsNull() const
@@ -1152,7 +1190,28 @@ public:
         uint256 
             thash;
 
-        scrypt_hash(CVOIDBEGIN(nVersion), sizeof(block_header), UINTBEGIN(thash), nfactor);
+        if (nVersion >= VERSION_of_block_for_time_extension) // 64-bit nTime
+        {
+            struct block_header block_data;
+            block_data.version = nVersion;
+            block_data.prev_block = hashPrevBlock;
+            block_data.merkle_root = hashMerkleRoot;
+            block_data.timestamp = nTime;
+            block_data.bits = nBits;
+            block_data.nonce = nNonce;
+            scrypt_hash(CVOIDBEGIN(block_data), sizeof(struct block_header), UINTBEGIN(thash), nfactor);
+        }
+        else // 32-bit nTime
+        {
+            old_block_header oldBlock;
+            oldBlock.version = nVersion;
+            oldBlock.prev_block = hashPrevBlock;
+            oldBlock.merkle_root = hashMerkleRoot;
+            oldBlock.timestamp = nTime;
+            oldBlock.bits = nBits;
+            oldBlock.nonce = nNonce;
+            scrypt_hash(CVOIDBEGIN(oldBlock), sizeof(old_block_header), UINTBEGIN(thash), nfactor);
+        }
 		return thash;
     }
 
@@ -1170,12 +1229,17 @@ public:
         return true;
     }
 
-    uint256 GetHash() const
+    uint256 GetHash(int blockHeight = 0) const
     {
         if(blockHash == 0 || IsHeaderDifferent())
         {
             blockHash = CalculateHash();
-            memcpy(UVOIDBEGIN(previousBlockHeader), CVOIDBEGIN(nVersion), sizeof(block_header));
+            previousBlockHeader.version = nVersion;
+            previousBlockHeader.prev_block = hashPrevBlock;
+            previousBlockHeader.merkle_root = hashMerkleRoot;
+            previousBlockHeader.timestamp = nTime;
+            previousBlockHeader.bits = nBits;
+            previousBlockHeader.nonce = nNonce;
         }
         return blockHash;
     }
@@ -1188,17 +1252,44 @@ public:
 
         unsigned char
             nfactor = GetNfactor(nTime);
-        scrypt_hash(CVOIDBEGIN(nVersion), sizeof(block_header), UINTBEGIN(thash), nfactor);
+
+        if (nVersion >= VERSION_of_block_for_time_extension) // 64-bit nTime
+        {
+            struct block_header block_data;
+            block_data.version = nVersion;
+            block_data.prev_block = hashPrevBlock;
+            block_data.merkle_root = hashMerkleRoot;
+            block_data.timestamp = nTime;
+            block_data.bits = nBits;
+            block_data.nonce = nNonce;
+            scrypt_hash(CVOIDBEGIN(block_data), sizeof(struct block_header), UINTBEGIN(thash), nfactor);
+        }
+        else // 32-bit nTime
+        {
+            old_block_header oldBlock;
+            oldBlock.version = nVersion;
+            oldBlock.prev_block = hashPrevBlock;
+            oldBlock.merkle_root = hashMerkleRoot;
+            oldBlock.timestamp = nTime;
+            oldBlock.bits = nBits;
+            oldBlock.nonce = nNonce;
+            scrypt_hash(CVOIDBEGIN(oldBlock), sizeof(old_block_header), UINTBEGIN(thash), nfactor);
+        }
 
         return thash;
     }
 
-    uint256 GetYacoinHash() const
+    uint256 GetYacoinHash(int blockHeight = 0) const
     {
         if(blockYacoinHash == 0 || IsHeaderDifferent())
         {
             blockYacoinHash = CalculateYacoinHash();
-            memcpy(UVOIDBEGIN(previousBlockHeader), CVOIDBEGIN(nVersion), sizeof(block_header));
+            previousBlockHeader.version = nVersion;
+            previousBlockHeader.prev_block = hashPrevBlock;
+            previousBlockHeader.merkle_root = hashMerkleRoot;
+            previousBlockHeader.timestamp = nTime;
+            previousBlockHeader.bits = nBits;
+            previousBlockHeader.nonce = nNonce;
         }
         return blockYacoinHash;
     }
@@ -1218,7 +1309,7 @@ public:
             unsigned int nEntropyBit = ((GetHash().Get64()) & 1ULL);
             if (fDebug && GetBoolArg("-printstakemodifier"))
                 printf(
-                        "GetStakeEntropyBit: nTime=%u \nhashBlock=%s\nnEntropyBit=%u\n", 
+                        "GetStakeEntropyBit: nTime=%ld \nhashBlock=%s\nnEntropyBit=%u\n",
                         nTime, 
                         GetHash().ToString().c_str(), 
                         nEntropyBit
@@ -1240,7 +1331,7 @@ public:
 
     std::pair<COutPoint, unsigned int> GetProofOfStake() const
     {
-        return IsProofOfStake()? std::make_pair(vtx[1].vin[0].prevout, vtx[1].nTime) : std::make_pair(COutPoint(), (unsigned int)0);
+        return IsProofOfStake()? std::make_pair(vtx[1].vin[0].prevout, (unsigned int)vtx[1].nTime) : std::make_pair(COutPoint(), (unsigned int)0);
     }
 
     // ppcoin: get max transaction timestamp
@@ -1379,7 +1470,7 @@ public:
                 "ver=%d,\n"
                 "hashPrevBlock=%s,\n"
                 "hashMerkleRoot=%s,\n"
-                "nTime=%u, "
+                "nTime=%ld, "
                 "nBits=%08x, "
                 "nNonce=%u, "
                 "vtx=%" PRIszu ",\n"
@@ -1479,7 +1570,7 @@ public:
     // block header
     ::int32_t  nVersion;
     uint256  hashMerkleRoot;
-    ::uint32_t nTime;
+    mutable ::int64_t nTime;
     ::uint32_t nBits;
     ::uint32_t nNonce;
 
@@ -1735,7 +1826,17 @@ public:
         READWRITE(this->nVersion);
         READWRITE(hashPrev);
         READWRITE(hashMerkleRoot);
-        READWRITE(nTime);
+        // nTime is extended to 64-bit since yacoin 1.0.0
+        if (this->nVersion >= VERSION_of_block_for_time_extension) // 64-bit nTime
+        {
+            READWRITE(nTime);
+        }
+        else // 32-bit nTime
+        {
+            uint32_t time = (uint32_t)nTime; // needed for GetSerializeSize, Serialize function
+            READWRITE(time);
+            nTime = time; // needed for Unserialize function
+        }
         READWRITE(nBits);
         READWRITE(nNonce);
         READWRITE(blockHash);

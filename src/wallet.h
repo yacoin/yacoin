@@ -92,8 +92,8 @@ public:
 class CWallet : public CCryptoKeyStore
 {
 private:
-    bool SelectCoinsSimple(::int64_t nTargetValue, ::int64_t nMinValue, ::int64_t nMaxValue, unsigned int nSpendTime, int nMinConf, std::set<std::pair<const CWalletTx*,unsigned int> >& setCoinsRet, ::int64_t& nValueRet) const;
-    bool SelectCoins(::int64_t nTargetValue, unsigned int nSpendTime, std::set<std::pair<const CWalletTx*,unsigned int> >& setCoinsRet, ::int64_t& nValueRet, const CCoinControl *coinControl=NULL) const;
+    bool SelectCoinsSimple(::int64_t nTargetValue, ::int64_t nMinValue, ::int64_t nMaxValue, int64_t nSpendTime, int nMinConf, std::set<std::pair<const CWalletTx*,unsigned int> >& setCoinsRet, ::int64_t& nValueRet) const;
+    bool SelectCoins(::int64_t nTargetValue, int64_t nSpendTime, std::set<std::pair<const CWalletTx*,unsigned int> >& setCoinsRet, ::int64_t& nValueRet, const CCoinControl *coinControl=NULL) const;
 
     CWalletDB *pwalletdbEncryption, *pwalletdbDecryption;
 
@@ -165,7 +165,7 @@ public:
 
     void AvailableCoinsMinConf(std::vector<COutput>& vCoins, int nConf, ::int64_t nMinValue, ::int64_t nMaxValue) const;
     void AvailableCoins(std::vector<COutput>& vCoins, bool fOnlyConfirmed=true, const CCoinControl *coinControl=NULL) const;
-    bool SelectCoinsMinConf(::int64_t nTargetValue, unsigned int nSpendTime, int nConfMine, int nConfTheirs, std::vector<COutput> vCoins, std::set<std::pair<const CWalletTx*,unsigned int> >& setCoinsRet, ::int64_t& nValueRet) const;
+    bool SelectCoinsMinConf(::int64_t nTargetValue, int64_t nSpendTime, int nConfMine, int nConfTheirs, std::vector<COutput> vCoins, std::set<std::pair<const CWalletTx*,unsigned int> >& setCoinsRet, ::int64_t& nValueRet) const;
     // keystore implementation
     // Generate a new key
     CPubKey GenerateNewKey();

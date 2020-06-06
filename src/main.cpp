@@ -428,7 +428,12 @@ bool CTransaction::ReadFromDisk(COutPoint prevout)
 
 bool CTransaction::oldIsStandard(string& strReason) const
 {
-    if (nVersion > CTransaction::CURRENT_VERSION_of_Tx)
+    // TODO: Temporary fix to avoid warning for yacoind 1.0.0. Because in yacoind 1.0.0, there are two times
+    // block version is upgraded:
+	// 1) At the time installing yacoind 1.0.0
+	// 2) At the time happening hardfork
+	// Need update this line at next yacoin version
+    if (nVersion > CTransaction::CURRENT_VERSION_of_Tx_for_time_extension)
     {
         strReason = "version";
         return false;
@@ -490,7 +495,12 @@ bool CTransaction::oldIsStandard(string& strReason) const
 
 bool CTransaction::IsStandard044( string& strReason ) const
 {
-    if (nVersion > CTransaction::CURRENT_VERSION_of_Tx) // same as in 0.4.4!?
+    // TODO: Temporary fix to avoid warning for yacoind 1.0.0. Because in yacoind 1.0.0, there are two times
+    // block version is upgraded:
+	// 1) At the time installing yacoind 1.0.0
+	// 2) At the time happening hardfork
+	// Need update this line at next yacoin version
+    if (nVersion > CTransaction::CURRENT_VERSION_of_Tx_for_time_extension) // same as in 0.4.4!?
     {                                                   // if we test differently,
         strReason = "version(in 0.4.4)";                // then shouldn't 0.4.5 be 
         return false;                                   // different?
@@ -3067,12 +3077,17 @@ bool CBlock::SetBestChain(CTxDB& txdb, CBlockIndex* pindexNew)
         const CBlockIndex* pindex = pindexBest;
         for (int i = 0; i < 100 && pindex != NULL; ++i)
         {
-            if (pindex->nVersion > CBlock::CURRENT_VERSION_of_block)
+            // TODO: Temporary fix to avoid warning for yacoind 1.0.0. Because in yacoind 1.0.0, there are two times
+            // block version is upgraded:
+        	// 1) At the time installing yacoind 1.0.0
+        	// 2) At the time happening hardfork
+        	// Need update this line at next yacoin version
+            if (pindex->nVersion > VERSION_of_block_for_time_extension)
                 ++nUpgraded;
             pindex = pindex->pprev;
         }
         if (nUpgraded > 0)
-            printf("SetBestChain: %d of last 100 blocks above version %d\n", nUpgraded, CBlock::CURRENT_VERSION_of_block);
+            printf("SetBestChain: %d of last 100 blocks above version %d\n", nUpgraded, CURRENT_VERSION_of_block);
         if (nUpgraded > 100/2)
             // strMiscWarning is read by GetWarnings(), called by Qt and the JSON-RPC code to warn the user:
             strMiscWarning = _("Warning: This version is obsolete, upgrade required!");
@@ -3125,7 +3140,7 @@ bool CTransaction::GetCoinAge(CTxDB& txdb, ::uint64_t& nCoinAge) const
         bnCentSecond += CBigNum(nValueIn) * (nTime-txPrev.nTime) / CENT;
 
         if (fDebug && GetBoolArg("-printcoinage"))
-            printf("coin age nValueIn=%" PRId64 " nTimeDiff=%d bnCentSecond=%s\n", nValueIn, nTime - txPrev.nTime, bnCentSecond.ToString().c_str());
+            printf("coin age nValueIn=%" PRId64 " nTimeDiff=%ld bnCentSecond=%s\n", nValueIn, nTime - txPrev.nTime, bnCentSecond.ToString().c_str());
     }
 
     CBigNum bnCoinDay = bnCentSecond * CENT / COIN / (24 * 60 * 60);
@@ -3310,7 +3325,7 @@ bool CBlock::CheckBlock(bool fCheckPOW, bool fCheckMerkleRoot, bool fCheckSig) c
 
         // Check coinstake timestamp
         if (GetBlockTime() != (::int64_t)vtx[1].nTime)
-            return DoS(50, error("CheckBlock () : coinstake timestamp violation nTimeBlock=%" PRId64 " nTimeTx=%u", GetBlockTime(), vtx[1].nTime));
+            return DoS(50, error("CheckBlock () : coinstake timestamp violation nTimeBlock=%" PRId64 " nTimeTx=%ld", GetBlockTime(), vtx[1].nTime));
 
         // Check timestamp  06/04/2018 missing test in this 0.4.5-0.48 code.  Thanks Joe! ;>
         if (GetBlockTime() > FutureDrift(GetAdjustedTime()))
@@ -3966,6 +3981,8 @@ bool CBlock::SignBlock(CWallet& wallet)
     if( 
        !IsProofOfStake()    // i.e PoW then immaterial what version!
        ||
+       (VERSION_of_block_for_time_extension == nVersion)
+       ||
        (VERSION_of_block_for_yac_05x_new == nVersion)
        ||
        (VERSION_of_block_for_yac_044_old == nVersion)
@@ -4305,8 +4322,8 @@ bool LoadBlockIndex(bool fAllowNew)
         block.vtx.push_back(txNew);
         block.hashPrevBlock = 0;
         block.hashMerkleRoot = block.BuildMerkleTree();
-        block.nVersion = CBlock::CURRENT_VERSION_of_block;  // was 1; which is strange?
-        block.nTime    = (::uint32_t)( fTestNet? 
+        block.nVersion = CURRENT_VERSION_of_block;  // was 1; which is strange?
+        block.nTime    = (::uint32_t)( fTestNet?
                                        nChainStartTimeTestNet + 20: 
                                        nChainStartTime + 20 
                                       );   // why + 20??

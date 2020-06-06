@@ -974,7 +974,7 @@ std::string BuildTxDetailsFrom(
                         sStandardItemModelElement.c_str()
                         );
     sStandardItemModelElement = strprintf( 
-                                        " %d (local %s)"
+                                        " %ld (local %s)"
                                         , tx.nTime, sTime.c_str()
                                          );
     sTemp += sStandardItemModelElement + "<br />\n";
@@ -2380,7 +2380,7 @@ std::string BuildBlockinfoDetailsFrom(
                             sStandardItemModelElement.c_str()
                            );
     sStandardItemModelElement = strprintf(
-                        " %u (local %s)"
+                        " %ld (local %s)"
                         , block.nTime, sTime.c_str()
                                          );
     sTemp += sStandardItemModelElement + "<br />\n";

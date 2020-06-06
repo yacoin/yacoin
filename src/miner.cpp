@@ -178,7 +178,15 @@ CBlock* CreateNewBlock(CWallet* pwallet, bool fProofOfStake)
     if( fUseOld044Rules )
     {
       //pblock->nVersion = CBlock::VERSION_of_block_for_yac_044_old;
-        pblock->nVersion = CBlock::CURRENT_VERSION_of_block;
+    	// TODO: Need update for mainet
+    	if (nBestHeight > nTestTimeExtensionBlockNumber)
+    	{
+            pblock->nVersion = VERSION_of_block_for_time_extension;
+    	}
+    	else
+    	{
+            pblock->nVersion = CURRENT_VERSION_of_block;
+    	}
         // here we can fiddle with time to try to make block generation easier
     }
     // Create coinbase tx
@@ -774,7 +782,7 @@ void FormatHashBuffers(CBlock* pblock, char* pmidstate, char* pdata, char* phash
             int nVersion;
             uint256 hashPrevBlock;
             uint256 hashMerkleRoot;
-            unsigned int nTime;
+            ::int64_t nTime;
             unsigned int nBits;
             unsigned int nNonce;
         }
@@ -1127,10 +1135,10 @@ static void YacoinMiner(CWallet *pwallet)  // here fProofOfStake is always false
 
         FormatHashBuffers(pblock.get(), pmidstate, pdata, phash1);
 
+        ::int64_t
+            & nBlockTime = *(::int64_t*)(pdata + 64 + 4);
         unsigned int
-            & nBlockTime = *(unsigned int*)(pdata + 64 + 4);
-        unsigned int
-            & nBlockNonce = *(unsigned int*)(pdata + 64 + 12);
+            & nBlockNonce = *(unsigned int*)(pdata + 64 + 16);
 
         Big.randomize_the_nonce( nBlockNonce ); // lazy initialization performed here
 
@@ -1149,9 +1157,6 @@ static void YacoinMiner(CWallet *pwallet)  // here fProofOfStake is always false
                      , hashTarget.GetHex().substr(0,16).c_str()
                     );
 
-        block_header 
-            res_header;
-
         uint256 
             result;
         unsigned int 
@@ -1167,11 +1172,10 @@ static void YacoinMiner(CWallet *pwallet)  // here fProofOfStake is always false
             unsigned int nNonceFound;
 
             nNonceFound = scanhash_scrypt(
-                                            (block_header *)&pblock->nVersion,
+                                            (char *)&pblock->nVersion,
                                             //max_nonce,
                                             nHashesDone,
                                             UBEGIN(result),
-                                            &res_header,
                                             GetNfactor(pblock->nTime, fNotYac1dot0BlockOrTx)
                                             , pindexPrev
                                             , &hashTarget
