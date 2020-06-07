@@ -431,6 +431,7 @@ bool CTxDB::LoadBlockIndex()
     CDataStream ssStartKey(SER_DISK, CLIENT_VERSION);
     ssStartKey << make_pair(string("blockindex"), uint256(0));
     iterator->Seek(ssStartKey.str());
+    ::int32_t bestEpochIntervalHeight = 0;
     // Now read each entry.
     while (iterator->Valid())   //what is so slow in this loop of all PoW blocks?
     {                           // 5 minutes for 1400 blocks, ~300 blocks/min or ~5/sec
@@ -553,7 +554,8 @@ bool CTxDB::LoadBlockIndex()
         pindexNew->nBits          = diskindex.nBits;
         pindexNew->nNonce         = diskindex.nNonce;
 
-        if (pindexNew->nHeight % nEpochInterval == 0) {
+        if ((pindexNew->nHeight % nEpochInterval == 0) && pindexNew->nHeight >= bestEpochIntervalHeight) {
+            bestEpochIntervalHeight = pindexNew->nHeight;
             nBlockRewardPrev = (::int64_t)
                 (
                 (pindexNew->pprev? pindexNew->pprev->nMoneySupply:
