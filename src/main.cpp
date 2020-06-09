@@ -1312,16 +1312,23 @@ CBigNum inline GetProofOfStakeLimit(int nHeight, unsigned int nTime)
 }
 
 // miner's coin base reward based on nBits
-::int64_t GetProofOfWorkReward(unsigned int nBits, ::int64_t nFees)
+::int64_t GetProofOfWorkReward(unsigned int nBits, ::int64_t nFees, bool fGetRewardOfBestHeightBlock)
 {
     const ::int32_t
         nYac20BlockNumber = 0;  //2960;
 #ifdef Yac1dot0
-    ::int64_t nBlockRewardExcludeFees;
+    if (fGetRewardOfBestHeightBlock)
+    {
+       return (::int64_t)nBlockRewardPrev
+                ? nBlockRewardPrev
+                : (nSimulatedMOneySupplyAtFork * nInflation / nNumberOfBlocksPerYear);
+    }
+
     if(
        (pindexBest->nHeight + 1) >= nYac20BlockNumber
       )
     {
+        ::int64_t nBlockRewardExcludeFees;
         // Default: nEpochInterval = 21000 blocks, recalculated with each epoch
         if ((pindexBest->nHeight + 1) % nEpochInterval == 0)
         {
