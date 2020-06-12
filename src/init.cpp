@@ -665,7 +665,7 @@ bool AppInit2()
     fLogTimestamps = GetBoolArg("-logtimestamps");
 
     nEpochInterval = (uint32_t)(GetArg("-epochinterval", 21000));
-    nDifficultyInterval = (uint32_t)(GetArg("-difficultyinterval", 21000));
+    nDifficultyInterval = nEpochInterval;
 
     if (mapArgs.count("-timeout"))
     {
