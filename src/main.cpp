@@ -161,11 +161,11 @@ static CBigNum bnProofOfStakeTestnetLimit(~uint256(0) >> 20);
 //static CBigNum bnInitialHashTarget(~uint256(0) >> 16);
 
 int
-    nCoinbaseMaturityInBlocks = 500;
+    nCoinbaseMaturityInBlocks = 6;
 
 int 
-    nCoinbaseMaturity = nCoinbaseMaturityInBlocks;  //500;
-                                                    // @~1 blk/minute, ~8.33 hrs        
+    nCoinbaseMaturity = nCoinbaseMaturityInBlocks;  // 6;
+                                                    // @~1 blk/minute, ~6 minutes
 CBlockIndex* pindexGenesisBlock = NULL;
 int nBestHeight = -1;
 
@@ -982,12 +982,7 @@ int CMerkleTx::GetBlocksToMaturity() const
 {
     if (!(IsCoinBase() || IsCoinStake()))
         return 0;
-    return max(
-                0, 
-                fTestNet?
-                (nCoinbaseMaturity +  0) - GetDepthInMainChain():   //<<<<<<<<<<< test
-                (nCoinbaseMaturity + 20) - GetDepthInMainChain()    // why is this 20?
-              );                                                    // what is this 20 from? For?
+    return max(0, nCoinbaseMaturity - GetDepthInMainChain());
 }
 
 
