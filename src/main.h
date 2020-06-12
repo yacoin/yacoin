@@ -195,7 +195,7 @@ void ThreadScriptCheckQuit();
 
 bool CheckProofOfWork(uint256 hash, unsigned int nBits);
 unsigned int GetNextTargetRequired(const CBlockIndex* pindexLast, bool fProofOfStake);
-::int64_t GetProofOfWorkReward(unsigned int nBits=0, ::int64_t nFees=0);
+::int64_t GetProofOfWorkReward(unsigned int nBits=0, ::int64_t nFees=0, bool fGetRewardOfBestHeightBlock=false);
 ::int64_t GetProofOfStakeReward(::int64_t nCoinAge, unsigned int nBits, ::int64_t nTime, bool bCoinYearOnly=false);
 
 ::int64_t GetProofOfStakeReward(::int64_t nCoinAge);
