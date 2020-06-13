@@ -1386,7 +1386,7 @@ CBigNum inline GetProofOfStakeLimit(int nHeight, unsigned int nTime)
     }
     else
     {
-        nMaxSize = (GetProofOfWorkReward() / MIN_TX_FEE) * 1000;
+        nMaxSize = (GetProofOfWorkReward() * 1000 / MIN_TX_FEE);
     }
 
     switch (mode)
