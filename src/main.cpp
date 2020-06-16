@@ -1784,7 +1784,7 @@ static unsigned int GetNextTargetRequired044(const CBlockIndex* pindexLast, bool
     }
     else // actually do a DAA
     {
-        // Go back by what we want to be 1.4 days worth of blocks
+        // Go back by what we want to be 14 days worth of blocks
         const CBlockIndex* pindexFirst = pindexLast;
 
         if (pindexLast->nHeight > nDifficultyInterval + 1)
@@ -1792,9 +1792,9 @@ static unsigned int GetNextTargetRequired044(const CBlockIndex* pindexLast, bool
             for (int i = 0; pindexFirst && i < nDifficultyInterval; ++i)
                 pindexFirst = pindexFirst->pprev;
         }
-        else // get block #1
+        else // get block #0
         {
-            CBlockIndex* pbi = FindBlockByHeight(1);
+            CBlockIndex* pbi = FindBlockByHeight(0);
             CBlock block;
 
             block.ReadFromDisk(pbi);
