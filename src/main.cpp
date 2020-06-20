@@ -1760,8 +1760,26 @@ static unsigned int GetNextTargetRequired044(const CBlockIndex* pindexLast, bool
     if (pindexPrevPrev->pprev == NULL)
         return bnInitialHashTarget.GetCompact(); // second block
 
-    // so there are more than 3 blocks
+    // Recalculate nMinEase if reorg through two or many epochs
+    static ::int32_t previousBlockHeight = pindexBest->nHeight;
+    if ((pindexBest->nHeight < previousBlockHeight) &&
+                   ((pindexBest->nHeight/nEpochInterval) < (previousBlockHeight/nEpochInterval)))
+    {
+        ::int32_t currentEpochNumber = pindexBest->nHeight / nEpochInterval;
+        ::uint32_t tempMinEase = bnEasiestTargetLimit.GetCompact();
+        for (int i = 1; i < currentEpochNumber; i++)
+        {
+            CBlockIndex* pbi = FindBlockByHeight(i*nEpochInterval);
+            if (tempMinEase > pbi->nBits)
+            {
+                tempMinEase = pbi->nBits;
+            }
+        }
+        nMinEase = min(tempMinEase, bnInitialHashTarget.GetCompact());
+    }
+    previousBlockHeight = pindexBest->nHeight;
 
+    // so there are more than 3 blocks
     ::int64_t
         nActualSpacing = pindexPrev->GetBlockTime() - pindexPrevPrev->GetBlockTime();
 
