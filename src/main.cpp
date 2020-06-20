@@ -1312,6 +1312,7 @@ CBigNum inline GetProofOfStakeLimit(int nHeight, unsigned int nTime)
     const ::int32_t
         nYac20BlockNumber = 0;  //2960;
 #ifdef Yac1dot0
+    static ::int32_t previousBlockHeight = pindexBest->nHeight;
     if (fGetRewardOfBestHeightBlock)
     {
        return (::int64_t)nBlockRewardPrev
@@ -1324,20 +1325,33 @@ CBigNum inline GetProofOfStakeLimit(int nHeight, unsigned int nTime)
       )
     {
         ::int64_t nBlockRewardExcludeFees;
-        // Default: nEpochInterval = 21000 blocks, recalculated with each epoch
-        if ((pindexBest->nHeight + 1) % nEpochInterval == 0)
+        if ((pindexBest->nHeight < previousBlockHeight) &&
+            ((pindexBest->nHeight/nEpochInterval) < (previousBlockHeight/nEpochInterval))) // Reorg through two or many epochs
         {
-            // recalculated
-            // PoW reward is 2%
-            nBlockRewardExcludeFees = (::int64_t)(pindexBest->nMoneySupply * nInflation / nNumberOfBlocksPerYear);
+            ::int32_t startEpochBlockHeight = (pindexBest->nHeight / nEpochInterval) * nEpochInterval;
+            ::int32_t moneySupplyBlockHeight = startEpochBlockHeight ? startEpochBlockHeight - 1 : 0;
+            const CBlockIndex* pindexMoneySupplyBlock = FindBlockByHeight(moneySupplyBlockHeight);
+            nBlockRewardExcludeFees = (::int64_t)(pindexMoneySupplyBlock->nMoneySupply * nInflation / nNumberOfBlocksPerYear);
             nBlockRewardPrev = nBlockRewardExcludeFees;
         }
-        else
+        else // normal case
         {
-            nBlockRewardExcludeFees = (::int64_t)nBlockRewardPrev
-                                        ? nBlockRewardPrev
-                                        : (nSimulatedMOneySupplyAtFork * nInflation / nNumberOfBlocksPerYear);
+            // Default: nEpochInterval = 21000 blocks, recalculated with each epoch
+            if ((pindexBest->nHeight + 1) % nEpochInterval == 0)
+            {
+                // recalculated
+                // PoW reward is 2%
+                nBlockRewardExcludeFees = (::int64_t)(pindexBest->nMoneySupply * nInflation / nNumberOfBlocksPerYear);
+                nBlockRewardPrev = nBlockRewardExcludeFees;
+            }
+            else
+            {
+                nBlockRewardExcludeFees = (::int64_t)nBlockRewardPrev
+                                            ? nBlockRewardPrev
+                                            : (nSimulatedMOneySupplyAtFork * nInflation / nNumberOfBlocksPerYear);
+            }
         }
+        previousBlockHeight = pindexBest->nHeight;
         return nBlockRewardExcludeFees;
     }
 #endif
