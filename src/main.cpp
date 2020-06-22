@@ -153,7 +153,8 @@ CBigNum bnProofOfWorkLimitTestNet( nPoWeasiestTargetLimitTestNet );
 // YACOIN TODO
 ::int64_t nBlockRewardPrev = 0;
 ::uint32_t nMinEase = std::numeric_limits< ::uint32_t>::max();
-
+bool recalculateBlockReward = false;
+bool recalculateMinEase = false;
 
 static CBigNum bnProofOfStakeTestnetLimit(~uint256(0) >> 20);
 
@@ -1312,7 +1313,6 @@ CBigNum inline GetProofOfStakeLimit(int nHeight, unsigned int nTime)
     const ::int32_t
         nYac20BlockNumber = 0;  //2960;
 #ifdef Yac1dot0
-    static ::int32_t previousBlockHeight = pindexBest->nHeight;
     if (fGetRewardOfBestHeightBlock)
     {
        return (::int64_t)nBlockRewardPrev
@@ -1325,9 +1325,9 @@ CBigNum inline GetProofOfStakeLimit(int nHeight, unsigned int nTime)
       )
     {
         ::int64_t nBlockRewardExcludeFees;
-        if ((pindexBest->nHeight < previousBlockHeight) &&
-            ((pindexBest->nHeight/nEpochInterval) < (previousBlockHeight/nEpochInterval))) // Reorg through two or many epochs
+        if (recalculateBlockReward) // Reorg through two or many epochs
         {
+            recalculateBlockReward = false;
             ::int32_t startEpochBlockHeight = (pindexBest->nHeight / nEpochInterval) * nEpochInterval;
             ::int32_t moneySupplyBlockHeight = startEpochBlockHeight ? startEpochBlockHeight - 1 : 0;
             const CBlockIndex* pindexMoneySupplyBlock = FindBlockByHeight(moneySupplyBlockHeight);
@@ -1351,7 +1351,6 @@ CBigNum inline GetProofOfStakeLimit(int nHeight, unsigned int nTime)
                                             : (nSimulatedMOneySupplyAtFork * nInflation / nNumberOfBlocksPerYear);
             }
         }
-        previousBlockHeight = pindexBest->nHeight;
         return nBlockRewardExcludeFees;
     }
 #endif
@@ -1761,10 +1760,9 @@ static unsigned int GetNextTargetRequired044(const CBlockIndex* pindexLast, bool
         return bnInitialHashTarget.GetCompact(); // second block
 
     // Recalculate nMinEase if reorg through two or many epochs
-    static ::int32_t previousBlockHeight = pindexBest->nHeight;
-    if ((pindexBest->nHeight < previousBlockHeight) &&
-                   ((pindexBest->nHeight/nEpochInterval) < (previousBlockHeight/nEpochInterval)))
+    if (recalculateMinEase)
     {
+        recalculateMinEase = false;
         ::int32_t currentEpochNumber = pindexBest->nHeight / nEpochInterval;
         ::uint32_t tempMinEase = bnEasiestTargetLimit.GetCompact();
         for (int i = 1; i < currentEpochNumber; i++)
@@ -1777,7 +1775,6 @@ static unsigned int GetNextTargetRequired044(const CBlockIndex* pindexLast, bool
         }
         nMinEase = min(tempMinEase, bnInitialHashTarget.GetCompact());
     }
-    previousBlockHeight = pindexBest->nHeight;
 
     // so there are more than 3 blocks
     ::int64_t
@@ -3074,8 +3071,20 @@ bool CBlock::SetBestChain(CTxDB& txdb, CBlockIndex* pindexNew)
 
     // New best block
     hashBestChain = hash;
-    pindexBest = pindexNew;
     pblockindexFBBHLast = NULL;
+    pindexBest = pindexNew;
+    // Reorg through two or many epochs
+    if ((abs(nBestHeight - pindexBest->nHeight) >= 2) &&
+        (abs((::int32_t)(nBestHeight / nEpochInterval) - (::int32_t)(pindexBest->nHeight / nEpochInterval)) >= 1))
+    {
+        recalculateBlockReward = true;
+        recalculateMinEase = true;
+    }
+    // Update minimum ease for next target calculation
+    if (nMinEase > pindexBest->nBits)
+    {
+        nMinEase = pindexBest->nBits;
+    }
     nBestHeight = pindexBest->nHeight;
 
     // good place to test for new logic
