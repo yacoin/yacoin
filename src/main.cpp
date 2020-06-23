@@ -153,7 +153,8 @@ CBigNum bnProofOfWorkLimitTestNet( nPoWeasiestTargetLimitTestNet );
 // YACOIN TODO
 ::int64_t nBlockRewardPrev = 0;
 ::uint32_t nMinEase = std::numeric_limits< ::uint32_t>::max();
-
+bool recalculateBlockReward = false;
+bool recalculateMinEase = false;
 
 static CBigNum bnProofOfStakeTestnetLimit(~uint256(0) >> 20);
 
@@ -1324,19 +1325,31 @@ CBigNum inline GetProofOfStakeLimit(int nHeight, unsigned int nTime)
       )
     {
         ::int64_t nBlockRewardExcludeFees;
-        // Default: nEpochInterval = 21000 blocks, recalculated with each epoch
-        if ((pindexBest->nHeight + 1) % nEpochInterval == 0)
+        if (recalculateBlockReward) // Reorg through two or many epochs
         {
-            // recalculated
-            // PoW reward is 2%
-            nBlockRewardExcludeFees = (::int64_t)(pindexBest->nMoneySupply * nInflation / nNumberOfBlocksPerYear);
+            recalculateBlockReward = false;
+            ::int32_t startEpochBlockHeight = (pindexBest->nHeight / nEpochInterval) * nEpochInterval;
+            ::int32_t moneySupplyBlockHeight = startEpochBlockHeight ? startEpochBlockHeight - 1 : 0;
+            const CBlockIndex* pindexMoneySupplyBlock = FindBlockByHeight(moneySupplyBlockHeight);
+            nBlockRewardExcludeFees = (::int64_t)(pindexMoneySupplyBlock->nMoneySupply * nInflation / nNumberOfBlocksPerYear);
             nBlockRewardPrev = nBlockRewardExcludeFees;
         }
-        else
+        else // normal case
         {
-            nBlockRewardExcludeFees = (::int64_t)nBlockRewardPrev
-                                        ? nBlockRewardPrev
-                                        : (nSimulatedMOneySupplyAtFork * nInflation / nNumberOfBlocksPerYear);
+            // Default: nEpochInterval = 21000 blocks, recalculated with each epoch
+            if ((pindexBest->nHeight + 1) % nEpochInterval == 0)
+            {
+                // recalculated
+                // PoW reward is 2%
+                nBlockRewardExcludeFees = (::int64_t)(pindexBest->nMoneySupply * nInflation / nNumberOfBlocksPerYear);
+                nBlockRewardPrev = nBlockRewardExcludeFees;
+            }
+            else
+            {
+                nBlockRewardExcludeFees = (::int64_t)nBlockRewardPrev
+                                            ? nBlockRewardPrev
+                                            : (nSimulatedMOneySupplyAtFork * nInflation / nNumberOfBlocksPerYear);
+            }
         }
         return nBlockRewardExcludeFees;
     }
@@ -1746,8 +1759,24 @@ static unsigned int GetNextTargetRequired044(const CBlockIndex* pindexLast, bool
     if (pindexPrevPrev->pprev == NULL)
         return bnInitialHashTarget.GetCompact(); // second block
 
-    // so there are more than 3 blocks
+    // Recalculate nMinEase if reorg through two or many epochs
+    if (recalculateMinEase)
+    {
+        recalculateMinEase = false;
+        ::int32_t currentEpochNumber = pindexBest->nHeight / nEpochInterval;
+        ::uint32_t tempMinEase = bnEasiestTargetLimit.GetCompact();
+        for (int i = 1; i < currentEpochNumber; i++)
+        {
+            CBlockIndex* pbi = FindBlockByHeight(i*nEpochInterval);
+            if (tempMinEase > pbi->nBits)
+            {
+                tempMinEase = pbi->nBits;
+            }
+        }
+        nMinEase = min(tempMinEase, bnInitialHashTarget.GetCompact());
+    }
 
+    // so there are more than 3 blocks
     ::int64_t
         nActualSpacing = pindexPrev->GetBlockTime() - pindexPrevPrev->GetBlockTime();
 
@@ -3042,8 +3071,20 @@ bool CBlock::SetBestChain(CTxDB& txdb, CBlockIndex* pindexNew)
 
     // New best block
     hashBestChain = hash;
-    pindexBest = pindexNew;
     pblockindexFBBHLast = NULL;
+    pindexBest = pindexNew;
+    // Reorg through two or many epochs
+    if ((abs(nBestHeight - pindexBest->nHeight) >= 2) &&
+        (abs((::int32_t)(nBestHeight / nEpochInterval) - (::int32_t)(pindexBest->nHeight / nEpochInterval)) >= 1))
+    {
+        recalculateBlockReward = true;
+        recalculateMinEase = true;
+    }
+    // Update minimum ease for next target calculation
+    if (nMinEase > pindexBest->nBits)
+    {
+        nMinEase = pindexBest->nBits;
+    }
     nBestHeight = pindexBest->nHeight;
 
     // good place to test for new logic
