@@ -1,9 +1,26 @@
 # Copyright (c) 2009-2010 Satoshi Nakamoto
+# Copyright (c) 2020 the Yacoin gangstas :)
 # Distributed under the MIT/X11 software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
+#
+# NOTE: there are no explicit paths, all paths are relative to the .../src 
+# directory.
+#
+# I added some output after the link to show 
+# the object files, since they may change (shouldn't in this build, but will 
+# in the Qt build!), 
+# the DEFS, in order to see what options were set into defines, 
+# INCLUDEPATHS to see what include directories were used, in case there's a problem,
+# LIBPATHS as above, and LIBS to see which libraries were actually linked.
+
+# this file is intened to be invoked via
+# mingw32-make -f makefile.mingw 
+# in a git-bash shell ala YMake.  Ron
 
 CC ?= g++
 CXX ?= g++
+
+scryptFiles := $(wildcard scrypt*.*)
 
 ###############################################################################
 #UPnP configuration
@@ -18,14 +35,24 @@ USE_UPNP:=1
 #IPV6 configuration
 #
 # choose either
-#USE_IPV6:=-
-#or 
 USE_IPV6:=1
+#or 
+#USE_IPV6:=-
 ###############################################################################
 
 ###############################################################################
 # USE_ASM configuration
+# this REQUIRES object file deletions unless you know exactly what you built 
+# last!  Or you cna waste time and do a clean first!
+# the files that need rebuilding are always scrypt.o, and usually(!) 
+# scrypt-generic.o, scrypt-arm.o, scrypt-x86.o, & scrypt-x86_64.o
+# The best would be to delete/remove the .o files or touch the .cpp & .S files
+# when switchiing from 
+# USE_ASM 1 to 0 or vv so that make recompiles them!  
+# How do you do that with a 'touch' perhaps, someone?
+# or using --assume-new = $(scryptFiles) somehow?
 #
+
 # choose either
 USE_ASM:=1
 #or no USE_ASM
@@ -45,22 +72,21 @@ BOOST_SUFFIX?=-mgw48-mt-sd-1_55
 INCLUDEPATHS= \
 -I"$(CURDIR)" \
 -I"$(CURDIR)/scrypt-jane" \
--I"$(CURDIR)/obj" \
 -I'./leveldb/include' \
 -I'./leveldb/helpers' \
--I'$(YDIR)/sw/boost_1_58_0/include' \
--I'$(YDIR)/sw/db-4.8.30.NC/include' \
--I'$(YDIR)/sw/openssl-1.0.1u/include' \
--I'$(YDIR)/sw/miniupnpc-1.9.20150206/include' \
--I'$(YDIR)/sw/qrencode-3.4.4/include'
+-I'../../../sw/boost_1_58_0/include' \
+-I'../../../sw/db-4.8.30.NC/include' \
+-I'../../../sw/openssl-1.0.1u/include' \
+-I'../../../sw/miniupnpc-1.9.20150206/include' \
+-I'../../../sw/qrencode-3.4.4/include'
 
 LIBPATHS= \
--L'$(YDIR)/sw/boost_1_58_0/lib' \
--L'$(YDIR)/sw/db-4.8.30.NC/lib' \
--L'$(YDIR)/sw/openssl-1.0.1u/lib' \
+-L'../../../sw/boost_1_58_0/lib' \
+-L'../../../sw/db-4.8.30.NC/lib' \
+-L'../../../sw/openssl-1.0.1u/lib' \
 -L'leveldb' \
--L'$(YDIR)/sw/miniupnpc-1.9.20150206/lib' \
--L'$(YDIR)/sw/qrencode-3.4.4/lib'
+-L'../../../sw/miniupnpc-1.9.20150206/lib' \
+-L'../../../sw/qrencode-3.4.4/lib'
 
 LIBS= \
 -lmingw32 \
@@ -90,9 +116,6 @@ LIBS= \
 # -l db_cxx \
 # -l ssl \
 # -l crypto
-#
-#-DUSE_LEVELDB \
-#-DSTATICLIB \
 #
 
 DEFS= \
@@ -141,13 +164,7 @@ TESTDEFS = -DTEST_DATA_DIR=$(abspath test/data)
 
 all: yacoind.exe
 
-obj/build.h: FORCE
-	../share/genbuild.sh obj/build.h
-
-DEFS += -DHAVE_BUILD_INFO
-
 ######################
-# DEFS += -DSTATICLIB -DUSE_UPNP
 ########### plug and play stuff
 ifneq (${USE_UPNP}, -)
  DEFS += -DUSE_UPNP
@@ -165,6 +182,7 @@ endif
 ########### USE_ASM stuff
 ifdef USE_ASM
  DEFS += -DUSE_ASM
+else
 endif
 ######################
 
@@ -267,9 +285,6 @@ obj/json_spirit_value.o: json/json_spirit_value.cpp
 obj/json_spirit_reader.o: json/json_spirit_reader.cpp
 	$(CXX) -c -frandom-seed=$@ $(CFLAGS) $(INCLUDEPATHS) -MMD -o $@ $<
 
-obj/scrypt-generic.o: scrypt-generic.c
-	$(CXX) -c -frandom-seed=$@ $(CFLAGS) $(INCLUDEPATHS) -MMD -o $@ $<
-
 obj/scrypt-x86_64.o : scrypt-x86_64.S
 	$(CXX) -c -frandom-seed=$@ $(CFLAGS) $(INCLUDEPATHS) -MMD -o $@ $<
 
@@ -282,7 +297,7 @@ obj/scrypt-arm.o : scrypt-arm.S
 obj/%.o: %.cpp $(HEADERS)
 	$(CXX) -c -frandom-seed=$@ $(CFLAGS) $(INCLUDEPATHS) -o $@ $<
 
-yacoind.exe: obj/build.h $(OBJS:obj/%=obj/%)
+yacoind.exe: $(OBJS:obj/%=obj/%)
 	$(CXX) $(CFLAGS) $(LDFLAGS) -o $@ $(LIBPATHS) $^ $(LIBS) -s
 	@echo	
 	@echo $(OBJS)
@@ -295,6 +310,7 @@ yacoind.exe: obj/build.h $(OBJS:obj/%=obj/%)
 	@echo	
 	@echo $(LIBS)
 	@echo	
+	@echo $(scryptFiles)
 
 TESTOBJS := $(patsubst test/%.cpp,obj-test/%.o,$(wildcard test/*.cpp))
 

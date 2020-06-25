@@ -11,21 +11,24 @@ CONFIG += static
 CONFIG += release
 CONFIG += warn_off
 
-BOOST_INCLUDE_PATH=$$YBOO/include
-BOOST_LIB_PATH=$$YBOO/lib
+BOOST_INCLUDE_PATH =../../sw/boost_1_58_0/include
+BOOST_LIB_PATH     =../../sw/boost_1_58_0/lib
 
-BDB_INCLUDE_PATH=$$YBDB/include
-BDB_LIB_PATH=$$YBDB/lib
+BDB_INCLUDE_PATH =../../sw/db-4.8.30.NC/include
+BDB_LIB_PATH     =../../sw/db-4.8.30.NC/lib
 
-OPENSSL_INCLUDE_PATH=$$YOSSL/include
-OPENSSL_LIB_PATH=$$YOSSL/lib
+OPENSSL_INCLUDE_PATH =../../sw/openssl-1.0.1u/include
+OPENSSL_LIB_PATH     =../../sw/openssl-1.0.1u/lib
 
-MINIUPNPC_INCLUDE_PATH=$$YUPNP/include
-MINIUPNPC_LIB_PATH=$$YUPNP/lib
+MINIUPNPC_INCLUDE_PATH =../../sw/miniupnpc-1.9.20150206/include
+MINIUPNPC_LIB_PATH     =../../sw/miniupnpc-1.9.20150206/lib
 
-QRENCODE_INCLUDE_PATH=$$YQR/include
-QRENCODE_LIB_PATH=$$YQR/lib
+QRENCODE_INCLUDE_PATH =../../sw/qrencode-3.4.4/include
+QRENCODE_LIB_PATH     =../../sw/qrencode-3.4.4/lib
 
+YQT=../../sw/qt-everywhere-opensource-src-4.8.6
+
+DEL_FILE = rm
 OBJECTS_DIR = build
 MOC_DIR = build
 UI_DIR = build
@@ -61,13 +64,35 @@ contains(USE_IPV6, -) {
     DEFINES += USE_IPV6=$$USE_IPV6
 }
 
+# scrypt.cpp works for USE_ASM or no USE_ASM in WIN32 (Windows).  Please do not change
+# anything in this file, or in the source files, if the build doesn't work in linux
+# with both USE_ASM and no USE_ASM.  
+# First try changing the #else part in scrypt.cpp to match what WIN32 does. NOTE:
+# scrypt-generic is now a cpp file, not a c file!!
+
+# really need to delete/remove scrypt.o or touch scrypt.cpp when switchiing from 
+# USE_ASM 1 to 0 or vv so that make recompiles it!  
+# How do you do that with a 'touch', someone?
+
 contains(USE_ASM, 1) {
     message(Using optimized scrypt core implementation)
     SOURCES += src/scrypt-arm.S src/scrypt-x86.S src/scrypt-x86_64.S
     DEFINES += USE_ASM
 } else {
     message(Using generic scrypt core implementation)
-    SOURCES += src/scrypt-generic.c
+    SOURCES += src/scrypt-generic.cpp
+}
+
+# use: qmake "USE_QRCODE=1" ( enabled by default; default)
+#  or: qmake "USE_QRCODE=0" (not supported)
+contains(USE_QRCODE, 1) {
+    message(Building with QrEncode support)
+    DEFINES += USE_QRCODE=$$USE_QRCODE STATICLIB QRMINIUPNP_STATICLIB
+    INCLUDEPATH += $$QRENCODE_INCLUDE_PATH
+    LIBS += $$join(QRENCODE_LIB_PATH,,-L,) -lqrencode
+    win32:LIBS += -liphlpapi
+} else {
+    message(Building without QrEncode support)    
 }
 
 genjane.target = .genjane
@@ -84,10 +109,12 @@ INCLUDEPATH += src/leveldb/include src/leveldb/helpers
 LIBS += $$PWD/src/leveldb/libleveldb.a $$PWD/src/leveldb/libmemenv.a
 SOURCES += src/txdb-leveldb.cpp
 genleveldb.target = .genleveldb
-genleveldb.commands = touch .genleveldb; cd $$PWD/src/leveldb && { make clean; TARGET_OS=NATIVE_WINDOWS OPT=\"-std=gnu++0x -msse2\" make libleveldb.a libmemenv.a; }
+genleveldb.commands = touch .genleveldb; cd $$PWD/src/leveldb && { make clean; TARGET_OS=NATIVE_WINDOWS OPT=\"-msse2\" make libleveldb.a libmemenv.a; }
 PRE_TARGETDEPS += .genleveldb
 QMAKE_EXTRA_TARGETS += genleveldb
 QMAKE_CLEAN += .genleveldb
+
+#genleveldb.commands = touch .genleveldb; cd $$PWD/src/leveldb && { make clean; TARGET_OS=NATIVE_WINDOWS OPT=\"-std=gnu++0x -msse2\" make libleveldb.a libmemenv.a; }
 
 
 genminiupnpc.target = src/miniupnpc/miniupnpc.h
@@ -330,8 +357,16 @@ OTHER_FILES += \
 windows:RC_FILE = src/qt/res/bitcoin-qt.rc
 
 # Set libraries and includes at end, to use platform-defined defaults if not overridden
-INCLUDEPATH += $$BOOST_INCLUDE_PATH $$BDB_INCLUDE_PATH $$OPENSSL_INCLUDE_PATH $$QRENCODE_INCLUDE_PATH
-LIBS += $$join(BOOST_LIB_PATH,,-L,) $$join(BDB_LIB_PATH,,-L,) $$join(OPENSSL_LIB_PATH,,-L,) $$join(QRENCODE_LIB_PATH,,-L,)
+INCLUDEPATH += \
+	$$BOOST_INCLUDE_PATH \
+	$$BDB_INCLUDE_PATH \
+	$$OPENSSL_INCLUDE_PATH \
+	$$QRENCODE_INCLUDE_PATH
+LIBS += \
+	$$join(BOOST_LIB_PATH,,-L,) \
+	$$join(BDB_LIB_PATH,,-L,) \
+	$$join(OPENSSL_LIB_PATH,,-L,) \
+	$$join(QRENCODE_LIB_PATH,,-L,)
 LIBS += -lssl -lcrypto -ldb_cxx$$BDB_LIB_SUFFIX -lqrencode
 # -lgdi32 has to happen after -lcrypto (see  #681)
 windows:LIBS += -lws2_32 -lshlwapi -lmswsock -lole32 -loleaut32 -luuid -lgdi32

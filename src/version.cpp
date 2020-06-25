@@ -17,7 +17,6 @@
 #define DISPLAY_VERSION_REVISION    7
                                     // 4 for new versioning to be more aligned with btc standards
                                     // 5 for #define DEBUG_LOCKORDER
-                                    // 5 for #define DEBUG_LOCKORDER
                                     // 6     20160 block length
 #define DISPLAY_VERSION_BUILD       2
 #define DISPLAY_VERSION_TESTING     01
@@ -51,13 +50,8 @@ const std::string
             CLIENT_NAME("Yacoin-WM daemon");
         #endif
     #endif
-//    #ifdef _MSC_VER
-//        CLIENT_NAME("Yacoin-WM MSVC++");
-//    #else
-//        CLIENT_NAME("Yacoin-WM");
-//    #endif
-//}
 // Client version number
+
 #ifdef USE_LEVELDB
 #define CLIENT_VERSION_SUFFIX   "-leveldb"
 #else

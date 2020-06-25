@@ -566,7 +566,7 @@ public:
         }
         else // 32-bit nTime
         {
-			uint32_t time = (uint32_t)nTime; // needed for GetSerializeSize, Serialize function
+            ::uint32_t time = (::uint32_t)nTime; // needed for GetSerializeSize, Serialize function
 			READWRITE(time);
 			nTime = time; // needed for Unserialize function
         }
@@ -787,7 +787,7 @@ public:
         str += IsCoinBase()? "Coinbase" : (IsCoinStake()? "Coinstake" : "CTransaction");
         str += strprintf(
             "(hash=%s, "
-            "nTime=%ld, "
+            "nTime=%lld, "
             "ver=%d, "
             "vin.size=%" PRIszu ", "
             "vout.size=%" PRIszu ", "
@@ -1052,7 +1052,7 @@ public:
         }
         else // 32-bit nTime
         {
-               uint32_t time = (uint32_t)nTime; // needed for GetSerializeSize, Serialize function
+            ::uint32_t time = (::uint32_t)nTime; // needed for GetSerializeSize, Serialize function
                READWRITE(time);
                nTime = time; // needed for Unserialize function
         }
@@ -1181,7 +1181,7 @@ public:
 
         if(
            nYac20BlockNumberTime &&
-           nTime >= (uint32_t)nYac20BlockNumberTime
+           nTime >= (::uint32_t)nYac20BlockNumberTime
           )
         {
             nfactor = YAC20_N_FACTOR;
@@ -1309,7 +1309,7 @@ public:
             unsigned int nEntropyBit = ((GetHash().Get64()) & 1ULL);
             if (fDebug && GetBoolArg("-printstakemodifier"))
                 printf(
-                        "GetStakeEntropyBit: nTime=%ld \nhashBlock=%s\nnEntropyBit=%u\n",
+                        "GetStakeEntropyBit: nTime=%lld \nhashBlock=%s\nnEntropyBit=%u\n",
                         nTime, 
                         GetHash().ToString().c_str(), 
                         nEntropyBit
@@ -1461,30 +1461,34 @@ public:
         return true;
     }
 
-
-
-    void print() const
-    {
+   void print() const
+   {
         printf("CBlock(\n"
                 "hash=%s,\n"
                 "ver=%d,\n"
                 "hashPrevBlock=%s,\n"
                 "hashMerkleRoot=%s,\n"
+#ifdef WIN32
+    // specified in 
+    // https://docs.microsoft.com/en-us/cpp/c-runtime-library/format-specification-syntax-printf-and-wprintf-functions?view=vs-2019
+                "nTime=%lld, "
+#else
                 "nTime=%ld, "
+#endif
                 "nBits=%08x, "
                 "nNonce=%u, "
                 "vtx=%" PRIszu ",\n"
                 "vchBlockSig=%s\n"
-                ")\n",
-            GetHash().ToString().c_str(),
-            nVersion,
-            hashPrevBlock.ToString().c_str(),
-            hashMerkleRoot.ToString().c_str(),
-            nTime, 
-            nBits, 
-            nNonce,
-            vtx.size(),
-            HexStr(vchBlockSig.begin(), vchBlockSig.end()).c_str()
+                ")\n"
+                , GetHash().ToString().c_str()
+                , nVersion
+                , hashPrevBlock.ToString().c_str()
+                , hashMerkleRoot.ToString().c_str()
+                , nTime
+                , nBits
+                , nNonce
+                , vtx.size()
+                , HexStr(vchBlockSig.begin(), vchBlockSig.end()).c_str()
               );
         for (unsigned int i = 0; i < vtx.size(); ++i)
         {
@@ -1833,7 +1837,7 @@ public:
         }
         else // 32-bit nTime
         {
-            uint32_t time = (uint32_t)nTime; // needed for GetSerializeSize, Serialize function
+            ::uint32_t time = (::uint32_t)nTime; // needed for GetSerializeSize, Serialize function
             READWRITE(time);
             nTime = time; // needed for Unserialize function
         }
@@ -1844,8 +1848,22 @@ public:
 
     uint256 GetBlockHash() const
     {
-        if (fUseFastIndex && (nTime < GetAdjustedTime() - 24 * 60 * 60) && blockHash != 0)
-            return blockHash;
+        //if (
+        //    fUseFastIndex && 
+        //    (nTime < (GetAdjustedTime() - 24 * 60 * 60)) && 
+        //    (blockHash != 0)
+        //   )
+        if ( fUseFastIndex )
+        {
+            int64_t
+              //nOneDayAgo = ( GetAdjustedTime() - (24 * 60 * 60) );
+                nOneHourAgo = ( GetAdjustedTime() - (60 * 60) );
+            if ( nTime < nOneHourAgo )
+            {
+                if( blockHash != 0 )
+                    return blockHash;
+            }
+        }
 
         CBlock block;
         block.nVersion        = nVersion;

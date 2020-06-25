@@ -65,6 +65,9 @@ void LogStackTrace();
 #endif
 
 /* Format characters for (s)size_t and ptrdiff_t */
+// it's ugly! see
+// https://stackoverflow.com/questions/9225567/how-to-print-a-int64-t-type-in-c
+//
 #if defined(_MSC_VER) || defined(__MSVCRT__)
 //#if defined(_MSC_VER)
   /* (s)size_t and ptrdiff_t have the same size specifier in MSVC:
@@ -350,7 +353,7 @@ std::string HexStr(const T itbegin, const T itend, bool fSpaces=false)
     static const char hexmap[16] = { '0', '1', '2', '3', '4', '5', '6', '7',
                                      '8', '9', 'a', 'b', 'c', 'd', 'e', 'f' };
     rv.reserve((itend-itbegin)*3);
-    for(T it = itbegin; it < itend; ++it)
+    for(T it = itbegin; it != itend; ++it)  // if T isn't a vector, < may not work!
     {
         unsigned char val = (unsigned char)(*it);
         if(fSpaces && it != itbegin)

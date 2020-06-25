@@ -1951,9 +1951,9 @@ bool CWallet::CreateTransaction(const vector<pair<CScript, int64_t> >& vecSend, 
                 int64_t nPayFee = (nBytes * nTransactionFee) / 1000;
                 int64_t nMinFee = wtxNew.GetMinFee(nBytes);
 
-                printf("CWallet::CreateTransaction, nBytes = %d, "
-                       "nPayFee = %ld, "
-                       "nMinFee = %ld\n",
+                printf("CWallet::CreateTransaction, nBytes = %u, "
+                       "nPayFee = %lld, "
+                       "nMinFee = %lld\n",
                        nBytes, nPayFee, nMinFee);
                 if (nFeeRet < max(nPayFee, nMinFee))
                 {
@@ -1961,12 +1961,12 @@ bool CWallet::CreateTransaction(const vector<pair<CScript, int64_t> >& vecSend, 
                     continue;
                 }
 
-                printf("CWallet::CreateTransaction, nBytes = %d, "
-                                               "total UTXO value = %ld, "
-                                               "send %ld, "
-                                               "change %ld, "
-                                               "expected fee = %ld, "
-                                               "nFeeRet = %ld\n",
+                printf("CWallet::CreateTransaction, nBytes = %u, "
+                                               "total UTXO value = %lld, "
+                                               "send %lld, "
+                                               "change %lld, "
+                                               "expected fee = %lld, "
+                                               "nFeeRet = %lld\n",
                        nBytes, nValueIn, nValue, nChange, nValueIn - nValue - nChange, nFeeRet);
 
                 // Fill vtxPrev by copying from previous transactions vtxPrev
