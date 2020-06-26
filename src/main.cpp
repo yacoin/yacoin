@@ -1311,23 +1311,37 @@ CBigNum inline GetProofOfStakeLimit(int nHeight, unsigned int nTime)
 ::int64_t GetProofOfWorkReward(unsigned int nBits, ::int64_t nFees, bool fGetRewardOfBestHeightBlock)
 {
 #ifdef Yac1dot0
-    if (fGetRewardOfBestHeightBlock)
-    {
-       return (::int64_t)nBlockRewardPrev
-                ? nBlockRewardPrev
-                : (nSimulatedMOneySupplyAtFork * nInflation / nNumberOfBlocksPerYear);
-    }
-
     if(
        (pindexBest->nHeight + 1) >= nMainnetNewLogicBlockNumber
       )
     {
+        // Get reward of current best height block
+        if (fGetRewardOfBestHeightBlock)
+        {
+            int64_t currentBlockReward = nBlockRewardPrev;
+            if (!nBlockRewardPrev)
+            {
+                const CBlockIndex* pindexMoneySupplyBlock =
+                    FindBlockByHeight(nMainnetNewLogicBlockNumber ? nMainnetNewLogicBlockNumber - 1 : 0);
+                currentBlockReward =
+                    (::int64_t)(pindexMoneySupplyBlock->nMoneySupply * nInflation / nNumberOfBlocksPerYear);
+            }
+            return currentBlockReward;
+        }
+
+        // Get reward of current mining block
         ::int64_t nBlockRewardExcludeFees;
         if (recalculateBlockReward) // Reorg through two or many epochs
         {
             recalculateBlockReward = false;
+            bool reorgToHardforkBlock = false;
+            if (pindexBest->nHeight / nEpochInterval == nMainnetNewLogicBlockNumber / nEpochInterval)
+            {
+                reorgToHardforkBlock = true;
+            }
             ::int32_t startEpochBlockHeight = (pindexBest->nHeight / nEpochInterval) * nEpochInterval;
-            ::int32_t moneySupplyBlockHeight = startEpochBlockHeight ? startEpochBlockHeight - 1 : 0;
+            ::int32_t moneySupplyBlockHeight =
+                reorgToHardforkBlock ? nMainnetNewLogicBlockNumber - 1 : startEpochBlockHeight - 1;
             const CBlockIndex* pindexMoneySupplyBlock = FindBlockByHeight(moneySupplyBlockHeight);
             nBlockRewardExcludeFees = (::int64_t)(pindexMoneySupplyBlock->nMoneySupply * nInflation / nNumberOfBlocksPerYear);
             nBlockRewardPrev = nBlockRewardExcludeFees;
@@ -1335,7 +1349,7 @@ CBigNum inline GetProofOfStakeLimit(int nHeight, unsigned int nTime)
         else // normal case
         {
             // Default: nEpochInterval = 21000 blocks, recalculated with each epoch
-            if ((pindexBest->nHeight + 1) % nEpochInterval == 0)
+            if ((pindexBest->nHeight + 1) % nEpochInterval == 0 || (pindexBest->nHeight + 1) == nMainnetNewLogicBlockNumber)
             {
                 // recalculated
                 // PoW reward is 2%
@@ -1344,9 +1358,14 @@ CBigNum inline GetProofOfStakeLimit(int nHeight, unsigned int nTime)
             }
             else
             {
-                nBlockRewardExcludeFees = (::int64_t)nBlockRewardPrev
-                                            ? nBlockRewardPrev
-                                            : (nSimulatedMOneySupplyAtFork * nInflation / nNumberOfBlocksPerYear);
+                nBlockRewardExcludeFees = (::int64_t)nBlockRewardPrev;
+                if (!nBlockRewardPrev)
+                {
+                    const CBlockIndex* pindexMoneySupplyBlock =
+                        FindBlockByHeight(nMainnetNewLogicBlockNumber ? nMainnetNewLogicBlockNumber - 1 : 0);
+                    nBlockRewardExcludeFees =
+                        (::int64_t)(pindexMoneySupplyBlock->nMoneySupply * nInflation / nNumberOfBlocksPerYear);
+                }
             }
         }
         return nBlockRewardExcludeFees;
@@ -3277,6 +3296,7 @@ bool CBlock::AddToBlockIndex(unsigned int nFile, unsigned int nBlockPos)
 
     if( 0 == pindexNew->nHeight )
     {
+        printf("TACA ===> Need to consider if we need to remove this line or not");
         pindexNew->nMoneySupply = pindexNew->nMint = nSimulatedMOneySupplyAtFork;
     }
     // Write to disk block index

@@ -555,7 +555,9 @@ bool CTxDB::LoadBlockIndex()
         pindexNew->nBits          = diskindex.nBits;
         pindexNew->nNonce         = diskindex.nNonce;
 
-        if ((pindexNew->nHeight % nEpochInterval == 0) && pindexNew->nHeight >= bestEpochIntervalHeight) {
+        if (pindexNew->nHeight >= bestEpochIntervalHeight &&
+            ((pindexNew->nHeight % nEpochInterval == 0) || (pindexNew->nHeight == nMainnetNewLogicBlockNumber)))
+        {
             bestEpochIntervalHeight = pindexNew->nHeight;
             bestEpochIntervalHash = blockHash;
         }
@@ -689,12 +691,9 @@ bool CTxDB::LoadBlockIndex()
     if (mi != mapBlockIndex.end())
     {
         CBlockIndex* pBestEpochIntervalIndex = (*mi).second;
-        nBlockRewardPrev = (::int64_t)
-            (
-            (pBestEpochIntervalIndex->pprev? pBestEpochIntervalIndex->pprev->nMoneySupply:
-                nSimulatedMOneySupplyAtFork) /
-                nNumberOfBlocksPerYear
-            ) * nInflation;
+        nBlockRewardPrev =
+            (::int64_t)((pBestEpochIntervalIndex->pprev ? pBestEpochIntervalIndex->pprev->nMoneySupply : pBestEpochIntervalIndex->nMoneySupply) /
+                        nNumberOfBlocksPerYear) * nInflation;
     }
     else
     {
