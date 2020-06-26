@@ -1310,8 +1310,6 @@ CBigNum inline GetProofOfStakeLimit(int nHeight, unsigned int nTime)
 // miner's coin base reward based on nBits
 ::int64_t GetProofOfWorkReward(unsigned int nBits, ::int64_t nFees, bool fGetRewardOfBestHeightBlock)
 {
-    const ::int32_t
-        nYac20BlockNumber = 0;  //2960;
 #ifdef Yac1dot0
     if (fGetRewardOfBestHeightBlock)
     {
@@ -1321,7 +1319,7 @@ CBigNum inline GetProofOfStakeLimit(int nHeight, unsigned int nTime)
     }
 
     if(
-       (pindexBest->nHeight + 1) >= nYac20BlockNumber
+       (pindexBest->nHeight + 1) >= nMainnetNewLogicBlockNumber
       )
     {
         ::int64_t nBlockRewardExcludeFees;
@@ -1642,7 +1640,7 @@ bool HaveWeSwitchedToNewLogicRules( bool &fUsingOld044Rules )
            fTestNet &&    // may use new rules, ATM only in TestNet
            (
             fTestNetNewLogic &&
-            (nTestNetNewLogicBlockNumber < nBestHeight)
+            (nMainnetNewLogicBlockNumber < nBestHeight)
            )
           )
         {
@@ -4262,7 +4260,7 @@ bool LoadBlockIndex(bool fAllowNew)
         (
          (GetTime() < (::int64_t)YACOIN_NEW_LOGIC_SWITCH_TIME)   // before the new PoW/PoS rules date-time
          &&
-         !fTestNetNewLogic      // (0 == nTestNetNewLogicBlockNumber )  // if fTestNetNewLogic is true, we
+         !fTestNetNewLogic      // (0 == nMainnetNewLogicBlockNumber )  // if fTestNetNewLogic is true, we
         )                                                               // will use it in TestNet
        )
         fUseOld044Rules = true;

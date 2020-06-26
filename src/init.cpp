@@ -545,7 +545,6 @@ bool AppInit2()
 
     // ********************************************************* Step 2: parameter interactions
 
-    nTestTimeExtensionBlockNumber = GetArg("-testTimeExtensionBlockNumber", 2);
     nNodeLifespan = (unsigned int)(GetArg("-addrlifespan", 7));
     fUseFastIndex = GetBoolArg("-fastindex", true);
     fUseMemoryLog = GetBoolArg("-memorylog", true);
@@ -1247,20 +1246,20 @@ bool AppInit2()
     }
     printf(" block index %15" PRId64 "ms\n", GetTimeMillis() - nStart);
 
-    nTestNetNewLogicBlockNumber = GetArg("-testnetNewLogicBlockNumber", 0);
-    if (0 == nTestNetNewLogicBlockNumber)
+    nMainnetNewLogicBlockNumber = GetArg("-testnetNewLogicBlockNumber", 0);
+    if (0 == nMainnetNewLogicBlockNumber)
     {
-        nTestNetNewLogicBlockNumber = pindexBest->nHeight;
+        nMainnetNewLogicBlockNumber = pindexBest->nHeight;
     }
     if (fDebug)
     {
 #ifdef WIN32
         (void)printf(
                      "\n"
-                     "nTestNetNewLogicBlockNumber is \n"
+                     "nMainnetNewLogicBlockNumber is \n"
                      "%d"
                      "\n"
-                     , nTestNetNewLogicBlockNumber
+                     , nMainnetNewLogicBlockNumber
                     );
 #endif
     }

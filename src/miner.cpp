@@ -179,7 +179,7 @@ CBlock* CreateNewBlock(CWallet* pwallet, bool fProofOfStake)
     {
       //pblock->nVersion = CBlock::VERSION_of_block_for_yac_044_old;
     	// TODO: Need update for mainet
-    	if (nBestHeight > nTestTimeExtensionBlockNumber)
+    	if (nBestHeight > nMainnetNewLogicBlockNumber)
     	{
             pblock->nVersion = VERSION_of_block_for_time_extension;
     	}
@@ -1112,7 +1112,7 @@ static void YacoinMiner(CWallet *pwallet)  // here fProofOfStake is always false
 
         bool
             fNotYac1dot0BlockOrTx = true;
-        if( (pindexPrev->nHeight + 1) >= nTestNetNewLogicBlockNumber )
+        if( (pindexPrev->nHeight + 1) >= nMainnetNewLogicBlockNumber )
         {
             fNotYac1dot0BlockOrTx = false;
         }

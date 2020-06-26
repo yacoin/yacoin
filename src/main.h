@@ -578,7 +578,7 @@ public:
     void SetNull()
     {
         // TODO: Need update for mainet
-        if (nBestHeight != -1 && nBestHeight > nTestTimeExtensionBlockNumber)
+        if (nBestHeight != -1 && nBestHeight > nMainnetNewLogicBlockNumber)
         {
             nVersion = CTransaction::CURRENT_VERSION_of_Tx_for_time_extension;
         }
@@ -1075,7 +1075,7 @@ public:
     void SetNull()
     {
         // TODO: Need update for mainnet
-        if (nBestHeight != -1 && nBestHeight > nTestTimeExtensionBlockNumber)
+        if (nBestHeight != -1 && nBestHeight > nMainnetNewLogicBlockNumber)
         {
             nVersion = VERSION_of_block_for_time_extension;
         }
