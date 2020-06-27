@@ -1776,29 +1776,9 @@ static unsigned int GetNextTargetRequired044(const CBlockIndex* pindexLast, bool
     if (pindexPrevPrev->pprev == NULL)
         return bnInitialHashTarget.GetCompact(); // second block
 
-    // Recalculate nMinEase if reorg through two or many epochs
-    if (recalculateMinEase)
-    {
-        recalculateMinEase = false;
-        ::int32_t currentEpochNumber = pindexBest->nHeight / nEpochInterval;
-        ::uint32_t tempMinEase = bnEasiestTargetLimit.GetCompact();
-        for (int i = 1; i < currentEpochNumber; i++)
-        {
-            CBlockIndex* pbi = FindBlockByHeight(i*nEpochInterval);
-            if (tempMinEase > pbi->nBits)
-            {
-                tempMinEase = pbi->nBits;
-            }
-        }
-        nMinEase = min(tempMinEase, bnInitialHashTarget.GetCompact());
-    }
-
     // so there are more than 3 blocks
     ::int64_t
         nActualSpacing = pindexPrev->GetBlockTime() - pindexPrevPrev->GetBlockTime();
-
-    const ::int64_t 
-        nAverageBlockperiod = nStakeTargetSpacing;  // 1 minute in seconds
 
     CBigNum 
         bnNewTarget;
@@ -1810,225 +1790,250 @@ static unsigned int GetNextTargetRequired044(const CBlockIndex* pindexLast, bool
         nTarget = CBigNum().SetCompact( nEase ).getuint256(),
         nRelativeTargetDelta = (nTarget >> 3);  // i.e. 1/8 of the current target
 
-
-#ifdef Yac1dot0
-    // From block 3, the target is only recalculated every 21000 blocks
-    int nBlocksToGo = (pindexLast->nHeight + 1) % nDifficultyInterval;
-    // Only change once per difficulty adjustment interval, first at block 21000
-    if (0 != nBlocksToGo) // the btc-ltc 2016 blocks
-    {                     // don't change the target
-        bnNewTarget.setuint256(nTarget);
-
-        (void)printf("PoW constant target %s"
-                     " (%d block"
-                     "%s to go)"
-                     "\n"
-                     "",
-                     nTarget.ToString().substr(0, 16).c_str(), (nDifficultyInterval - nBlocksToGo),
-                     (1 != nBlocksToGo) ? "s" : "");
-        return bnNewTarget.GetCompact();
-    }
-    else // actually do a DAA
+    // Yacoind version 1.0.0
+    if ((pindexBest->nHeight + 1) >= nMainnetNewLogicBlockNumber)
     {
-        // Go back by what we want to be 14 days worth of blocks
-        const CBlockIndex* pindexFirst = pindexLast;
+        // COMMENT THIS BLOCK CODE OUT , WE MAY USE IT IN CASE OF AN EMERGENCY HARDFORK
+//        const ::int64_t
+//            nAverageBlockperiod = nStakeTargetSpacing;  // 1 minute in seconds
 
-        if (pindexLast->nHeight > nDifficultyInterval + 1)
+        // Recalculate nMinEase if reorg through two or many epochs
+        if (recalculateMinEase)
         {
-            for (int i = 0; pindexFirst && i < nDifficultyInterval; ++i)
-                pindexFirst = pindexFirst->pprev;
+            recalculateMinEase = false;
+            ::int32_t currentEpochNumber = pindexBest->nHeight / nEpochInterval;
+            ::int32_t firstEpochNumberSinceHardfork = nMainnetNewLogicBlockNumber / nEpochInterval;
+            ::uint32_t tempMinEase = bnEasiestTargetLimit.GetCompact();
+            for (int i = firstEpochNumberSinceHardfork; i < currentEpochNumber; i++)
+            {
+                CBlockIndex* pbi = FindBlockByHeight(i*nEpochInterval);
+                if (tempMinEase > pbi->nBits)
+                {
+                    tempMinEase = pbi->nBits;
+                }
+            }
+            nMinEase = min(tempMinEase, bnInitialHashTarget.GetCompact());
         }
-        else // get block #0
+
+        // From block 3, the target is only recalculated every 21000 blocks
+        int nBlocksToGo = (pindexLast->nHeight + 1) % nDifficultyInterval;
+        // Only change once per difficulty adjustment interval, first at block 21000
+        if (0 != nBlocksToGo) // the btc-ltc 2016 blocks
+        {                     // don't change the target
+            bnNewTarget.setuint256(nTarget);
+
+            (void)printf("PoW constant target %s"
+                         " (%d block"
+                         "%s to go)"
+                         "\n"
+                         "",
+                         nTarget.ToString().substr(0, 16).c_str(), (nDifficultyInterval - nBlocksToGo),
+                         (1 != nBlocksToGo) ? "s" : "");
+            return bnNewTarget.GetCompact();
+        }
+        else // actually do a DAA
         {
-            CBlockIndex* pbi = FindBlockByHeight(0);
-            CBlock block;
+            // Go back by what we want to be 14 days worth of blocks
+            const CBlockIndex* pindexFirst = pindexLast;
 
-            block.ReadFromDisk(pbi);
-            pindexFirst = pbi;
+            if (pindexLast->nHeight > nDifficultyInterval + 1)
+            {
+                for (int i = 0; pindexFirst && i < nDifficultyInterval; ++i)
+                    pindexFirst = pindexFirst->pprev;
+            }
+            else // get block #0
+            {
+                CBlockIndex* pbi = FindBlockByHeight(0);
+                CBlock block;
+
+                block.ReadFromDisk(pbi);
+                pindexFirst = pbi;
+            }
+            Yassert(pindexFirst);
+
+            return CalculateNextWorkRequired(pindexLast, pindexFirst->GetBlockTime());
         }
-        Yassert(pindexFirst);
 
-        return CalculateNextWorkRequired(pindexLast, pindexFirst->GetBlockTime());
+        // COMMENT THIS BLOCK CODE OUT , WE MAY USE IT IN CASE OF AN EMERGENCY HARDFORK
+        // Before block 4032, the target is recalculated every block
+        // since we are forking off of YAC, there exists > 1,806,727 blocks, as of 1/6/2019 10am EST
+        // we can do a weighted (exponential) average of the last 9(arbitrary) block times
+        // last is Block(height).GetBlockTime() which is .nTime (64 bit),
+        // next is Block(height - 1).GetBlockTime(), etc.
+        // so given as a parameter, pindexLast,
+//        int
+//            nNumberOfWeightedBlocks = min(
+//                                            nExponentialTrailingAverageLength,
+//                                            pindexLast->nHeight - 2  //skip block 0 & 1
+//                                         );
+//        const CBlockIndex
+//            *pLastBI = pindexLast,
+//            *pPreviousBI = pLastBI->pprev;
+//        ::int64_t
+//            nMultiplier,
+//            nLatestDeltaT,
+//            nDeltaT,
+//            nWeighting = 0,
+//            nSum2000 = 0,
+//            nSum1000 = 0,
+//            nSum200 = 0,
+//            nSum100 = 0,
+//            nSum = 0;
+//
+//        nStatisticsNumberOfBlocks = min( nBigLinearTrailingAverageLength, pindexLast->nHeight - 1 ),
+//        nLatestDeltaT = pLastBI->GetBlockTime() - pPreviousBI->GetBlockTime();
+//
+//        nSum = pLastBI->GetBlockTime();
+//        for( int count = nStatisticsNumberOfBlocks; count >= 1; --count )
+//        {
+//            pLastBI = pPreviousBI;  // just get previous block
+//            pPreviousBI = pLastBI->pprev;
+//            if( nStatisticsNumberOfBlocks2000 == (nStatisticsNumberOfBlocks - count) )
+//            {
+//                nSum2000 = nSum - pPreviousBI->GetBlockTime();
+//                nLongAverageBP2000 = nSum2000 / nStatisticsNumberOfBlocks2000;
+//            }
+//            if( nStatisticsNumberOfBlocks1000 == (nStatisticsNumberOfBlocks - count) )
+//            {
+//                nSum1000 = nSum - pPreviousBI->GetBlockTime();
+//                nLongAverageBP1000 = nSum1000 / nStatisticsNumberOfBlocks1000;
+//            }
+//            if( nStatisticsNumberOfBlocks200 == (nStatisticsNumberOfBlocks - count) )
+//            {
+//                nSum200 = nSum - pPreviousBI->GetBlockTime();
+//                nLongAverageBP200 = nSum200 / nStatisticsNumberOfBlocks200;
+//            }
+//            if( nStatisticsNumberOfBlocks100 == (nStatisticsNumberOfBlocks - count) )
+//            {
+//                nSum100 = nSum - pPreviousBI->GetBlockTime();
+//                nLongAverageBP100 = nSum100 / nStatisticsNumberOfBlocks100;
+//            }
+//        }
+//        nSum -= pLastBI->GetBlockTime();
+//        if ( 0 != nStatisticsNumberOfBlocks )
+//            nLongAverageBP = nSum / nStatisticsNumberOfBlocks;   // integer /
+//
+//        // new fixed length DAA code ala ltc
+//
+//
+//
+//        pLastBI = pindexLast,
+//        pPreviousBI = pLastBI->pprev;
+//        nWeighting = 0,
+//        nSum = 0;
+//        for( int count = nNumberOfWeightedBlocks; count >= 1; --count )
+//        {
+//            nMultiplier = ((::int64_t)0x0001 << count);
+//            nDeltaT = pLastBI->GetBlockTime() - pPreviousBI->GetBlockTime();
+//            nSum += (nDeltaT * nMultiplier);
+//            nWeighting += nMultiplier;
+//
+//            pLastBI = pPreviousBI;  // just get previous block
+//            pPreviousBI = pLastBI->pprev;
+//        }
+//
+//        ::int64_t
+//            nEWA = 0;
+//
+//        if ( 0 != nWeighting )
+//            nEWA = nSum / nWeighting;   // integer /
+//        // should be near (?) average block period
+//        (void)printf(
+//                     "PoW last period %" PRId64 "sec, weighted average period %" PRId64 " sec\n"
+//                     ""
+//                     , nActualSpacing, nEWA
+//                    );
+//        (void)printf(
+//                     "PoW old target %s\n"
+//                     ""
+//                     , nTarget.ToString().substr(0,16).c_str()
+//                    );
+//
+//        // do we do a special case for no block in > future drift time?
+//        if( nLatestDeltaT >= nMaxClockDrift/2 )   // in this case, 12/2 = 6 minutes
+//        {
+//            //nTarget <<= 1; // double target value
+//        }
+//        if(
+//           (nLatestDeltaT >= (5 * nAverageBlockperiod / 4))
+//           ||
+//           (nLatestDeltaT <= (3 * nAverageBlockperiod / 4))
+//          )
+//        {       // latest period was still out of the normal range so adjust the ease
+//            if( nEWA > (4 * nAverageBlockperiod) )      // too difficult
+//            {
+//                nTarget += (nRelativeTargetDelta << 1); // up the ease 1/4 of target value
+//            }
+//            if( nEWA > (2 * nAverageBlockperiod) )      // too difficult
+//            {
+//                nTarget += nRelativeTargetDelta;        // up the ease 1/8 of target value
+//            }
+//            if( nEWA > (3 * nAverageBlockperiod / 2) )  // too difficult
+//            {
+//                nTarget += nRelativeTargetDelta;        // up the ease 1/8 of target value
+//            }
+//            if( nEWA > (4 * nAverageBlockperiod / 3) )  // too difficult
+//            {
+//                nTarget += nRelativeTargetDelta;        // up the ease 1/8 of target value
+//            }
+//            if( nEWA > (5 * nAverageBlockperiod / 4) )  // too difficult
+//            {
+//                nTarget += nRelativeTargetDelta;        // up the ease 1/8 of target value
+//            }
+//            else // nLWA <= 3 * nAverageBlockperiod / 2 // i.e. perhaps too easy
+//            {
+//                if( nEWA <= (nAverageBlockperiod / 4) )     // too easy
+//                {
+//                    nTarget -= (nRelativeTargetDelta << 1); // decrease the ease 1/4 of target value
+//                }
+//                if( nEWA <= (nAverageBlockperiod / 2) )     // too easy
+//                {
+//                    nTarget -= nRelativeTargetDelta;        // decrease the ease 1/8 of target value
+//                }
+//                if( nEWA <= (3 * nAverageBlockperiod / 4) ) // too easy
+//                {
+//                    nTarget -= nRelativeTargetDelta;        // decrease the ease by 1/8 of target value
+//                }
+//            }
+//        }
+//        else
+//        {       // latest period was within range so leave the ease as is
+//        }
+//    //#ifdef DEBUG
+//        (void)printf(
+//                     "PoW new target %s\n"
+//                     ""
+//                     , nTarget.ToString().substr(0,16).c_str()
+//                    );
+//    //#endif
+//        //uint256 nTarget = CBigNum().SetCompact(pblock->nBits).getuint256();
+//        bnNewTarget.setuint256( nTarget );
+    }
+    else
+    {
+        // ppcoin: target change every block
+        // ppcoin: retarget with exponential moving toward target spacing
+        //
+        // I don't understand how this code is an exponential weighting?
+        //
+        bnNewTarget.SetCompact(pindexPrev->nBits);
+
+        ::int64_t
+            nTargetSpacing = fProofOfStake?
+                             nStakeTargetSpacing :
+                             min(                       // what is this PoW value?
+                                nTargetSpacingWorkMax,  //12 minutes
+                                (::int64_t) nStakeTargetSpacing *
+                                            (1 + pindexLast->nHeight - pindexPrev->nHeight)
+                                );
+
+        ::int64_t
+            nInterval = nTargetTimespan / nTargetSpacing;   // this is the one week / nTargetSpacing
+
+        bnNewTarget *= (((nInterval - 1) * nTargetSpacing) + nActualSpacing + nActualSpacing);
+        bnNewTarget /=  ((nInterval + 1) * nTargetSpacing);
     }
 
-    // COMMENT THIS BLOCK CODE OUT , WE MAY USE IT IN CASE OF AN EMERGENCY HARDFORK
-    // Before block 4032, the target is recalculated every block
-    // since we are forking off of YAC, there exists > 1,806,727 blocks, as of 1/6/2019 10am EST
-    // we can do a weighted (exponential) average of the last 9(arbitrary) block times
-    // last is Block(height).GetBlockTime() which is .nTime (64 bit),
-    // next is Block(height - 1).GetBlockTime(), etc.
-    // so given as a parameter, pindexLast,
-//    int
-//        nNumberOfWeightedBlocks = min(
-//                                        nExponentialTrailingAverageLength,
-//                                        pindexLast->nHeight - 2  //skip block 0 & 1
-//                                     );
-//    const CBlockIndex
-//        *pLastBI = pindexLast,
-//        *pPreviousBI = pLastBI->pprev;
-//    ::int64_t
-//        nMultiplier,
-//        nLatestDeltaT,
-//        nDeltaT,
-//        nWeighting = 0,
-//        nSum2000 = 0,
-//        nSum1000 = 0,
-//        nSum200 = 0,
-//        nSum100 = 0,
-//        nSum = 0;
-//
-//    nStatisticsNumberOfBlocks = min( nBigLinearTrailingAverageLength, pindexLast->nHeight - 1 ),
-//    nLatestDeltaT = pLastBI->GetBlockTime() - pPreviousBI->GetBlockTime();
-//
-//    nSum = pLastBI->GetBlockTime();
-//    for( int count = nStatisticsNumberOfBlocks; count >= 1; --count )
-//    {
-//        pLastBI = pPreviousBI;  // just get previous block
-//        pPreviousBI = pLastBI->pprev;
-//        if( nStatisticsNumberOfBlocks2000 == (nStatisticsNumberOfBlocks - count) )
-//        {
-//            nSum2000 = nSum - pPreviousBI->GetBlockTime();
-//            nLongAverageBP2000 = nSum2000 / nStatisticsNumberOfBlocks2000;
-//        }
-//        if( nStatisticsNumberOfBlocks1000 == (nStatisticsNumberOfBlocks - count) )
-//        {
-//            nSum1000 = nSum - pPreviousBI->GetBlockTime();
-//            nLongAverageBP1000 = nSum1000 / nStatisticsNumberOfBlocks1000;
-//        }
-//        if( nStatisticsNumberOfBlocks200 == (nStatisticsNumberOfBlocks - count) )
-//        {
-//            nSum200 = nSum - pPreviousBI->GetBlockTime();
-//            nLongAverageBP200 = nSum200 / nStatisticsNumberOfBlocks200;
-//        }
-//        if( nStatisticsNumberOfBlocks100 == (nStatisticsNumberOfBlocks - count) )
-//        {
-//            nSum100 = nSum - pPreviousBI->GetBlockTime();
-//            nLongAverageBP100 = nSum100 / nStatisticsNumberOfBlocks100;
-//        }
-//    }
-//    nSum -= pLastBI->GetBlockTime();
-//    if ( 0 != nStatisticsNumberOfBlocks )
-//        nLongAverageBP = nSum / nStatisticsNumberOfBlocks;   // integer /
-//
-//    // new fixed length DAA code ala ltc
-//
-//
-//
-//    pLastBI = pindexLast,
-//    pPreviousBI = pLastBI->pprev;
-//    nWeighting = 0,
-//    nSum = 0;
-//    for( int count = nNumberOfWeightedBlocks; count >= 1; --count )
-//    {
-//        nMultiplier = ((::int64_t)0x0001 << count);
-//        nDeltaT = pLastBI->GetBlockTime() - pPreviousBI->GetBlockTime();
-//        nSum += (nDeltaT * nMultiplier);
-//        nWeighting += nMultiplier;
-//
-//        pLastBI = pPreviousBI;  // just get previous block
-//        pPreviousBI = pLastBI->pprev;
-//    }
-//
-//    ::int64_t
-//        nEWA = 0;
-//
-//    if ( 0 != nWeighting )
-//        nEWA = nSum / nWeighting;   // integer /
-//    // should be near (?) average block period
-//    (void)printf(
-//                 "PoW last period %" PRId64 "sec, weighted average period %" PRId64 " sec\n"
-//                 ""
-//                 , nActualSpacing, nEWA
-//                );
-//    (void)printf(
-//                 "PoW old target %s\n"
-//                 ""
-//                 , nTarget.ToString().substr(0,16).c_str()
-//                );
-//
-//    // do we do a special case for no block in > future drift time?
-//    if( nLatestDeltaT >= nMaxClockDrift/2 )   // in this case, 12/2 = 6 minutes
-//    {
-//        //nTarget <<= 1; // double target value
-//    }
-//    if(
-//       (nLatestDeltaT >= (5 * nAverageBlockperiod / 4))
-//       ||
-//       (nLatestDeltaT <= (3 * nAverageBlockperiod / 4))
-//      )
-//    {       // latest period was still out of the normal range so adjust the ease
-//        if( nEWA > (4 * nAverageBlockperiod) )      // too difficult
-//        {
-//            nTarget += (nRelativeTargetDelta << 1); // up the ease 1/4 of target value
-//        }
-//        if( nEWA > (2 * nAverageBlockperiod) )      // too difficult
-//        {
-//            nTarget += nRelativeTargetDelta;        // up the ease 1/8 of target value
-//        }
-//        if( nEWA > (3 * nAverageBlockperiod / 2) )  // too difficult
-//        {
-//            nTarget += nRelativeTargetDelta;        // up the ease 1/8 of target value
-//        }
-//        if( nEWA > (4 * nAverageBlockperiod / 3) )  // too difficult
-//        {
-//            nTarget += nRelativeTargetDelta;        // up the ease 1/8 of target value
-//        }
-//        if( nEWA > (5 * nAverageBlockperiod / 4) )  // too difficult
-//        {
-//            nTarget += nRelativeTargetDelta;        // up the ease 1/8 of target value
-//        }
-//        else // nLWA <= 3 * nAverageBlockperiod / 2 // i.e. perhaps too easy
-//        {
-//            if( nEWA <= (nAverageBlockperiod / 4) )     // too easy
-//            {
-//                nTarget -= (nRelativeTargetDelta << 1); // decrease the ease 1/4 of target value
-//            }
-//            if( nEWA <= (nAverageBlockperiod / 2) )     // too easy
-//            {
-//                nTarget -= nRelativeTargetDelta;        // decrease the ease 1/8 of target value
-//            }
-//            if( nEWA <= (3 * nAverageBlockperiod / 4) ) // too easy
-//            {
-//                nTarget -= nRelativeTargetDelta;        // decrease the ease by 1/8 of target value
-//            }
-//        }
-//    }
-//    else
-//    {       // latest period was within range so leave the ease as is
-//    }
-////#ifdef DEBUG
-//    (void)printf(
-//                 "PoW new target %s\n"
-//                 ""
-//                 , nTarget.ToString().substr(0,16).c_str()
-//                );
-////#endif
-//    //uint256 nTarget = CBigNum().SetCompact(pblock->nBits).getuint256();
-//    bnNewTarget.setuint256( nTarget );
-#else
-    // ppcoin: target change every block
-    // ppcoin: retarget with exponential moving toward target spacing
-    //
-    // I don't understand how this code is an exponential weighting?
-    //
-    bnNewTarget.SetCompact(pindexPrev->nBits);
-
-    ::int64_t
-        nTargetSpacing = fProofOfStake?         
-                         nStakeTargetSpacing : 
-                         min(                       // what is this PoW value?
-                            nTargetSpacingWorkMax,  //12 minutes
-                            (::int64_t) nStakeTargetSpacing * 
-                                        (1 + pindexLast->nHeight - pindexPrev->nHeight)
-                            );
-
-    ::int64_t
-        nInterval = nTargetTimespan / nTargetSpacing;   // this is the one week / nTargetSpacing
-
-    bnNewTarget *= (((nInterval - 1) * nTargetSpacing) + nActualSpacing + nActualSpacing);
-    bnNewTarget /=  ((nInterval + 1) * nTargetSpacing);
-
-#endif
     if (bnNewTarget > bnEasiestTargetLimit)
         bnNewTarget = bnEasiestTargetLimit;
 
