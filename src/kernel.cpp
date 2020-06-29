@@ -185,9 +185,11 @@ static bool SelectBlockFromCandidates(vector<pair< int64_t, uint256> >& vSortedB
 // blocks.
 bool ComputeNextStakeModifier(const CBlockIndex* pindexCurrent, uint64_t& nStakeModifier, bool& fGeneratedStakeModifier)
 {
-#ifdef Yac1dot0
-    return true;
-#endif
+    if (pindexBest && (pindexBest->nHeight + 1) >= nMainnetNewLogicBlockNumber)
+    {
+        return true;
+    }
+
     nStakeModifier = 0;
     fGeneratedStakeModifier = false;
     const CBlockIndex* pindexPrev = pindexCurrent->pprev;
@@ -896,12 +898,16 @@ uint32_t GetStakeModifierChecksum(const CBlockIndex* pindex)
 // Check stake modifier hard checkpoints
 bool CheckStakeModifierCheckpoints(int nHeight, uint32_t nStakeModifierChecksum)
 {
-#if !defined( Yac1dot0)
+    if (pindexBest && (pindexBest->nHeight + 1) >= nMainnetNewLogicBlockNumber)
+    {
+        return true;
+    }
+
     MapModifierCheckpoints& checkpoints = (fTestNet ? mapStakeModifierCheckpointsTestNet : mapStakeModifierCheckpoints);
 
     if (checkpoints.count(nHeight))
         return nStakeModifierChecksum == checkpoints[nHeight];
-#endif
+
     return true;
 }
 #ifdef _MSC_VER

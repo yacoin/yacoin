@@ -816,11 +816,12 @@ bool CTxDB::LoadBlockIndex()
     #endif
         nCounter = 0;
 #endif
-#ifdef Yac1dot0
-#else
+
         BOOST_FOREACH(const PAIRTYPE(int, CBlockIndex*)& item, vSortedByHeight)
         {
             CBlockIndex* pindex = item.second;
+            if (pindex->nHeight >= nMainnetNewLogicBlockNumber)
+				break;
             pindex->nPosBlockCount = ( pindex->pprev ? pindex->pprev->nPosBlockCount : 0 ) + ( pindex->IsProofOfStake() ? 1 : 0 );
             pindex->nBitsMA = pindex->IsProofOfStake() ? GetProofOfWorkMA(pindex->pprev) : 0;
             pindex->bnChainTrust = (pindex->pprev ? pindex->pprev->bnChainTrust : CBigNum(0)) + pindex->GetBlockTrust();
@@ -841,7 +842,6 @@ bool CTxDB::LoadBlockIndex()
             }
 #endif        
         }
-#endif
     }
 
 #ifdef WIN32

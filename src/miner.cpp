@@ -932,7 +932,7 @@ void StakeMinter(CWallet *pwallet)
 
     while (true)
     {
-        if (fShutdown)
+        if (fShutdown || (pindexBest && pindexBest->nHeight + 1 >= nMainnetNewLogicBlockNumber))
             return;
 
         while (pwallet->IsLocked())

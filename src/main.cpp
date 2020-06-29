@@ -3280,19 +3280,20 @@ bool CBlock::AddToBlockIndex(unsigned int nFile, unsigned int nBlockPos)
         pindexNew->hashProofOfStake = mapProofOfStake[hash];
     }
 
-#ifdef Yac1dot0
-#else
-    // ppcoin: compute stake modifier
-    ::uint64_t nStakeModifier = 0;
-    bool fGeneratedStakeModifier = false;
-    if (!ComputeNextStakeModifier(pindexNew, nStakeModifier, fGeneratedStakeModifier))
-        return error("AddToBlockIndex() : ComputeNextStakeModifier() failed");
-    pindexNew->SetStakeModifier(nStakeModifier, fGeneratedStakeModifier);
- 
-    pindexNew->nStakeModifierChecksum = GetStakeModifierChecksum(pindexNew);
-    if (!CheckStakeModifierCheckpoints(pindexNew->nHeight, pindexNew->nStakeModifierChecksum))
-        return error("AddToBlockIndex() : Rejected by stake modifier checkpoint height=%d, modifier=0x%016" PRIx64, pindexNew->nHeight, nStakeModifier);
-#endif
+    if (!pindexBest || (pindexBest->nHeight + 1) < nMainnetNewLogicBlockNumber)
+    {
+        // ppcoin: compute stake modifier
+        ::uint64_t nStakeModifier = 0;
+        bool fGeneratedStakeModifier = false;
+        if (!ComputeNextStakeModifier(pindexNew, nStakeModifier, fGeneratedStakeModifier))
+            return error("AddToBlockIndex() : ComputeNextStakeModifier() failed");
+        pindexNew->SetStakeModifier(nStakeModifier, fGeneratedStakeModifier);
+
+        pindexNew->nStakeModifierChecksum = GetStakeModifierChecksum(pindexNew);
+        if (!CheckStakeModifierCheckpoints(pindexNew->nHeight, pindexNew->nStakeModifierChecksum))
+            return error("AddToBlockIndex() : Rejected by stake modifier checkpoint height=%d, modifier=0x%016" PRIx64, pindexNew->nHeight, nStakeModifier);
+    }
+
     // Add to mapBlockIndex
     map<uint256, CBlockIndex*>::iterator mi = mapBlockIndex.insert(make_pair(hash, pindexNew)).first;
     if (pindexNew->IsProofOfStake())
