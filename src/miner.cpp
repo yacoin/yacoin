@@ -181,7 +181,7 @@ CBlock* CreateNewBlock(CWallet* pwallet, bool fProofOfStake)
     	// TODO: Need update for mainet
     	if (nBestHeight > nMainnetNewLogicBlockNumber)
     	{
-            pblock->nVersion = VERSION_of_block_for_time_extension;
+            pblock->nVersion = VERSION_of_block_for_yac_05x_new;
     	}
     	else
     	{

@@ -434,7 +434,7 @@ bool CTransaction::oldIsStandard(string& strReason) const
 	// 1) At the time installing yacoind 1.0.0
 	// 2) At the time happening hardfork
 	// Need update this line at next yacoin version
-    if (nVersion > CTransaction::CURRENT_VERSION_of_Tx_for_time_extension)
+    if (nVersion > CTransaction::CURRENT_VERSION_of_Tx_for_yac_new)
     {
         strReason = "version";
         return false;
@@ -501,7 +501,7 @@ bool CTransaction::IsStandard044( string& strReason ) const
 	// 1) At the time installing yacoind 1.0.0
 	// 2) At the time happening hardfork
 	// Need update this line at next yacoin version
-    if (nVersion > CTransaction::CURRENT_VERSION_of_Tx_for_time_extension) // same as in 0.4.4!?
+    if (nVersion > CTransaction::CURRENT_VERSION_of_Tx_for_yac_new) // same as in 0.4.4!?
     {                                                   // if we test differently,
         strReason = "version(in 0.4.4)";                // then shouldn't 0.4.5 be 
         return false;                                   // different?
@@ -3145,7 +3145,7 @@ bool CBlock::SetBestChain(CTxDB& txdb, CBlockIndex* pindexNew)
         	// 1) At the time installing yacoind 1.0.0
         	// 2) At the time happening hardfork
         	// Need update this line at next yacoin version
-            if (pindex->nVersion > VERSION_of_block_for_time_extension)
+            if (pindex->nVersion > VERSION_of_block_for_yac_05x_new)
                 ++nUpgraded;
             pindex = pindex->pprev;
         }
@@ -4045,7 +4045,7 @@ bool CBlock::SignBlock(CWallet& wallet)
     if( 
        !IsProofOfStake()    // i.e PoW then immaterial what version!
        ||
-       (VERSION_of_block_for_time_extension == nVersion)
+       (VERSION_of_block_for_yac_05x_new == nVersion)
        ||
        (VERSION_of_block_for_yac_05x_new == nVersion)
        ||

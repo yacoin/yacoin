@@ -80,15 +80,11 @@ static const unsigned char YAC20_N_FACTOR = 16;
 
 // block version header
 static const int
-    VERSION_of_block_for_time_extension = 8,
     VERSION_of_block_for_yac_05x_new = 7,
     VERSION_of_block_for_yac_049     = 6,
     VERSION_of_block_for_yac_044_old = 3,
-#ifdef Yac1dot0
-    CURRENT_VERSION_of_block = VERSION_of_block_for_yac_05x_new;
-#else
     CURRENT_VERSION_of_block = VERSION_of_block_for_yac_049;
-#endif
+
 //static const int
 //    CURRENT_VERSION_previous = VERSION_of_block_for_yac_044_old;
 
@@ -533,12 +529,11 @@ class CTransaction
 public:
     static const int 
         CURRENT_VERSION_of_Tx_for_yac_old = 1,      // this should be different for Yac1.0
-        CURRENT_VERSION_of_Tx_for_yac_new = 2,
-        CURRENT_VERSION_of_Tx_for_time_extension = 3;
+        CURRENT_VERSION_of_Tx_for_yac_new = 2;
 
     static const int 
       //CURRENT_VERSION_of_Tx = CURRENT_VERSION_of_Tx_for_yac_old;
-        CURRENT_VERSION_of_Tx = CURRENT_VERSION_of_Tx_for_yac_new;
+        CURRENT_VERSION_of_Tx = CURRENT_VERSION_of_Tx_for_yac_old;
 
     int nVersion;
     mutable ::int64_t nTime;
@@ -560,7 +555,7 @@ public:
         READWRITE(this->nVersion);
         nVersion = this->nVersion;
         // nTime is extended to 64-bit since yacoin 1.0.0
-        if (this->nVersion >= CURRENT_VERSION_of_Tx_for_time_extension) // 64-bit nTime
+        if (this->nVersion >= CURRENT_VERSION_of_Tx_for_yac_new) // 64-bit nTime
         {
 			READWRITE(nTime);
         }
@@ -580,7 +575,7 @@ public:
         // TODO: Need update for mainet
         if (nBestHeight != -1 && nBestHeight > nMainnetNewLogicBlockNumber)
         {
-            nVersion = CTransaction::CURRENT_VERSION_of_Tx_for_time_extension;
+            nVersion = CTransaction::CURRENT_VERSION_of_Tx_for_yac_new;
         }
         else
         {
@@ -1046,7 +1041,7 @@ public:
         READWRITE(hashPrevBlock);
         READWRITE(hashMerkleRoot);
         // nTime is extended to 64-bit since yacoin 1.0.0
-        if (this->nVersion >= VERSION_of_block_for_time_extension) // 64-bit nTime
+        if (this->nVersion >= VERSION_of_block_for_yac_05x_new) // 64-bit nTime
         {
                READWRITE(nTime);
         }
@@ -1077,7 +1072,7 @@ public:
         // TODO: Need update for mainnet
         if (nBestHeight != -1 && nBestHeight > nMainnetNewLogicBlockNumber)
         {
-            nVersion = VERSION_of_block_for_time_extension;
+            nVersion = VERSION_of_block_for_yac_05x_new;
         }
         else
         {
@@ -1190,7 +1185,7 @@ public:
         uint256 
             thash;
 
-        if (nVersion >= VERSION_of_block_for_time_extension) // 64-bit nTime
+        if (nVersion >= VERSION_of_block_for_yac_05x_new) // 64-bit nTime
         {
             struct block_header block_data;
             block_data.version = nVersion;
@@ -1253,7 +1248,7 @@ public:
         unsigned char
             nfactor = GetNfactor(nTime);
 
-        if (nVersion >= VERSION_of_block_for_time_extension) // 64-bit nTime
+        if (nVersion >= VERSION_of_block_for_yac_05x_new) // 64-bit nTime
         {
             struct block_header block_data;
             block_data.version = nVersion;
@@ -1827,7 +1822,7 @@ public:
         READWRITE(hashPrev);
         READWRITE(hashMerkleRoot);
         // nTime is extended to 64-bit since yacoin 1.0.0
-        if (this->nVersion >= VERSION_of_block_for_time_extension) // 64-bit nTime
+        if (this->nVersion >= VERSION_of_block_for_yac_05x_new) // 64-bit nTime
         {
             READWRITE(nTime);
         }
