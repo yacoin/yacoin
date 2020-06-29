@@ -1312,9 +1312,7 @@ CBigNum inline GetProofOfStakeLimit(int nHeight, unsigned int nTime)
 ::int64_t GetProofOfWorkReward(unsigned int nBits, ::int64_t nFees, bool fGetRewardOfBestHeightBlock)
 {
 #ifdef Yac1dot0
-    if(
-       (pindexBest->nHeight + 1) >= nMainnetNewLogicBlockNumber
-      )
+    if (pindexBest && (pindexBest->nHeight + 1) >= nMainnetNewLogicBlockNumber)
     {
         // Get reward of current best height block
         if (fGetRewardOfBestHeightBlock)
