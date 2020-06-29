@@ -573,7 +573,7 @@ public:
     void SetNull()
     {
         // TODO: Need update for mainet
-        if (nBestHeight != -1 && nBestHeight > nMainnetNewLogicBlockNumber)
+        if (nBestHeight != -1 && pindexGenesisBlock && nBestHeight >= nMainnetNewLogicBlockNumber)
         {
             nVersion = CTransaction::CURRENT_VERSION_of_Tx_for_yac_new;
         }
@@ -1070,7 +1070,7 @@ public:
     void SetNull()
     {
         // TODO: Need update for mainnet
-        if (nBestHeight != -1 && nBestHeight > nMainnetNewLogicBlockNumber)
+        if (nBestHeight != -1 && pindexGenesisBlock && nBestHeight >= nMainnetNewLogicBlockNumber)
         {
             nVersion = VERSION_of_block_for_yac_05x_new;
         }

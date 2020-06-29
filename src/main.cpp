@@ -1658,7 +1658,7 @@ bool HaveWeSwitchedToNewLogicRules( bool &fUsingOld044Rules )
            fTestNet &&    // may use new rules, ATM only in TestNet
            (
             fTestNetNewLogic &&
-            (nMainnetNewLogicBlockNumber < nBestHeight)
+            (nMainnetNewLogicBlockNumber <= nBestHeight)
            )
           )
         {

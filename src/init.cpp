@@ -1247,10 +1247,6 @@ bool AppInit2()
     printf(" block index %15" PRId64 "ms\n", GetTimeMillis() - nStart);
 
     nMainnetNewLogicBlockNumber = GetArg("-testnetNewLogicBlockNumber", 0);
-    if (0 == nMainnetNewLogicBlockNumber)
-    {
-        nMainnetNewLogicBlockNumber = pindexBest->nHeight;
-    }
     if (fDebug)
     {
 #ifdef WIN32
