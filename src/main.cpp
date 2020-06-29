@@ -65,8 +65,8 @@ using std::multimap;
 const ::int64_t 
     nSimulatedMOneySupplyAtFork = 124460820773591,  //124,460,820.773591 YAC
     nChainStartTime = 1367991200,           // unix time???? ~ Wed May 08 2013 05:33:20
-    //nChainStartTimeTestNet = 1464123328;    //Tue, 24 May 2016 20:55:28 GMT
-                                            // 1464373956  Fri, 27 May 2016 18:32:36 GMT
+//    nChainStartTimeTestNet = 1464123328;    //Tue, 24 May 2016 20:55:28 GMT
+//                                            // 1464373956  Fri, 27 May 2016 18:32:36 GMT
     nChainStartTimeTestNet = 1546300800;    // 1546116950 ~12/29/2018
                                             // 1546300800 1/1/2019 00:00:00 GMT
 const uint256 
@@ -82,19 +82,19 @@ const uint256
                             // version 0.5.0.04
 //hashGenesisBlockTestNet( "0x049a99dd896cbaa9004c790d8b3855e714ede6328b0555c55d08b94fda187f1e" ),
 //hashGenesisBlockTestNet( "0x0619394c5fc682ef90f64a256a48b428636246010cf898b59491465e47d3b49e" ),
-  hashGenesisBlockTestNet( "0x169551a096df5cfe084cd8625611a4174ca9859b3269f420b1fe6e78d0cc7415" ),
+  hashGenesisBlockTestNet( "0x1dc29b112550069ecb870e1be78c8d0c166e5f4e41433283e74dcf30b510c1f3" ),
     
                             // version 0.5.0.03
 //hashGenesisMerkleRootTestNet( "0xf87fdba660d8d4cf099c09bc684968249311611ff18c92ddce3d44ccf8df0c28" ),
                             // version 0.5.0.04
 //hashGenesisMerkleRootTestNet( "0x389003d67b17d9a38a9c83b9289225f5e5469b9f6a2d70fc7c97ee6e8f995f23" ),
                             // old 0.4.9
-  hashGenesisMerkleRootTestNet( "0x7e23f7b1ed2db1d5bb1b1f12fc499de0d24b35fb533d9cd04e4fdba9b0ec8143" ),
+  hashGenesisMerkleRootTestNet( "0xd6ab993974b85898d45cfd850c8865fefa342450b4b38dca9eaafb515920baf7" ),
                             // new 0.5.5
   //hashGenesisMerkleRootMainNet( "0x678b76419ff06676a591d3fa9d57d7f7b26d8021b7cc69dde925f39d4cf2244f" );
 //   hashGenesisMerkleRootMainNet( "0x97a5a4d34dc12eff03febfd7c906b31740ac3412c820950a431b25ee1b874cb6" );
 //   hashGenesisMerkleRootMainNet( "0x5b1c7339ef15a2c8ad96b672e345a8cd316cc8ee019ea7edeef4f0cd1e8116eb");
-  hashGenesisMerkleRootMainNet( "0x97a5a4d34dc12eff03febfd7c906b31740ac3412c820950a431b25ee1b874cb6");
+  hashGenesisMerkleRootMainNet( "0x678b76419ff06676a591d3fa9d57d7f7b26d8021b7cc69dde925f39d4cf2244f");
 
 const ::uint32_t 
     nTestNetGenesisNonce = 0x1F656; // = 128,598 decimal
@@ -134,7 +134,7 @@ map<uint256, CBlockIndex*> mapBlockIndex;
 set<pair<COutPoint, unsigned int> > setStakeSeen;
 
 // are all of these undocumented numbers a function of Nfactor?  Cpu power? Other???
-CBigNum bnProofOfWorkLimit(~uint256(0) >> 3);  // TODO verify why the original value >> 20 is not working
+CBigNum bnProofOfWorkLimit(~uint256(0) >> 20);
 
 CBigNum bnProofOfStakeLegacyLimit(~uint256(0) >> 24); 
 CBigNum bnProofOfStakeLimit(~uint256(0) >> 27); 
@@ -158,7 +158,8 @@ bool recalculateMinEase = false;
 
 static CBigNum bnProofOfStakeTestnetLimit(~uint256(0) >> 20);
 
-  static CBigNum bnInitialHashTarget(~uint256(0) >> 8);    // test
+static CBigNum bnInitialHashTarget(~uint256(0) >> 20);
+static CBigNum bnInitialHashTargetTestNet(~uint256(0) >> 8);    // test
 //static CBigNum bnInitialHashTarget(~uint256(0) >> 16);
 
 int
@@ -4302,6 +4303,7 @@ bool LoadBlockIndex(bool fAllowNew)
         pchMessageStart[3] = 0xef;
 
         bnProofOfWorkLimit = bnProofOfWorkLimitTestNet; // 16 bits PoW target limit for testnet
+        bnInitialHashTarget = bnInitialHashTargetTestNet;
         nStakeMinAge = 2 * nSecondsPerHour;             // 2 hours (to what?)
         nModifierInterval =  10 * nSecondsperMinute;    // 10 minutes, for what?
         nCoinbaseMaturity = 6; // test maturity is 6 blocks + nCoinbaseMaturity(20) = 26
@@ -4363,7 +4365,7 @@ bool LoadBlockIndex(bool fAllowNew)
         txNew.vin[0].scriptSig = 
             CScript()           // what is being constructed here?????
             << (!fTestNet?  486604799:      // is this a time? 1985?
-                           nChainStartTimeTestNet)  // how about a more current time????  If it is a time???????
+                            1464032600)  // how about a more current time????  If it is a time???????
             << CBigNum(9999)    // what is this??
             << vector<unsigned char>((const unsigned char*)pszTimestamp, 
                                      (const unsigned char*)pszTimestamp + strlen(pszTimestamp)
@@ -4387,7 +4389,7 @@ bool LoadBlockIndex(bool fAllowNew)
         block.vtx.push_back(txNew);
         block.hashPrevBlock = 0;
         block.hashMerkleRoot = block.BuildMerkleTree();
-        block.nVersion = CURRENT_VERSION_of_block;  // was 1; which is strange?
+        block.nVersion = 1;  // was 1; which is strange?
         block.nTime    = (::uint32_t)( fTestNet?
                                        nChainStartTimeTestNet + 20: 
                                        nChainStartTime + 20 
@@ -4395,7 +4397,7 @@ bool LoadBlockIndex(bool fAllowNew)
         block.nBits    = bnProofOfWorkLimit.GetCompact();
         block.nNonce   = !fTestNet ? 
                             127357 :        // main net genesis block nonce
-                            nTestNetGenesisNonce;  
+							nTestNetGenesisNonce;
                                             //0x1F653; //for 0.5.0.04 TestNet
                                             //0x1F652; //for 0.5.0.03 TestNet
                                             //0x1f650;  13D93;    //67103;
