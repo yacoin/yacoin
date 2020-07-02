@@ -106,11 +106,8 @@ extern int
     nConsecutiveStakeSwitchHeight;  // see timesamps.h = 420000;
 
 const ::int64_t 
-#ifdef Yac1dot0
-    nMaxClockDrift = 12 * nSecondsPerMinute;
-#else
     nMaxClockDrift = nTwoHoursInSeconds;
-#endif
+
 inline ::int64_t PastDrift(::int64_t nTime)   
     { return nTime - nMaxClockDrift; } // up to 2 hours from the past
 inline ::int64_t FutureDrift(::int64_t nTime) 
