@@ -87,7 +87,7 @@ class MiningTest(BitcoinTestFramework):
         for t in range(0,30):
             print("calculating block "+str(t+1))
             self.nodes[0].setmocktime(TIME_GENESIS_BLOCK+t*120)
-            self.nodes[0].generate(1)
+            self.nodes[0].generate(1, 4294967295)
             mining_info = self.nodes[0].getmininginfo()
             assert_equal(mining_info['blocks'], t+1)
             # assert_equal(mining_info['powreward'], blockreward[t])
