@@ -219,8 +219,9 @@ const ::uint32_t
         *hasht = (unsigned char *) &nT,
         *hashc = (unsigned char *) &hash,
       //highestZeroBitsSet = 0xe0;
+        // Hash target can't be smaller than bnProofOfWorkLimit which is 00000fffff000000
         nMask = 0x00,
-        highestZeroBitsSet = ~(hasht[ 31 ]),
+        highestZeroBitsSet = ~(hasht[ 29 ]),
         nMaskPattern = 0x80;
 
     while( 0x80 == ( 0x80 & highestZeroBitsSet) )
@@ -254,8 +255,11 @@ const ::uint32_t
             scrypt_hash(data, sizeof(old_block_header), UINTBEGIN(hash), Nfactor);
         }
         ++hash_count;
+        // Hash target can't be smaller than bnProofOfWorkLimit which is 00000fffff000000
         if (            
-            ( 0 == ( nMask & hashc[31]))
+            ( 0 == ( hashc[31]))
+            && ( 0 == ( hashc[30]))
+            && ( 0 == ( nMask & hashc[29]))
            ) 
         {
             //memcpy(result, hash, 32);
