@@ -1198,6 +1198,8 @@ bool AppInit2()
     }
 
 
+    nMainnetNewLogicBlockNumber = GetArg("-testnetNewLogicBlockNumber", 0);
+
     printf("Loading block index...\n");
     bool fLoaded = false;
     while (!fLoaded) 
@@ -1246,7 +1248,6 @@ bool AppInit2()
     }
     printf(" block index %15" PRId64 "ms\n", GetTimeMillis() - nStart);
 
-    nMainnetNewLogicBlockNumber = GetArg("-testnetNewLogicBlockNumber", 0);
     if (fDebug)
     {
 #ifdef WIN32

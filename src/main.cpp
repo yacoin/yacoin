@@ -1409,7 +1409,7 @@ CBigNum inline GetProofOfStakeLimit(int nHeight, unsigned int nTime)
 ::uint64_t GetMaxSize(enum GetMaxSize_mode mode)
 {
     ::uint64_t nMaxSize = 0;
-    if (pindexGenesisBlock == NULL)
+    if (pindexGenesisBlock == NULL || (pindexBest->nHeight + 1) < nMainnetNewLogicBlockNumber)
     {
         nMaxSize = MAX_GENESIS_BLOCK_SIZE;
     }
