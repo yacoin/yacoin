@@ -277,7 +277,11 @@ const ::uint32_t
                         );
     #endif
 #endif
-            break;
+            if (
+                (pindexPrev != pindexBest) ||
+                fShutdown
+               )
+                break;
         }
     }
     memcpy(result, hash, 32);
