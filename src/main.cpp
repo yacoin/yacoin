@@ -152,7 +152,7 @@ CBigNum bnProofOfWorkLimitTestNet( nPoWeasiestTargetLimitTestNet );
 
 // YACOIN TODO
 ::int64_t nBlockRewardPrev = 0;
-::uint32_t nMinEase = std::numeric_limits< ::uint32_t>::max();
+::uint32_t nMinEase = bnProofOfWorkLimit.GetCompact();
 bool recalculateBlockReward = false;
 bool recalculateMinEase = false;
 
@@ -1716,6 +1716,12 @@ static unsigned int CalculateNextWorkRequired(const CBlockIndex* pindexLast, ::i
     bnMaximumTarget.setuint256(bnMaximum);
     bnMaximumTarget *= 3;
 
+    // Compare 1/3 highest difficulty with 0.4.9 min difficulty (genesis block difficulty), choose the higher
+    if (bnMaximumTarget > bnProofOfWorkLimit)
+    {
+        bnMaximumTarget = bnProofOfWorkLimit;
+    }
+
     // Choose higher difficulty (higher difficulty have smaller target)
     CBigNum bnNewTarget = min(bnPrevTarget, bnMaximumTarget);
     (void)printf(
@@ -1752,8 +1758,7 @@ static unsigned int GetNextTargetRequired044(const CBlockIndex* pindexLast, bool
 
     if (pindexLast == NULL)
     {
-        nMinEase = bnEasiestTargetLimit.GetCompact();
-        return nMinEase; // genesis (zeroth) block
+        return bnEasiestTargetLimit.GetCompact(); // genesis (zeroth) block
     }
 
     const CBlockIndex
@@ -1761,12 +1766,7 @@ static unsigned int GetNextTargetRequired044(const CBlockIndex* pindexLast, bool
 
     if (pindexPrev->pprev == NULL)
     {
-        ::uint32_t nInitialEase = bnInitialHashTarget.GetCompact();
-        if (nMinEase > nInitialEase)
-        {
-            nMinEase = nInitialEase;
-        }
-        return nInitialEase; // first block
+        return bnInitialHashTarget.GetCompact(); // first block
     }
 
     const CBlockIndex
@@ -1811,7 +1811,7 @@ static unsigned int GetNextTargetRequired044(const CBlockIndex* pindexLast, bool
                     tempMinEase = pbi->nBits;
                 }
             }
-            nMinEase = min(tempMinEase, bnInitialHashTarget.GetCompact());
+            nMinEase = tempMinEase;
         }
 
         // From block 3, the target is only recalculated every 21000 blocks
@@ -1832,6 +1832,11 @@ static unsigned int GetNextTargetRequired044(const CBlockIndex* pindexLast, bool
         }
         else // actually do a DAA
         {
+            // Hardfork happens
+            if ((pindexLast->nHeight + 1) == nMainnetNewLogicBlockNumber)
+            {
+                return bnProofOfWorkLimit.GetCompact();
+            }
             // Go back by what we want to be 14 days worth of blocks
             const CBlockIndex* pindexFirst = pindexLast;
 
@@ -3102,7 +3107,8 @@ bool CBlock::SetBestChain(CTxDB& txdb, CBlockIndex* pindexNew)
         recalculateMinEase = true;
     }
     // Update minimum ease for next target calculation
-    if (nMinEase > pindexBest->nBits)
+    if ((pindexBest->nHeight >= nMainnetNewLogicBlockNumber)
+        && (nMinEase > pindexBest->nBits))
     {
         nMinEase = pindexBest->nBits;
     }
