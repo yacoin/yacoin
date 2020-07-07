@@ -179,7 +179,7 @@ CBlock* CreateNewBlock(CWallet* pwallet, bool fProofOfStake)
     {
       //pblock->nVersion = CBlock::VERSION_of_block_for_yac_044_old;
     	// TODO: Need update for mainet
-    	if (pindexGenesisBlock && nBestHeight >= nMainnetNewLogicBlockNumber)
+    	if (pindexGenesisBlock && (nBestHeight + 1) >= nMainnetNewLogicBlockNumber)
     	{
             pblock->nVersion = VERSION_of_block_for_yac_05x_new;
     	}
