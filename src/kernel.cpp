@@ -373,7 +373,7 @@ uint8_t GetStakeNfactor (uint64_t nTime, uint64_t nCoinDayWeight)
 	// coin day weight factor, used for ProofOfStake kernel hash
 	// human friendly notation: nCoinDayWeight / ( ( nTime - 268435456 ) / 131072 - 8192 );
 	uint64_t cdwfactor = nCoinDayWeight / ( ( ( nTime - ( 1<<28 ) ) >> 17 ) - ( 1<<13 ) ) ;
-	uint8_t nfactor = GetNfactor(nTime);
+	uint8_t nfactor = GetNfactor(nTime, nBestHeight + 1 >= nMainnetNewLogicBlockNumber? true : false);
 
 	if ( cdwfactor > (uint64_t)( nfactor - 4 ) )
 		return 4;

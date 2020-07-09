@@ -1149,14 +1149,20 @@ const unsigned char maxNfactor = MAXIMUM_N_FACTOR;
                                         //30; since uint32_t fails on 07 Feb 2106 06:28:15 GMT
                                         //    when stored as an uint32_t in a block
                                         //    so there is no point going past Nf = 25
+const unsigned char maxNfactorYc1dot0 = 21;
 
-unsigned char GetNfactor(::int64_t nTimestamp, bool fNotYc1dot0BlockOrTx) 
+unsigned char GetNfactor(::int64_t nTimestamp, bool fYac1dot0BlockOrTx)
 {
-    int 
+	if (fYac1dot0BlockOrTx)
+	{
+		return MAXIMUM_YAC1DOT0_N_FACTOR;
+	}
+
+    int
         nBitCount = 0;
 
     if (
-        ( nTimestamp <= (fTestNet? nChainStartTimeTestNet: nChainStartTime) ) 
+        ( nTimestamp <= (fTestNet? nChainStartTimeTestNet: nChainStartTime) )
         || fTestNet
        )    //was just nTimestamp <= nChainStartTime)
 #if defined(Yac1dot0)
@@ -1165,7 +1171,7 @@ unsigned char GetNfactor(::int64_t nTimestamp, bool fNotYc1dot0BlockOrTx)
             return minNfactor;
 #endif
 
-    ::int64_t 
+    ::int64_t
         nAgeOfBlockOrTxInSeconds = nTimestamp - (fTestNet? nChainStartTimeTestNet: nChainStartTime);
         //nChainStartTime, nSavedAgeOfBlockOrTxInSeconds = nAgeOfBlockOrTxInSeconds;
 
@@ -1179,7 +1185,7 @@ unsigned char GetNfactor(::int64_t nTimestamp, bool fNotYc1dot0BlockOrTx)
     int                             // is 3 max
         n = ( (nBitCount * 170) + (nAgeOfBlockOrTxInSeconds * 25) - 2320) / 100;
 
-    if (n < 0) 
+    if (n < 0)
         n = 0;
     if (n > 255)
       //printf("GetNfactor (%ld) - something wrong(n == %d)\n", nTimestamp, n);
@@ -1188,23 +1194,23 @@ unsigned char GetNfactor(::int64_t nTimestamp, bool fNotYc1dot0BlockOrTx)
     // so n is between 0 and 0xff
     unsigned char N = (unsigned char)n;
 #ifdef _DEBUG
-    if( 
+    if(
         false &&    // just a quick way to turn it off
         fDebug &&
         fPrintToConsole
       )
     {
         printf(
-                "GetNfactor: %"PRI64d" -> %d %"PRId64" : %d / %d\n", 
+                "GetNfactor: %"PRI64d" -> %d %"PRId64" : %d / %d\n",
                 nTimestamp - (fTestNet? nChainStartTimeTestNet: nChainStartTime), //nChainStartTime,   // 64 bit int
-                nBitCount, 
-                nAgeOfBlockOrTxInSeconds, 
-                n, 
+                nBitCount,
+                nAgeOfBlockOrTxInSeconds,
+                n,
                 (unsigned int)min(
                                     max(
-                                        N, 
+                                        N,
                                         minNfactor
-                                       ), 
+                                       ),
                                     maxNfactor
                                  )
                 );

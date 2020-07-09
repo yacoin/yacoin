@@ -1111,10 +1111,10 @@ static void YacoinMiner(CWallet *pwallet)  // here fProofOfStake is always false
         IncrementExtraNonce(pblock.get(), pindexPrev, nExtraNonce);
 
         bool
-            fNotYac1dot0BlockOrTx = true;
+            fYac1dot0BlockOrTx = false;
         if( (pindexPrev->nHeight + 1) >= nMainnetNewLogicBlockNumber )
         {
-            fNotYac1dot0BlockOrTx = false;
+        	fYac1dot0BlockOrTx = true;
         }
         printf(
                 "Running YACoinMiner with %" PRIszu " transaction"
@@ -1176,7 +1176,7 @@ static void YacoinMiner(CWallet *pwallet)  // here fProofOfStake is always false
                                             //max_nonce,
                                             nHashesDone,
                                             UBEGIN(result),
-                                            GetNfactor(pblock->nTime, fNotYac1dot0BlockOrTx)
+                                            GetNfactor(pblock->nTime, fYac1dot0BlockOrTx)
                                             , pindexPrev
                                             , &hashTarget
                                          );
