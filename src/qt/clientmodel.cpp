@@ -150,7 +150,7 @@ int ClientModel::getNumBlocksOfPeers() const
 
 int ClientModel::getNFactor() const
 {
-    return GetNfactor(pindexBest->GetBlockTime(), nBestHeight + 1 >= nMainnetNewLogicBlockNumber? true : false);
+    return GetNfactor(pindexBest->GetBlockTime(), nBestHeight >= nMainnetNewLogicBlockNumber? true : false);
 }
 
 QString ClientModel::getStatusBarWarnings() const

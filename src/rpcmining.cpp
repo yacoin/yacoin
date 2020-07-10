@@ -175,7 +175,7 @@ Value getmininginfo(const Array& params, bool fHelp)
 
     // WM - Tweaks to report current Nfactor and N.
     unsigned char 
-        Nfactor = GetNfactor(pindexBest->GetBlockTime(), nBestHeight + 1 >= nMainnetNewLogicBlockNumber? true : false);
+        Nfactor = GetNfactor(pindexBest->GetBlockTime(), nBestHeight >= nMainnetNewLogicBlockNumber? true : false);
 
     uint64_t 
         N;
