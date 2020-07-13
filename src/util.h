@@ -192,6 +192,7 @@ extern ::uint32_t
     nDifficultyInterval,
     nEpochInterval;
 extern std::string strMiscWarning;
+extern unsigned char MAXIMUM_YAC1DOT0_N_FACTOR;
 
 #ifdef WIN32
 extern void DoProgress( int nCount, int nTotalToScan, ::int64_t n64MsStartTime );

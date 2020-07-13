@@ -1199,6 +1199,7 @@ bool AppInit2()
 
 
     nMainnetNewLogicBlockNumber = GetArg("-testnetNewLogicBlockNumber", 0);
+    MAXIMUM_YAC1DOT0_N_FACTOR = GetArg("-nFactorAtHardfork", 21);
 
     printf("Loading block index...\n");
     bool fLoaded = false;

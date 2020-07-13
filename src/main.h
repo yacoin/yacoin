@@ -76,7 +76,7 @@ static const unsigned char MAXIMUM_N_FACTOR = 25;  //30; since uint32_t fails on
                                                    //    when stored as an uint32_t in a block
                                                    //    so there is no point going past Nf = 25
 
-static const unsigned char MAXIMUM_YAC1DOT0_N_FACTOR = 21;
+//static const unsigned char MAXIMUM_YAC1DOT0_N_FACTOR = 21;
 
 static const unsigned char YAC20_N_FACTOR = 16;
 
