@@ -376,7 +376,9 @@ Value getwork(const Array& params, bool fHelp)
             // Create new block
             pblock = CreateNewBlock(pwalletMain);
             if (!pblock)
+            {
                 throw JSONRPCError(RPC_OUT_OF_MEMORY, "Out of memory");
+            }
             vNewBlock.push_back(pblock);
 
             // Need to update only after we know CreateNewBlock succeeded
@@ -398,7 +400,14 @@ Value getwork(const Array& params, bool fHelp)
         char pmidstate[32];
         char pdata[128];
         char phash1[64];
-        FormatHashBuffers(pblock, pmidstate, pdata, phash1);
+        if (pblock->nVersion >= VERSION_of_block_for_yac_05x_new)
+        {
+            FormatHashBuffers_64bit_nTime((char*)pblock, pmidstate, pdata, phash1);
+        }
+        else
+        {
+            FormatHashBuffers(pblock, pmidstate, pdata, phash1);
+        }
 
         uint256 hashTarget = CBigNum().SetCompact(pblock->nBits).getuint256();
 
@@ -407,6 +416,7 @@ Value getwork(const Array& params, bool fHelp)
         result.push_back(Pair("data",     HexStr(BEGIN(pdata), END(pdata))));
         result.push_back(Pair("hash1",    HexStr(BEGIN(phash1), END(phash1)))); // deprecated
         result.push_back(Pair("target",   HexStr(BEGIN(hashTarget), END(hashTarget))));
+
         return result;
     }
     else
@@ -416,8 +426,11 @@ Value getwork(const Array& params, bool fHelp)
             vchData = ParseHex(params[0].get_str());
 
         if (vchData.size() != 128)
+        {
             throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid parameter");
-        CBlock* pdata = (CBlock*)&vchData[0];
+        }
+
+        struct block_header* pdata = (struct block_header*)&vchData[0];
 
         // Byte reverse
         for (unsigned int i = 0; i < 128/sizeof( uint32_t ); ++i)
@@ -425,13 +438,26 @@ Value getwork(const Array& params, bool fHelp)
             ((uint32_t *)pdata)[i] = ByteReverse(((uint32_t *)pdata)[i]);
 
         // Get saved block
-        if (!mapNewBlock.count(pdata->hashMerkleRoot))
+        if (!mapNewBlock.count(pdata->merkle_root))
+        {
             return false;
-        CBlock* pblock = mapNewBlock[pdata->hashMerkleRoot].first;
+        }
 
-        pblock->nTime = pdata->nTime;
-        pblock->nNonce = pdata->nNonce;
-        pblock->vtx[0].vin[0].scriptSig = mapNewBlock[pdata->hashMerkleRoot].second;
+        CBlock* pblock = mapNewBlock[pdata->merkle_root].first;
+
+        // Parse nTime based on block version
+        if (pblock->nVersion >= VERSION_of_block_for_yac_05x_new)
+        {
+            pblock->nTime = pdata->timestamp;
+            pblock->nNonce = pdata->nonce;
+        }
+        else
+        {
+            pblock->nTime = ((uint32_t *)pdata)[17];
+            pblock->nNonce = ((uint32_t *)pdata)[19];
+        }
+        pblock->vtx[0].vin[0].scriptSig = mapNewBlock[pdata->merkle_root].second;
+
         pblock->hashMerkleRoot = pblock->BuildMerkleTree();
 
         if (!pblock->SignBlock(*pwalletMain))
