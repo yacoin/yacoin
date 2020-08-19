@@ -396,6 +396,17 @@ Value getwork(const Array& params, bool fHelp)
         // Save
         mapNewBlock[pblock->hashMerkleRoot] = make_pair(pblock, pblock->vtx[0].vin[0].scriptSig);
 
+        printf("rpc getwork,\n"
+               "params.size() == 0,\n"
+               "pblock->nVersion = %d,\n"
+               "pblock->hashPrevBlock = %s,\n"
+               "pblock->hashMerkleRoot = %s,\n"
+               "pblock->nTime = %lld,\n"
+               "pblock->nBits = %u,\n"
+               "pblock->nNonce = %u\n",
+               pblock->nVersion, pblock->hashPrevBlock.ToString().c_str(), pblock->hashMerkleRoot.ToString().c_str(),
+               pblock->nTime, pblock->nBits, pblock->nNonce);
+
         // Pre-build hash buffers
         char pmidstate[32];
         char pdata[128];
@@ -437,9 +448,21 @@ Value getwork(const Array& params, bool fHelp)
       //for (int i = 0; i < 128/4; i++) //really, the limit is sizeof( *pdata ) / sizeof( uint32_t
             ((uint32_t *)pdata)[i] = ByteReverse(((uint32_t *)pdata)[i]);
 
+        printf("rpc getwork,\n"
+               "params.size() != 0,\n"
+               "pdata->nVersion = %d,\n"
+               "pdata->hashPrevBlock = %s,\n"
+               "pdata->hashMerkleRoot = %s,\n"
+               "pdata->nTime = %lld,\n"
+               "pdata->nBits = %u,\n"
+               "pdata->nNonce = %u\n",
+               pdata->version, pdata->prev_block.ToString().c_str(), pdata->merkle_root.ToString().c_str(),
+               pdata->timestamp, pdata->bits, pdata->nonce);
+
         // Get saved block
         if (!mapNewBlock.count(pdata->merkle_root))
         {
+            printf("rpc getwork, No saved block\n");
             return false;
         }
 
@@ -461,7 +484,10 @@ Value getwork(const Array& params, bool fHelp)
         pblock->hashMerkleRoot = pblock->BuildMerkleTree();
 
         if (!pblock->SignBlock(*pwalletMain))
+        {
+            printf("rpc getwork, Unable to sign block\n");
             throw JSONRPCError(-100, "Unable to sign block, wallet locked?");
+        }
         
         return CheckWork(pblock, *pwalletMain, reservekey);
     }
