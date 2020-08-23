@@ -61,7 +61,6 @@ extern int
 
 static const unsigned int MAX_GENESIS_BLOCK_SIZE = 1000000;
 static const unsigned int MAX_ORPHAN_TRANSACTIONS = 10000;
-static const unsigned int DEFAULT_MAX_BLOCK_SIGOPS = 20000;
 static const unsigned int MAX_INV_SZ = 50000;
 
 static const ::int64_t MIN_TX_FEE = CENT;

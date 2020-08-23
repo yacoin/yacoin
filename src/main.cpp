@@ -1431,7 +1431,7 @@ CBigNum inline GetProofOfStakeLimit(int nHeight, unsigned int nTime)
             break;
 
         case MAX_BLOCK_SIGOPS:
-            nMaxSize = max(nMaxSize, (::uint64_t)DEFAULT_MAX_BLOCK_SIGOPS);
+            nMaxSize = max(nMaxSize, (::uint64_t)MAX_GENESIS_BLOCK_SIZE) / 50;
             break;
 
         case MAX_BLOCK_SIZE:
