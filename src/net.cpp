@@ -2694,7 +2694,7 @@ void ThreadMessageHandler2(void* parg)
 
 bool BindListenPort(const CService &addrBind, string& strError)
 {
-    LOCK(cs_net);
+//    LOCK(cs_net);
     {
     strError = "";
     u_long
@@ -2960,11 +2960,12 @@ void StartNode(void* parg)
     if (!NewThread(ThreadDumpAddress, NULL))
         printf("Error; NewThread(ThreadDumpAddress) failed\n");
 
-#if !defined(Yac1dot0)
-    // ppcoin: mint proof-of-stake blocks in the background
-    if (!NewThread(ThreadStakeMinter, pwalletMain))
-        printf("Error: NewThread(ThreadStakeMinter) failed\n");
-#endif
+    if (!pindexBest || (pindexBest->nHeight + 1) < nMainnetNewLogicBlockNumber)
+    {
+        // ppcoin: mint proof-of-stake blocks in the background
+        if (!NewThread(ThreadStakeMinter, pwalletMain))
+            printf("Error: NewThread(ThreadStakeMinter) failed\n");
+    }
 
     // Generate coins in the background
     GenerateYacoins(GetBoolArg("-gen", false), pwalletMain);

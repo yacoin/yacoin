@@ -359,7 +359,7 @@ bool static Socks5(std::string strDest, int port, SOCKET& hSocket)
 
 bool static ConnectSocketDirectly(const CService &addrConnect, SOCKET& hSocketRet, int nTimeout)
 {
-    LOCK(cs_net);
+//    LOCK(cs_net);
     {
     hSocketRet = INVALID_SOCKET;
 

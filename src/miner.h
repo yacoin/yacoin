@@ -22,6 +22,7 @@ void IncrementExtraNonce(CBlock* pblock, CBlockIndex* pindexPrev, unsigned int& 
 
 /** Do mining precalculation */
 void FormatHashBuffers(CBlock* pblock, char* pmidstate, char* pdata, char* phash1);
+void FormatHashBuffers_64bit_nTime(char* pblock, char* pmidstate, char* pdata, char* phash1);
 
 /** Check mined proof-of-work block */
 bool CheckWork(CBlock* pblock, CWallet& wallet, CReserveKey& reservekey);

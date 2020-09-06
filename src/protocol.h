@@ -18,17 +18,20 @@
  #include "netbase.h"
 #endif
 
-#include <string>
+#ifndef BITCOIN_UTIL_H
+ #include "util.h"
+#endif
 
 #ifndef BITCOIN_UINT256_H
  #include "uint256.h"
 #endif
 
+
 extern bool fTestNet;
 static inline unsigned short GetDefaultPort(const bool testnet = fTestNet)
 {
 #if defined(Yac1dot0)
-    return testnet ? 17788 : 7788;
+    return testnet ? GetArg("-port", 17788) : GetArg("-port", 7788);
 #else
     return testnet ? 17688 : 7688;
 #endif
