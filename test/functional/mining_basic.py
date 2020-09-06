@@ -53,7 +53,7 @@ class MiningTest(BitcoinTestFramework):
         mining_info = self.nodes[0].getmininginfo()
         assert_equal(mining_info['blocks'], 1)
         assert_equal(mining_info['currentblocktx'], 0)
-        assert_equal(mining_info['difficulty']['proof-of-work'], Decimal('5.96046448E-8'))
+        assert_equal(mining_info['difficulty']['proof-of-work'], Decimal('0.0002441371325370'))
         assert_equal(mining_info['currentblocksize'], 1000)
         assert_equal(mining_info['powreward'], Decimal('4.7327100000000000'))
         assert_equal(mining_info['Nfactor'], 4)

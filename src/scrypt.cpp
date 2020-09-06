@@ -195,7 +195,7 @@ const ::uint32_t
 
     void* data;
     ::uint32_t* nOnce; // really any random uint32_t
-    if (new_block_data.version >= VERSION_of_block_for_time_extension)  // 64-bit nTime
+    if (new_block_data.version >= VERSION_of_block_for_yac_05x_new)  // 64-bit nTime
     {
         data = &new_block_data;
         nOnce = &new_block_data.nonce;
@@ -219,8 +219,9 @@ const ::uint32_t
         *hasht = (unsigned char *) &nT,
         *hashc = (unsigned char *) &hash,
       //highestZeroBitsSet = 0xe0;
+        // Hash target can't be smaller than bnProofOfWorkLimit which is 00000fffff000000
         nMask = 0x00,
-        highestZeroBitsSet = ~(hasht[ 31 ]),
+        highestZeroBitsSet = ~(hasht[ 29 ]),
         nMaskPattern = 0x80;
 
     while( 0x80 == ( 0x80 & highestZeroBitsSet) )
@@ -245,7 +246,7 @@ const ::uint32_t
         *nOnce = Big.get_a_nonce( *nOnce );
         //data.nonce = n;
 
-        if (new_block_data.version >= VERSION_of_block_for_time_extension) // 64-bit nTime
+        if (new_block_data.version >= VERSION_of_block_for_yac_05x_new) // 64-bit nTime
         {
             scrypt_hash(data, sizeof(struct block_header), UINTBEGIN(hash), Nfactor);
         }
@@ -254,8 +255,11 @@ const ::uint32_t
             scrypt_hash(data, sizeof(old_block_header), UINTBEGIN(hash), Nfactor);
         }
         ++hash_count;
+        // Hash target can't be smaller than bnProofOfWorkLimit which is 00000fffff000000
         if (            
-            ( 0 == ( nMask & hashc[31]))
+            ( 0 == ( hashc[31]))
+            && ( 0 == ( hashc[30]))
+            && ( 0 == ( nMask & hashc[29]))
            ) 
         {
             //memcpy(result, hash, 32);
@@ -273,7 +277,11 @@ const ::uint32_t
                         );
     #endif
 #endif
-            break;
+            if (
+                (pindexPrev != pindexBest) ||
+                fShutdown
+               )
+                break;
         }
     }
     memcpy(result, hash, 32);

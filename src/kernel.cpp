@@ -185,9 +185,11 @@ static bool SelectBlockFromCandidates(vector<pair< int64_t, uint256> >& vSortedB
 // blocks.
 bool ComputeNextStakeModifier(const CBlockIndex* pindexCurrent, uint64_t& nStakeModifier, bool& fGeneratedStakeModifier)
 {
-#ifdef Yac1dot0
-    return true;
-#endif
+    if (pindexBest && (pindexBest->nHeight + 1) >= nMainnetNewLogicBlockNumber)
+    {
+        return true;
+    }
+
     nStakeModifier = 0;
     fGeneratedStakeModifier = false;
     const CBlockIndex* pindexPrev = pindexCurrent->pprev;
@@ -371,7 +373,7 @@ uint8_t GetStakeNfactor (uint64_t nTime, uint64_t nCoinDayWeight)
 	// coin day weight factor, used for ProofOfStake kernel hash
 	// human friendly notation: nCoinDayWeight / ( ( nTime - 268435456 ) / 131072 - 8192 );
 	uint64_t cdwfactor = nCoinDayWeight / ( ( ( nTime - ( 1<<28 ) ) >> 17 ) - ( 1<<13 ) ) ;
-	uint8_t nfactor = GetNfactor(nTime);
+	uint8_t nfactor = GetNfactor(nTime, nBestHeight + 1 >= nMainnetNewLogicBlockNumber? true : false);
 
 	if ( cdwfactor > (uint64_t)( nfactor - 4 ) )
 		return 4;
@@ -896,12 +898,16 @@ uint32_t GetStakeModifierChecksum(const CBlockIndex* pindex)
 // Check stake modifier hard checkpoints
 bool CheckStakeModifierCheckpoints(int nHeight, uint32_t nStakeModifierChecksum)
 {
-#if !defined( Yac1dot0)
+    if (pindexBest && (pindexBest->nHeight + 1) >= nMainnetNewLogicBlockNumber)
+    {
+        return true;
+    }
+
     MapModifierCheckpoints& checkpoints = (fTestNet ? mapStakeModifierCheckpointsTestNet : mapStakeModifierCheckpoints);
 
     if (checkpoints.count(nHeight))
         return nStakeModifierChecksum == checkpoints[nHeight];
-#endif
+
     return true;
 }
 #ifdef _MSC_VER

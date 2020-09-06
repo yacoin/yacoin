@@ -61,7 +61,6 @@ extern int
 
 static const unsigned int MAX_GENESIS_BLOCK_SIZE = 1000000;
 static const unsigned int MAX_ORPHAN_TRANSACTIONS = 10000;
-static const unsigned int DEFAULT_MAX_BLOCK_SIGOPS = 20000;
 static const unsigned int MAX_INV_SZ = 50000;
 
 static const ::int64_t MIN_TX_FEE = CENT;
@@ -76,19 +75,17 @@ static const unsigned char MAXIMUM_N_FACTOR = 25;  //30; since uint32_t fails on
                                                    //    when stored as an uint32_t in a block
                                                    //    so there is no point going past Nf = 25
 
+//static const unsigned char MAXIMUM_YAC1DOT0_N_FACTOR = 21;
+
 static const unsigned char YAC20_N_FACTOR = 16;
 
 // block version header
 static const int
-    VERSION_of_block_for_time_extension = 8,
     VERSION_of_block_for_yac_05x_new = 7,
     VERSION_of_block_for_yac_049     = 6,
     VERSION_of_block_for_yac_044_old = 3,
-#ifdef Yac1dot0
-    CURRENT_VERSION_of_block = VERSION_of_block_for_yac_05x_new;
-#else
     CURRENT_VERSION_of_block = VERSION_of_block_for_yac_049;
-#endif
+
 //static const int
 //    CURRENT_VERSION_previous = VERSION_of_block_for_yac_044_old;
 
@@ -102,7 +99,7 @@ static const uint256
     // hashGenesisBlock("0x0000060fc90618113cde415ead019a1052a9abc43afcccff38608ff8751353e5");
     // hashGenesisBlock("0x00000f3f5eac1539c4e9216e17c74ff387ac1629884d2f97a3144dc32bf67bda");
     // hashGenesisBlock("0x0ea17bb85e10d8c6ded6783a4ce8f79e75d49b439ff41f55d274e6b15612fff9");
-    hashGenesisBlock("0x03f09b4d52a5e4204306588aa0576713d59c3364c36d893dfe1b4129e0d13c52");
+    hashGenesisBlock("0x0000060fc90618113cde415ead019a1052a9abc43afcccff38608ff8751353e5");
 extern const uint256 
     nPoWeasiestTargetLimitTestNet,
     hashGenesisBlockTestNet;
@@ -110,11 +107,8 @@ extern int
     nConsecutiveStakeSwitchHeight;  // see timesamps.h = 420000;
 
 const ::int64_t 
-#ifdef Yac1dot0
-    nMaxClockDrift = 12 * nSecondsPerMinute;
-#else
     nMaxClockDrift = nTwoHoursInSeconds;
-#endif
+
 inline ::int64_t PastDrift(::int64_t nTime)   
     { return nTime - nMaxClockDrift; } // up to 2 hours from the past
 inline ::int64_t FutureDrift(::int64_t nTime) 
@@ -195,7 +189,7 @@ void ThreadScriptCheckQuit();
 
 bool CheckProofOfWork(uint256 hash, unsigned int nBits);
 unsigned int GetNextTargetRequired(const CBlockIndex* pindexLast, bool fProofOfStake);
-::int64_t GetProofOfWorkReward(unsigned int nBits=0, ::int64_t nFees=0);
+::int64_t GetProofOfWorkReward(unsigned int nBits=0, ::int64_t nFees=0, bool fGetRewardOfBestHeightBlock=false);
 ::int64_t GetProofOfStakeReward(::int64_t nCoinAge, unsigned int nBits, ::int64_t nTime, bool bCoinYearOnly=false);
 
 ::int64_t GetProofOfStakeReward(::int64_t nCoinAge);
@@ -216,7 +210,7 @@ void ResendWalletTransactions();
 bool VerifySignature(const CTransaction& txFrom, const CTransaction& txTo, unsigned int nIn, unsigned int flags, int nHashType);
 
 // yacoin: calculate Nfactor using timestamp
-extern unsigned char GetNfactor(::int64_t nTimestamp, bool fNotYac1dot0BlockOrTx = false);
+extern unsigned char GetNfactor(::int64_t nTimestamp, bool fYac1dot0BlockOrTx = false);
 
 // yacoin2015: GetProofOfWorkMA, GetProofOfWorkSMA
 unsigned int GetProofOfWorkMA(const CBlockIndex* pIndexLast);
@@ -533,12 +527,11 @@ class CTransaction
 public:
     static const int 
         CURRENT_VERSION_of_Tx_for_yac_old = 1,      // this should be different for Yac1.0
-        CURRENT_VERSION_of_Tx_for_yac_new = 2,
-        CURRENT_VERSION_of_Tx_for_time_extension = 3;
+        CURRENT_VERSION_of_Tx_for_yac_new = 2;
 
     static const int 
       //CURRENT_VERSION_of_Tx = CURRENT_VERSION_of_Tx_for_yac_old;
-        CURRENT_VERSION_of_Tx = CURRENT_VERSION_of_Tx_for_yac_new;
+        CURRENT_VERSION_of_Tx = CURRENT_VERSION_of_Tx_for_yac_old;
 
     int nVersion;
     mutable ::int64_t nTime;
@@ -560,7 +553,7 @@ public:
         READWRITE(this->nVersion);
         nVersion = this->nVersion;
         // nTime is extended to 64-bit since yacoin 1.0.0
-        if (this->nVersion >= CURRENT_VERSION_of_Tx_for_time_extension) // 64-bit nTime
+        if (this->nVersion >= CURRENT_VERSION_of_Tx_for_yac_new) // 64-bit nTime
         {
 			READWRITE(nTime);
         }
@@ -578,9 +571,9 @@ public:
     void SetNull()
     {
         // TODO: Need update for mainet
-        if (nBestHeight != -1 && nBestHeight > nTestTimeExtensionBlockNumber)
+        if (nBestHeight != -1 && pindexGenesisBlock && nBestHeight >= nMainnetNewLogicBlockNumber)
         {
-            nVersion = CTransaction::CURRENT_VERSION_of_Tx_for_time_extension;
+            nVersion = CTransaction::CURRENT_VERSION_of_Tx_for_yac_new;
         }
         else
         {
@@ -1046,7 +1039,7 @@ public:
         READWRITE(hashPrevBlock);
         READWRITE(hashMerkleRoot);
         // nTime is extended to 64-bit since yacoin 1.0.0
-        if (this->nVersion >= VERSION_of_block_for_time_extension) // 64-bit nTime
+        if (this->nVersion >= VERSION_of_block_for_yac_05x_new) // 64-bit nTime
         {
                READWRITE(nTime);
         }
@@ -1075,9 +1068,9 @@ public:
     void SetNull()
     {
         // TODO: Need update for mainnet
-        if (nBestHeight != -1 && nBestHeight > nTestTimeExtensionBlockNumber)
+        if (nBestHeight != -1 && pindexGenesisBlock && nBestHeight >= nMainnetNewLogicBlockNumber)
         {
-            nVersion = VERSION_of_block_for_time_extension;
+            nVersion = VERSION_of_block_for_yac_05x_new;
         }
         else
         {
@@ -1105,92 +1098,10 @@ public:
     // yacoin2015 update
     uint256 CalculateHash() const
     {
-        const ::uint64_t
-            nSpanOf4  = 1368515488 - nChainStartTime,                           
-            nSpanOf5  = 1368777632 - nChainStartTime,                           
-            nSpanOf6  = 1369039776 - nChainStartTime,                           
-            nSpanOf7  = 1369826208 - nChainStartTime,                           
-            nSpanOf8  = 1370088352 - nChainStartTime,                           
-            nSpanOf9  = 1372185504 - nChainStartTime,                           
-            nSpanOf10 = 1373234080 - nChainStartTime,                           
-            nSpanOf11 = 1376379808 - nChainStartTime,                           
-            nSpanOf12 = 1380574112 - nChainStartTime,   // Mon, 30 Sep 2013 20:48:32 GMT                        
-            nSpanOf13 = 1384768416 - nChainStartTime,   // Mon, 18 Nov 2013 09:53:36 GMT                    
-            nSpanOf14 = 1401545632 - nChainStartTime,   // Sat, 31 May 2014 14:13:52 GMT                    
-            nSpanOf15 = 1409934240 - nChainStartTime,   // Fri, 05 Sep 2014 16:24:00 GMT (Nf) 16
-            nSpanOf16 = 1435100064 - nChainStartTime,   // Tue, 23 Jun 2015 22:54:24 GMT (Nf) 17
-            nSpanOf17 = 1468654496 - nChainStartTime,   // Sat, 16 Jul 2016 07:34:56 GMT (Nf) 18
-            nSpanOf18 = 1502208928 - nChainStartTime,   // Tue, 08 Aug 2017 16:15:28 GMT (Nf) 19
-            nSpanOf19 = 1602872224 - nChainStartTime,   // Fri, 16 Oct 2020 18:17:04 GMT                        
-            nSpanOf20 = 1636426656 - nChainStartTime,   // Tue, 09 Nov 2021 02:57:36 GMT                        
-            nSpanOf21 = 1904862112 - nChainStartTime,   // Mon, 13 May 2030 00:21:52 GMT                        
-            nSpanOf22 = 2173297568U - nChainStartTime,   // Sat, 13 Nov 2038 21:46:08 GMT                        
-            nSpanOf23 = 2441733024U - nChainStartTime,   // Fri, 17 May 2047 19:10:24 GMT                        
-            nSpanOf24 = 3247039392U - nChainStartTime,   // Tue, 22 Nov 2072 11:23:12 GMT                        
-            nSpanOf25 = 3515474848U - nChainStartTime;   // Mon, 26 May 2081 08:47:28 GMT                        
-            // uint_32 fails here                          Sun, 07 Feb 2106 06:28:15 GMT
-          //nSpanOf26 = 5662958496 - nChainStartTime,   // Sat, 14 Jun 2149 12:01:36 GMT                       
-          //nSpanOf27 = 6736700320 - nChainStartTime,   // Tue, 24 Jun 2183 01:38:40 GMT                        
-          //nSpanOf28 = 9957925792 - nChainStartTime,   // Tue, 21 Jul 2285 18:29:52 GMT                        
-          //nSpanOf29 = 14252893088 - nChainStartTime,  // Sat, 28 Aug 2421 00:58:08 GMT
-          //nSpanOf30 = 18547860384 - nChainStartTime;  // Tue, 04 Oct 2557 07:26:24 GMT
-
-        unsigned char 
-            nfactor;
-        if( !fTestNet )
-        {     // nChainStartTime = 1367991200 is start
-		    if      ( nTime < (nChainStartTime + nSpanOf4 ) ) nfactor = 4;
-            else if ( nTime < (nChainStartTime + nSpanOf5 ) ) nfactor = 5;
-            else if ( nTime < (nChainStartTime + nSpanOf6 ) ) nfactor = 6;
-            else if ( nTime < (nChainStartTime + nSpanOf7 ) ) nfactor = 7;
-            else if ( nTime < (nChainStartTime + nSpanOf8 ) ) nfactor = 8;
-            else if ( nTime < (nChainStartTime + nSpanOf9 ) ) nfactor = 9;
-            else if ( nTime < (nChainStartTime + nSpanOf10) ) nfactor = 10;
-            else if ( nTime < (nChainStartTime + nSpanOf11) ) nfactor = 11;
-            else if ( nTime < (nChainStartTime + nSpanOf12) ) nfactor = 12;
-            else if ( nTime < (nChainStartTime + nSpanOf13) ) nfactor = 13;
-            else if ( nTime < (nChainStartTime + nSpanOf14) ) nfactor = 14;
-            else if ( nTime < (nChainStartTime + nSpanOf15) ) nfactor = 15;
-            else if ( nTime < (nChainStartTime + nSpanOf16) ) nfactor = 16;
-            else if ( nTime < (nChainStartTime + nSpanOf17) ) nfactor = 17;
-            else if ( nTime < (nChainStartTime + nSpanOf18) ) nfactor = 18;
-            else if ( nTime < (nChainStartTime + nSpanOf19) ) nfactor = 19;
-            else if ( nTime < (nChainStartTime + nSpanOf20) ) nfactor = 20;
-            else if ( nTime < (nChainStartTime + nSpanOf21) ) nfactor = 21;
-            else if ( nTime < (nChainStartTime + nSpanOf22) ) nfactor = 22;
-            else if ( nTime < (nChainStartTime + nSpanOf23) ) nfactor = 23;
-            else if ( nTime < (nChainStartTime + nSpanOf24) ) nfactor = 24;
-            else if ( nTime < (nChainStartTime + nSpanOf25) ) nfactor = 25;
-          //  else if ( nTime < (nChainStartTime + nSpanOf26) ) nfactor = 26;
-            // uint_32 fails here
-          //  else if ( nTime < (nChainStartTime + nSpanOf27) ) nfactor = 27;
-          //  else if ( nTime < (nChainStartTime + nSpanOf28) ) nfactor = 28;
-          //  else if ( nTime < (nChainStartTime + nSpanOf29) ) nfactor = 29;
-          //  else if ( nTime < (nChainStartTime + nSpanOf30) ) nfactor = 30;
-            else
-                nfactor = MAXIMUM_N_FACTOR;
-        }
-        else    // is TestNet
-        {
-#if defined(Yac1dot0)
-            nfactor = Nfactor_1dot0;
-#else
-            nfactor = 4;
-#endif
-        }
-
-        if(
-           nYac20BlockNumberTime &&
-           nTime >= (uint32_t)nYac20BlockNumberTime
-          )
-        {
-            nfactor = YAC20_N_FACTOR;
-        }
-
         uint256 
             thash;
 
-        if (nVersion >= VERSION_of_block_for_time_extension) // 64-bit nTime
+        if (nVersion >= VERSION_of_block_for_yac_05x_new) // 64-bit nTime
         {
             struct block_header block_data;
             block_data.version = nVersion;
@@ -1199,10 +1110,92 @@ public:
             block_data.timestamp = nTime;
             block_data.bits = nBits;
             block_data.nonce = nNonce;
-            scrypt_hash(CVOIDBEGIN(block_data), sizeof(struct block_header), UINTBEGIN(thash), nfactor);
+            scrypt_hash(CVOIDBEGIN(block_data), sizeof(struct block_header), UINTBEGIN(thash), MAXIMUM_YAC1DOT0_N_FACTOR);
         }
         else // 32-bit nTime
         {
+            const ::uint64_t
+                nSpanOf4  = 1368515488 - nChainStartTime,
+                nSpanOf5  = 1368777632 - nChainStartTime,
+                nSpanOf6  = 1369039776 - nChainStartTime,
+                nSpanOf7  = 1369826208 - nChainStartTime,
+                nSpanOf8  = 1370088352 - nChainStartTime,
+                nSpanOf9  = 1372185504 - nChainStartTime,
+                nSpanOf10 = 1373234080 - nChainStartTime,
+                nSpanOf11 = 1376379808 - nChainStartTime,
+                nSpanOf12 = 1380574112 - nChainStartTime,   // Mon, 30 Sep 2013 20:48:32 GMT
+                nSpanOf13 = 1384768416 - nChainStartTime,   // Mon, 18 Nov 2013 09:53:36 GMT
+                nSpanOf14 = 1401545632 - nChainStartTime,   // Sat, 31 May 2014 14:13:52 GMT
+                nSpanOf15 = 1409934240 - nChainStartTime,   // Fri, 05 Sep 2014 16:24:00 GMT (Nf) 16
+                nSpanOf16 = 1435100064 - nChainStartTime,   // Tue, 23 Jun 2015 22:54:24 GMT (Nf) 17
+                nSpanOf17 = 1468654496 - nChainStartTime,   // Sat, 16 Jul 2016 07:34:56 GMT (Nf) 18
+                nSpanOf18 = 1502208928 - nChainStartTime,   // Tue, 08 Aug 2017 16:15:28 GMT (Nf) 19
+                nSpanOf19 = 1602872224 - nChainStartTime,   // Fri, 16 Oct 2020 18:17:04 GMT
+                nSpanOf20 = 1636426656 - nChainStartTime,   // Tue, 09 Nov 2021 02:57:36 GMT
+                nSpanOf21 = 1904862112 - nChainStartTime,   // Mon, 13 May 2030 00:21:52 GMT
+                nSpanOf22 = 2173297568U - nChainStartTime,   // Sat, 13 Nov 2038 21:46:08 GMT
+                nSpanOf23 = 2441733024U - nChainStartTime,   // Fri, 17 May 2047 19:10:24 GMT
+                nSpanOf24 = 3247039392U - nChainStartTime,   // Tue, 22 Nov 2072 11:23:12 GMT
+                nSpanOf25 = 3515474848U - nChainStartTime;   // Mon, 26 May 2081 08:47:28 GMT
+                // uint_32 fails here                          Sun, 07 Feb 2106 06:28:15 GMT
+              //nSpanOf26 = 5662958496 - nChainStartTime,   // Sat, 14 Jun 2149 12:01:36 GMT
+              //nSpanOf27 = 6736700320 - nChainStartTime,   // Tue, 24 Jun 2183 01:38:40 GMT
+              //nSpanOf28 = 9957925792 - nChainStartTime,   // Tue, 21 Jul 2285 18:29:52 GMT
+              //nSpanOf29 = 14252893088 - nChainStartTime,  // Sat, 28 Aug 2421 00:58:08 GMT
+              //nSpanOf30 = 18547860384 - nChainStartTime;  // Tue, 04 Oct 2557 07:26:24 GMT
+
+            unsigned char
+                nfactor;
+            if( !fTestNet )
+            {     // nChainStartTime = 1367991200 is start
+    		    if      ( nTime < (nChainStartTime + nSpanOf4 ) ) nfactor = 4;
+                else if ( nTime < (nChainStartTime + nSpanOf5 ) ) nfactor = 5;
+                else if ( nTime < (nChainStartTime + nSpanOf6 ) ) nfactor = 6;
+                else if ( nTime < (nChainStartTime + nSpanOf7 ) ) nfactor = 7;
+                else if ( nTime < (nChainStartTime + nSpanOf8 ) ) nfactor = 8;
+                else if ( nTime < (nChainStartTime + nSpanOf9 ) ) nfactor = 9;
+                else if ( nTime < (nChainStartTime + nSpanOf10) ) nfactor = 10;
+                else if ( nTime < (nChainStartTime + nSpanOf11) ) nfactor = 11;
+                else if ( nTime < (nChainStartTime + nSpanOf12) ) nfactor = 12;
+                else if ( nTime < (nChainStartTime + nSpanOf13) ) nfactor = 13;
+                else if ( nTime < (nChainStartTime + nSpanOf14) ) nfactor = 14;
+                else if ( nTime < (nChainStartTime + nSpanOf15) ) nfactor = 15;
+                else if ( nTime < (nChainStartTime + nSpanOf16) ) nfactor = 16;
+                else if ( nTime < (nChainStartTime + nSpanOf17) ) nfactor = 17;
+                else if ( nTime < (nChainStartTime + nSpanOf18) ) nfactor = 18;
+                else if ( nTime < (nChainStartTime + nSpanOf19) ) nfactor = 19;
+                else if ( nTime < (nChainStartTime + nSpanOf20) ) nfactor = 20;
+                else if ( nTime < (nChainStartTime + nSpanOf21) ) nfactor = 21;
+                else if ( nTime < (nChainStartTime + nSpanOf22) ) nfactor = 22;
+                else if ( nTime < (nChainStartTime + nSpanOf23) ) nfactor = 23;
+                else if ( nTime < (nChainStartTime + nSpanOf24) ) nfactor = 24;
+                else if ( nTime < (nChainStartTime + nSpanOf25) ) nfactor = 25;
+              //  else if ( nTime < (nChainStartTime + nSpanOf26) ) nfactor = 26;
+                // uint_32 fails here
+              //  else if ( nTime < (nChainStartTime + nSpanOf27) ) nfactor = 27;
+              //  else if ( nTime < (nChainStartTime + nSpanOf28) ) nfactor = 28;
+              //  else if ( nTime < (nChainStartTime + nSpanOf29) ) nfactor = 29;
+              //  else if ( nTime < (nChainStartTime + nSpanOf30) ) nfactor = 30;
+                else
+                    nfactor = MAXIMUM_N_FACTOR;
+            }
+            else    // is TestNet
+            {
+#if defined(Yac1dot0)
+                nfactor = Nfactor_1dot0;
+#else
+                nfactor = 4;
+#endif
+            }
+
+            if(
+               nYac20BlockNumberTime &&
+               nTime >= (uint32_t)nYac20BlockNumberTime
+              )
+            {
+                nfactor = YAC20_N_FACTOR;
+            }
+
             old_block_header oldBlock;
             oldBlock.version = nVersion;
             oldBlock.prev_block = hashPrevBlock;
@@ -1249,12 +1242,10 @@ public:
     {
         uint256 
             thash;
-
-        unsigned char
-            nfactor = GetNfactor(nTime);
-
-        if (nVersion >= VERSION_of_block_for_time_extension) // 64-bit nTime
+        unsigned char nfactor;
+        if (nVersion >= VERSION_of_block_for_yac_05x_new) // 64-bit nTime
         {
+            nfactor = GetNfactor(nTime, true);
             struct block_header block_data;
             block_data.version = nVersion;
             block_data.prev_block = hashPrevBlock;
@@ -1266,6 +1257,7 @@ public:
         }
         else // 32-bit nTime
         {
+        	nfactor = GetNfactor(nTime, false);
             old_block_header oldBlock;
             oldBlock.version = nVersion;
             oldBlock.prev_block = hashPrevBlock;
@@ -1827,7 +1819,7 @@ public:
         READWRITE(hashPrev);
         READWRITE(hashMerkleRoot);
         // nTime is extended to 64-bit since yacoin 1.0.0
-        if (this->nVersion >= VERSION_of_block_for_time_extension) // 64-bit nTime
+        if (this->nVersion >= VERSION_of_block_for_yac_05x_new) // 64-bit nTime
         {
             READWRITE(nTime);
         }

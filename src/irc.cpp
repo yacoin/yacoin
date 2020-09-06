@@ -223,7 +223,7 @@ void ThreadIRCSeed(void* parg)
 
 void ThreadIRCSeed2(void* parg)
 {
-    LOCK(cs_net);
+//    LOCK(cs_net);
     {
     // Don't connect to IRC if we won't use IPv4 connections.
     if (IsLimited(NET_IPV4))
