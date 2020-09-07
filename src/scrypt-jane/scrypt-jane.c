@@ -139,7 +139,9 @@ scrypt_alloc(uint64_t size)
 	aa.mem = (uint8_t *)malloc((size_t)size);
 	aa.ptr = (uint8_t *)(((size_t)aa.mem + (SCRYPT_BLOCK_BYTES - 1)) & ~(SCRYPT_BLOCK_BYTES - 1));
 	if (!aa.mem)
+	{
 		scrypt_fatal_error("scrypt: out of memory");
+	}
 	return aa;
 }
 

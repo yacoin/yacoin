@@ -163,12 +163,10 @@ void scrypt_buffer_free(void *scratchpad)
 
 //_____________________________________________________________________________
 unsigned int scanhash_scrypt(
-
-                            block_header *pdata,
+                            char *pdata,
                             //::uint32_t max_nonce, 
                             ::uint32_t &hash_count,
                             void *result, 
-                            block_header *res_header, 
                             unsigned char Nfactor
                             , CBlockIndex *pindexPrev
                             , uint256 *phashTarget
@@ -188,11 +186,31 @@ const ::uint32_t
                                 // one minute is the average block period
 
     //hash_count = 0;
-    block_header 
-        data = *pdata;
-    ::uint32_t 
-        hash[8],
-        &n = data.nonce;        // really any random uint32_t
+    struct block_header new_block_data;
+    char *pblockData = (char *) &new_block_data;
+    memcpy((void *)pblockData, (const void*)pdata, 68);
+    memcpy((void *)(pblockData+68), (const void*)(pdata+72), 16);
+    old_block_header old_block_data;
+    ::uint32_t hash[8];
+
+    void* data;
+    ::uint32_t* nOnce; // really any random uint32_t
+    if (new_block_data.version >= VERSION_of_block_for_yac_05x_new)  // 64-bit nTime
+    {
+        data = &new_block_data;
+        nOnce = &new_block_data.nonce;
+    }
+    else // 32-bit nTime
+    {
+        old_block_data.version = new_block_data.version;
+        old_block_data.prev_block = new_block_data.prev_block;
+        old_block_data.merkle_root = new_block_data.merkle_root;
+        old_block_data.timestamp = new_block_data.timestamp;
+        old_block_data.bits = new_block_data.bits;
+        old_block_data.nonce = new_block_data.nonce;
+        data = &old_block_data;
+        nOnce = &old_block_data.nonce;
+    }
     uint256
         nT = *phashTarget;
     unsigned char
@@ -201,8 +219,9 @@ const ::uint32_t
         *hasht = (unsigned char *) &nT,
         *hashc = (unsigned char *) &hash,
       //highestZeroBitsSet = 0xe0;
+        // Hash target can't be smaller than bnProofOfWorkLimit which is 00000fffff000000
         nMask = 0x00,
-        highestZeroBitsSet = ~(hasht[ 31 ]),
+        highestZeroBitsSet = ~(hasht[ 29 ]),
         nMaskPattern = 0x80;
 
     while( 0x80 == ( 0x80 & highestZeroBitsSet) )
@@ -224,23 +243,23 @@ const ::uint32_t
     while (true) 
     {
         //++n;
-        n = Big.get_a_nonce( n );
+        *nOnce = Big.get_a_nonce( *nOnce );
         //data.nonce = n;
 
-        scrypt(
-               (const unsigned char*)&data, 
-               80,
-               (const unsigned char*)&data, 
-               80,
-               Nfactor, 
-               0, 
-               0, 
-               (unsigned char*)&hash, 
-               32
-              );
+        if (new_block_data.version >= VERSION_of_block_for_yac_05x_new) // 64-bit nTime
+        {
+            scrypt_hash(data, sizeof(struct block_header), UINTBEGIN(hash), Nfactor);
+        }
+        else // 32-bit nTime
+        {
+            scrypt_hash(data, sizeof(old_block_header), UINTBEGIN(hash), Nfactor);
+        }
         ++hash_count;
+        // Hash target can't be smaller than bnProofOfWorkLimit which is 00000fffff000000
         if (            
-            ( 0 == ( nMask & hashc[31]))
+            ( 0 == ( hashc[31]))
+            && ( 0 == ( hashc[30]))
+            && ( 0 == ( nMask & hashc[29]))
            ) 
         {
             //memcpy(result, hash, 32);
@@ -258,11 +277,15 @@ const ::uint32_t
                         );
     #endif
 #endif
-            break;
+            if (
+                (pindexPrev != pindexBest) ||
+                fShutdown
+               )
+                break;
         }
     }
     memcpy(result, hash, 32);
-    return data.nonce;
+    return *nOnce;
 }
 #ifdef _MSC_VER
     #include "msvc_warnings.pop.h"

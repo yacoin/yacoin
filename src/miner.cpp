@@ -178,7 +178,15 @@ CBlock* CreateNewBlock(CWallet* pwallet, bool fProofOfStake)
     if( fUseOld044Rules )
     {
       //pblock->nVersion = CBlock::VERSION_of_block_for_yac_044_old;
-        pblock->nVersion = CBlock::CURRENT_VERSION_of_block;
+    	// TODO: Need update for mainet
+    	if (pindexGenesisBlock && (nBestHeight + 1) >= nMainnetNewLogicBlockNumber)
+    	{
+            pblock->nVersion = VERSION_of_block_for_yac_05x_new;
+    	}
+    	else
+    	{
+            pblock->nVersion = CURRENT_VERSION_of_block;
+    	}
         // here we can fiddle with time to try to make block generation easier
     }
     // Create coinbase tx
@@ -811,6 +819,43 @@ void FormatHashBuffers(CBlock* pblock, char* pmidstate, char* pdata, char* phash
     memcpy(phash1, &tmp.hash1, 64);
 }
 
+void FormatHashBuffers_64bit_nTime(char* pblock, char* pmidstate, char* pdata, char* phash1)
+{
+    //
+    // Pre-build hash buffers
+    //
+    struct
+    {
+        struct block_header block;
+        unsigned char pchPadding0[64];
+        uint256 hash1;
+        unsigned char pchPadding1[64];
+    }
+    tmp;
+    memset(&tmp, 0, sizeof(tmp));
+
+    char *pblockData = (char *) &tmp.block;
+    memcpy((void *)pblockData, (const void*)pblock, 68);
+    memcpy((void *)(pblockData + 68), (const void*)(pblock+72), 16);
+
+    FormatHashBlocks(&tmp.block, sizeof(tmp.block));
+    FormatHashBlocks(&tmp.hash1, sizeof(tmp.hash1));
+
+    // Byte swap all the input buffer
+    for (uint32_t i = 0; i < sizeof(tmp)/sizeof(uint32_t); ++i)
+  //for (unsigned int i = 0; i < sizeof(tmp)/4; ++i)    // this is only true
+    {                                                   // if an unsigned int
+                                                        // is 32 bits!!?? What
+                                                        // if it is 64 bits???????
+        ((uint32_t *)&tmp)[i] = ByteReverse(((uint32_t *)&tmp)[i]);
+    }
+    //tmp.block.nTime = (tmp.block.nTime & 0x00000000FFFFFFFF) << 32 | (tmp.block.nTime & 0xFFFFFFFF00000000) >> 32;
+    // Precalc the first half of the first hash, which stays constant
+    SHA256Transform(pmidstate, &tmp.block, pSHA256InitState);
+
+    memcpy(pdata, &tmp.block, 128);
+    memcpy(phash1, &tmp.hash1, 64);
+}
 
 bool CheckWork(CBlock* pblock, CWallet& wallet, CReserveKey& reservekey)
 {
@@ -821,7 +866,9 @@ bool CheckWork(CBlock* pblock, CWallet& wallet, CReserveKey& reservekey)
         return error("CheckWork () : %s is not a proof-of-work block", hashBlock.GetHex().c_str());
 
     if (hashBlock > hashTarget)
+    {
         return error("CheckWork () : proof-of-work not meeting target");
+    }
 
     //// debug print
     printf(
@@ -924,7 +971,7 @@ void StakeMinter(CWallet *pwallet)
 
     while (true)
     {
-        if (fShutdown)
+        if (fShutdown || (pindexBest && pindexBest->nHeight + 1 >= nMainnetNewLogicBlockNumber))
             return;
 
         while (pwallet->IsLocked())
@@ -1103,10 +1150,10 @@ static void YacoinMiner(CWallet *pwallet)  // here fProofOfStake is always false
         IncrementExtraNonce(pblock.get(), pindexPrev, nExtraNonce);
 
         bool
-            fNotYac1dot0BlockOrTx = true;
-        if( (pindexPrev->nHeight + 1) >= nTestNetNewLogicBlockNumber )
+            fYac1dot0BlockOrTx = false;
+        if( (pindexPrev->nHeight + 1) >= nMainnetNewLogicBlockNumber )
         {
-            fNotYac1dot0BlockOrTx = false;
+        	fYac1dot0BlockOrTx = true;
         }
         printf(
                 "Running YACoinMiner with %" PRIszu " transaction"
@@ -1127,10 +1174,10 @@ static void YacoinMiner(CWallet *pwallet)  // here fProofOfStake is always false
 
         FormatHashBuffers(pblock.get(), pmidstate, pdata, phash1);
 
+        ::int64_t
+            & nBlockTime = *(::int64_t*)(pdata + 64 + 4);
         unsigned int
-            & nBlockTime = *(unsigned int*)(pdata + 64 + 4);
-        unsigned int
-            & nBlockNonce = *(unsigned int*)(pdata + 64 + 12);
+            & nBlockNonce = *(unsigned int*)(pdata + 64 + 16);
 
         Big.randomize_the_nonce( nBlockNonce ); // lazy initialization performed here
 
@@ -1149,9 +1196,6 @@ static void YacoinMiner(CWallet *pwallet)  // here fProofOfStake is always false
                      , hashTarget.GetHex().substr(0,16).c_str()
                     );
 
-        block_header 
-            res_header;
-
         uint256 
             result;
         unsigned int 
@@ -1167,12 +1211,11 @@ static void YacoinMiner(CWallet *pwallet)  // here fProofOfStake is always false
             unsigned int nNonceFound;
 
             nNonceFound = scanhash_scrypt(
-                                            (block_header *)&pblock->nVersion,
+                                            (char *)&pblock->nVersion,
                                             //max_nonce,
                                             nHashesDone,
                                             UBEGIN(result),
-                                            &res_header,
-                                            GetNfactor(pblock->nTime, fNotYac1dot0BlockOrTx)
+                                            GetNfactor(pblock->nTime, fYac1dot0BlockOrTx)
                                             , pindexPrev
                                             , &hashTarget
                                          );

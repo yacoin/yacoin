@@ -45,21 +45,22 @@ BOOST_SUFFIX?=-mgw48-mt-sd-1_55
 INCLUDEPATHS= \
 -I"$(CURDIR)" \
 -I"$(CURDIR)/scrypt-jane" \
+-I"$(CURDIR)/obj" \
 -I'./leveldb/include' \
 -I'./leveldb/helpers' \
--I'../../../sw/boost_1_58_0/include' \
--I'../../../sw/db-4.8.30.NC/include' \
--I'../../../sw/openssl-1.0.1u/include' \
--I'../../../sw/miniupnpc-1.9.20150206/include' \
--I'../../../sw/qrencode-3.4.4/include'
+-I'$(YDIR)/sw/boost_1_58_0/include' \
+-I'$(YDIR)/sw/db-4.8.30.NC/include' \
+-I'$(YDIR)/sw/openssl-1.0.1u/include' \
+-I'$(YDIR)/sw/miniupnpc-1.9.20150206/include' \
+-I'$(YDIR)/sw/qrencode-3.4.4/include'
 
 LIBPATHS= \
--L'../../../sw/boost_1_58_0/lib' \
--L'../../../sw/db-4.8.30.NC/lib' \
--L'../../../sw/openssl-1.0.1u/lib' \
+-L'$(YDIR)/sw/boost_1_58_0/lib' \
+-L'$(YDIR)/sw/db-4.8.30.NC/lib' \
+-L'$(YDIR)/sw/openssl-1.0.1u/lib' \
 -L'leveldb' \
--L'../../../sw/miniupnpc-1.9.20150206/lib' \
--L'../../../sw/qrencode-3.4.4/lib'
+-L'$(YDIR)/sw/miniupnpc-1.9.20150206/lib' \
+-L'$(YDIR)/sw/qrencode-3.4.4/lib'
 
 LIBS= \
 -lmingw32 \
@@ -139,6 +140,11 @@ LDFLAGS= \
 TESTDEFS = -DTEST_DATA_DIR=$(abspath test/data)
 
 all: yacoind.exe
+
+obj/build.h: FORCE
+	../share/genbuild.sh obj/build.h
+
+DEFS += -DHAVE_BUILD_INFO
 
 ######################
 # DEFS += -DSTATICLIB -DUSE_UPNP
@@ -276,7 +282,7 @@ obj/scrypt-arm.o : scrypt-arm.S
 obj/%.o: %.cpp $(HEADERS)
 	$(CXX) -c -frandom-seed=$@ $(CFLAGS) $(INCLUDEPATHS) -o $@ $<
 
-yacoind.exe: $(OBJS:obj/%=obj/%)
+yacoind.exe: obj/build.h $(OBJS:obj/%=obj/%)
 	$(CXX) $(CFLAGS) $(LDFLAGS) -o $@ $(LIBPATHS) $^ $(LIBS) -s
 	@echo	
 	@echo $(OBJS)

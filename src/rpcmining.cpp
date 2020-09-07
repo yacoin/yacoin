@@ -156,7 +156,7 @@ Value getmininginfo(const Array& params, bool fHelp)
     // YACOIN TODO - May need to re-enable blockvalue if used in any custom api's
     // obj.push_back(Pair("blockvalue",    (uint64_t)GetProofOfWorkReward(GetLastBlockIndex(pindexBest, false)->nBits)));
     // WM - Report current Proof-of-Work block reward.
-    obj.push_back(Pair("powreward", (Value_type)GetProofOfWorkReward(GetLastBlockIndex(pindexBest, false)->nBits) / 1000000.0));
+    obj.push_back(Pair("powreward", (Value_type)GetProofOfWorkReward(GetLastBlockIndex(pindexBest, false)->nBits, 0, true) / 1000000.0));
     obj.push_back(Pair("netmhashps",     GetPoWMHashPS()));
     obj.push_back(Pair("netstakeweight", GetPoSKernelPS()));
     obj.push_back(Pair("errors",        GetWarnings("statusbar")));
@@ -175,7 +175,7 @@ Value getmininginfo(const Array& params, bool fHelp)
 
     // WM - Tweaks to report current Nfactor and N.
     unsigned char 
-        Nfactor = GetNfactor(pindexBest->GetBlockTime());
+        Nfactor = GetNfactor(pindexBest->GetBlockTime(), nBestHeight >= nMainnetNewLogicBlockNumber? true : false);
 
     uint64_t 
         N;
@@ -187,6 +187,7 @@ Value getmininginfo(const Array& params, bool fHelp)
     obj.push_back( Pair( "Nfactor", Nfactor ) );
     obj.push_back( Pair( "N", (Value_type)N ) );
     obj.push_back( Pair( "Epoch Interval", (Value_type)nEpochInterval ) );
+    obj.push_back( Pair( "Difficulty Interval", (Value_type)nDifficultyInterval ) );
 
     return obj;
 }
@@ -375,7 +376,9 @@ Value getwork(const Array& params, bool fHelp)
             // Create new block
             pblock = CreateNewBlock(pwalletMain);
             if (!pblock)
+            {
                 throw JSONRPCError(RPC_OUT_OF_MEMORY, "Out of memory");
+            }
             vNewBlock.push_back(pblock);
 
             // Need to update only after we know CreateNewBlock succeeded
@@ -393,11 +396,29 @@ Value getwork(const Array& params, bool fHelp)
         // Save
         mapNewBlock[pblock->hashMerkleRoot] = make_pair(pblock, pblock->vtx[0].vin[0].scriptSig);
 
+        printf("rpc getwork,\n"
+               "params.size() == 0,\n"
+               "pblock->nVersion = %d,\n"
+               "pblock->hashPrevBlock = %s,\n"
+               "pblock->hashMerkleRoot = %s,\n"
+               "pblock->nTime = %lld,\n"
+               "pblock->nBits = %u,\n"
+               "pblock->nNonce = %u\n",
+               pblock->nVersion, pblock->hashPrevBlock.ToString().c_str(), pblock->hashMerkleRoot.ToString().c_str(),
+               pblock->nTime, pblock->nBits, pblock->nNonce);
+
         // Pre-build hash buffers
         char pmidstate[32];
         char pdata[128];
         char phash1[64];
-        FormatHashBuffers(pblock, pmidstate, pdata, phash1);
+        if (pblock->nVersion >= VERSION_of_block_for_yac_05x_new)
+        {
+            FormatHashBuffers_64bit_nTime((char*)pblock, pmidstate, pdata, phash1);
+        }
+        else
+        {
+            FormatHashBuffers(pblock, pmidstate, pdata, phash1);
+        }
 
         uint256 hashTarget = CBigNum().SetCompact(pblock->nBits).getuint256();
 
@@ -406,6 +427,7 @@ Value getwork(const Array& params, bool fHelp)
         result.push_back(Pair("data",     HexStr(BEGIN(pdata), END(pdata))));
         result.push_back(Pair("hash1",    HexStr(BEGIN(phash1), END(phash1)))); // deprecated
         result.push_back(Pair("target",   HexStr(BEGIN(hashTarget), END(hashTarget))));
+
         return result;
     }
     else
@@ -415,26 +437,57 @@ Value getwork(const Array& params, bool fHelp)
             vchData = ParseHex(params[0].get_str());
 
         if (vchData.size() != 128)
+        {
             throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid parameter");
-        CBlock* pdata = (CBlock*)&vchData[0];
+        }
+
+        struct block_header* pdata = (struct block_header*)&vchData[0];
 
         // Byte reverse
         for (unsigned int i = 0; i < 128/sizeof( uint32_t ); ++i)
       //for (int i = 0; i < 128/4; i++) //really, the limit is sizeof( *pdata ) / sizeof( uint32_t
             ((uint32_t *)pdata)[i] = ByteReverse(((uint32_t *)pdata)[i]);
 
-        // Get saved block
-        if (!mapNewBlock.count(pdata->hashMerkleRoot))
-            return false;
-        CBlock* pblock = mapNewBlock[pdata->hashMerkleRoot].first;
+        printf("rpc getwork,\n"
+               "params.size() != 0,\n"
+               "pdata->nVersion = %d,\n"
+               "pdata->hashPrevBlock = %s,\n"
+               "pdata->hashMerkleRoot = %s,\n"
+               "pdata->nTime = %lld,\n"
+               "pdata->nBits = %u,\n"
+               "pdata->nNonce = %u\n",
+               pdata->version, pdata->prev_block.ToString().c_str(), pdata->merkle_root.ToString().c_str(),
+               pdata->timestamp, pdata->bits, pdata->nonce);
 
-        pblock->nTime = pdata->nTime;
-        pblock->nNonce = pdata->nNonce;
-        pblock->vtx[0].vin[0].scriptSig = mapNewBlock[pdata->hashMerkleRoot].second;
+        // Get saved block
+        if (!mapNewBlock.count(pdata->merkle_root))
+        {
+            printf("rpc getwork, No saved block\n");
+            return false;
+        }
+
+        CBlock* pblock = mapNewBlock[pdata->merkle_root].first;
+
+        // Parse nTime based on block version
+        if (pblock->nVersion >= VERSION_of_block_for_yac_05x_new)
+        {
+            pblock->nTime = pdata->timestamp;
+            pblock->nNonce = pdata->nonce;
+        }
+        else
+        {
+            pblock->nTime = ((uint32_t *)pdata)[17];
+            pblock->nNonce = ((uint32_t *)pdata)[19];
+        }
+        pblock->vtx[0].vin[0].scriptSig = mapNewBlock[pdata->merkle_root].second;
+
         pblock->hashMerkleRoot = pblock->BuildMerkleTree();
 
         if (!pblock->SignBlock(*pwalletMain))
+        {
+            printf("rpc getwork, Unable to sign block\n");
             throw JSONRPCError(-100, "Unable to sign block, wallet locked?");
+        }
         
         return CheckWork(pblock, *pwalletMain, reservekey);
     }

@@ -72,9 +72,9 @@ void ThreadRPCServer3(void* parg);
 static inline unsigned short GetDefaultRPCPort()
 {
 #if defined(Yac1dot0)
-    return GetBoolArg("-testnet", false)? 7787: 17787;
+    return GetBoolArg("-testnet", false)? GetArg("-port", 17787) : GetArg("-port", 7787);
 #else
-    return GetBoolArg("-testnet", false)? 7687: 17687;
+    return GetBoolArg("-testnet", false)? 17687 : 7687;
 #endif
 }
 
@@ -928,12 +928,12 @@ void JSONRequest::parse(const Value& valRequest)
     if (valMethod.type() != str_type)
         throw JSONRPCError(RPC_INVALID_REQUEST, "Method must be a string");
     strMethod = valMethod.get_str();
-    if (
-        strMethod != "getwork" && 
-        strMethod != "getworkex" && 
-        strMethod != "getblocktemplate"
-       )
-        printf("ThreadRPCServer method=%s\n", strMethod.c_str());
+//    if (
+//        strMethod != "getwork" &&
+//        strMethod != "getworkex" &&
+//        strMethod != "getblocktemplate"
+//       )
+    printf("ThreadRPCServer method=%s\n", strMethod.c_str());
 
     // Parse params
     Value valParams = find_value(request, "params");

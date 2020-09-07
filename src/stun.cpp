@@ -279,7 +279,7 @@ static int StunRequest2(int sock, struct sockaddr_in *server, struct sockaddr_in
 /*---------------------------------------------------------------------*/
 static int StunRequest(const char *host, uint16_t port, struct sockaddr_in *mapped) 
 {
-    LOCK(cs_net);
+//    LOCK(cs_net);
     {
 
     struct hostent *hostinfo = gethostbyname(host);
