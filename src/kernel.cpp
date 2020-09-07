@@ -907,6 +907,7 @@ bool CheckStakeModifierCheckpoints(int nHeight, uint32_t nStakeModifierChecksum)
 
     if (checkpoints.count(nHeight))
         return nStakeModifierChecksum == checkpoints[nHeight];
+
     return true;
 }
 #ifdef _MSC_VER

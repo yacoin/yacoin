@@ -1022,7 +1022,11 @@ public:
 
     // memory only
     mutable std::vector<uint256> vMerkleTree;
+
+    // Denial-of-service detection:
+    mutable int nDoS;
     bool DoS(int nDoSIn, bool fIn) const { nDoS += nDoSIn; return fIn; }
+
     CBlock()
     {
         SetNull();
@@ -1229,30 +1233,6 @@ public:
             previousBlockHeader.timestamp = nTime;
             previousBlockHeader.bits = nBits;
             previousBlockHeader.nonce = nNonce;
-        }
-        return blockHash;
-    }
-
-    bool IsHeaderDifferent() const
-    {
-        if((nVersion == previousBlockHeader.version)
-            && (hashPrevBlock == previousBlockHeader.prev_block)
-            && (hashMerkleRoot == previousBlockHeader.merkle_root)
-            && (nTime == previousBlockHeader.timestamp)
-            && (nBits == previousBlockHeader.bits)
-            && (nNonce == previousBlockHeader.nonce))
-        {
-            return false;
-        }
-        return true;
-    }
-
-    uint256 GetHash() const
-    {
-        if(blockHash == 0 || IsHeaderDifferent())
-        {
-            blockHash = CalculateHash();
-            memcpy(UVOIDBEGIN(previousBlockHeader), CVOIDBEGIN(nVersion), sizeof(block_header));
         }
         return blockHash;
     }

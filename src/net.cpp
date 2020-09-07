@@ -2694,7 +2694,7 @@ void ThreadMessageHandler2(void* parg)
 
 bool BindListenPort(const CService &addrBind, string& strError)
 {
-    LOCK(cs_net);
+//    LOCK(cs_net);
     {
     strError = "";
     u_long

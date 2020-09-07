@@ -816,6 +816,7 @@ bool CTxDB::LoadBlockIndex()
     #endif
         nCounter = 0;
 #endif
+
         BOOST_FOREACH(const PAIRTYPE(int, CBlockIndex*)& item, vSortedByHeight)
         {
             CBlockIndex* pindex = item.second;
@@ -841,7 +842,6 @@ bool CTxDB::LoadBlockIndex()
             }
 #endif        
         }
-#endif
     }
 
 #ifdef WIN32
