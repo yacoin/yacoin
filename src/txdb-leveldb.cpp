@@ -431,6 +431,8 @@ bool CTxDB::LoadBlockIndex()
     CDataStream ssStartKey(SER_DISK, CLIENT_VERSION);
     ssStartKey << make_pair(string("blockindex"), uint256(0));
     iterator->Seek(ssStartKey.str());
+    ::int32_t bestEpochIntervalHeight = 0;
+    uint256 bestEpochIntervalHash;
     // Now read each entry.
     while (iterator->Valid())   //what is so slow in this loop of all PoW blocks?
     {                           // 5 minutes for 1400 blocks, ~300 blocks/min or ~5/sec
@@ -553,17 +555,15 @@ bool CTxDB::LoadBlockIndex()
         pindexNew->nBits          = diskindex.nBits;
         pindexNew->nNonce         = diskindex.nNonce;
 
-        if (pindexNew->nHeight % nEpochInterval == 0) {
-            nBlockRewardPrev = (::int64_t)
-                (
-                (pindexNew->pprev? pindexNew->pprev->nMoneySupply:
-                    nSimulatedMOneySupplyAtFork) /
-                    nNumberOfBlocksPerYear
-                ) * nInflation;
+        if (pindexNew->nHeight >= bestEpochIntervalHeight &&
+            ((pindexNew->nHeight % nEpochInterval == 0) || (pindexNew->nHeight == nMainnetNewLogicBlockNumber)))
+        {
+            bestEpochIntervalHeight = pindexNew->nHeight;
+            bestEpochIntervalHash = blockHash;
         }
         // Find the minimum ease (highest difficulty) when starting node
         // It will be used to calculate min difficulty (maximum ease)
-        if (nMinEase > pindexNew->nBits)
+        if ((pindexNew->nHeight >= nMainnetNewLogicBlockNumber) && (nMinEase > pindexNew->nBits))
         {
             nMinEase = pindexNew->nBits;
         }
@@ -686,6 +686,21 @@ bool CTxDB::LoadBlockIndex()
     }
     delete iterator;
 
+    // Calculate current block reward
+    map<uint256, CBlockIndex*>::iterator mi = mapBlockIndex.find(bestEpochIntervalHash);
+    if (mi != mapBlockIndex.end())
+    {
+        CBlockIndex* pBestEpochIntervalIndex = (*mi).second;
+        nBlockRewardPrev =
+            (::int64_t)((pBestEpochIntervalIndex->pprev ? pBestEpochIntervalIndex->pprev->nMoneySupply : pBestEpochIntervalIndex->nMoneySupply) /
+                        nNumberOfBlocksPerYear) * nInflation;
+    }
+    else
+    {
+       printf("There is something wrong, can't find best epoch interval block\n");
+    }
+
+
     if (fRequestShutdown)
         return true;
 #ifdef WIN32
@@ -801,11 +816,11 @@ bool CTxDB::LoadBlockIndex()
     #endif
         nCounter = 0;
 #endif
-#ifdef Yac1dot0
-#else
         BOOST_FOREACH(const PAIRTYPE(int, CBlockIndex*)& item, vSortedByHeight)
         {
             CBlockIndex* pindex = item.second;
+            if (pindex->nHeight >= nMainnetNewLogicBlockNumber)
+				break;
             pindex->nPosBlockCount = ( pindex->pprev ? pindex->pprev->nPosBlockCount : 0 ) + ( pindex->IsProofOfStake() ? 1 : 0 );
             pindex->nBitsMA = pindex->IsProofOfStake() ? GetProofOfWorkMA(pindex->pprev) : 0;
             pindex->bnChainTrust = (pindex->pprev ? pindex->pprev->bnChainTrust : CBigNum(0)) + pindex->GetBlockTrust();

@@ -664,6 +664,7 @@ bool AppInit2()
     fLogTimestamps = GetBoolArg("-logtimestamps");
 
     nEpochInterval = (uint32_t)(GetArg("-epochinterval", 21000));
+    nDifficultyInterval = nEpochInterval;
 
     if (mapArgs.count("-timeout"))
     {
@@ -1197,6 +1198,9 @@ bool AppInit2()
     }
 
 
+    nMainnetNewLogicBlockNumber = GetArg("-testnetNewLogicBlockNumber", 0);
+    MAXIMUM_YAC1DOT0_N_FACTOR = GetArg("-nFactorAtHardfork", 21);
+
     printf("Loading block index...\n");
     bool fLoaded = false;
     while (!fLoaded) 
@@ -1245,18 +1249,15 @@ bool AppInit2()
     }
     printf(" block index %15" PRId64 "ms\n", GetTimeMillis() - nStart);
 
-    nTestNetNewLogicBlockNumber = GetArg("-testnetNewLogicBlockNumber", 0);
-    if (0 == nTestNetNewLogicBlockNumber)
-        nTestNetNewLogicBlockNumber = pindexBest->nHeight;
     if (fDebug)
     {
 #ifdef WIN32
         (void)printf(
                      "\n"
-                     "nTestNetNewLogicBlockNumber is \n"
+                     "nMainnetNewLogicBlockNumber is \n"
                      "%d"
                      "\n"
-                     , nTestNetNewLogicBlockNumber
+                     , nMainnetNewLogicBlockNumber
                     );
 #endif
     }

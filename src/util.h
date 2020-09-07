@@ -186,12 +186,13 @@ extern bool
     fLogTimestamps,
     fReopenDebugLog;
 extern ::int32_t 
-    nTestNetNewLogicBlockNumber,
-    nYac20BlockNumber,
+	nMainnetNewLogicBlockNumber,
     nYac20BlockNumberTime;
 extern ::uint32_t
+    nDifficultyInterval,
     nEpochInterval;
 extern std::string strMiscWarning;
+extern unsigned char MAXIMUM_YAC1DOT0_N_FACTOR;
 
 #ifdef WIN32
 extern void DoProgress( int nCount, int nTotalToScan, ::int64_t n64MsStartTime );
@@ -585,5 +586,13 @@ inline ::uint32_t ByteReverse(::uint32_t value)
     return (value<<16) | (value>>16);
 }
 
+// interestingly, here, 64 bits is explicitly mentioned!!
+inline ::uint64_t ByteReverse_64bit(::uint64_t value)
+{
+	value = (value & 0x00000000FFFFFFFF) << 32 | (value & 0xFFFFFFFF00000000) >> 32;
+	value = (value & 0x0000FFFF0000FFFF) << 16 | (value & 0xFFFF0000FFFF0000) >> 16;
+	value = (value & 0x00FF00FF00FF00FF) << 8  | (value & 0xFF00FF00FF00FF00) >> 8;
+	return value;
+}
 #endif
 

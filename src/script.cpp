@@ -1227,8 +1227,10 @@ public:
         ::int64_t nMaxCacheSize = GetArg("-maxsigcachesize", 50000);
         if (nMaxCacheSize <= 0) return;
 
-        boost::shared_lock<boost::shared_mutex> lock(cs_sigcache);
+        // We must use unique_lock, instead of shared_lock for writer
+//        boost::shared_lock<boost::shared_mutex> lock(cs_sigcache);
         //LOCK(cs_sigcache);
+        boost::unique_lock< boost::shared_mutex > lock(cs_sigcache);
 
         while (static_cast< ::int64_t>(setValid.size()) > nMaxCacheSize)
         {
@@ -1262,7 +1264,9 @@ public:
         ::int64_t nMaxCacheSize = GetArg("-maxsigcachesize", 50000);
         if (nMaxCacheSize <= 0) return;
 
-        boost::shared_lock<boost::shared_mutex> lock(cs_sigcache);
+        // We must use unique_lock, instead of shared_lock for writer
+//        boost::shared_lock<boost::shared_mutex> lock(cs_sigcache);
+        boost::unique_lock< boost::shared_mutex > lock(cs_sigcache);
 
         while (static_cast< ::int64_t>(setValid.size()) > nMaxCacheSize)
         {
