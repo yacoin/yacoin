@@ -4371,7 +4371,7 @@ bool LoadBlockIndex(bool fAllowNew)
             CScript()           // what is being constructed here?????
             << (!fTestNet?  486604799:      // is this a time? 1985?
                             1464032600)  // how about a more current time????  If it is a time???????
-            << CBigNum(9999)    // what is this??
+            << CScriptNum(9999)    // what is this??
             << vector<unsigned char>((const unsigned char*)pszTimestamp, 
                                      (const unsigned char*)pszTimestamp + strlen(pszTimestamp)
                                     );
