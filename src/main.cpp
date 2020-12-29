@@ -134,7 +134,11 @@ map<uint256, CBlockIndex*> mapBlockIndex;
 set<pair<COutPoint, unsigned int> > setStakeSeen;
 
 // are all of these undocumented numbers a function of Nfactor?  Cpu power? Other???
+#ifndef LOW_DIFFICULTY_FOR_DEVELOPMENT
 CBigNum bnProofOfWorkLimit(~uint256(0) >> 20);
+#else
+CBigNum bnProofOfWorkLimit(~uint256(0) >> 3);
+#endif
 
 CBigNum bnProofOfStakeLegacyLimit(~uint256(0) >> 24); 
 CBigNum bnProofOfStakeLimit(~uint256(0) >> 27); 
@@ -158,7 +162,12 @@ bool recalculateMinEase = false;
 
 static CBigNum bnProofOfStakeTestnetLimit(~uint256(0) >> 20);
 
+#ifndef LOW_DIFFICULTY_FOR_DEVELOPMENT
 static CBigNum bnInitialHashTarget(~uint256(0) >> 20);
+#else
+static CBigNum bnInitialHashTarget(~uint256(0) >> 8);
+#endif
+
 static CBigNum bnInitialHashTargetTestNet(~uint256(0) >> 8);    // test
 //static CBigNum bnInitialHashTarget(~uint256(0) >> 16);
 
@@ -389,9 +398,158 @@ unsigned int LimitOrphanTxSize(unsigned int nMaxOrphans)
     return nEvicted;
 }
 
+/**
+ * Calculates the block height and previous block's time at
+ * which the transaction will be considered final in the context of BIP 68.
+ * Also removes from the vector of input heights any entries which did not
+ * correspond to sequence locked inputs as they do not affect the calculation.
+ */
+static std::pair<int, int64_t> CalculateSequenceLocks(const CTransaction &tx,
+        int flags, std::vector<int> *prevHeights, const CBlockIndex &block)
+{
+    assert(prevHeights->size() == tx.vin.size());
 
+    // Will be set to the equivalent height- and time-based nLockTime
+    // values that would be necessary to satisfy all relative lock-
+    // time constraints given our view of block chain history.
+    // The semantics of nLockTime are the last invalid height/time, so
+    // use -1 to have the effect of any height or time being valid.
+    int nMinHeight = -1;
+    int64_t nMinTime = -1;
 
+    for (size_t txinIndex = 0; txinIndex < tx.vin.size(); txinIndex++)
+    {
+        const CTxIn &txin = tx.vin[txinIndex];
 
+        // Sequence numbers with the most significant bit set are not
+        // treated as relative lock-times, nor are they given any
+        // consensus-enforced meaning at this point.
+        if (txin.nSequence & CTxIn::SEQUENCE_LOCKTIME_DISABLE_FLAG)
+        {
+            // The height of this input is not relevant for sequence locks
+            (*prevHeights)[txinIndex] = 0;
+            continue;
+        }
+
+        int nCoinHeight = (*prevHeights)[txinIndex];
+
+        if (txin.nSequence & CTxIn::SEQUENCE_LOCKTIME_TYPE_FLAG)
+        {
+            CBlockIndex *pbi = FindBlockByHeight(std::max(nCoinHeight - 1, 0));
+            int64_t nCoinTime = pbi->GetBlockTime();
+            // NOTE: Subtract 1 to maintain nLockTime semantics
+            // BIP 68 relative lock times have the semantics of calculating
+            // the first block or time at which the transaction would be
+            // valid. When calculating the effective block time or height
+            // for the entire transaction, we switch to using the
+            // semantics of nLockTime which is the last invalid block
+            // time or height.  Thus we subtract 1 from the calculated
+            // time or height.
+
+            // Time-based relative lock-times are measured from the
+            // smallest allowed timestamp of the block containing the
+            // txout being spent, which is the time of the block prior.
+            nMinTime = std::max(nMinTime, nCoinTime + (int64_t)((txin.nSequence & CTxIn::SEQUENCE_LOCKTIME_MASK) << CTxIn::SEQUENCE_LOCKTIME_GRANULARITY) - 1);
+        }
+        else
+        {
+            nMinHeight = std::max(nMinHeight, nCoinHeight + (int)(txin.nSequence & CTxIn::SEQUENCE_LOCKTIME_MASK) - 1);
+        }
+    }
+
+    return std::make_pair(nMinHeight, nMinTime);
+}
+
+static bool EvaluateSequenceLocks(const CBlockIndex& block, std::pair<int, int64_t> lockPair)
+{
+    assert(block.pprev);
+    int64_t nBlockTime = block.pprev->GetBlockTime();
+    if (lockPair.first >= block.nHeight)
+    {
+        printf("EvaluateSequenceLocks, failed to use relative time-lock coins, current block height  = %d"
+                ", the coin inputs can only be used in a block with height > %d\n", block.nHeight, lockPair.first);
+        return false;
+    }
+    else if (lockPair.second >= nBlockTime)
+    {
+        printf("EvaluateSequenceLocks, failed to use relative time-lock coins, current block time  = %ld (%s)"
+                ", the coin inputs can only be used after a block with block time > %ld (%s) is mined\n",
+                nBlockTime, DateTimeStrFormat(nBlockTime).c_str(),
+                lockPair.second, DateTimeStrFormat(lockPair.second).c_str());
+        return false;
+    }
+
+    return true;
+}
+
+bool SequenceLocks(const CTransaction &tx, int flags, std::vector<int>* prevHeights, const CBlockIndex& block)
+{
+    return EvaluateSequenceLocks(block, CalculateSequenceLocks(tx, flags, prevHeights, block));
+}
+
+bool CheckSequenceLocks(const CTransaction &tx, int flags)
+{
+    LOCK2(cs_main, mempool.cs);
+
+    CBlockIndex index;
+    index.pprev = pindexBest;
+    // CheckSequenceLocks() uses pindexBest->nHeight+1 to evaluate
+    // height based locks because when SequenceLocks() is called within
+    // ConnectBlock(), the height of the block *being*
+    // evaluated is what is used.
+    // Thus if we want to know if a transaction can be part of the
+    // *next* block, we need to use one more than pindexBest->nHeight
+    index.nHeight = pindexBest->nHeight + 1;
+
+    std::vector<int> prevheights;
+    prevheights.resize(tx.vin.size());
+    for (size_t txinIndex = 0; txinIndex < tx.vin.size(); txinIndex++) {
+        COutPoint prevout = tx.vin[txinIndex].prevout;
+
+        // Check from both mempool and db
+        if (mempool.exists(prevout.COutPointGetHash()))
+        {
+            // Assume all mempool transaction confirm in the next block
+            prevheights[txinIndex] = pindexBest->nHeight + 1;
+        }
+        else // Check from txdb
+        {
+            CTransaction txPrev;
+            CTxIndex txindex;
+            CTxDB txdb("r");
+            if (!txPrev.ReadFromDisk(txdb, prevout, txindex))
+            {
+                // Can't find transaction index
+                return error("CheckSequenceLocks : ReadFromDisk tx %s failed", prevout.COutPointGetHash().ToString().substr(0,10).c_str());
+            }
+
+            uint256 hashBlock = 0;
+            CBlock block;
+            if (!block.ReadFromDisk(txindex.pos.Get_CDiskTxPos_nFile(), txindex.pos.Get_CDiskTxPos_nBlockPos(), false))
+            {
+                return error("CheckSequenceLocks : ReadFromDisk block containing tx %s failed", prevout.COutPointGetHash().ToString().substr(0,10).c_str());
+            }
+            else
+            {
+                hashBlock = block.GetHash();
+            }
+
+            map<uint256, CBlockIndex*>::iterator mi = mapBlockIndex.find(hashBlock);
+            if (mi != mapBlockIndex.end() && (*mi).second)
+            {
+                CBlockIndex* pindex = (*mi).second;
+                prevheights[txinIndex] = pindex->nHeight;
+            }
+            else
+            {
+                return error("CheckSequenceLocks : mapBlockIndex doesn't contains block %s", hashBlock.ToString().substr(0,10).c_str());
+            }
+        }
+    }
+
+    std::pair<int, int64_t> lockPair = CalculateSequenceLocks(tx, flags, &prevheights, index);
+    return EvaluateSequenceLocks(index, lockPair);
+}
 
 
 
@@ -775,6 +933,12 @@ bool CTxMemPool::accept(CTxDB& txdb, CTransaction &tx, bool fCheckInputs,
     if (!fTestNet && !tx.IsStandard(strNonStd))
         return error("CTxMemPool::accept() : nonstandard transaction (%s)", strNonStd.c_str());
 
+    // Only accept nLockTime-using transactions that can be mined in the next
+    // block; we don't want our mempool filled up with transactions that can't
+    // be mined yet.
+    if (!tx.IsFinal())
+        return error("CTxMemPool::accept() : non-final transaction");
+
     // Do we already have it?
     uint256 hash = tx.GetHash();
     {
@@ -826,6 +990,14 @@ bool CTxMemPool::accept(CTxDB& txdb, CTransaction &tx, bool fCheckInputs,
             if (pfMissingInputs)
                 *pfMissingInputs = true;
             return false;
+        }
+
+        // Only accept BIP68 sequence locked transactions that can be mined in the next
+        // block; we don't want our mempool filled up with transactions that can't
+        // be mined yet.
+        if (!CheckSequenceLocks(tx, STANDARD_LOCKTIME_VERIFY_FLAGS))
+        {
+            return error("CTxMemPool::accept() : non-BIP68-final transaction");
         }
 
         // Check for non-standard pay-to-script-hash in inputs
@@ -1331,6 +1503,11 @@ CBigNum inline GetProofOfStakeLimit(int nHeight, unsigned int nTime)
                 currentBlockReward =
                     (::int64_t)(pindexMoneySupplyBlock->nMoneySupply * nInflation / nNumberOfBlocksPerYear);
             }
+#ifdef LOW_DIFFICULTY_FOR_DEVELOPMENT
+            if(currentBlockReward == 0) { // this is an edge case when starting the chain
+                currentBlockReward = (::int64_t)1E13;
+            }
+#endif
             return currentBlockReward;
         }
 
@@ -1373,6 +1550,11 @@ CBigNum inline GetProofOfStakeLimit(int nHeight, unsigned int nTime)
                 }
             }
         }
+#ifdef LOW_DIFFICULTY_FOR_DEVELOPMENT
+        if(nBlockRewardExcludeFees == 0) { // this is an edge case when starting the chain
+            nBlockRewardExcludeFees = (::int64_t)1E13;
+        }
+#endif        
         return nBlockRewardExcludeFees;
     }
 #endif
@@ -2811,6 +2993,41 @@ bool CBlock::ConnectBlock(CTxDB& txdb, CBlockIndex* pindex, bool fJustCheck)
             if (!tx.FetchInputs(txdb, mapQueuedChanges, true, false, mapInputs, fInvalid))
                 return false;
 
+            // Check that transaction is BIP68 final
+            // BIP68 lock checks (as opposed to nLockTime checks) must
+            // be in ConnectBlock because they require the UTXO set
+            std::vector<int> prevheights;
+            prevheights.resize(tx.vin.size());
+            int nLockTimeFlags = 0;
+            for (unsigned int i = 0; i < tx.vin.size(); ++i)
+            {
+                COutPoint
+                    prevout = tx.vin[i].prevout;
+                CTransaction tx;
+                uint256 hashBlock = 0;
+                if (GetTransaction(prevout.COutPointGetHash(), tx, hashBlock))
+                {
+                    map<uint256, CBlockIndex*>::iterator mi = mapBlockIndex.find(hashBlock);
+                    if (mi != mapBlockIndex.end() && (*mi).second)
+                    {
+                        CBlockIndex* pTmpIndex = (*mi).second;
+                        prevheights[i] = pTmpIndex->nHeight;
+                    }
+                    else
+                    {
+                        prevheights[i] = pindex->nHeight;
+                    }
+                }
+                else
+                {
+                    return false;
+                }
+            }
+            if (!SequenceLocks(tx, nLockTimeFlags, &prevheights, *pindex))
+            {
+                return DoS(100, error("ConnectBlock(): contains a non-BIP68-final transaction", __func__));
+            }
+
             // Add in sigops done by pay-to-script-hash inputs;
             // this is to prevent a "rogue miner" from creating
             // an incredibly-expensive-to-validate block.
@@ -3367,7 +3584,12 @@ bool CBlock::CheckBlock(bool fCheckPOW, bool fCheckMerkleRoot, bool fCheckSig) c
 
     // Size limits
     if (vtx.empty() || vtx.size() > GetMaxSize(MAX_BLOCK_SIZE) || ::GetSerializeSize(*this, SER_NETWORK, PROTOCOL_VERSION) > GetMaxSize(MAX_BLOCK_SIZE))
+    {
+        if (vtx.empty()) printf("vtx.empty\n");
+        if (vtx.size() > GetMaxSize(MAX_BLOCK_SIZE)) printf("vtx.size > getmaxsize\n");
+        if (::GetSerializeSize(*this, SER_NETWORK, PROTOCOL_VERSION) > GetMaxSize(MAX_BLOCK_SIZE)) printf("vtx getserialsize\n");
         return DoS(100, error("CheckBlock () : size limits failed"));
+    }
 
     bool fProofOfStake = IsProofOfStake();
 

@@ -301,6 +301,7 @@ CBlock* CreateNewBlock(CWallet* pwallet, bool fProofOfStake)
             LOCK2(cs_main, mempool.cs);
             CBlockIndex
                 * pindexPrev = pindexBest;
+            const int nHeight = pindexPrev->nHeight + 1;
             CTxDB 
                 txdb("r");
 
@@ -321,7 +322,7 @@ CBlock* CreateNewBlock(CWallet* pwallet, bool fProofOfStake)
             {
                 CTransaction& 
                     tx = (*mi).second;
-                if (tx.IsCoinBase() || tx.IsCoinStake() || !tx.IsFinal())
+                if (tx.IsCoinBase() || tx.IsCoinStake() || !tx.IsFinal(nHeight))
                     continue;
 
                 COrphan
@@ -544,6 +545,7 @@ CBlock* CreateNewBlock(CWallet* pwallet, bool fProofOfStake)
         LOCK2(cs_main, mempool.cs);
         CBlockIndex
             * pindexPrev = pindexBest;
+        const int nHeight = pindexPrev->nHeight + 1;
         CTxDB 
             txdb("r");
 
@@ -565,7 +567,7 @@ CBlock* CreateNewBlock(CWallet* pwallet, bool fProofOfStake)
         {
             CTransaction
                 & tx = (*mi).second;
-            if (tx.IsCoinBase() || tx.IsCoinStake() || !tx.IsFinal())
+            if (tx.IsCoinBase() || tx.IsCoinStake() || !tx.IsFinal(nHeight))
                 continue;
 
             COrphan* porphan = NULL;

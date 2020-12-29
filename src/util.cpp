@@ -112,6 +112,8 @@ bool fLogTimestamps = false;
 CMedianFilter< int64_t> vTimeOffsets(200,0);
 bool fReopenDebugLog = false;
 
+static int64_t nMockTime = 0;  // For unit testing
+
 // Extended DecodeDumpTime implementation, see this page for details:
 // http://stackoverflow.com/questions/3786201/parsing-of-date-time-from-string-boost
 const std::locale formats[] = {
@@ -309,7 +311,12 @@ inline int OutputDebugStringF(const char* pszFormat, ...)
 
             // Debug print useful for profiling
             if (fLogTimestamps && fStartedNewLine)
-                fprintf(fileout, "%s ", DateTimeStrFormat("%x %H:%M:%S", GetTime()).c_str());
+            {
+                if(nMockTime == 0)
+                    fprintf(fileout, "%s ", DateTimeStrFormat("%x %H:%M:%S", GetTime()).c_str());
+                else
+                    fprintf(fileout, "Mock %s Real %s ",DateTimeStrFormat("%x %H:%M:%S", GetTime()).c_str(), DateTimeStrFormat("%x %H:%M:%S", time(NULL)).c_str());
+            }
             if (pszFormat[strlen(pszFormat) - 1] == '\n')
                 fStartedNewLine = true;
             else
@@ -1393,7 +1400,6 @@ void ShrinkDebugFile()
 //  - Median of other nodes clocks
 //  - The user (asking the user to fix the system clock if the first two disagree)
 //
-static int64_t nMockTime = 0;  // For unit testing
 
 int64_t GetTime()
 {

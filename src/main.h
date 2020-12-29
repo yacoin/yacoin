@@ -97,7 +97,12 @@ static const uint256
     // hashGenesisBlock("0x0000060fc90618113cde415ead019a1052a9abc43afcccff38608ff8751353e5");
     // hashGenesisBlock("0x00000f3f5eac1539c4e9216e17c74ff387ac1629884d2f97a3144dc32bf67bda");
     // hashGenesisBlock("0x0ea17bb85e10d8c6ded6783a4ce8f79e75d49b439ff41f55d274e6b15612fff9");
+#ifndef LOW_DIFFICULTY_FOR_DEVELOPMENT
     hashGenesisBlock("0x0000060fc90618113cde415ead019a1052a9abc43afcccff38608ff8751353e5");
+#else
+    hashGenesisBlock("0x1ddf335eb9c59727928cabf08c4eb1253348acde8f36c6c4b75d0b9686a28848");
+#endif
+
 extern const uint256 
     nPoWeasiestTargetLimitTestNet,
     hashGenesisBlockTestNet;
@@ -214,7 +219,16 @@ extern unsigned char GetNfactor(::int64_t nTimestamp, bool fYac1dot0BlockOrTx = 
 unsigned int GetProofOfWorkMA(const CBlockIndex* pIndexLast);
 unsigned int GetProofOfWorkSMA(const CBlockIndex* pIndexLast);
 
+/**
+ * Check if transaction is final per BIP 68 sequence numbers and can be included in a block.
+ * Consensus critical. Takes as input a list of heights at which tx's inputs (in order) confirmed.
+ */
+bool SequenceLocks(const CTransaction &tx, int flags, std::vector<int>* prevHeights, const CBlockIndex& block);
 
+/**
+ * Check if transaction will be BIP 68 final in the next block to be created.
+ */
+bool CheckSequenceLocks(const CTransaction &tx, int flags);
 
 
 
@@ -360,19 +374,46 @@ public:
     CScript scriptSig;
     ::uint32_t nSequence;
 
+    /* Setting nSequence to this value for every input in a transaction
+     * disables nLockTime. */
+    static const uint32_t SEQUENCE_FINAL = 0xffffffff;
+
+    /* Below flags apply in the context of BIP 68*/
+    /* If this flag set, CTxIn::nSequence is NOT interpreted as a
+     * relative lock-time. */
+    static const uint32_t SEQUENCE_LOCKTIME_DISABLE_FLAG = (1 << 31);
+
+    /* If CTxIn::nSequence encodes a relative lock-time and this flag
+     * is set, the relative lock-time has units of 1 seconds,
+     * otherwise it specifies blocks with a granularity of 1. */
+    static const uint32_t SEQUENCE_LOCKTIME_TYPE_FLAG = (1 << 30);
+
+    /* If CTxIn::nSequence encodes a relative lock-time, this mask is
+     * applied to extract that lock-time from the sequence field. */
+    static const uint32_t SEQUENCE_LOCKTIME_MASK = 0x3fffffff;
+
+    /* In order to use the same number of bits to encode roughly the
+     * same wall-clock duration, and because blocks are naturally
+     * limited to occur every 60s on average, the minimum granularity
+     * for time-based relative lock-time is fixed at 1 seconds.
+     * Converting from CTxIn::nSequence to seconds is performed by
+     * multiplying by 1 = 2^0, or equivalently shifting up by
+     * 0 bits. */
+    static const int SEQUENCE_LOCKTIME_GRANULARITY = 0;
+
     CTxIn()
     {
-        nSequence = std::numeric_limits<unsigned int>::max();
+        nSequence = SEQUENCE_FINAL;
     }
 
-    explicit CTxIn(COutPoint prevoutIn, CScript scriptSigIn=CScript(), unsigned int nSequenceIn=std::numeric_limits<unsigned int>::max())
+    explicit CTxIn(COutPoint prevoutIn, CScript scriptSigIn=CScript(), unsigned int nSequenceIn=SEQUENCE_FINAL)
     {
         prevout = prevoutIn;
         scriptSig = scriptSigIn;
         nSequence = nSequenceIn;
     }
 
-    CTxIn(uint256 hashPrevTx, unsigned int nOut, CScript scriptSigIn=CScript(), unsigned int nSequenceIn=std::numeric_limits<unsigned int>::max())
+    CTxIn(uint256 hashPrevTx, unsigned int nOut, CScript scriptSigIn=CScript(), unsigned int nSequenceIn=SEQUENCE_FINAL)
     {
         prevout = COutPoint(hashPrevTx, nOut);
         scriptSig = scriptSigIn;
@@ -388,7 +429,7 @@ public:
 
     bool IsFinal() const
     {
-        return (nSequence == std::numeric_limits<unsigned int>::max());
+        return (nSequence == SEQUENCE_FINAL);
     }
 
     friend bool operator==(const CTxIn& a, const CTxIn& b)
@@ -417,7 +458,7 @@ public:
             str += strprintf(", coinbase %s", HexStr(scriptSig).c_str());
         else
             str += strprintf(", scriptSig=%s", scriptSig.ToString().substr(0,24).c_str());
-        if (nSequence != std::numeric_limits<unsigned int>::max())
+        if (nSequence != SEQUENCE_FINAL)
             str += strprintf(", nSequence=%u", nSequence);
         str += ")";
         return str;
@@ -600,7 +641,7 @@ public:
         if (nLockTime == 0)
             return true;
         if (nBlockHeight == 0)
-            nBlockHeight = nBestHeight;
+            nBlockHeight = nBestHeight + 1;
         if (nBlockTime == 0)
             nBlockTime = GetAdjustedTime();
         if ((::int64_t)nLockTime < ((::int64_t)nLockTime < LOCKTIME_THRESHOLD ? (::int64_t)nBlockHeight : nBlockTime))
@@ -620,7 +661,7 @@ public:
                 return false;
 
         bool fNewer = false;
-        unsigned int nLowest = std::numeric_limits<unsigned int>::max();
+        unsigned int nLowest = CTxIn::SEQUENCE_FINAL;
         for (unsigned int i = 0; i < vin.size(); i++)
         {
             if (vin[i].nSequence != old.vin[i].nSequence)

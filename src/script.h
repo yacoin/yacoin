@@ -86,6 +86,9 @@ public:
 
     inline CScriptNum& operator+=( const CScriptNum& rhs)       { return operator+=(rhs.m_value);  }
     inline CScriptNum& operator-=( const CScriptNum& rhs)       { return operator-=(rhs.m_value);  }
+    inline CScriptNum operator&(   const int64_t& rhs)    const { return CScriptNum(m_value & rhs);}
+    inline CScriptNum operator&(   const CScriptNum& rhs) const { return operator&(rhs.m_value);   }
+    inline CScriptNum& operator&=( const CScriptNum& rhs)       { return operator&=(rhs.m_value);  }
 
     inline CScriptNum operator-()                         const
     {
@@ -112,6 +115,12 @@ public:
         assert(rhs == 0 || (rhs > 0 && m_value >= std::numeric_limits<int64_t>::min() + rhs) ||
                            (rhs < 0 && m_value <= std::numeric_limits<int64_t>::max() + rhs));
         m_value -= rhs;
+        return *this;
+    }
+
+    inline CScriptNum& operator&=( const int64_t& rhs)
+    {
+        m_value &= rhs;
         return *this;
     }
 
@@ -207,6 +216,17 @@ enum
     //
     // See BIP65 for details.
     SCRIPT_VERIFY_CHECKLOCKTIMEVERIFY = (1U << 9),
+
+    // support CHECKSEQUENCEVERIFY opcode
+    //
+    // See BIP112 for details
+    SCRIPT_VERIFY_CHECKSEQUENCEVERIFY = (1U << 10),
+};
+
+/** Flags for nSequence and nLockTime locks */
+enum {
+    /* Interpret sequence numbers as relative lock-time constraints. */
+    LOCKTIME_VERIFY_SEQUENCE = (1 << 0),
 };
 
 // Strict verification:
@@ -228,10 +248,13 @@ static const unsigned int MANDATORY_SCRIPT_VERIFY_FLAGS = SCRIPT_VERIFY_P2SH;
 // Standard script verification flags that standard transactions will comply
 // with. However scripts violating these flags may still be present in valid
 // blocks and we must accept those blocks.
-static const unsigned int STRICT_FLAGS = MANDATORY_SCRIPT_VERIFY_FLAGS | STRICT_FORMAT_FLAGS | SCRIPT_VERIFY_CHECKLOCKTIMEVERIFY;
+static const unsigned int STRICT_FLAGS = MANDATORY_SCRIPT_VERIFY_FLAGS | STRICT_FORMAT_FLAGS | SCRIPT_VERIFY_CHECKLOCKTIMEVERIFY | SCRIPT_VERIFY_CHECKSEQUENCEVERIFY;
 
 // Soft verifications, no extended signature format checkings
 static const unsigned int SOFT_FLAGS = STRICT_FLAGS & ~STRICT_FORMAT_FLAGS;
+
+/** Used as the flags parameter to sequence and nLocktime checks in non-consensus code. */
+static const unsigned int STANDARD_LOCKTIME_VERIFY_FLAGS = LOCKTIME_VERIFY_SEQUENCE;
 
 enum txnouttype
 {
@@ -241,6 +264,8 @@ enum txnouttype
     TX_PUBKEYHASH,
     TX_SCRIPTHASH,
     TX_MULTISIG,
+	TX_CLTV,
+	TX_CSV,
     TX_NULL_DATA,
 };
 
@@ -374,6 +399,7 @@ enum opcodetype
     OP_NOP2 = 0xb1,
 	OP_CHECKLOCKTIMEVERIFY = OP_NOP2,
     OP_NOP3 = 0xb2,
+    OP_CHECKSEQUENCEVERIFY = OP_NOP3,
     OP_NOP4 = 0xb3,
     OP_NOP5 = 0xb4,
     OP_NOP6 = 0xb5,
@@ -690,7 +716,8 @@ public:
 
     void SetDestination(const CTxDestination& address);
     void SetMultisig(int nRequired, const std::vector<CKey>& keys);
-
+    void SetCltv(int nLockTime, const CPubKey& pubKey);
+    void SetCsv(::uint32_t nSequence, const CPubKey& pubKey);
 
     void PrintHex() const
     {
@@ -741,6 +768,8 @@ int ScriptSigArgsExpected(txnouttype t, const std::vector<std::vector<unsigned c
 bool IsStandard(const CScript& scriptPubKey, txnouttype& whichType);
 isminetype IsMine(const CKeyStore& keystore, const CScript& scriptPubKey);
 isminetype IsMine(const CKeyStore& keystore, const CTxDestination& dest);
+bool IsSpendableCltvUTXO(const CKeyStore &keystore, const CScript& scriptPubKey);
+bool IsSpendableCsvUTXO(const CKeyStore &keystore, const CScript& scriptPubKey);
 void ExtractAffectedKeys(const CKeyStore &keystore, const CScript& scriptPubKey, std::vector<CKeyID> &vKeys);
 bool ExtractDestination(const CScript& scriptPubKey, CTxDestination& addressRet);
 bool ExtractDestinations(const CScript& scriptPubKey, txnouttype& typeRet, std::vector<CTxDestination>& addressRet, int& nRequiredRet);
