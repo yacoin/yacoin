@@ -155,6 +155,13 @@ AC_ARG_ENABLE([debug],
     [enable_debug=$enableval],
     [enable_debug=no])
 
+# Enable low difficulty for development and testing 
+AC_ARG_ENABLE([low_difficulty_for_development],
+    [AS_HELP_STRING([--enable-low-difficulty-for-development],
+                    [set difficulty for mining to an extremly low value to make development and testing faster (default is no)])],
+    [enable_low_difficulty_for_development=$enableval],
+    [enable_low_difficulty_for_development=no])
+
 if test "x$enable_debug" = xyes; then
     if test "x$GCC" = xyes; then
         CFLAGS="-g3 -O0 -DDEBUG"
@@ -165,6 +172,15 @@ if test "x$enable_debug" = xyes; then
     fi
 fi 
 
+if test "x$enable_low_difficulty_for_development" = xyes; then
+    if test "x$GCC" = xyes; then
+        CFLAGS="$CFLAGS -DLOW_DIFFICULTY_FOR_DEVELOPMENT"
+    fi
+    
+    if test "x$GXX" = xyes; then
+        CXXFLAGS="$CXXFLAGS -DLOW_DIFFICULTY_FOR_DEVELOPMENT"
+    fi
+fi 
 ## TODO: Remove these hard-coded paths and flags. They are here for the sake of
 ##       compatibility with the legacy buildsystem.
 ##

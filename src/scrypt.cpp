@@ -221,7 +221,11 @@ const ::uint32_t
       //highestZeroBitsSet = 0xe0;
         // Hash target can't be smaller than bnProofOfWorkLimit which is 00000fffff000000
         nMask = 0x00,
+#ifndef LOW_DIFFICULTY_FOR_DEVELOPMENT        
         highestZeroBitsSet = ~(hasht[ 29 ]),
+#else
+        highestZeroBitsSet = ~(hasht[ 31 ]),
+#endif
         nMaskPattern = 0x80;
 
     while( 0x80 == ( 0x80 & highestZeroBitsSet) )
@@ -256,16 +260,24 @@ const ::uint32_t
         }
         ++hash_count;
         // Hash target can't be smaller than bnProofOfWorkLimit which is 00000fffff000000
-        if (            
+
+#ifndef LOW_DIFFICULTY_FOR_DEVELOPMENT        
+        if (         
             ( 0 == ( hashc[31]))
             && ( 0 == ( hashc[30]))
             && ( 0 == ( nMask & hashc[29]))
+
            ) 
         {
             //memcpy(result, hash, 32);
             //return data.nonce;
             break;
         }
+#else
+        if(0 == ( nMask & hashc[31]))
+            break;
+#endif
+
         if( 0 == (hash_count % NArbitraryHashCount) )
         {               // really we should hash for a while, then check
 #ifdef Yac1dot0

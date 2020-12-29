@@ -59,7 +59,11 @@ const std::string
 //}
 // Client version number
 #ifdef USE_LEVELDB
+#ifdef LOW_DIFFICULTY_FOR_DEVELOPMENT
+#define CLIENT_VERSION_SUFFIX   "-leveldb-low-difficulty"
+#else
 #define CLIENT_VERSION_SUFFIX   "-leveldb"
+#endif
 #else
 #define CLIENT_VERSION_SUFFIX   "-bdb"
 #endif
