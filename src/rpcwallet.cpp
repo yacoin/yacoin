@@ -166,13 +166,13 @@ static void
             nDaysUp = nUpTimeSeconds / nSecondsPerDay;
 
         nUpTimeSeconds -= (nDaysUp * nSecondsPerDay);
-        sUpTime += strprintf( "%dday%s ", nDaysUp, 1 == nDaysUp? "": "s" );
+        sUpTime += strprintf( "%d day%s ", nDaysUp, 1 == nDaysUp? "": "s" );
     }
     if( nUpTimeSeconds >= nSecondsPerHour )     // & less than 1 day
     {
         sUpTime += strprintf( 
                              "%s (%"PRId64" sec)",
-                             DateTimeStrFormat("%Hhrs %Mmins %Ssec", 
+                             DateTimeStrFormat("%H hrs %M mins %S sec", 
                                                 nUpTimeSeconds
                                               ).c_str(),
                              nUpCopy
@@ -183,7 +183,7 @@ static void
     {
         sUpTime += strprintf( 
                              "%s (%"PRId64" sec)",
-                             DateTimeStrFormat("%Mmins %Ssec", 
+                             DateTimeStrFormat("%M mins %S sec", 
                                                nUpTimeSeconds
                                               ).c_str(),
                              nUpCopy
