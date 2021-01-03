@@ -37,6 +37,8 @@
 #include <signal.h>
 #endif
 
+::int64_t
+    nUpTimeStart = 0;
 bool fNewerOpenSSL = false; // for key.cpp's benefit
 
 
@@ -324,6 +326,7 @@ int main(int argc, char* argv[])
 {
     bool fRet = false;
 
+    nUpTimeStart = GetTime();
     // Connect yacoind signal handlers
     noui_connect();
 

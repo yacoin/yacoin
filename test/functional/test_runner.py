@@ -73,7 +73,8 @@ BASE_SCRIPTS = [
     'feature_op_cltv.py',
     'feature_op_csv.py',
     'feature_describe_redeemscript.py',
-    'feature_basic_transfer.py',    
+    'feature_basic_transfer.py',
+    'feature_uptime.py',
     'rpc_check.py',
     'feature_set_min_fee.py'
 ]
