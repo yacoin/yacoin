@@ -288,6 +288,7 @@ Value getrpcinfo(const Array& params, bool fHelp){
     Object res;
     res.push_back(Pair("active_commands",commands));
     res.push_back(Pair("logpath",GetDebugLogPathName()));
+    res.push_back(Pair("RPCport", GetDefaultRPCPort() ));
     return res;
 }
 
