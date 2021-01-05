@@ -435,12 +435,17 @@ uint256 GetProofOfStakeHash(
         stakehashdata.nPrevoutn = nPrevoutn;
         stakehashdata.nTimeTx = nTimeTx;
 
-        scrypt_hash(
-                    CVOIDBEGIN( stakehashdata.nStakeModifier ), 
-                    sizeof( stakehashdata ), 
-                    UINTBEGIN( thash ), 
-                    stakeNfactor
-                   );
+        if(
+           !scrypt_hash(
+                       CVOIDBEGIN( stakehashdata.nStakeModifier ), 
+                       sizeof( stakehashdata ), 
+                       UINTBEGIN( thash ), 
+                       stakeNfactor
+                      )
+          )
+        {
+            thash = 0;  // perhaps? should error("lack of memory for scrypt hash?");
+        }
     }
     else    // the old 0.4.4 way
     {

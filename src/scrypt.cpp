@@ -114,11 +114,28 @@ uint256 scrypt_hash(const void* input, size_t inputlen)
 }
 
 //YACOIN
-void scrypt_hash(const void* input, size_t inputlen, ::uint32_t *res, unsigned char Nfactor)
+bool scrypt_hash(
+                 const void* input,
+                 size_t inputlen,
+                 ::uint32_t *res,
+                 unsigned char Nfactor
+                )
 {
-    return scrypt((const unsigned char*)input, inputlen,
-                  (const unsigned char*)input, inputlen,
-                  Nfactor, 0, 0, (unsigned char*)res, 32);
+    if(
+       0 != scrypt(
+                   (const unsigned char *)input,
+                   inputlen,
+                   (const unsigned char *)input,
+                   inputlen,
+                   Nfactor,
+                   0,
+                   0,
+                   (unsigned char*)res,
+                   32
+                  )
+      )
+        return true;
+    return false;
 }
 
 uint256 scrypt_salted_hash(const void* input, size_t inputlen, const void* salt, size_t saltlen)
@@ -247,37 +264,38 @@ const ::uint32_t
                  , nMask
                 );
 #endif
-    // here we should have already seeked to a random position in the file
+    size_t
+        nHeaderSize;
+
+    if (new_block_data.version >= VERSION_of_block_for_yac_05x_new) // 64-bit nTime
+        nHeaderSize = sizeof(struct block_header);
+    else                                                            // 32-bit nTime
+        nHeaderSize = sizeof(old_block_header);
     while (true) 
     {
         //++n;
         *nOnce = Big.get_a_nonce( *nOnce );
         //data.nonce = n;
 
-        if (new_block_data.version >= VERSION_of_block_for_yac_05x_new) // 64-bit nTime
-        {
-            scrypt_hash(data, sizeof(struct block_header), UINTBEGIN(hash), Nfactor);
-        }
-        else // 32-bit nTime
-        {
-            scrypt_hash(data, sizeof(old_block_header), UINTBEGIN(hash), Nfactor);
+        if(!scrypt_hash(data, nHeaderSize, UINTBEGIN(hash), Nfactor))
+        {            
+            return 0;
         }
         ++hash_count;
         // Hash target can't be smaller than bnProofOfWorkLimit which is 00000fffff000000
 
-#ifndef LOW_DIFFICULTY_FOR_DEVELOPMENT        
         if (         
             ( 0 == ( hashc[31]))
             && ( 0 == ( hashc[30]))
             && ( 0 == ( nMask & hashc[29]))
-
            ) 
         {
             //memcpy(result, hash, 32);
             //return data.nonce;
             break;
         }
-#else
+
+#ifdef LOW_DIFFICULTY_FOR_DEVELOPMENT        
         if(0 == ( nMask & hashc[31]))
             break;
 #endif

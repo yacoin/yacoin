@@ -1386,6 +1386,17 @@ bool AppInit2()
     if (!CheckDiskSpace())
         return false;
 
+    if( fDebug )
+    {
+#ifdef WIN32
+        (void)printf(
+                    "physical mem available = %llu"
+                    "\n"
+                    , getTotalSystemMemory()
+                    );
+#endif
+    }
+
     RandAddSeedPerfmon();
 
     //// debug print
