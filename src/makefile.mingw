@@ -267,7 +267,7 @@ obj/json_spirit_value.o: json/json_spirit_value.cpp
 obj/json_spirit_reader.o: json/json_spirit_reader.cpp
 	$(CXX) -c -frandom-seed=$@ $(CFLAGS) $(INCLUDEPATHS) -MMD -o $@ $<
 
-obj/scrypt-generic.o: scrypt-generic.c
+obj/scrypt-generic.o: scrypt-generic.cpp
 	$(CXX) -c -frandom-seed=$@ $(CFLAGS) $(INCLUDEPATHS) -MMD -o $@ $<
 
 obj/scrypt-x86_64.o : scrypt-x86_64.S

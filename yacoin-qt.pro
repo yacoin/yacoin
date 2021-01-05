@@ -151,7 +151,7 @@ contains(USE_ASM, 1) {
     SOURCES += src/scrypt-arm.S src/scrypt-x86.S src/scrypt-x86_64.S
 } else {
     message(Using generic scrypt core implementation)
-    SOURCES += src/scrypt-generic.c
+    SOURCES += src/scrypt-generic.cpp
 }
 
 # regenerate src/build.h

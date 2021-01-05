@@ -67,7 +67,7 @@ contains(USE_ASM, 1) {
     DEFINES += USE_ASM
 } else {
     message(Using generic scrypt core implementation)
-    SOURCES += src/scrypt-generic.c
+    SOURCES += src/scrypt-generic.cpp
 }
 
 genjane.target = .genjane
