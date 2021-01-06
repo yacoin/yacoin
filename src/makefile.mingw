@@ -5,6 +5,8 @@
 CC ?= g++
 CXX ?= g++
 
+scryptFiles := $(wildcard scrypt*.*)
+
 ###############################################################################
 #UPnP configuration
 #
@@ -48,19 +50,19 @@ INCLUDEPATHS= \
 -I"$(CURDIR)/obj" \
 -I'./leveldb/include' \
 -I'./leveldb/helpers' \
--I'$(YDIR)/sw/boost_1_58_0/include' \
--I'$(YDIR)/sw/db-4.8.30.NC/include' \
--I'$(YDIR)/sw/openssl-1.0.1u/include' \
--I'$(YDIR)/sw/miniupnpc-1.9.20150206/include' \
--I'$(YDIR)/sw/qrencode-3.4.4/include'
+-I'../../../sw/boost_1_58_0/include' \
+-I'../../../sw/db-4.8.30.NC/include' \
+-I'../../../sw/openssl-1.0.1u/include' \
+-I'../../../sw/miniupnpc-1.9.20150206/include' \
+-I'../../../sw/qrencode-3.4.4/include'
 
 LIBPATHS= \
--L'$(YDIR)/sw/boost_1_58_0/lib' \
--L'$(YDIR)/sw/db-4.8.30.NC/lib' \
--L'$(YDIR)/sw/openssl-1.0.1u/lib' \
+-L'../../../sw/boost_1_58_0/lib' \
+-L'../../../sw/db-4.8.30.NC/lib' \
+-L'../../../sw/openssl-1.0.1u/lib' \
 -L'leveldb' \
--L'$(YDIR)/sw/miniupnpc-1.9.20150206/lib' \
--L'$(YDIR)/sw/qrencode-3.4.4/lib'
+-L'../../../sw/miniupnpc-1.9.20150206/lib' \
+-L'../../../sw/qrencode-3.4.4/lib'
 
 LIBS= \
 -lmingw32 \
@@ -255,6 +257,29 @@ obj/walletdb.o
 test check: test_yacoin.exe FORCE
 	test_yacoin.exe
 
+######################
+#
+# LevelDB support, with mingw shlwapi lib must come at the end! (Why?)
+#
+# None of this code below works! At all!!
+# I built leveldb libraries from the Qt build, which does work!
+
+ifdef USE_LEVELDB
+ #SOURCES += src/txdb-leveldb.cpp  
+ #OBJS += obj/txdb-leveldb.o
+leveldb/libleveldb.a:
+	cd leveldb; TARGET_OS=NATIVE_WINDOWS make libleveldb.a libmemenv.a; cd ..
+#obj/txdb-leveldb.o	: txdb-leveldb.cpp
+#	$(CXX) -c -frandom-seed=$@ $(CFLAGS) $(INCLUDEPATHS) -o $@ $<
+# @echo TEST LEVELDB $(DEFS)
+else
+ #SOURCES += src/txdb-bdb.cpp
+ #OBJS += obj/txdb-bdb.o
+ #obj/txdb-bdb.o	: txdb-bdb.cpp
+#	$(CXX) -c -frandom-seed=$@ $(CFLAGS) $(INCLUDEPATHS) -o $@ $<
+# @echo TEST BDB $(DEFS)	
+endif
+######################
 #.genjane:
 #	touch .genjane; gcc -c -O3 -DSCRYPT_CHACHA -DSCRYPT_KECCAK512 -DSCRYPT_CHOOSE_COMPILETIME -o obj/scrypt-jane.o scrypt-jane/scrypt-jane.c
 
@@ -295,6 +320,7 @@ yacoind.exe: obj/build.h $(OBJS:obj/%=obj/%)
 	@echo	
 	@echo $(LIBS)
 	@echo	
+	@echo $(scryptFiles)
 
 TESTOBJS := $(patsubst test/%.cpp,obj-test/%.o,$(wildcard test/*.cpp))
 
