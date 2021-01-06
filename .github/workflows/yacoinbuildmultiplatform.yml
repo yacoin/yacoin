@@ -63,7 +63,7 @@ jobs:
       - name: build
         run: |
           docker pull dev34253/yacoin-build:windows.latest
-          docker run -v %CD%:c:\git\src -e BUILDVERSION=$GITHUB_RUN_NUMBER dev34253/yacoin-build:windows.latest
+          docker run -v %CD%:c:\git\ydir\build\yacoin -e BUILDVERSION=$GITHUB_RUN_NUMBER --entrypoint c:\git\bin\bash.exe dev34253/yacoin-build:windows.latest c:\git\ydir\build\yacoin\build-windows-in-docker.sh
         shell: cmd
       - uses: actions/upload-artifact@v1
         with:
