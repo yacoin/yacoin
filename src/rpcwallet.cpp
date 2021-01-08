@@ -154,6 +154,48 @@ string AccountFromValue(const Value& value)
     return strAccount;
 }
 
+static void
+    ConvertUpTimeToNiceString( ::int64_t nUpTimeSeconds, string & sUpTime )
+{
+    ::int64_t
+        nUpCopy = nUpTimeSeconds;
+
+    if( nUpTimeSeconds >= nSecondsPerDay )
+    {
+        int
+            nDaysUp = nUpTimeSeconds / nSecondsPerDay;
+
+        nUpTimeSeconds -= (nDaysUp * nSecondsPerDay);
+        sUpTime += strprintf( "%d day%s ", nDaysUp, 1 == nDaysUp? "": "s" );
+    }
+    if( nUpTimeSeconds >= nSecondsPerHour )     // & less than 1 day
+    {
+        sUpTime += strprintf( 
+                             "%s (%"PRId64" sec)",
+                             DateTimeStrFormat("%H hrs %M mins %S sec", 
+                                                nUpTimeSeconds
+                                              ).c_str(),
+                             nUpCopy
+                            );
+    }
+    else
+    if( nUpTimeSeconds >= nSecondsperMinute )   // & less than 1 hour
+    {
+        sUpTime += strprintf( 
+                             "%s (%"PRId64" sec)",
+                             DateTimeStrFormat("%M mins %S sec", 
+                                               nUpTimeSeconds
+                                              ).c_str(),
+                             nUpCopy
+                            );
+    }
+    else    // < one minute
+    {
+        sUpTime = strprintf( "%"PRId64" sec", nUpCopy );
+    }
+}
+
+
 Value getinfo(const Array& params, bool fHelp)
 {
     if (fHelp || params.size() != 0)
@@ -175,6 +217,15 @@ Value getinfo(const Array& params, bool fHelp)
     obj.push_back(Pair("blocks",        (int)nBestHeight));
     obj.push_back(Pair("posblocks",	    (int)pindexBest->nPosBlockCount));
     obj.push_back(Pair("timeoffset",    (boost::int64_t)GetTimeOffset()));
+
+    ::int64_t
+        nUpTimeSeconds = GetTime() - nUpTimeStart;
+    string
+        sUpTime = "";
+    ConvertUpTimeToNiceString( nUpTimeSeconds, sUpTime );
+
+    obj.push_back(Pair("up-time",       sUpTime));
+
     obj.push_back(Pair("moneysupply",   ValueFromAmount(pindexBest->nMoneySupply)));
     obj.push_back(Pair("connections",   (int)vNodes.size()));
     obj.push_back(Pair("proxy",         (proxy.first.IsValid() ? proxy.first.ToStringIPPort() : string())));

@@ -30,11 +30,7 @@
 extern bool fTestNet;
 static inline unsigned short GetDefaultPort(const bool testnet = fTestNet)
 {
-#if defined(Yac1dot0)
-    return testnet ? GetArg("-port", 17788) : GetArg("-port", 7788);
-#else
-    return testnet ? 17688 : 7688;
-#endif
+    return testnet ? GetArg("-port", 17688) : GetArg("-port", 7688);
 }
 
 

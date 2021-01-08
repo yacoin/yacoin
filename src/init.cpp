@@ -37,6 +37,8 @@
 #include <signal.h>
 #endif
 
+::int64_t
+    nUpTimeStart = 0;
 bool fNewerOpenSSL = false; // for key.cpp's benefit
 
 
@@ -324,6 +326,7 @@ int main(int argc, char* argv[])
 {
     bool fRet = false;
 
+    nUpTimeStart = GetTime();
     // Connect yacoind signal handlers
     noui_connect();
 
@@ -448,14 +451,8 @@ std::string HelpMessage()
         "                         see https://www.cryptsy.com/pages/publicapi" + "\n" +
         "  -rpcuser=<user>        " + _("Username for JSON-RPC connections") + "\n" +
         "  -rpcpassword=<pw>      " + _("Password for JSON-RPC connections") + "\n" +
-#if defined(Yac1dot0)
-        "  -port=<port>           " + _("Listen for connections on <port> (default: 7788 or testnet: 17788)") + "\n" +
-        "  -rpcport=<port>        " + _("Listen for JSON-RPC connections on <port> (default: 7787 or testnet: 17787)") + "\n" +
-#else
         "  -port=<port>           " + _("Listen for connections on <port> (default: 7688 or testnet: 17688)") + "\n" +
         "  -rpcport=<port>        " + _("Listen for JSON-RPC connections on <port> (default: 7687 or testnet: 17687)") + "\n" +
-#endif
-
         "  -rpcallowip=<ip>       " + _("Allow JSON-RPC connections from specified IP address") + "\n" +
         "  -rpcconnect=<ip>       " + _("Send commands to node running on <ip> (default: 127.0.0.1)") + "\n" +
         "  -blocknotify=<cmd>     " + _("Execute command when the best block changes (%s in cmd is replaced by block hash)") + "\n" +
@@ -1388,6 +1385,17 @@ bool AppInit2()
 
     if (!CheckDiskSpace())
         return false;
+
+    if( fDebug )
+    {
+#ifdef WIN32
+        (void)printf(
+                    "physical mem available = %llu"
+                    "\n"
+                    , getTotalSystemMemory()
+                    );
+#endif
+    }
 
     RandAddSeedPerfmon();
 

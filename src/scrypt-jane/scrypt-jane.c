@@ -145,16 +145,16 @@ scrypt_alloc(uint64_t size)
 	return aa;
 }
 
-static void
-scrypt_free(scrypt_aligned_alloc *aa) 
+static void scrypt_free(scrypt_aligned_alloc *aa) 
 {
 	free(aa->mem);
 }
 #endif
 
 
-void
-scrypt(
+#define True 1
+#define False 0
+int scrypt(
        const uint8_t *password, 
        size_t password_len, 
        const uint8_t *salt, 
@@ -206,8 +206,17 @@ scrypt(
 
 	chunk_bytes = SCRYPT_BLOCK_BYTES * r * 2;
     V = scrypt_alloc((uint64_t)N * chunk_bytes);
-	YX = scrypt_alloc((p + 1) * chunk_bytes);
-
+    if( V.mem )
+    {
+	    YX = scrypt_alloc((p + 1) * chunk_bytes);
+        if( YX.mem )
+        {
+        }
+        else
+            return False;
+    } else {
+        return False;
+    }
 	/* 1: X = PBKDF2(password, salt) */
 	Y = YX.ptr;
 	X = Y + chunk_bytes;
@@ -232,6 +241,7 @@ scrypt(
 
 	scrypt_free(&YX);
 	scrypt_free(&V);
+    return True;
 }
 #if defined( _WINDOWS )
 #if !defined( QT_GUI )

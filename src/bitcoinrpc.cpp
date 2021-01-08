@@ -71,11 +71,7 @@ void ThreadRPCServer3(void* parg);
 
 static inline unsigned short GetDefaultRPCPort()
 {
-#if defined(Yac1dot0)
-    return GetBoolArg("-testnet", false)? GetArg("-port", 17787) : GetArg("-port", 7787);
-#else
-    return GetBoolArg("-testnet", false)? 17687 : 7687;
-#endif
+    return GetBoolArg("-testnet", false)? GetArg("-rpcport", 17687) : GetArg("-rpcport", 7687);
 }
 
 Object JSONRPCError(int code, const string& message)
@@ -288,6 +284,7 @@ Value getrpcinfo(const Array& params, bool fHelp){
     Object res;
     res.push_back(Pair("active_commands",commands));
     res.push_back(Pair("logpath",GetDebugLogPathName()));
+    res.push_back(Pair("RPCport", GetDefaultRPCPort() ));
     return res;
 }
 

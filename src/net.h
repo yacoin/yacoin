@@ -91,6 +91,8 @@ const int
 const double
     nInflation = 0.02;      // 2%
 
+extern ::int64_t
+    nUpTimeStart;
 extern const unsigned int 
     nStakeMaxAge,
     nOnedayOfAverageBlocks;

@@ -50,7 +50,7 @@ unsigned int scanhash_scrypt(
                             , CBlockIndex *pindexPrev
                             , uint256 *phashTarget
                             );
-void scrypt_hash(const void* input, size_t inputlen, ::uint32_t *res, unsigned char Nfactor);
+bool scrypt_hash(const void* input, size_t inputlen, ::uint32_t *res, unsigned char Nfactor);
 
 #endif // SCRYPT_H
 
