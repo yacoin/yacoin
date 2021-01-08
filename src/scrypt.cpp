@@ -288,13 +288,13 @@ const ::uint32_t
             ( 0 == ( hashc[31]))
             && ( 0 == ( hashc[30]))
             && ( 0 == ( nMask & hashc[29]))
+
            ) 
         {
             //memcpy(result, hash, 32);
             //return data.nonce;
             break;
         }
-
 #ifdef LOW_DIFFICULTY_FOR_DEVELOPMENT        
         if(0 == ( nMask & hashc[31]))
             break;
