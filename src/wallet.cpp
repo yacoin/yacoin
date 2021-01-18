@@ -2659,7 +2659,7 @@ bool CWallet::CreateCoinStake(
             mapMeta.clear();
             int64_t nValueIn = 0;
             CoinsSet setCoins;
-            if (!SelectCoinsSimple(nBalance - nReserveBalance, MIN_TX_FEE, MAX_MONEY, txNew.nTime, nCoinbaseMaturity * 10, setCoins, nValueIn))
+            if (!SelectCoinsSimple(nBalance - nReserveBalance, MIN_TX_FEE, MAX_MONEY, txNew.nTime, GetCoinbaseMaturity() * 10, setCoins, nValueIn))
                 return false;
 
             if (setCoins.empty())

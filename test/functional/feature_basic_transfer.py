@@ -45,6 +45,7 @@ class BasicTransfer_Test(BitcoinTestFramework):
         self.setup_clean_chain = True
         self.supports_cli = False
         self.mocktime = TIME_GENESIS_BLOCK
+        self.block_fork_1_0=0
         
     def setmocktimeforallnodes(self, mocktime):
         for node in self.nodes:
@@ -52,7 +53,7 @@ class BasicTransfer_Test(BitcoinTestFramework):
 
     def mine_blocks(self, nodeId, numberOfBlocks):
         timeBetweenBlocks = 60
-        for i in range(numberOfBlocks):
+        for _ in range(numberOfBlocks):
             self.setmocktimeforallnodes(self.mocktime)
             self.mocktime=self.mocktime+timeBetweenBlocks      
             self.nodes[nodeId].generate(1)
@@ -70,13 +71,13 @@ class BasicTransfer_Test(BitcoinTestFramework):
         self.log.info('Address 0: '+str(address_0))
         self.log.info('Address 1: '+str(address_1))
 
-        self.mine_blocks(0, 10)
-        assert_equal(self.nodes[0].getblockcount(), 10)
-        assert_equal(self.nodes[1].getblockcount(), 10)
+        self.mine_blocks(0, 30)
+        assert_equal(self.nodes[0].getblockcount(), 30)
+        assert_equal(self.nodes[1].getblockcount(), 30)
         
-        balance_0 = self.nodes[0].getbalance()
-        balance_1 = self.nodes[1].getbalance()
-        assert_equal(balance_0, Decimal('50000000.0'))
+        balance_0 = float(self.nodes[0].getbalance())
+        balance_1 = float(self.nodes[1].getbalance())
+        assert_approx(balance_0, 95.064278) # 3.8025705377 * 5
         assert_equal(balance_1, Decimal('0.0'))
 
         self.log.info('Balances after initial mining')
@@ -84,20 +85,18 @@ class BasicTransfer_Test(BitcoinTestFramework):
         self.log.info('Balance node 1: '+str(balance_1))
         self.log_accounts("after 10")
 
-        transaction_id = self.nodes[0].sendtoaddress(address_1, 100.0)
+        transaction_id = self.nodes[0].sendtoaddress(address_1, 2)
         tx_details = self.nodes[0].gettransaction(transaction_id)
         self.log.info(str(tx_details))
-        assert_equal(tx_details['vout'][1]['value'],Decimal('100.0'))
+        assert_equal(tx_details['vout'][1]['value'],Decimal('2'))
         assert_equal(tx_details['vout'][1]['scriptPubKey']['addresses'][0],address_1)
         assert_equal(tx_details['confirmations'],Decimal('0'))
-                
-        self.mine_blocks(0, 10)        
-        self.log_accounts("after 20")
-        assert_equal(self.nodes[0].getblockcount(), 20)
+
+        self.mine_blocks(0, 10)
+        assert_equal(self.nodes[0].getblockcount(), 40)
         balance_0 = self.nodes[0].getbalance()
         balance_1 = self.nodes[1].getbalance()
-        assert_approx(balance_0, 89999920.523877)
-        assert_equal(balance_1, Decimal('100.0'))
+        assert_equal(balance_1, Decimal('2'))
         node_0_accounts = self.nodes[0].listaccounts()
         node_1_accounts = self.nodes[1].listaccounts()
         assert_equal(node_0_accounts[''],balance_0)

@@ -99,8 +99,9 @@ class BitcoinTestFramework(metaclass=BitcoinTestMetaClass):
         self.rpc_timeout = 600  # Wait for up to 600 seconds for the RPC server to respond
         self.supports_cli = True
         self.bind_to_localhost_only = True
+        self.block_fork_1_0=0
         self.set_test_params()
-        self.parse_args()
+        self.parse_args()        
 
     def main(self):
         """Main function. This should not be overridden by the subclass test scripts."""
@@ -410,6 +411,7 @@ class BitcoinTestFramework(metaclass=BitcoinTestMetaClass):
                 use_cli=self.options.usecli,
                 start_perf=self.options.perf,
                 use_valgrind=self.options.valgrind,
+                block_fork_1_0=self.block_fork_1_0
             ))
 
     def start_node(self, i, *args, **kwargs):
@@ -551,6 +553,7 @@ class BitcoinTestFramework(metaclass=BitcoinTestMetaClass):
                     bitcoin_cli=self.options.bitcoincli,
                     coverage_dir=None,
                     cwd=self.options.tmpdir,
+                    block_fork_1_0=self.block_fork_1_0
                 ))
             self.start_node(CACHE_NODE_ID)
 

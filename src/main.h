@@ -93,14 +93,15 @@ inline bool MoneyRange(::int64_t nValue) { return (nValue >= 0 && nValue <= MAX_
 // Maximum number of script-checking threads allowed
 static const int MAX_SCRIPTCHECK_THREADS = 16;
 
-static const uint256 
     // hashGenesisBlock("0x0000060fc90618113cde415ead019a1052a9abc43afcccff38608ff8751353e5");
     // hashGenesisBlock("0x00000f3f5eac1539c4e9216e17c74ff387ac1629884d2f97a3144dc32bf67bda");
     // hashGenesisBlock("0x0ea17bb85e10d8c6ded6783a4ce8f79e75d49b439ff41f55d274e6b15612fff9");
 #ifndef LOW_DIFFICULTY_FOR_DEVELOPMENT
-    hashGenesisBlock("0x0000060fc90618113cde415ead019a1052a9abc43afcccff38608ff8751353e5");
+    static const uint256 hashGenesisBlock("0x0000060fc90618113cde415ead019a1052a9abc43afcccff38608ff8751353e5");
+    static const int64_t INITIAL_MONEY_SUPPLY = 0;
 #else
-    hashGenesisBlock("0x1ddf335eb9c59727928cabf08c4eb1253348acde8f36c6c4b75d0b9686a28848");
+    static const uint256 hashGenesisBlock("0x1ddf335eb9c59727928cabf08c4eb1253348acde8f36c6c4b75d0b9686a28848");
+    static const int64_t INITIAL_MONEY_SUPPLY = 1E14;
 #endif
 
 extern const uint256 
@@ -192,7 +193,7 @@ void ThreadScriptCheckQuit();
 
 bool CheckProofOfWork(uint256 hash, unsigned int nBits);
 unsigned int GetNextTargetRequired(const CBlockIndex* pindexLast, bool fProofOfStake);
-::int64_t GetProofOfWorkReward(unsigned int nBits=0, ::int64_t nFees=0, bool fGetRewardOfBestHeightBlock=false);
+::int64_t GetProofOfWorkReward(unsigned int nBits=0, ::int64_t nFees=0, unsigned int nHeight=0);
 ::int64_t GetProofOfStakeReward(::int64_t nCoinAge, unsigned int nBits, ::int64_t nTime, bool bCoinYearOnly=false);
 
 ::int64_t GetProofOfStakeReward(::int64_t nCoinAge);
@@ -230,7 +231,20 @@ bool SequenceLocks(const CTransaction &tx, int flags, std::vector<int>* prevHeig
  */
 bool CheckSequenceLocks(const CTransaction &tx, int flags);
 
+/**
+ * Get minimum confirmations to use coinbase
+ */
+int GetCoinbaseMaturity();
 
+/**
+ * Get an extra confirmations to add coinbase to balance
+ */
+int GetCoinbaseMaturityOffset();
+
+/**
+ * Check if the hardfork happens
+ */
+bool isHardforkHappened();
 
 //bool GetWalletFile(CWallet* pwallet, std::string &strWalletFileOut);
 
@@ -610,7 +624,7 @@ public:
     void SetNull()
     {
         // TODO: Need update for mainet
-        if (nBestHeight != -1 && pindexGenesisBlock && nBestHeight >= nMainnetNewLogicBlockNumber)
+        if (nBestHeight != -1 && pindexGenesisBlock && (nBestHeight + 1) >= nMainnetNewLogicBlockNumber)
         {
             nVersion = CTransaction::CURRENT_VERSION_of_Tx_for_yac_new;
         }
@@ -630,9 +644,41 @@ public:
         return (vin.empty() && vout.empty());
     }
 
+    const uint256 GetNormalizedHash() const
+    {
+        // Coinbase transactions cannot be malleated and may not change after
+        // publication. We cannot zero out the scripts, otherwise we get collisions
+        // among coinbase transactions by the same miner.
+        if (IsCoinBase())
+        {
+            return SerializeHash(*this);
+        }
+        else
+        {
+            CTransaction tmp(*this);
+            // Replace scriptSigs in inputs with empty strings
+            for (unsigned int i = 0; i < tmp.vin.size(); i++)
+            {
+                tmp.vin[i].scriptSig = CScript();
+            }
+
+            CHashWriter ss(SER_GETHASH, 0);
+            ss << tmp;
+            return ss.GetHash();
+        }
+    }
+
     uint256 GetHash() const
     {
-        return SerializeHash(*this);
+        // transaction with version >=2 fixes tx malleability
+        if (this->nVersion >= CURRENT_VERSION_of_Tx_for_yac_new)
+        {
+            return GetNormalizedHash();
+        }
+        else
+        {
+            return SerializeHash(*this);
+        }
     }
 
     bool IsFinal(int nBlockHeight=0, ::int64_t nBlockTime=0) const
@@ -1107,7 +1153,7 @@ public:
     void SetNull()
     {
         // TODO: Need update for mainnet
-        if (nBestHeight != -1 && pindexGenesisBlock && nBestHeight >= nMainnetNewLogicBlockNumber)
+        if (nBestHeight != -1 && pindexGenesisBlock && (nBestHeight + 1) >= nMainnetNewLogicBlockNumber)
         {
             nVersion = VERSION_of_block_for_yac_05x_new;
         }
@@ -1619,7 +1665,7 @@ public:
         nBitsMA = 0;
         bnChainTrust = CBigNum(0);
         nMint = 0;
-        nMoneySupply = 0;
+        nMoneySupply = INITIAL_MONEY_SUPPLY;
         nFlags = 0;
         nStakeModifier = 0;
         nStakeModifierChecksum = 0;
@@ -1647,7 +1693,7 @@ public:
         nBitsMA = 0;
         bnChainTrust = CBigNum(0);
         nMint = 0;
-        nMoneySupply = 0;
+        nMoneySupply = INITIAL_MONEY_SUPPLY;
         nFlags = 0;
         nStakeModifier = 0;
         nStakeModifierChecksum = 0;

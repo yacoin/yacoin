@@ -60,7 +60,7 @@ class TestNode():
     To make things easier for the test writer, any unrecognised messages will
     be dispatched to the RPC connection."""
 
-    def __init__(self, i, datadir, *, chain, rpchost, timewait, bitcoind, bitcoin_cli, coverage_dir, cwd, extra_conf=None, extra_args=None, use_cli=False, start_perf=False, use_valgrind=False, version=None):
+    def __init__(self, i, datadir, *, chain, rpchost, timewait, bitcoind, bitcoin_cli, coverage_dir, cwd, extra_conf=None, extra_args=None, use_cli=False, start_perf=False, use_valgrind=False, version=None, block_fork_1_0=0):
         """
         Kwargs:
             start_perf (bool): If True, begin profiling the node with `perf` as soon as
@@ -88,6 +88,7 @@ class TestNode():
         # Configuration for logging is set as command-line args rather than in the bitcoin.conf file.
         # This means that starting a bitcoind using the temp dir to debug a failed test won't
         # spam debug.log.
+        print("Block fork "+str(block_fork_1_0))
         self.args = [
             self.binary,
             "-datadir=" + self.datadir,
@@ -96,6 +97,7 @@ class TestNode():
             "-debugexclude=libevent",
             "-debugexclude=leveldb",
             "-uacomment=testnode%d" % i,
+            "-testnetNewLogicBlockNumber="+str(block_fork_1_0)
         ]
         if use_valgrind:
             default_suppressions_file = os.path.join(
@@ -141,7 +143,7 @@ class TestNode():
             AddressKeyPair('Y8RMtv2rPfNj3JeUq5Zb6xxvUeyXULz8ki', 'XPayZe8BXgKqarj3ZPRZmtcyqdkMPCpZR6bnF2EnJ1NdyivjTWU9'),
             AddressKeyPair('YHU8rSKMYsHKv9JPiuzGD5tabVN1zxfrhy', 'XQC4xmMd8S1tNwKpMcKb2kjotURFtnVUsauNB6eChvsrRkUZKGFM'),
             AddressKeyPair('YFzYDbzCkNbViCjkYJ2i9pzfhWpKMQzhcb', 'XMJ75XrddqxpyGeUrsVZs7PbVYKN2s7y5oRNzRY9v2C6S36f58Kd')
-# AddressKeyPair('YCYpkfgECJsUSH42FzTgpbjWRqf1E6oRcK', 'XSs57SNVPmiNMmNJx3hRdMycTPhZHnocYLqxWYpFsAaLZUgtXooY')
+            # AddressKeyPair('YCYpkfgECJsUSH42FzTgpbjWRqf1E6oRcK', 'XSs57SNVPmiNMmNJx3hRdMycTPhZHnocYLqxWYpFsAaLZUgtXooY')
     ]
 
     def get_deterministic_priv_key(self):
