@@ -257,13 +257,13 @@ const ::uint32_t
     }
 
     highestZeroBitsSet <<= 1;
-#ifdef Yac1dot0
-    (void)printf(
-                 "test mask %02x\n"
-                 ""
-                 , nMask
-                );
-#endif
+// #ifdef Yac1dot0
+//     (void)printf(
+//                  "test mask %02x\n"
+//                  ""
+//                  , nMask
+//                 );
+// #endif
     size_t
         nHeaderSize;
 

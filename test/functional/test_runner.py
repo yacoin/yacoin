@@ -67,17 +67,20 @@ TEST_EXIT_PASSED = 0
 TEST_EXIT_SKIPPED = 77
 
 BASE_SCRIPTS = [
-    'feature_help.py',    
-    'interface_rpc.py',
-    'mining_basic.py',
+    'feature_help.py', # at the beginning to quickly check that it can be started
+    'feature_basic_transfer.py',
+    'feature_describe_redeemscript.py',
+    'feature_epoch.py',
+    'feature_hardfork_1_0.py',        
     'feature_getrpcinfo.py',
     'feature_op_cltv.py',
     'feature_op_csv.py',
-    'feature_describe_redeemscript.py',
-    'feature_basic_transfer.py',
+    'feature_set_min_fee.py',
+    'feature_tx_malleability.py',
     'feature_uptime.py',
-    'rpc_check.py',
-    'feature_set_min_fee.py'
+    'interface_rpc.py',
+    'mining_basic.py',
+    'rpc_check.py'
 ]
 
 EXTENDED_SCRIPTS = []

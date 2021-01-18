@@ -1287,13 +1287,13 @@ static void YacoinMiner(CWallet *pwallet)  // here fProofOfStake is always false
             nHashCounter += nHashesDone;
             nHashesDone = 0;
                 
-#ifdef Yac1dot0
-            (void)printf(
-                         "hash counter %" PRId64 ""
-                         "\n"
-                         , nHashCounter
-                        );
-#endif
+// #ifdef Yac1dot0
+//             (void)printf(
+//                          "hash counter %" PRId64 ""
+//                          "\n"
+//                          , nHashCounter
+//                         );
+// #endif
             ::int64_t 
                 nNow = GetTimeMillis();
 

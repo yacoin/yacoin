@@ -172,11 +172,15 @@ static CBigNum bnInitialHashTargetTestNet(~uint256(0) >> 8);    // test
 //static CBigNum bnInitialHashTarget(~uint256(0) >> 16);
 
 int
-    nCoinbaseMaturityInBlocks = 6;
+    nCoinbaseMaturityInBlocks = 500;
 
 int 
-    nCoinbaseMaturity = nCoinbaseMaturityInBlocks;  // 6;
-                                                    // @~1 blk/minute, ~6 minutes
+    nCoinbaseMaturity = nCoinbaseMaturityInBlocks;  //500;
+                                                    // @~1 blk/minute, ~8.33 hrs        
+
+int
+    nCoinbaseMaturityAfterHardfork = 6;
+
 CBlockIndex* pindexGenesisBlock = NULL;
 int nBestHeight = -1;
 
@@ -551,8 +555,41 @@ bool CheckSequenceLocks(const CTransaction &tx, int flags)
     return EvaluateSequenceLocks(index, lockPair);
 }
 
+int GetCoinbaseMaturity()
+{
+    if (nBestHeight != -1 && pindexGenesisBlock && nBestHeight >= nMainnetNewLogicBlockNumber)
+    {
+        return nCoinbaseMaturityAfterHardfork;
+    }
+    else
+    {
+        return nCoinbaseMaturity;
+    }
+}
 
+int GetCoinbaseMaturityOffset()
+{
+    if (nBestHeight != -1 && pindexGenesisBlock && nBestHeight >= nMainnetNewLogicBlockNumber)
+    {
+        return 0;
+    }
+    else
+    {
+        return 20;
+    }
+}
 
+bool isHardforkHappened()
+{
+    if (nBestHeight != -1 && pindexGenesisBlock && nBestHeight >= nMainnetNewLogicBlockNumber)
+    {
+        return true;
+    }
+    else
+    {
+        return false;
+    }
+}
 //////////////////////////////////////////////////////////////////////////////
 //
 // CTransaction and CTxIndex
@@ -913,6 +950,9 @@ bool CTxMemPool::accept(CTxDB& txdb, CTransaction &tx, bool fCheckInputs,
     if (pfMissingInputs)
         *pfMissingInputs = false;
 
+    if (tx.nVersion == CTransaction::CURRENT_VERSION_of_Tx_for_yac_old && isHardforkHappened())
+        return error("CTxMemPool::accept() : Not accept transaction with old version");
+
     if (!tx.CheckTransaction())
         return error("CTxMemPool::accept() : CheckTransaction failed");
 
@@ -1156,7 +1196,12 @@ int CMerkleTx::GetBlocksToMaturity() const
 {
     if (!(IsCoinBase() || IsCoinStake()))
         return 0;
-    return max(0, nCoinbaseMaturity - GetDepthInMainChain());
+    return max(
+                0, 
+                fTestNet?
+                (GetCoinbaseMaturity() +  0) - GetDepthInMainChain():   //<<<<<<<<<<< test
+                (GetCoinbaseMaturity() + GetCoinbaseMaturityOffset()) - GetDepthInMainChain()    // why is this 20?
+              );                                                    // what is this 20 from? For?
 }
 
 
@@ -1266,6 +1311,12 @@ static CBlockIndex* pblockindexFBBHLast;
 CBlockIndex* FindBlockByHeight(int nHeight)
 {
     CBlockIndex *pblockindex;
+    // Check input parameter
+    if (nHeight <= 0)
+        return pindexGenesisBlock;
+    if (nHeight >= pindexBest->nHeight)
+        return pindexBest;
+
     if (nHeight < nBestHeight / 2)
         pblockindex = pindexGenesisBlock;
     else
@@ -1486,31 +1537,22 @@ CBigNum inline GetProofOfStakeLimit(int nHeight, unsigned int nTime)
     return bnProofOfStakeHardLimit; // YAC has always been 30 
 }
 
-// miner's coin base reward based on nBits
-::int64_t GetProofOfWorkReward(unsigned int nBits, ::int64_t nFees, bool fGetRewardOfBestHeightBlock)
+// Before hardfork, miner's coin base reward based on nBits
+// After hardfork, calculate coinbase reward based on nHeight. If not specify nHeight, always
+// calculate coinbase reward based on pindexBest->nHeight + 1 (reward of next best block)
+::int64_t GetProofOfWorkReward(unsigned int nBits, ::int64_t nFees, unsigned int nHeight)
 {
 #ifdef Yac1dot0
+    // Get reward of a specific block height
+    if (nHeight != 0 && nHeight >= nMainnetNewLogicBlockNumber)
+    {
+        ::int32_t startEpochBlockHeight = (nHeight / nEpochInterval) * nEpochInterval;
+        const CBlockIndex* pindexMoneySupplyBlock = FindBlockByHeight(startEpochBlockHeight - 1);
+        return (pindexMoneySupplyBlock->nMoneySupply * nInflation / nNumberOfBlocksPerYear);
+    }
+
     if (pindexBest && (pindexBest->nHeight + 1) >= nMainnetNewLogicBlockNumber)
     {
-        // Get reward of current best height block
-        if (fGetRewardOfBestHeightBlock)
-        {
-            int64_t currentBlockReward = nBlockRewardPrev;
-            if (!nBlockRewardPrev)
-            {
-                const CBlockIndex* pindexMoneySupplyBlock =
-                    FindBlockByHeight(nMainnetNewLogicBlockNumber ? nMainnetNewLogicBlockNumber - 1 : 0);
-                currentBlockReward =
-                    (::int64_t)(pindexMoneySupplyBlock->nMoneySupply * nInflation / nNumberOfBlocksPerYear);
-            }
-#ifdef LOW_DIFFICULTY_FOR_DEVELOPMENT
-            if(currentBlockReward == 0) { // this is an edge case when starting the chain
-                currentBlockReward = (::int64_t)1E13;
-            }
-#endif
-            return currentBlockReward;
-        }
-
         // Get reward of current mining block
         ::int64_t nBlockRewardExcludeFees;
         if (recalculateBlockReward) // Reorg through two or many epochs
@@ -1550,11 +1592,6 @@ CBigNum inline GetProofOfStakeLimit(int nHeight, unsigned int nTime)
                 }
             }
         }
-#ifdef LOW_DIFFICULTY_FOR_DEVELOPMENT
-        if(nBlockRewardExcludeFees == 0) { // this is an edge case when starting the chain
-            nBlockRewardExcludeFees = (::int64_t)1E13;
-        }
-#endif        
         return nBlockRewardExcludeFees;
     }
 #endif
@@ -2705,10 +2742,18 @@ bool CTransaction::ConnectInputs(
 
             // If prev is coinbase or coinstake, check that it's matured
             if (txPrev.IsCoinBase() || txPrev.IsCoinStake())
+            {
+                // Fix off-by-one error in coinbase maturity check after hardfork
+                int coinbaseMaturityOffset = 0;
+                if (nBestHeight != -1 && pindexGenesisBlock && nBestHeight >= nMainnetNewLogicBlockNumber)
+                {
+                    coinbaseMaturityOffset = 1;
+                }
+
                 for (
                      const CBlockIndex
                         * pindex = pindexBlock;
-                     pindex && ((pindexBlock->nHeight - pindex->nHeight) < nCoinbaseMaturity); 
+                     pindex && ((pindexBlock->nHeight - pindex->nHeight + coinbaseMaturityOffset) < GetCoinbaseMaturity());
                      pindex = pindex->pprev
                     )
                     if (
@@ -2718,8 +2763,9 @@ bool CTransaction::ConnectInputs(
                         return error(
                                      "ConnectInputs() : tried to spend %s at depth %d", 
                                      txPrev.IsCoinBase()? "coinbase": "coinstake", 
-                                     pindexBlock->nHeight - pindex->nHeight
+                                     pindexBlock->nHeight - pindex->nHeight + coinbaseMaturityOffset
                                     );
+            }
 
             // ppcoin: check transaction timestamp
             if (txPrev.nTime > nTime)
@@ -3020,7 +3066,7 @@ bool CBlock::ConnectBlock(CTxDB& txdb, CBlockIndex* pindex, bool fJustCheck)
                 }
                 else
                 {
-                    return false;
+                    prevheights[i] = pindex->nHeight;
                 }
             }
             if (!SequenceLocks(tx, nLockTimeFlags, &prevheights, *pindex))
@@ -3584,12 +3630,7 @@ bool CBlock::CheckBlock(bool fCheckPOW, bool fCheckMerkleRoot, bool fCheckSig) c
 
     // Size limits
     if (vtx.empty() || vtx.size() > GetMaxSize(MAX_BLOCK_SIZE) || ::GetSerializeSize(*this, SER_NETWORK, PROTOCOL_VERSION) > GetMaxSize(MAX_BLOCK_SIZE))
-    {
-        if (vtx.empty()) printf("vtx.empty\n");
-        if (vtx.size() > GetMaxSize(MAX_BLOCK_SIZE)) printf("vtx.size > getmaxsize\n");
-        if (::GetSerializeSize(*this, SER_NETWORK, PROTOCOL_VERSION) > GetMaxSize(MAX_BLOCK_SIZE)) printf("vtx getserialsize\n");
         return DoS(100, error("CheckBlock () : size limits failed"));
-    }
 
     bool fProofOfStake = IsProofOfStake();
 
@@ -3725,6 +3766,26 @@ bool CBlock::AcceptBlock()
         return DoS(10, error("AcceptBlock () : prev block not found"));
     CBlockIndex* pindexPrev = (*mi).second;
     int nHeight = pindexPrev->nHeight+1;
+
+    // Since hardfork block, new blocks don't accept transactions with version 1 anymore
+    if (nHeight >= nMainnetNewLogicBlockNumber)
+    {
+        bool fProofOfStake = IsProofOfStake();
+
+        if (vtx[0].nVersion == CTransaction::CURRENT_VERSION_of_Tx_for_yac_old)
+            return DoS(vtx[0].nDoS, error("AcceptBlock () : Not accept coinbase transaction with version 1"));
+
+        if(fProofOfStake && vtx[1].nVersion == CTransaction::CURRENT_VERSION_of_Tx_for_yac_old)
+            return DoS(vtx[1].nDoS, error("AcceptBlock () : Not accept coinstake transaction with version 1"));
+
+        // Iterate all transactions starting from second for proof-of-stake block
+        //    or first for proof-of-work block
+        for (unsigned int i = (fProofOfStake ? 2 : 1); i < vtx.size(); ++i)
+        {
+            if (vtx[i].nVersion == CTransaction::CURRENT_VERSION_of_Tx_for_yac_old)
+                return DoS(vtx[i].nDoS, error("AcceptBlock () : Not accept transaction with version 1"));
+        }
+    }
 
     // Check proof-of-work or proof-of-stake
     if (nBits != GetNextTargetRequired(pindexPrev, IsProofOfStake()))

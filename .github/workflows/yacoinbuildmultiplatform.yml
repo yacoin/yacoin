@@ -27,7 +27,7 @@ jobs:
         with:
           name: yacoin-qt-ubuntu-16.04
           path: /home/runner/work/yacoin/yacoin/release/yacoin-qt
-  build-ubuntu-1604-low-difficulty:
+  build-ubuntu-1604-functional-test:
     runs-on: ubuntu-latest  
     steps:
       - uses: actions/checkout@v2
