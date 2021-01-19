@@ -1561,7 +1561,7 @@ public:
             nBits, 
             nNonce,
             vtx.size(),
-            HexStr(vchBlockSig.begin(), vchBlockSig.end()).c_str()
+            (vchBlockSig.size()>0?HexStr(vchBlockSig.begin(), vchBlockSig.end()).c_str():"")
               );
         for (unsigned int i = 0; i < vtx.size(); ++i)
         {
