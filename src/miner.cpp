@@ -224,7 +224,7 @@ CBlock* CreateNewBlock(CWallet* pwallet, bool fProofOfStake)
         * pindexPrev = pindexBest;
 /*********************/
     // ppcoin: if coinstake available add coinstake tx
-    static int64_t 
+    static ::int64_t 
         nLastCoinStakeSearchTime = GetAdjustedTime();  // only initialized at startup
     //CBlockIndex* pindexPrev = pindexBest;
 
@@ -235,8 +235,8 @@ CBlock* CreateNewBlock(CWallet* pwallet, bool fProofOfStake)
         CTransaction 
             txCoinStake;    // uses real time
 
-        int64_t 
-            nSearchTime = (int64_t)txCoinStake.nTime; // search to current time
+        ::int64_t 
+            nSearchTime = (::int64_t)txCoinStake.nTime; // search to current time
 
         if (
             (nSearchTime > nLastCoinStakeSearchTime)

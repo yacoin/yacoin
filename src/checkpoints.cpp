@@ -121,9 +121,7 @@ namespace Checkpoints
         LOCK(cs_hashSyncCheckpoint);
         if (!mapBlockIndex.count(hashSyncCheckpoint))
         {
-#ifndef Yac1dot0
             error("GetSyncCheckpoint: block index missing for current sync-checkpoint %s", hashSyncCheckpoint.ToString().c_str());
-#endif
         }
         else
             return mapBlockIndex[hashSyncCheckpoint];
@@ -391,11 +389,11 @@ namespace Checkpoints
         }
 
         // Relay checkpoint
-        {{
+        {
             LOCK(cs_vNodes);
             BOOST_FOREACH(CNode* pnode, vNodes)
                 checkpoint.RelayTo(pnode);
-        }}
+        }
         return true;
     }
 

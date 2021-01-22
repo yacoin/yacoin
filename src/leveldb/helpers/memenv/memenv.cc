@@ -12,6 +12,7 @@
 #include <string.h>
 #include <string>
 #include <vector>
+#include <stdint.h> // for SIZE_MAX in Windows gcc build
 
 namespace leveldb {
 

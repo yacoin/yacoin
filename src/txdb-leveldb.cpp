@@ -763,7 +763,7 @@ bool CTxDB::LoadBlockIndex()
 
 #ifdef WIN32
     if (fPrintToConsole) 
-        (void)printf( "Sorting by height...\n" );        
+        (void)printf( "Sorting by height..." );        
     #ifdef QT_GUI
     uiInterface.InitMessage(
                             _("Sorting by height...")

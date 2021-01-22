@@ -48,7 +48,7 @@ class CNode;
 class CBlockIndex;
 extern int nBestHeight;
 
-extern CCriticalSection cs_net;
+//extern CCriticalSection cs_net;
 
 const ::int64_t
     nSecondsPerMinute = 60,
@@ -75,7 +75,7 @@ const ::uint32_t
     nHoursPerDay = 24,
     nSecondsPerDay = nHoursPerDay * nSecondsPerHour;
 
-const int
+const ::uint32_t
     nAverageBlocksPerMinute = 1,
     nNumberOfDaysPerYear = 365,
     nNumberOfBlocksPerYear = (nAverageBlocksPerMinute *
@@ -368,7 +368,7 @@ public:
     {
         if (hSocket != INVALID_SOCKET)
         {
-            closesocket(hSocket);
+            (void)closesocket(hSocket);
             hSocket = INVALID_SOCKET;
         }
     }
@@ -389,7 +389,8 @@ private:
         nTotalBytesSent;
 
     CNode(const CNode&);
-    void operator=(const CNode&);
+    CNode &operator=(const CNode&);
+  //void operator=(const CNode&);
 public:
     int GetRefCount()
     {
@@ -448,9 +449,9 @@ public:
         // the key is the earliest time the request can be sent
         ::int64_t& nRequestTime = mapAlreadyAskedFor[inv];
         if (fDebugNet)
-            printf("askfor %s   %" PRId64 " (%s)\n", 
-                    inv.ToString().c_str(), 
-                    nRequestTime, 
+            printf("askfor %s   %" PRId64 " (%s)\n",
+                    inv.ToString().c_str(),
+                    nRequestTime,
                     DateTimeStrFormat("%H:%M:%S", nRequestTime/1000000).c_str()
                   );
 
@@ -505,26 +506,26 @@ public:
 
         // Set the size
         ::uint32_t 
-            nSize = (::uint32_t) vSend.size() - nMessageStart;
+            nSize = (::uint32_t)vSend.size() - nMessageStart;
 
         memcpy(
-                (char*)&vSend[nHeaderStart] + CMessageHeader::MESSAGE_SIZE_OFFSET, 
-                &nSize, 
-                sizeof(nSize)
+               (char*)&vSend[nHeaderStart] + CMessageHeader::MESSAGE_SIZE_OFFSET,
+               &nSize,
+               sizeof(nSize)
               );
 
         // Set the checksum
-        uint256 
+        uint256
             hash = Hash(vSend.begin() + nMessageStart, vSend.end());
 
-        ::uint32_t 
+        ::uint32_t
             nChecksum = 0;
 
         memcpy(&nChecksum, &hash, sizeof(nChecksum));
         Yassert(nMessageStart - nHeaderStart >= CMessageHeader::CHECKSUM_OFFSET + sizeof(nChecksum));
         memcpy((char*)&vSend[nHeaderStart] + CMessageHeader::CHECKSUM_OFFSET, &nChecksum, sizeof(nChecksum));
 
-        if (fDebug) 
+        if (fDebug)
         {
             printf("(%d bytes)\n", nSize);
         }
@@ -713,7 +714,7 @@ public:
     void PushRequest(const char* pszCommand,
                      void (*fn)(void*, CDataStream&), void* param1)
     {
-        uint256 
+        uint256
             hashReply;
 
         RAND_bytes((unsigned char*)&hashReply, sizeof(hashReply));

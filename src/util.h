@@ -41,7 +41,7 @@
 
 static const ::int64_t COIN = 1000000;
 //THEREFORE
-       const int COINdecimalPower = 16;     // i.e. log10( COIN )
+const int COINdecimalPower = 16;     // i.e. log10( COIN )
 static const ::int64_t CENT = 10000;
 
 #define BEGIN(a)            ((char*)&(a))
@@ -347,7 +347,6 @@ template<typename T>
 std::string HexStr(const T itbegin, const T itend, bool fSpaces=false)
 {
     std::string rv;
-    if(itbegin == itend) return("");
     static const char hexmap[16] = { '0', '1', '2', '3', '4', '5', '6', '7',
                                      '8', '9', 'a', 'b', 'c', 'd', 'e', 'f' };
     rv.reserve((itend-itbegin)*3);

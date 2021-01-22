@@ -283,12 +283,10 @@ const ::uint32_t
         }
         ++hash_count;
         // Hash target can't be smaller than bnProofOfWorkLimit which is 00000fffff000000
-
-        if (         
+        if (            
             ( 0 == ( hashc[31]))
             && ( 0 == ( hashc[30]))
             && ( 0 == ( nMask & hashc[29]))
-
            ) 
         {
             //memcpy(result, hash, 32);
