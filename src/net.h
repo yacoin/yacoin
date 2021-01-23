@@ -388,9 +388,8 @@ private:
     static ::uint64_t 
         nTotalBytesSent;
 
-    CNode(const CNode&);
-    CNode &operator=(const CNode&);
-  //void operator=(const CNode&);
+    CNode(const CNode&);    
+    void operator=(const CNode&);
 public:
     int GetRefCount()
     {
