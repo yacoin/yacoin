@@ -57,7 +57,7 @@
 #ifndef BITCOIN_SYNC_H
  #include "sync.h"
 #endif
-extern CCriticalSection cs_net;
+//extern CCriticalSection cs_net;
 
 extern int GetRandInt(int nMax);
 extern uint64_t GetRand(uint64_t nMax);
@@ -306,14 +306,14 @@ static int StunRequest(const char *host, uint16_t port, struct sockaddr_in *mapp
 #ifndef WIN32
     close(sock);
 #else
-    closesocket(sock);
+    (void)closesocket(sock);
 #endif
     return rc;
     }
 } // StunRequest
 
 /*---------------------------------------------------------------------*/
-// Input: two random values (pos, step) for generate uniuqe way over server
+// Input: two random values (pos, step) for generate unique way over server
 // list
 // Output: populate struct struct mapped
 // Retval:

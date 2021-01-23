@@ -41,7 +41,7 @@
 
 static const ::int64_t COIN = 1000000;
 //THEREFORE
-       const int COINdecimalPower = 16;     // i.e. log10( COIN )
+const int COINdecimalPower = 16;     // i.e. log10( COIN )
 static const ::int64_t CENT = 10000;
 
 #define BEGIN(a)            ((char*)&(a))

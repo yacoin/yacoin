@@ -612,7 +612,7 @@ public:
         }
         else // 32-bit nTime
         {
-			uint32_t time = (uint32_t)nTime; // needed for GetSerializeSize, Serialize function
+            ::uint32_t time = (::uint32_t)nTime; // needed for GetSerializeSize, Serialize function
 			READWRITE(time);
 			nTime = time; // needed for Unserialize function
         }
@@ -865,7 +865,7 @@ public:
         str += IsCoinBase()? "Coinbase" : (IsCoinStake()? "Coinstake" : "CTransaction");
         str += strprintf(
             "(hash=%s, "
-            "nTime=%ld, "
+            "nTime=%" PRId64 ", "
             "ver=%d, "
             "vin.size=%" PRIszu ", "
             "vout.size=%" PRIszu ", "
@@ -1130,7 +1130,7 @@ public:
         }
         else // 32-bit nTime
         {
-               uint32_t time = (uint32_t)nTime; // needed for GetSerializeSize, Serialize function
+               ::uint32_t time = (::uint32_t)nTime; // needed for GetSerializeSize, Serialize function
                READWRITE(time);
                nTime = time; // needed for Unserialize function
         }
@@ -1195,7 +1195,17 @@ public:
             block_data.timestamp = nTime;
             block_data.bits = nBits;
             block_data.nonce = nNonce;
-            scrypt_hash(CVOIDBEGIN(block_data), sizeof(struct block_header), UINTBEGIN(thash), MAXIMUM_YAC1DOT0_N_FACTOR);
+            if( 
+               !scrypt_hash(
+                           CVOIDBEGIN(block_data),
+                           sizeof(struct block_header),
+                           UINTBEGIN(thash),
+                           MAXIMUM_YAC1DOT0_N_FACTOR
+                          )
+              )
+            {
+                thash = 0;  // perhaps? should error("lack of memory for scrypt hash?");
+            }
         }
         else // 32-bit nTime
         {
@@ -1274,7 +1284,7 @@ public:
             }
 
             if(
-               nYac20BlockNumberTime &&
+               (0 != nYac20BlockNumberTime) &&
                nTime >= (uint32_t)nYac20BlockNumberTime
               )
             {
@@ -1288,19 +1298,31 @@ public:
             oldBlock.timestamp = nTime;
             oldBlock.bits = nBits;
             oldBlock.nonce = nNonce;
-            scrypt_hash(CVOIDBEGIN(oldBlock), sizeof(old_block_header), UINTBEGIN(thash), nfactor);
+            if(
+               !scrypt_hash(
+                           CVOIDBEGIN(oldBlock),
+                           sizeof(old_block_header),
+                           UINTBEGIN(thash),
+                           nfactor
+                          )
+              )
+            {
+                thash = 0;  // perhaps? should error("lack of memory for scrypt hash?");
+            }
         }
 		return thash;
     }
 
     bool IsHeaderDifferent() const
     {
-        if((nVersion == previousBlockHeader.version)
-            && (hashPrevBlock == previousBlockHeader.prev_block)
-            && (hashMerkleRoot == previousBlockHeader.merkle_root)
-            && (nTime == previousBlockHeader.timestamp)
-            && (nBits == previousBlockHeader.bits)
-            && (nNonce == previousBlockHeader.nonce))
+        if(
+           (nVersion == previousBlockHeader.version)
+           && (hashPrevBlock == previousBlockHeader.prev_block)
+           && (hashMerkleRoot == previousBlockHeader.merkle_root)
+           && (nTime == previousBlockHeader.timestamp)
+           && (nBits == previousBlockHeader.bits)
+           && (nNonce == previousBlockHeader.nonce)
+          )
         {
             return false;
         }
@@ -1338,7 +1360,17 @@ public:
             block_data.timestamp = nTime;
             block_data.bits = nBits;
             block_data.nonce = nNonce;
-            scrypt_hash(CVOIDBEGIN(block_data), sizeof(struct block_header), UINTBEGIN(thash), nfactor);
+            if(
+               !scrypt_hash(
+                           CVOIDBEGIN(block_data),
+                           sizeof(struct block_header),
+                           UINTBEGIN(thash),
+                           nfactor
+                          )
+              )
+            {
+                thash = 0;  // perhaps? should error("lack of memory for scrypt hash?");
+            }
         }
         else // 32-bit nTime
         {
@@ -1350,7 +1382,17 @@ public:
             oldBlock.timestamp = nTime;
             oldBlock.bits = nBits;
             oldBlock.nonce = nNonce;
-            scrypt_hash(CVOIDBEGIN(oldBlock), sizeof(old_block_header), UINTBEGIN(thash), nfactor);
+            if(
+               !scrypt_hash(
+                           CVOIDBEGIN(oldBlock),
+                           sizeof(old_block_header),
+                           UINTBEGIN(thash),
+                           nfactor
+                          )
+              )
+            {
+                thash = 0;  // perhaps? should error("lack of memory for scrypt hash?");
+            }
         }
 
         return thash;
@@ -1386,7 +1428,7 @@ public:
             unsigned int nEntropyBit = ((GetHash().Get64()) & 1ULL);
             if (fDebug && GetBoolArg("-printstakemodifier"))
                 printf(
-                        "GetStakeEntropyBit: nTime=%ld \nhashBlock=%s\nnEntropyBit=%u\n",
+                        "GetStakeEntropyBit: nTime=%" PRId64 " \nhashBlock=%s\nnEntropyBit=%u\n",
                         nTime, 
                         GetHash().ToString().c_str(), 
                         nEntropyBit
@@ -1547,7 +1589,7 @@ public:
                 "ver=%d,\n"
                 "hashPrevBlock=%s,\n"
                 "hashMerkleRoot=%s,\n"
-                "nTime=%ld, "
+                "nTime=%" PRId64 ", "
                 "nBits=%08x, "
                 "nNonce=%u, "
                 "vtx=%" PRIszu ",\n",
@@ -1606,11 +1648,25 @@ private:
  */
 class CBlockIndex
 {
-//private:
-//public:
-
-//protected:
-//public:
+protected:
+    std::string ToString() const
+    {
+        return strprintf(
+                         "CBlockIndex(nprev=%p, pnext=%p, nFile=%u, nBlockPos=%-6d "
+                         "nHeight=%d, nMint=%s, nMoneySupply=%s, nFlags=(%s)(%d)(%s), "
+                         "nStakeModifier=%016" PRIx64 ", nStakeModifierChecksum=%08x, "
+                         "hashProofOfStake=%s, prevoutStake=(%s), nStakeTime=%d merkle=%s, "
+                         "hashBlock=%s)",
+                         pprev, pnext, nFile, nBlockPos, nHeight,
+                         FormatMoney(nMint).c_str(), FormatMoney(nMoneySupply).c_str(),
+                         GeneratedStakeModifier() ? "MOD" : "-", GetStakeEntropyBit(), IsProofOfStake()? "PoS" : "PoW",
+                         nStakeModifier, nStakeModifierChecksum, 
+                         hashProofOfStake.ToString().c_str(),
+                         prevoutStake.ToString().c_str(), nStakeTime,
+                         hashMerkleRoot.ToString().c_str(),
+                         GetBlockHash().ToString().c_str()
+                        );
+    }
 
 public:
     const uint256* phashBlock;
@@ -1831,19 +1887,6 @@ public:
             nFlags |= BLOCK_STAKE_MODIFIER;
     }
 
-    std::string ToString() const
-    {
-        return strprintf("CBlockIndex(nprev=%p, pnext=%p, nFile=%u, nBlockPos=%-6d nHeight=%d, nMint=%s, nMoneySupply=%s, nFlags=(%s)(%d)(%s), nStakeModifier=%016" PRIx64 ", nStakeModifierChecksum=%08x, hashProofOfStake=%s, prevoutStake=(%s), nStakeTime=%d merkle=%s, hashBlock=%s)",
-            pprev, pnext, nFile, nBlockPos, nHeight,
-            FormatMoney(nMint).c_str(), FormatMoney(nMoneySupply).c_str(),
-            GeneratedStakeModifier() ? "MOD" : "-", GetStakeEntropyBit(), IsProofOfStake()? "PoS" : "PoW",
-            nStakeModifier, nStakeModifierChecksum, 
-            hashProofOfStake.ToString().c_str(),
-            prevoutStake.ToString().c_str(), nStakeTime,
-            hashMerkleRoot.ToString().c_str(),
-            GetBlockHash().ToString().c_str());
-    }
-
     void print() const
     {
         printf("%s\n", ToString().c_str());
@@ -1908,7 +1951,7 @@ public:
         }
         else // 32-bit nTime
         {
-            uint32_t time = (uint32_t)nTime; // needed for GetSerializeSize, Serialize function
+            ::uint32_t time = (::uint32_t)nTime; // needed for GetSerializeSize, Serialize function
             READWRITE(time);
             nTime = time; // needed for Unserialize function
         }
@@ -1919,7 +1962,11 @@ public:
 
     uint256 GetBlockHash() const
     {
-        if (fUseFastIndex && (nTime < GetAdjustedTime() - 24 * 60 * 60) && blockHash != 0)
+        if (
+            fUseFastIndex &&
+            (nTime < GetAdjustedTime() - 24 * 60 * 60) &&   // block's time is ~< 1 day old
+            (blockHash != 0)
+           )
             return blockHash;
 
         CBlock block;
@@ -2002,7 +2049,7 @@ public:
         vHave.clear();
     }
 
-    bool IsNull()
+    bool IsNull() const
     {
         return vHave.empty();
     }
@@ -2045,7 +2092,7 @@ public:
         return nDistance;
     }
 
-    CBlockIndex* GetBlockIndex()
+    CBlockIndex* GetBlockIndex() const
     {
         // Find the first block the caller has in the main chain
         BOOST_FOREACH(const uint256& hash, vHave)
@@ -2077,7 +2124,7 @@ public:
         return (!fTestNet ? hashGenesisBlock : hashGenesisBlockTestNet);
     }
 
-    int GetHeight()
+    int GetHeight() const
     {
         CBlockIndex* pindex = GetBlockIndex();
         if (!pindex)
