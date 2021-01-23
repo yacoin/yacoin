@@ -4,6 +4,7 @@
 
 #pragma warning(disable:4503)   // decorated name > the compiler limit (4096 characters, yikes!), truncated
 #pragma warning( push )
+#pragma warning(disable:4018)   // signed/unsigned mismatch
 #pragma warning(disable:4101)   // local variable is never used     
 #pragma warning(disable:4146)   // unary minus operator applied to unsigned type, result still unsigned
 #pragma warning(disable:4200)   // nonstandard extension used : zero-sized array in struct/union Cannot generate copy-ctor or copy-assignment operator when UDT contains a zero-sized array

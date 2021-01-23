@@ -2700,7 +2700,8 @@ bool CTransaction::ConnectInputs(
                                  bool fBlock, 
                                  bool fMiner, 
                                  bool fScriptChecks, 
-                                 unsigned int flags, std::vector<CScriptCheck> *pvChecks
+                                 unsigned int flags,
+                                 std::vector<CScriptCheck> *pvChecks
                                 )
 {
     // Take over previous transactions' spent pointers
@@ -3089,7 +3090,20 @@ bool CBlock::ConnectBlock(CTxDB& txdb, CBlockIndex* pindex, bool fJustCheck)
                 nFees += nTxValueIn - nTxValueOut;
 
             std::vector<CScriptCheck> vChecks;
-            if (!tx.ConnectInputs(txdb, mapInputs, mapQueuedChanges, posThisTx, pindex, true, false, fScriptChecks, SCRIPT_VERIFY_NOCACHE | SCRIPT_VERIFY_P2SH, nScriptCheckThreads ? &vChecks : NULL))
+            if (
+                !tx.ConnectInputs(
+                                  txdb, 
+                                  mapInputs, 
+                                  mapQueuedChanges,
+                                  posThisTx,
+                                  pindex,
+                                  true,
+                                  false,
+                                  fScriptChecks,
+                                  SCRIPT_VERIFY_NOCACHE | SCRIPT_VERIFY_P2SH,
+                                  nScriptCheckThreads ? &vChecks : NULL
+                                 )
+               )
                 return false;
             control.Add(vChecks);
         }
@@ -6133,18 +6147,17 @@ void ProcessMessages(CNode* pfrom)
         bool fRet = false;
         try
         {
-            {{
+            {
                 LOCK(cs_main);
                 fRet = ProcessMessage(pfrom, strCommand, vMsg);
-            }}
+            }
             if (fShutdown)
                 return;
         }
         catch (std::ios_base::failure& e)
         {
             if (strstr(e.what(), "end of data"))
-            {
-                // Allow exceptions from under-length message on vRecv
+            {   // Allow exceptions from under-length message on vRecv
                 printf(
                         "ProcessMessages(%s, %u bytes) : "
                         "Exception '%s' caught, normally caused by "
@@ -6158,8 +6171,7 @@ void ProcessMessages(CNode* pfrom)
             else 
             {
                 if (strstr(e.what(), "size too large"))
-                {
-                    // Allow exceptions from over-long size
+                {   // Allow exceptions from over-long size
                     printf(
                             "ProcessMessages(%s, %u bytes) : Exception '%s' caught\n", 
                             strCommand.c_str(), 
@@ -6236,7 +6248,7 @@ void SendMessages(CNode* pto, bool fSendTrickle)
             ((GetTime() - nLastRebroadcast) > nBroadcastInterval)
            )
         {
-            {{
+            {
                 LOCK(cs_vNodes);
                 BOOST_FOREACH(CNode* pnode, vNodes)
                 {
@@ -6252,7 +6264,7 @@ void SendMessages(CNode* pto, bool fSendTrickle)
                             pnode->PushAddress(addr);
                     }
                 }
-            }}
+            }
             nLastRebroadcast = GetTime();
         }
 

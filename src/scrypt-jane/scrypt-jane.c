@@ -4,7 +4,11 @@
 	Public Domain or MIT License, whichever is easier
 */
 
-#include <string.h>
+#ifdef _MSC_VER
+    #include <stdint.h>
+#endif
+
+#include <stdlib.h>
 
 #if defined( _WINDOWS )
 #if !defined( QT_GUI )
@@ -43,8 +47,8 @@ scrypt_fatal_error_default(const char *msg) {
 
 static scrypt_fatal_errorfn scrypt_fatal_error = scrypt_fatal_error_default;
 
-void
-scrypt_set_fatal_error(scrypt_fatal_errorfn fn) {
+void scrypt_set_fatal_error(scrypt_fatal_errorfn fn)
+{
 	scrypt_fatal_error = fn;
 }
 
@@ -120,13 +124,12 @@ scrypt_alloc(uint64_t size) {
 	return aa;
 }
 
-static void
-scrypt_free(scrypt_aligned_alloc *aa) {
+static void scrypt_free(scrypt_aligned_alloc *aa)
+{
 	mem_bump = 0;
 }
 #else
-static scrypt_aligned_alloc
-scrypt_alloc(uint64_t size) 
+static scrypt_aligned_alloc scrypt_alloc(uint64_t size) 
 {
 	static const size_t 
         max_alloc = (size_t)-1;
@@ -137,11 +140,9 @@ scrypt_alloc(uint64_t size)
 	if (size > max_alloc)
 		scrypt_fatal_error("scrypt: not enough address space on this CPU to allocate required memory");
 	aa.mem = (uint8_t *)malloc((size_t)size);
-	aa.ptr = (uint8_t *)(((size_t)aa.mem + (SCRYPT_BLOCK_BYTES - 1)) & ~(SCRYPT_BLOCK_BYTES - 1));
 	if (!aa.mem)
-	{
 		scrypt_fatal_error("scrypt: out of memory");
-	}
+	aa.ptr = (uint8_t *)(((size_t)aa.mem + (SCRYPT_BLOCK_BYTES - 1)) & ~(SCRYPT_BLOCK_BYTES - 1));
 	return aa;
 }
 
@@ -155,16 +156,16 @@ static void scrypt_free(scrypt_aligned_alloc *aa)
 #define True 1
 #define False 0
 int scrypt(
-       const uint8_t *password, 
-       size_t password_len, 
-       const uint8_t *salt, 
-       size_t salt_len, 
-       uint8_t Nfactor, 
-       uint8_t rfactor, 
-       uint8_t pfactor, 
-       uint8_t *out, 
-       size_t bytes
-      ) 
+            const unsigned char *password, 
+            size_t password_len, 
+            const unsigned char *salt, 
+            size_t salt_len, 
+            uint8_t Nfactor, 
+            uint8_t rfactor, 
+            uint8_t pfactor, 
+            uint8_t *out, 
+            size_t bytes
+          ) 
 {
 	scrypt_aligned_alloc 
         YX, 

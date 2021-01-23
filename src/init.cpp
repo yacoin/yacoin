@@ -71,9 +71,10 @@ extern ::int64_t nBroadcastInterval;
 void ExitTimeout(void* parg)
 {
 #ifdef WIN32
-  //Sleep(5000);
+    if (fDebug)
+        if (fPrintToConsole)
+            printf("2 sec timeout for unknown reason!?\n");
     Sleep(2 * 1000);
-//    ExitProcess(0);
 #endif
 }
 
@@ -88,7 +89,7 @@ void StartShutdown()
     NewThread(Shutdown, NULL);
 #endif
 }
-static bool 
+static bool
     fExit;
 
 void Shutdown(void* parg)
@@ -136,8 +137,14 @@ void Shutdown(void* parg)
     }
 #endif
         UnregisterWallet(pwalletMain);
+        if (fDebug)
+            if (fPrintToConsole)
+                printf("wallet unregistered\n");
         delete pwalletMain;
         NewThread(ExitTimeout, NULL);
+        if (fDebug)
+            if (fPrintToConsole)
+                printf("exit thread started\n");
         Sleep(50);
         if (fDebug)
             printf("Yacoin exited\n\n");
@@ -256,7 +263,8 @@ bool AppInit(int argc, char* argv[])
                                                 
                                                 // this is documentation!
 
-        if(mapArgs.count("--version") || mapArgs.count("-v")){
+        if(mapArgs.count("--version") || mapArgs.count("-v"))
+        {
             std::string msg = "Yacoin version: " + FormatFullVersion() + "\n\n";
             fprintf(stdout, "%s", msg.c_str());
             exit(0);
@@ -660,7 +668,7 @@ bool AppInit2()
     fPrintToDebugger = GetBoolArg("-printtodebugger");
     fLogTimestamps = GetBoolArg("-logtimestamps");
 
-    nEpochInterval = (uint32_t)(GetArg("-epochinterval", 21000));
+    nEpochInterval = (::uint32_t)(GetArg("-epochinterval", 21000));
     nDifficultyInterval = nEpochInterval;
 
     if (mapArgs.count("-timeout"))
@@ -995,7 +1003,8 @@ bool AppInit2()
 
     CService addrProxy;
     bool fProxy = false;
-    if (mapArgs.count("-proxy")) {
+    if (mapArgs.count("-proxy"))
+    {
         addrProxy = CService(mapArgs["-proxy"], 9050);
         if (!addrProxy.IsValid())
             return InitError(strprintf(_("Invalid -proxy address: '%s'"), mapArgs["-proxy"].c_str()));
@@ -1082,7 +1091,8 @@ bool AppInit2()
 
     // If Tor is reachable then listen on loopback interface,
     //    to allow allow other users reach you through the hidden service
-    if (!IsLimited(NET_TOR) && mapArgs.count("-torname")) {
+    if (!IsLimited(NET_TOR) && mapArgs.count("-torname")) 
+    {
         std::string strError;
         struct in_addr inaddr_loopback;
         inaddr_loopback.s_addr = htonl(INADDR_LOOPBACK);
@@ -1404,9 +1414,9 @@ bool AppInit2()
 
     //// debug print
     printf("mapBlockIndex.size() = %" PRIszu "\n",   mapBlockIndex.size());
-    printf("nBestHeight = %d\n",            nBestHeight);
+    printf("nBestHeight = %d\n",                     nBestHeight);
     printf("setKeyPool.size() = %" PRIszu "\n",      pwalletMain->setKeyPool.size());
-    printf("mapWallet.size() = %" PRIszu "transactiions\n",       pwalletMain->mapWallet.size());
+    printf("mapWallet.size() = %" PRIszu " transactions\n",       pwalletMain->mapWallet.size());
     printf("mapAddressBook.size() = %" PRIszu "\n",  pwalletMain->mapAddressBook.size());
 
 
