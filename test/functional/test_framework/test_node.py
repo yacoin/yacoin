@@ -314,7 +314,8 @@ class TestNode():
         if unexpected_msgs is None:
             unexpected_msgs = []
         time_end = time.time() + timeout
-        debug_log = os.path.join(self.datadir, self.chain, 'debug.log')
+        # debug_log = os.path.join(self.datadir, self.chain, 'debug.log')
+        debug_log = os.path.join(self.datadir, 'debug.log')
         with open(debug_log, encoding='utf-8') as dl:
             dl.seek(0, 2)
             prev_size = dl.tell()
