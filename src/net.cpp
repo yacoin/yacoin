@@ -1866,15 +1866,6 @@ void ThreadDNSAddressSeed2(void* parg)
 }
 
 
-
-
-
-
-
-
-
-
-
 //YACOIN TODO update seeds
 ::uint32_t pnSeed[] =
 {
@@ -2112,8 +2103,6 @@ void ThreadOpenConnections2(void* parg)
                         return;
                 }
             }
-          //Sleep(500);             // ditto
-            //Sleep(5 * nOneHundredMilliseconds);
         }
     }
 
@@ -2136,9 +2125,9 @@ void ThreadOpenConnections2(void* parg)
             return;
 
 
-        --vnThreadsRunning[THREAD_OPENCONNECTIONS];
-        CSemaphoreGrant grant(*semOutbound);
         ++vnThreadsRunning[THREAD_OPENCONNECTIONS];
+        CSemaphoreGrant grant(*semOutbound);
+        --vnThreadsRunning[THREAD_OPENCONNECTIONS];
         if (fShutdown)
             return;
 
@@ -3065,9 +3054,10 @@ public:
         if (fDebug)
         {
 #ifdef _MSC_VER
-            (void)printf(
-                        "~CNetCleanup() destructor called..."
-                       );
+            if (fPrintToConsole)
+                (void)printf(
+                             "~CNetCleanup() destructor called..."
+                            );
 #endif
         }
         // Close sockets
@@ -3102,7 +3092,8 @@ public:
         if (fDebug)
         {
 #ifdef _MSC_VER
-            (void)printf( " done\n" );
+            if (fPrintToConsole)
+                (void)printf( " done\n" );
 #endif
             Sleep( 2 * nMillisecondsPerSecond );    // 2 seconds just to see the 
                                                     //message of who is the slowest to close
