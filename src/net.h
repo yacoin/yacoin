@@ -389,7 +389,7 @@ private:
         nTotalBytesSent;
 
     CNode(const CNode&);    
-    
+
     CNode& operator=(const CNode&);
 
 public:

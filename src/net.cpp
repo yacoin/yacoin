@@ -2118,7 +2118,7 @@ void ThreadOpenConnections2(void* parg)
         ProcessOneShot();
 
         ++vnThreadsRunning[THREAD_OPENCONNECTIONS];
-        //Sleep(500);                 // Is this by any chance(???) related to the above??? Or not????
+      //Sleep(500);                 // Is this by any chance(???) related to the above??? Or not????
         Sleep( nOneMillisecond );
         --vnThreadsRunning[THREAD_OPENCONNECTIONS];
         if (fShutdown)
