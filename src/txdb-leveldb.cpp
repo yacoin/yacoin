@@ -806,9 +806,9 @@ bool CTxDB::LoadBlockIndex()
         if (fPrintToConsole) 
             (void)printf( "\ndone\nChecking stake checksums...\n" );
     #ifdef _DEBUG
-        nUpdatePeriod /= 4; // speed up update for debug mode
+        nUpdatePeriod /= 20; // speed up update for debug mode
     #else
-        nUpdatePeriod *= 5; // slow down update for release mode
+        nUpdatePeriod /= 2; // slow down update for release mode
     #endif
     #ifdef QT_GUI
         uiInterface.InitMessage( _("done") );

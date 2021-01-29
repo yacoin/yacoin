@@ -90,6 +90,7 @@ map<string, vector<string> > mapMultiArgs;
 bool fDebug = false;
 bool fDebugNet = false;
 bool fTestNetNewLogic = false;
+::int32_t nTestNetNewLogicBlockNumber;
 ::int32_t nMainnetNewLogicBlockNumber;
 unsigned char MAXIMUM_YAC1DOT0_N_FACTOR;
 ::int32_t nYac20BlockNumberTime = 0;
