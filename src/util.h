@@ -186,6 +186,7 @@ extern bool
     fLogTimestamps,
     fReopenDebugLog;
 extern ::int32_t 
+    nTestNetNewLogicBlockNumber,
 	nMainnetNewLogicBlockNumber,
     nYac20BlockNumberTime;
 extern ::uint32_t
