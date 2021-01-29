@@ -389,7 +389,9 @@ private:
         nTotalBytesSent;
 
     CNode(const CNode&);    
-    void operator=(const CNode&);
+    
+    CNode& operator=(const CNode&);
+
 public:
     int GetRefCount()
     {
