@@ -9,13 +9,13 @@
 #include <string>
 
 #ifndef BITCOIN_VERSION_H
- #include "version.h"
+#include "version.h"
 #endif
 
-#define DISPLAY_VERSION_MAJOR       1
-#define DISPLAY_VERSION_MINOR       0
-#define DISPLAY_VERSION_REVISION    0
-#define DISPLAY_VERSION_BUILD       2
+#define DISPLAY_VERSION_MAJOR       CLIENT_VERSION_MAJOR
+#define DISPLAY_VERSION_MINOR       CLIENT_VERSION_MINOR
+#define DISPLAY_VERSION_REVISION    CLIENT_VERSION_REVISION
+#define DISPLAY_VERSION_BUILD       CLIENT_VERSION_BUILD
 #define DISPLAY_VERSION_TESTING     01
 
 const int
@@ -26,7 +26,6 @@ const int
     DISPLAY_VERSION_TESTING_for_Qt  = DISPLAY_VERSION_TESTING ;
 
 // Name of client reported in the getinfo 'version' message. 
-
 const std::string 
     #ifdef QT_GUI
         #ifdef _MSC_VER
@@ -42,21 +41,34 @@ const std::string
         #endif
     #endif
 
-// Client version number
-#ifdef USE_LEVELDB
-#ifdef LOW_DIFFICULTY_FOR_DEVELOPMENT
-#define CLIENT_VERSION_SUFFIX   "-leveldb-low-difficulty"
-#else
-#define CLIENT_VERSION_SUFFIX   "-leveldb"
-#endif
-#else
-#define CLIENT_VERSION_SUFFIX   "-bdb"
-#endif
 
 // First, include build.h if requested
 #ifdef HAVE_BUILD_INFO
 #    include "build.h"
 #endif
+
+// Client version suffix
+#ifdef USE_LEVELDB
+#define DB_SUFFIX "-leveldb"
+#else
+#define DB_SUFFIX   "-bdb"
+#endif
+
+#ifdef LOW_DIFFICULTY_FOR_DEVELOPMENT
+#define LOW_DIFFICULTY_SUFFIX   "-low-difficulty"
+#else
+#define LOW_DIFFICULTY_SUFFIX   ""
+#endif
+
+#ifdef BUILD_GIT_TAG
+#define BUILD_SUFFIX "-" BUILD_GIT_TAG
+#endif
+
+#ifdef BUILD_GIT_COMMIT
+#define BUILD_SUFFIX "-" BUILD_GIT_COMMIT
+#endif
+
+#define CLIENT_VERSION_SUFFIX  BUILD_SUFFIX DB_SUFFIX LOW_DIFFICULTY_SUFFIX
 
 #define BUILD_DESC_INFO(maj,min,rev,build) \
     "YAC-v" \
