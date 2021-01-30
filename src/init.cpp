@@ -1205,8 +1205,10 @@ bool AppInit2()
     }
 
 
-    nMainnetNewLogicBlockNumber = GetArg("-testnetNewLogicBlockNumber", 0);
-    printf("Param testnetNewLogicBlockNumber = %d\n",nMainnetNewLogicBlockNumber);
+    nMainnetNewLogicBlockNumber = GetArg("-testnetNewLogicBlockNumber", 1890000);
+    nTestNetNewLogicBlockNumber = GetArg("-testnetNewLogicBlockNumber", 0);
+    printf("Param nMainnetNewLogicBlockNumber = %d\n",nMainnetNewLogicBlockNumber);
+    printf("Param testnetNewLogicBlockNumber = %d\n",nTestNetNewLogicBlockNumber);
 
     MAXIMUM_YAC1DOT0_N_FACTOR = GetArg("-nFactorAtHardfork", 21);
     printf("Param nFactorAtHardfork = %d\n", MAXIMUM_YAC1DOT0_N_FACTOR);

@@ -1592,7 +1592,9 @@ public:
                 "nTime=%" PRId64 ", "
                 "nBits=%08x, "
                 "nNonce=%u, "
-                "vtx=%" PRIszu ",\n",
+                "vtx=%" PRIszu ",\n"
+                "vchBlockSig=%s\n"
+                ")\n",
             GetHash().ToString().c_str(),
             nVersion,
             hashPrevBlock.ToString().c_str(),
@@ -1600,9 +1602,9 @@ public:
             nTime, 
             nBits, 
             nNonce,
-            vtx.size());
-        printf("vchBlockSig=%s\n",HexStr(vchBlockSig.begin(), vchBlockSig.end()).c_str());
-        printf(")\n");
+            vtx.size(),
+            HexStr(vchBlockSig.begin(), vchBlockSig.end()).c_str()
+              );
         for (unsigned int i = 0; i < vtx.size(); ++i)
         {
             printf("  ");
