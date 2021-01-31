@@ -188,8 +188,7 @@ bool Lookup(const char *pszName, std::vector<CService>& vAddr, int portDefault, 
     vAddr.resize(vIP.size());
     for (unsigned int i = 0; i < vIP.size(); ++i)
     {
-      //vAddr[i] = CService(vIP[i], port);
-        vAddr[i] = CService(vIP[i], portDefault);
+        vAddr[i] = CService(vIP[i], port);      
     }
     return true;
 }
