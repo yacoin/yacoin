@@ -9,6 +9,13 @@
  #include "wallet.h"
 #endif
 
+extern ::int64_t 
+    nLongAverageBP2000,
+    nLongAverageBP1000,
+    nLongAverageBP200, 
+    nLongAverageBP100, 
+    nLongAverageBP;
+
 extern CWallet* pwalletMain;
 extern std::string strWalletFileName;
 void StartShutdown();

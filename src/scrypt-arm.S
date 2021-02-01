@@ -7,6 +7,7 @@
  * any later version.  See COPYING for more details.
  */
 
+#ifdef USE_ASM
 #if defined(__arm__) && defined(__APCS_32__)
 
 .macro salsa8_core_doubleround_body
@@ -390,4 +391,5 @@ scrypt_core_loop2:
 	ldmfd	sp!, {r4-r11, pc}
 #endif
 
+#endif
 #endif

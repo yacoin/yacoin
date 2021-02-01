@@ -1,4 +1,4 @@
-    // Copyright (c) 2009-2012 Bitcoin Developers
+// Copyright (c) 2009-2012 Bitcoin Developers
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 #ifdef _MSC_VER
@@ -229,6 +229,39 @@ Value dumpwallet(const Array& params, bool fHelp)
 
     return Value::null;
 }
+
+Value getwalletinfo(const Array& params, bool fHelp)
+{
+    printf("rpc.getwalletinfo\n");
+    if (fHelp)
+        throw runtime_error(
+            "getwalletinfo\n"
+            "Returns wallet information:\n"
+            "walletname\n"
+            "walletversion\n"
+            "balance\n"
+            "unconfirmed_balance\n"
+            "immature_balance\n"
+            "txcount\n"
+            "keypoololdest\n"
+            "keypoolsize\n");
+    
+    if(pwalletMain==NULL){
+        throw runtime_error("getwalletinfo: wallet = Null\n");
+    }
+
+    Object obj;
+    obj.push_back(Pair("walletname", "YacoinWallet"));
+    obj.push_back(Pair("walletversion", pwalletMain->GetVersion()));
+    obj.push_back(Pair("balance", pwalletMain->GetBalance()));
+    obj.push_back(Pair("unconfirmed_balance",pwalletMain->GetUnconfirmedBalance()));
+    obj.push_back(Pair("immature_balance", pwalletMain->GetImmatureBalance()));
+    obj.push_back(Pair("txcount", (int)pwalletMain->mapWallet.size()));
+    obj.push_back(Pair("keypoololdest", (int64_t)pwalletMain->GetOldestKeyPoolTime()));
+    obj.push_back(Pair("keypoolsize",   (int64_t)pwalletMain->GetKeyPoolSize()));
+    return obj;
+}
+
 #ifdef _MSC_VER
     #include "msvc_warnings.pop.h"
 #endif

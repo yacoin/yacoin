@@ -41,7 +41,7 @@
 
 static const ::int64_t COIN = 1000000;
 //THEREFORE
-       const int COINdecimalPower = 6;     // i.e. log10( COIN )
+const int COINdecimalPower = 16;     // i.e. log10( COIN )
 static const ::int64_t CENT = 10000;
 
 #define BEGIN(a)            ((char*)&(a))
@@ -101,15 +101,10 @@ void LogStackTrace();
     #define PRI64d  "lld"
     #define PRI64u  "llu"
     #define PRI64x  "llx"
-#ifndef PRI64d
+
     #define PRId64  "lld"
-#endif
-#ifndef PRIu64
     #define PRIu64  "llu"
-#endif
-#ifndef PRIx64
     #define PRIx64  "llx"
-#endif
  #endif
   #define PRIszx    "zx"
   #define PRIszu    "zu"
@@ -174,23 +169,31 @@ inline void Sleep(::int64_t n)
 
 extern std::map<std::string, std::string> mapArgs;
 extern std::map<std::string, std::vector<std::string> > mapMultiArgs;
-extern bool fDebug;
-extern bool fDebugNet;
-extern bool fTestNetNewLogic;
-extern ::int32_t nTestNetNewLogicBlockNumber;
-extern ::int32_t nYac20BlockNumber;
-extern ::int32_t nYac20BlockNumberTime;
-extern bool fPrintToConsole;
-extern bool fPrintToDebugger;
-extern bool fRequestShutdown;
-extern bool fShutdown;
-extern bool fDaemon;
-extern bool fServer;
+extern bool 
+    fDebug,
+    fDebugNet,
+    f1dot0OnThisBlockOrTx,
+    fTestNetNewLogic,
+    fPrintToConsole,
+    fPrintToDebugger,
+    fRequestShutdown,
+    fShutdown,
+    fDaemon,
+    fServer,
+    fTestNet,
+    fUseOld044Rules,
+    fNoListen,
+    fLogTimestamps,
+    fReopenDebugLog;
+extern ::int32_t 
+    nTestNetNewLogicBlockNumber,
+	nMainnetNewLogicBlockNumber,
+    nYac20BlockNumberTime;
+extern ::uint32_t
+    nDifficultyInterval,
+    nEpochInterval;
 extern std::string strMiscWarning;
-extern bool fTestNet;
-extern bool fUseOld044Rules;
-extern bool fNoListen;
-extern bool fReopenDebugLog;
+extern unsigned char MAXIMUM_YAC1DOT0_N_FACTOR;
 
 #ifdef WIN32
 extern void DoProgress( int nCount, int nTotalToScan, ::int64_t n64MsStartTime );
@@ -226,6 +229,7 @@ bool ATTR_WARN_PRINTF(1,2) error(const char *format, ...);
  */
 #define printf OutputDebugStringF
 
+extern unsigned long long getTotalSystemMemory( void );
 void LogException(std::exception* pex, const char* pszThread);
 void PrintException(std::exception* pex, const char* pszThread);
 void PrintExceptionContinue(std::exception* pex, const char* pszThread);
@@ -255,7 +259,8 @@ void FileCommit(FILE *fileout);
 int GetFilesize(FILE* file);
 bool RenameOver(boost::filesystem::path src, boost::filesystem::path dest);
 boost::filesystem::path GetDefaultDataDir();
-const boost::filesystem::path &GetDataDir(bool fNetSpecific = true);
+const boost::filesystem::path &GetDataDir(bool fTest_or_Main_Net_is_decided = true);
+std::string GetDebugLogPathName();
 boost::filesystem::path GetConfigFile();
 boost::filesystem::path GetPidFile();
 #ifndef WIN32
@@ -583,5 +588,13 @@ inline ::uint32_t ByteReverse(::uint32_t value)
     return (value<<16) | (value>>16);
 }
 
+// interestingly, here, 64 bits is explicitly mentioned!!
+inline ::uint64_t ByteReverse_64bit(::uint64_t value)
+{
+	value = (value & 0x00000000FFFFFFFF) << 32 | (value & 0xFFFFFFFF00000000) >> 32;
+	value = (value & 0x0000FFFF0000FFFF) << 16 | (value & 0xFFFF0000FFFF0000) >> 16;
+	value = (value & 0x00FF00FF00FF00FF) << 8  | (value & 0xFF00FF00FF00FF00) >> 8;
+	return value;
+}
 #endif
 
