@@ -14,15 +14,14 @@
  #include "keystore.h"
 #endif
 
-#ifndef BITCOIN_BIGNUM_H
- #include "bignum.h"
-#endif
-
 typedef std::vector< ::uint8_t> valtype;
 
 class CTransaction;
 
 static const unsigned int MAX_SCRIPT_ELEMENT_SIZE = 520; // bytes
+
+// Threshold for nLockTime: below this value it is interpreted as block number, otherwise as UNIX timestamp.
+static const unsigned int LOCKTIME_THRESHOLD = 500000000; // Tue Nov  5 00:53:20 1985 UTC
 
 /** IsMine() return codes */
 enum isminetype
@@ -34,6 +33,165 @@ enum isminetype
 };
 
 typedef ::uint8_t isminefilter;
+
+class scriptnum_error : public std::runtime_error
+{
+public:
+    explicit scriptnum_error(const std::string& str) : std::runtime_error(str) {}
+};
+
+class CScriptNum
+{
+// Numeric opcodes (OP_1ADD, etc) are restricted to operating on 4-byte integers.
+// The semantics are subtle, though: operands must be in the range [-2^31 +1...2^31 -1],
+// but results may overflow (and are valid as long as they are not used in a subsequent
+// numeric operation). CScriptNum enforces those semantics by storing results as
+// an int64 and allowing out-of-range values to be returned as a vector of bytes but
+// throwing an exception if arithmetic is done or the result is interpreted as an integer.
+public:
+
+    explicit CScriptNum(const int64_t& n)
+    {
+        m_value = n;
+    }
+
+    static const size_t nDefaultMaxNumSize = 4;
+
+	explicit CScriptNum(const std::vector<unsigned char> &vch,
+			const size_t nMaxNumSize = nDefaultMaxNumSize)
+    {
+        if (vch.size() > nMaxNumSize)
+            throw scriptnum_error("CScriptNum(const std::vector<unsigned char>&) : overflow");
+        m_value = set_vch(vch);
+    }
+
+    inline bool operator==(const int64_t& rhs) const    { return m_value == rhs; }
+    inline bool operator!=(const int64_t& rhs) const    { return m_value != rhs; }
+    inline bool operator<=(const int64_t& rhs) const    { return m_value <= rhs; }
+    inline bool operator< (const int64_t& rhs) const    { return m_value <  rhs; }
+    inline bool operator>=(const int64_t& rhs) const    { return m_value >= rhs; }
+    inline bool operator> (const int64_t& rhs) const    { return m_value >  rhs; }
+
+    inline bool operator==(const CScriptNum& rhs) const { return operator==(rhs.m_value); }
+    inline bool operator!=(const CScriptNum& rhs) const { return operator!=(rhs.m_value); }
+    inline bool operator<=(const CScriptNum& rhs) const { return operator<=(rhs.m_value); }
+    inline bool operator< (const CScriptNum& rhs) const { return operator< (rhs.m_value); }
+    inline bool operator>=(const CScriptNum& rhs) const { return operator>=(rhs.m_value); }
+    inline bool operator> (const CScriptNum& rhs) const { return operator> (rhs.m_value); }
+
+    inline CScriptNum operator+(   const int64_t& rhs)    const { return CScriptNum(m_value + rhs);}
+    inline CScriptNum operator-(   const int64_t& rhs)    const { return CScriptNum(m_value - rhs);}
+    inline CScriptNum operator+(   const CScriptNum& rhs) const { return operator+(rhs.m_value);   }
+    inline CScriptNum operator-(   const CScriptNum& rhs) const { return operator-(rhs.m_value);   }
+
+    inline CScriptNum& operator+=( const CScriptNum& rhs)       { return operator+=(rhs.m_value);  }
+    inline CScriptNum& operator-=( const CScriptNum& rhs)       { return operator-=(rhs.m_value);  }
+    inline CScriptNum operator&(   const int64_t& rhs)    const { return CScriptNum(m_value & rhs);}
+    inline CScriptNum operator&(   const CScriptNum& rhs) const { return operator&(rhs.m_value);   }
+    inline CScriptNum& operator&=( const CScriptNum& rhs)       { return operator&=(rhs.m_value);  }
+
+    inline CScriptNum operator-()                         const
+    {
+        assert(m_value != std::numeric_limits<int64_t>::min());
+        return CScriptNum(-m_value);
+    }
+
+    inline CScriptNum& operator=( const int64_t& rhs)
+    {
+        m_value = rhs;
+        return *this;
+    }
+
+    inline CScriptNum& operator+=( const int64_t& rhs)
+    {
+        assert(rhs == 0 || (rhs > 0 && m_value <= std::numeric_limits<int64_t>::max() - rhs) ||
+                           (rhs < 0 && m_value >= std::numeric_limits<int64_t>::min() - rhs));
+        m_value += rhs;
+        return *this;
+    }
+
+    inline CScriptNum& operator-=( const int64_t& rhs)
+    {
+        assert(rhs == 0 || (rhs > 0 && m_value >= std::numeric_limits<int64_t>::min() + rhs) ||
+                           (rhs < 0 && m_value <= std::numeric_limits<int64_t>::max() + rhs));
+        m_value -= rhs;
+        return *this;
+    }
+
+    inline CScriptNum& operator&=( const int64_t& rhs)
+    {
+        m_value &= rhs;
+        return *this;
+    }
+
+    int getint() const
+    {
+        if (m_value > std::numeric_limits<int>::max())
+            return std::numeric_limits<int>::max();
+        else if (m_value < std::numeric_limits<int>::min())
+            return std::numeric_limits<int>::min();
+        return m_value;
+    }
+
+    std::vector<unsigned char> getvch() const
+    {
+        return serialize(m_value);
+    }
+
+    static std::vector<unsigned char> serialize(const int64_t& value)
+    {
+        if(value == 0)
+            return std::vector<unsigned char>();
+
+        std::vector<unsigned char> result;
+        const bool neg = value < 0;
+        uint64_t absvalue = neg ? -value : value;
+
+        while(absvalue)
+        {
+            result.push_back(absvalue & 0xff);
+            absvalue >>= 8;
+        }
+
+
+//    - If the most significant byte is >= 0x80 and the value is positive, push a
+//    new zero-byte to make the significant byte < 0x80 again.
+
+//    - If the most significant byte is >= 0x80 and the value is negative, push a
+//    new 0x80 byte that will be popped off when converting to an integral.
+
+//    - If the most significant byte is < 0x80 and the value is negative, add
+//    0x80 to it, since it will be subtracted and interpreted as a negative when
+//    converting to an integral.
+
+        if (result.back() & 0x80)
+            result.push_back(neg ? 0x80 : 0);
+        else if (neg)
+            result.back() |= 0x80;
+
+        return result;
+    }
+
+private:
+    static int64_t set_vch(const std::vector<unsigned char>& vch)
+    {
+      if (vch.empty())
+          return 0;
+
+      int64_t result = 0;
+      for (size_t i = 0; i != vch.size(); ++i)
+          result |= static_cast<int64_t>(vch[i]) << 8*i;
+
+      // If the input vector's most significant byte is 0x80, remove it from
+      // the result's msb and return a negative.
+      if (vch.back() & 0x80)
+          return -(result & ~(0x80 << (8 * (vch.size() - 1))));
+
+      return result;
+    }
+
+    int64_t m_value;
+};
 
 /** Signature hash types/flags */
 enum
@@ -53,6 +211,22 @@ enum
     SCRIPT_VERIFY_LOW_S     = (1U << 2), // enforce low S values in signatures (depends on STRICTENC)
     SCRIPT_VERIFY_NOCACHE   = (1U << 3), // do not store results in signature cache (but do query it)
     SCRIPT_VERIFY_NULLDUMMY = (1U << 4), // verify dummy stack item consumed by CHECKMULTISIG is of zero-length
+
+    // Verify CHECKLOCKTIMEVERIFY
+    //
+    // See BIP65 for details.
+    SCRIPT_VERIFY_CHECKLOCKTIMEVERIFY = (1U << 9),
+
+    // support CHECKSEQUENCEVERIFY opcode
+    //
+    // See BIP112 for details
+    SCRIPT_VERIFY_CHECKSEQUENCEVERIFY = (1U << 10),
+};
+
+/** Flags for nSequence and nLockTime locks */
+enum {
+    /* Interpret sequence numbers as relative lock-time constraints. */
+    LOCKTIME_VERIFY_SEQUENCE = (1 << 0),
 };
 
 // Strict verification:
@@ -74,10 +248,13 @@ static const unsigned int MANDATORY_SCRIPT_VERIFY_FLAGS = SCRIPT_VERIFY_P2SH;
 // Standard script verification flags that standard transactions will comply
 // with. However scripts violating these flags may still be present in valid
 // blocks and we must accept those blocks.
-static const unsigned int STRICT_FLAGS = MANDATORY_SCRIPT_VERIFY_FLAGS | STRICT_FORMAT_FLAGS;
+static const unsigned int STRICT_FLAGS = MANDATORY_SCRIPT_VERIFY_FLAGS | STRICT_FORMAT_FLAGS | SCRIPT_VERIFY_CHECKLOCKTIMEVERIFY | SCRIPT_VERIFY_CHECKSEQUENCEVERIFY;
 
 // Soft verifications, no extended signature format checkings
 static const unsigned int SOFT_FLAGS = STRICT_FLAGS & ~STRICT_FORMAT_FLAGS;
+
+/** Used as the flags parameter to sequence and nLocktime checks in non-consensus code. */
+static const unsigned int STANDARD_LOCKTIME_VERIFY_FLAGS = LOCKTIME_VERIFY_SEQUENCE;
 
 enum txnouttype
 {
@@ -87,6 +264,8 @@ enum txnouttype
     TX_PUBKEYHASH,
     TX_SCRIPTHASH,
     TX_MULTISIG,
+	TX_CLTV,
+	TX_CSV,
     TX_NULL_DATA,
 };
 
@@ -218,7 +397,9 @@ enum opcodetype
     // expansion
     OP_NOP1 = 0xb0,
     OP_NOP2 = 0xb1,
+	OP_CHECKLOCKTIMEVERIFY = OP_NOP2,
     OP_NOP3 = 0xb2,
+    OP_CHECKSEQUENCEVERIFY = OP_NOP3,
     OP_NOP4 = 0xb3,
     OP_NOP5 = 0xb4,
     OP_NOP6 = 0xb5,
@@ -244,7 +425,7 @@ const char* GetOpName(opcodetype opcode);
 inline std::string ValueString(const std::vector<unsigned char>& vch)
 {
     if (vch.size() <= 4)
-        return strprintf("%d", CBigNum(vch).getint32());
+        return strprintf("%d", CScriptNum(vch).getint());
     else
         return HexStr(vch);
 }
@@ -273,22 +454,20 @@ protected:
         }
         else
         {
-            CBigNum bn(n);
-            *this << bn.getvch();
+        	*this << CScriptNum::serialize(n);
         }
         return *this;
     }
 
     CScript& push_uint64(::uint64_t n)
     {
-        if (n >= 1 && n <= 16)
+        if (n == -1 || (n >= 1 && n <= 16))
         {
             push_back((::uint8_t)n + (OP_1 - 1));
         }
         else
         {
-            CBigNum bn(n);
-            *this << bn.getvch();
+        	*this << CScriptNum::serialize(n);
         }
         return *this;
     }
@@ -326,7 +505,7 @@ public:
 
     explicit CScript(opcodetype b)     { operator<<(b); }
     explicit CScript(const uint256& b) { operator<<(b); }
-    explicit CScript(const CBigNum& b) { operator<<(b); }
+    explicit CScript(const CScriptNum& b) { operator<<(b); }
     explicit CScript(const std::vector< ::uint8_t>& b) { operator<<(b); }
 
     CScript& operator<<(::int8_t  b) { return push_int64(b); }
@@ -338,6 +517,12 @@ public:
     CScript& operator<<(::uint16_t b) { return push_uint64(b); }
     CScript& operator<<(::uint32_t b) { return push_uint64(b); }
     CScript& operator<<(::uint64_t b) { return push_uint64(b); }
+
+    CScript& operator<<(const CScriptNum& b)
+    {
+        *this << b.getvch();
+        return *this;
+    }
 
     CScript& operator<<(opcodetype opcode)
     {
@@ -365,12 +550,6 @@ public:
     {
         std::vector< ::uint8_t> vchKey = key.Raw();
         return (*this) << vchKey;
-    }
-
-    CScript& operator<<(const CBigNum& b)
-    {
-        *this << b.getvch();
-        return *this;
     }
 
     CScript& operator<<(const std::vector< ::uint8_t>& b)
@@ -566,7 +745,8 @@ public:
 
     void SetDestination(const CTxDestination& address);
     void SetMultisig(int nRequired, const std::vector<CKey>& keys);
-
+    void SetCltv(int nLockTime, const CPubKey& pubKey);
+    void SetCsv(::uint32_t nSequence, const CPubKey& pubKey);
 
     void PrintHex() const
     {
@@ -617,6 +797,8 @@ int ScriptSigArgsExpected(txnouttype t, const std::vector<std::vector<unsigned c
 bool IsStandard(const CScript& scriptPubKey, txnouttype& whichType);
 isminetype IsMine(const CKeyStore& keystore, const CScript& scriptPubKey);
 isminetype IsMine(const CKeyStore& keystore, const CTxDestination& dest);
+bool IsSpendableCltvUTXO(const CKeyStore &keystore, const CScript& scriptPubKey);
+bool IsSpendableCsvUTXO(const CKeyStore &keystore, const CScript& scriptPubKey);
 void ExtractAffectedKeys(const CKeyStore &keystore, const CScript& scriptPubKey, std::vector<CKeyID> &vKeys);
 bool ExtractDestination(const CScript& scriptPubKey, CTxDestination& addressRet);
 bool ExtractDestinations(const CScript& scriptPubKey, txnouttype& typeRet, std::vector<CTxDestination>& addressRet, int& nRequiredRet);

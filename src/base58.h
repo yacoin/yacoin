@@ -285,7 +285,7 @@ class CBitcoinAddress : public CBase58Data
 public:
     enum
     {
-        PUBKEY_ADDRESS = 77,  // yacoin: address begin with 'Y'
+        PUBKEY_ADDRESS = (int)77,  // yacoin: address begin with 'Y' what is all this?????
         SCRIPT_ADDRESS = 139, // yacoin: address begin with 'y'
         PUBKEY_ADDRESS_TEST = 111,
         SCRIPT_ADDRESS_TEST = 196,
