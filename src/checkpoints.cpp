@@ -107,6 +107,7 @@ namespace Checkpoints
         return NULL;
     }
 
+    /* BELOW CODES ARE DEPRECATED FOR YACOIN 1.0.0 */
     // ppcoin: synchronized checkpoint (centrally broadcasted)
     uint256 hashSyncCheckpoint = 0;
     uint256 hashPendingCheckpoint = 0;
@@ -237,7 +238,7 @@ namespace Checkpoints
         return false;
     }
 
-    // Automatically select a suitable sync-checkpoint 
+    // Automatically select a suitable sync-checkpoint
     uint256 AutoSelectSyncCheckpoint()
     {
         const CBlockIndex *pindex = pindexBest;
