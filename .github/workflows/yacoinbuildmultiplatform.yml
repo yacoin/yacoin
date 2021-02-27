@@ -34,7 +34,7 @@ jobs:
       - name: build
         run: |
           docker pull dev34253/yacoin-build:ubuntu.16.04
-          docker run -v /home/runner/work/yacoin/yacoin:/src --entrypoint /bin/bash dev34253/yacoin-build:ubuntu.16.04 -c "cd /src && ./autogen.sh && ./configure --with-gui=no --enable-low-difficulty-for-development && make"
+          docker run -v /home/runner/work/yacoin/yacoin:/src --entrypoint /bin/bash dev34253/yacoin-build:ubuntu.16.04 -c "cd /src && ./autogen.sh && ./configure --with-gui=no --enable-low-difficulty-for-development && make -j 2"
           docker run -v /home/runner/work/yacoin/yacoin:/src --entrypoint /src/test/functional/test_runner.py dev34253/yacoin-build:ubuntu.16.04 -j 1
       - uses: actions/upload-artifact@v1
         with:
