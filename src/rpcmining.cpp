@@ -223,7 +223,8 @@ Value getworkex(const Array& params, bool fHelp)
         static int64_t nStart;
         static CBlock* pblock;
         if (pindexPrev != pindexBest ||
-            (nTransactionsUpdated != nTransactionsUpdatedLast && GetTime() - nStart > 60))
+            (nTransactionsUpdated != nTransactionsUpdatedLast && GetTime() - nStart > 60)
+            || (GetTime() - nStart > nMaxClockDrift*0.75))
         {
             if (pindexPrev != pindexBest)
             {
@@ -357,8 +358,10 @@ Value getwork(const Array& params, bool fHelp)
         static CBlockIndex* pindexPrev;
         static int64_t nStart;
         static CBlock* pblock;
-        if (pindexPrev != pindexBest ||
-            (nTransactionsUpdated != nTransactionsUpdatedLast && GetTime() - nStart > 60))
+        if ((pindexPrev != pindexBest)
+            || (nTransactionsUpdated != nTransactionsUpdatedLast && GetTime() - nStart > 60)
+            || (GetTime() - nStart > nMaxClockDrift*0.75)
+            )
         {
             if (pindexPrev != pindexBest)
             {
