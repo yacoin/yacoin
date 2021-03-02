@@ -3195,6 +3195,15 @@ bool static Reorganize(CTxDB& txdb, CBlockIndex* pindexNew)
     for (CBlockIndex* pindex = pindexBest; pindex != pfork; pindex = pindex->pprev)
         vDisconnect.push_back(pindex);
 
+    // Not allow to reorg back to blocks which before last checkpoint
+    CBlockIndex* pcheckpoint = Checkpoints::GetLastCheckpoint(mapBlockIndex);
+    if (pindexBest->nHeight - vDisconnect.size() < pcheckpoint->nHeight)
+    {
+        return error(
+                "Reorganize() : Not allow to reorg back to blocks before last checkpoint, current best height = %d, last checkpoint height = %d, number of reorg blocks = %d",
+                pindexBest->nHeight, pcheckpoint->nHeight, vDisconnect.size());
+    }
+
     // List of what to connect
     vector<CBlockIndex*> vConnect;
     for (CBlockIndex* pindex = pindexNew; pindex != pfork; pindex = pindex->pprev)
