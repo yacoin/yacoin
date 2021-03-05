@@ -41,6 +41,8 @@ obj/build.h:
 	@$(top_srcdir)/share/genbuild.sh $(abs_top_builddir)/src/obj/build.h \
 	  $(abs_top_srcdir)
 
+libyacoin_common_a-version.cpp: obj/build.h
+
 SCRYPTDEFS=-DBOOST_SPIRIT_THREADSAFE -DUSE_ASM 
 SCRYPTHARDENING=-fno-stack-protector -fstack-protector-all -Wstack-protector -D_FORTIFY_SOURCE=2 -fPIC
 xCXXFLAGS=-O2 -msse2 -pthread -Wall -Wextra -Wformat -Wformat-security -Wno-unused-parameter $(SCRYPTDEFS) $(SCRYPTHARDENING) -std=c++0x
@@ -96,7 +98,7 @@ libyacoin_common_a_SOURCES= \
     scrypt.cpp \
     scrypt-x86.S \
     scrypt-x86_64.S \
-    scrypt-generic.c \
+    scrypt-generic.cpp \
     scrypt-jane/scrypt-jane.c
 
 libyacoin_common_a_CPPFLAGS = $(BITCOIN_INCLUDES)

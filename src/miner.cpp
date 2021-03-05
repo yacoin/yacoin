@@ -40,6 +40,7 @@ using std::string;
 //
 
 extern unsigned int nMinerSleep;
+int nBlocksToGenerate = -10;
 
 int static FormatHashBlocks(void* pbuffer, unsigned int len)
 {
@@ -177,7 +178,15 @@ CBlock* CreateNewBlock(CWallet* pwallet, bool fProofOfStake)
     if( fUseOld044Rules )
     {
       //pblock->nVersion = CBlock::VERSION_of_block_for_yac_044_old;
-        pblock->nVersion = CBlock::CURRENT_VERSION_of_block;
+    	// TODO: Need update for mainet
+    	if (pindexGenesisBlock && (nBestHeight + 1) >= nMainnetNewLogicBlockNumber)
+    	{
+            pblock->nVersion = VERSION_of_block_for_yac_05x_new;
+    	}
+    	else
+    	{
+            pblock->nVersion = CURRENT_VERSION_of_block;
+    	}
         // here we can fiddle with time to try to make block generation easier
     }
     // Create coinbase tx
@@ -201,25 +210,7 @@ CBlock* CreateNewBlock(CWallet* pwallet, bool fProofOfStake)
     pblock->vtx.push_back(txNew);
 
     // Largest block you're willing to create:
-    unsigned int 
-        nBlockMaxSize = GetArg("-blockmaxsize", MAX_BLOCK_SIZE_GEN/2);
-
-    // Limit to betweeen 1K and MAX_BLOCK_SIZE-1K for sanity:
-    nBlockMaxSize = std::max((unsigned int)1000, std::min((unsigned int)(MAX_BLOCK_SIZE-1000), nBlockMaxSize));
-
-    // How much of the block should be dedicated to high-priority transactions,
-    // included regardless of the fees they pay
-    unsigned int 
-        nBlockPrioritySize = GetArg("-blockprioritysize", 27000);
-
-    nBlockPrioritySize = std::min(nBlockMaxSize, nBlockPrioritySize);
-
-    // Minimum block size you want to create; block will be filled with free transactions
-    // until there are no more or the block reaches this size:
-    unsigned int 
-        nBlockMinSize = GetArg("-blockminsize", 0);
-
-    nBlockMinSize = std::min(nBlockMaxSize, nBlockMinSize);
+    unsigned int nBlockMaxSize = GetMaxSize(MAX_BLOCK_SIZE);
 
     // Fee-per-kilobyte amount considered the same as "free"
     // Be careful setting this: if you set it to zero then
@@ -229,14 +220,11 @@ CBlock* CreateNewBlock(CWallet* pwallet, bool fProofOfStake)
     int64_t 
         nMinTxFee = MIN_TX_FEE;
 
-    if (mapArgs.count("-mintxfee"))
-        ParseMoney(mapArgs["-mintxfee"], nMinTxFee);
-
     CBlockIndex
         * pindexPrev = pindexBest;
 /*********************/
     // ppcoin: if coinstake available add coinstake tx
-    static int64_t 
+    static ::int64_t 
         nLastCoinStakeSearchTime = GetAdjustedTime();  // only initialized at startup
     //CBlockIndex* pindexPrev = pindexBest;
 
@@ -247,8 +235,8 @@ CBlock* CreateNewBlock(CWallet* pwallet, bool fProofOfStake)
         CTransaction 
             txCoinStake;    // uses real time
 
-        int64_t 
-            nSearchTime = (int64_t)txCoinStake.nTime; // search to current time
+        ::int64_t 
+            nSearchTime = (::int64_t)txCoinStake.nTime; // search to current time
 
         if (
             (nSearchTime > nLastCoinStakeSearchTime)
@@ -313,6 +301,7 @@ CBlock* CreateNewBlock(CWallet* pwallet, bool fProofOfStake)
             LOCK2(cs_main, mempool.cs);
             CBlockIndex
                 * pindexPrev = pindexBest;
+            const int nHeight = pindexPrev->nHeight + 1;
             CTxDB 
                 txdb("r");
 
@@ -333,7 +322,7 @@ CBlock* CreateNewBlock(CWallet* pwallet, bool fProofOfStake)
             {
                 CTransaction& 
                     tx = (*mi).second;
-                if (tx.IsCoinBase() || tx.IsCoinStake() || !tx.IsFinal())
+                if (tx.IsCoinBase() || tx.IsCoinStake() || !tx.IsFinal(nHeight))
                     continue;
 
                 COrphan
@@ -419,8 +408,12 @@ CBlock* CreateNewBlock(CWallet* pwallet, bool fProofOfStake)
                 nBlockTx = 0;
             int 
                 nBlockSigOps = 100;
+
+            // From yacoin 1.0.0, the order of transaction included to a block is
+            // based on FeePerKb by default. If FeePerKb are equal between transactions,
+            // coin-age could then take priority
             bool 
-                fSortedByFee = (nBlockPrioritySize <= 0);   // is usually 27,000
+                fSortedByFee = true;
 
             TxPriorityCompare 
                 comparer(fSortedByFee);
@@ -448,7 +441,7 @@ CBlock* CreateNewBlock(CWallet* pwallet, bool fProofOfStake)
                 // Legacy limits on sigOps:
                 unsigned int 
                     nTxSigOps = tx.GetLegacySigOpCount();
-                if (nBlockSigOps + nTxSigOps >= MAX_BLOCK_SIGOPS)
+                if (nBlockSigOps + nTxSigOps >= GetMaxSize(MAX_BLOCK_SIGOPS))
                     continue;
 
                 // Timestamp limit
@@ -458,32 +451,9 @@ CBlock* CreateNewBlock(CWallet* pwallet, bool fProofOfStake)
                    )
                     continue;
 
-                // ppcoin: simplify transaction fee - allow free = false
-                ::int64_t 
-                    nMinFee = tx.GetMinFee(nBlockSize, false, GMF_BLOCK);
-
-                // Skip free transactions if we're past the minimum block size:
-                if (
-                    fSortedByFee && 
-                    (dFeePerKb < nMinTxFee) && 
-                    ((nBlockSize + nTxSize) >= nBlockMinSize)
-                   )
+                // Never include transactions with fee < min fee
+                if (dFeePerKb < nMinTxFee) // nMinTxFee = 0.01 YAC/kb
                     continue;
-
-                // Prioritize by fee once past the priority size or we run out of high-priority
-                // transactions:
-                if (
-                    !fSortedByFee &&
-                    (
-                     ((nBlockSize + nTxSize) >= nBlockPrioritySize) || 
-                     (dPriority < (COIN * 144 / 250))
-                    )
-                   )
-                {
-                    fSortedByFee = true;
-                    comparer = TxPriorityCompare(fSortedByFee);
-                    std::make_heap(vecPriority.begin(), vecPriority.end(), comparer);
-                }
 
                 // Connecting shouldn't fail due to dependency on other memory pool transactions
                 // because we're already processing them in order of dependency
@@ -498,11 +468,9 @@ CBlock* CreateNewBlock(CWallet* pwallet, bool fProofOfStake)
 
                 ::int64_t 
                     nTxFees = tx.GetValueIn(mapInputs)-tx.GetValueOut();
-                if (nTxFees < nMinFee)
-                    continue;
 
                 nTxSigOps += tx.GetP2SHSigOpCount(mapInputs);
-                if ((nBlockSigOps + nTxSigOps) >= MAX_BLOCK_SIGOPS)
+                if ((nBlockSigOps + nTxSigOps) >= GetMaxSize(MAX_BLOCK_SIGOPS))
                     continue;
 
                 if (!tx.ConnectInputs(txdb, mapInputs, mapTestPoolTmp, CDiskTxPos(1,1,1), pindexPrev, false, true))
@@ -577,6 +545,7 @@ CBlock* CreateNewBlock(CWallet* pwallet, bool fProofOfStake)
         LOCK2(cs_main, mempool.cs);
         CBlockIndex
             * pindexPrev = pindexBest;
+        const int nHeight = pindexPrev->nHeight + 1;
         CTxDB 
             txdb("r");
 
@@ -598,7 +567,7 @@ CBlock* CreateNewBlock(CWallet* pwallet, bool fProofOfStake)
         {
             CTransaction
                 & tx = (*mi).second;
-            if (tx.IsCoinBase() || tx.IsCoinStake() || !tx.IsFinal())
+            if (tx.IsCoinBase() || tx.IsCoinStake() || !tx.IsFinal(nHeight))
                 continue;
 
             COrphan* porphan = NULL;
@@ -669,7 +638,7 @@ CBlock* CreateNewBlock(CWallet* pwallet, bool fProofOfStake)
         uint64_t nBlockSize = 1000;
         uint64_t nBlockTx = 0;
         int nBlockSigOps = 100;
-        bool fSortedByFee = (nBlockPrioritySize <= 0);
+        bool fSortedByFee = true;
 
         TxPriorityCompare comparer(fSortedByFee);
         std::make_heap(vecPriority.begin(), vecPriority.end(), comparer);
@@ -691,34 +660,16 @@ CBlock* CreateNewBlock(CWallet* pwallet, bool fProofOfStake)
 
             // Legacy limits on sigOps:
             unsigned int nTxSigOps = tx.GetLegacySigOpCount();
-            if (nBlockSigOps + nTxSigOps >= MAX_BLOCK_SIGOPS)
+            if (nBlockSigOps + nTxSigOps >= GetMaxSize(MAX_BLOCK_SIGOPS))
                 continue;
 
             // Timestamp limit
             if (tx.nTime > GetAdjustedTime() || (fProofOfStake && tx.nTime > pblock->vtx[0].nTime))
                 continue;
 
-            // Simplify transaction fee - allow free = false
-            int64_t nMinFee = tx.GetMinFee(nBlockSize, true, GMF_BLOCK, nTxSize);
-
-            // Skip free transactions if we're past the minimum block size:
-            if (fSortedByFee && (dFeePerKb < nMinTxFee) && (nBlockSize + nTxSize >= nBlockMinSize))
+            // Never include transactions with fee < min fee
+            if (dFeePerKb < nMinTxFee) // nMinTxFee = 0.01 YAC/kb
                 continue;
-
-            // Prioritize by fee once past the priority size or we run out of high-priority
-            // transactions:
-            if (
-                !fSortedByFee &&
-                (
-                 ((nBlockSize + nTxSize) >= nBlockPrioritySize) || 
-                 (dPriority < (COIN * 144 / 250))
-                )               // what is this double < some int64 / mean?
-               )
-            {
-                fSortedByFee = true;
-                comparer = TxPriorityCompare(fSortedByFee);
-                std::make_heap(vecPriority.begin(), vecPriority.end(), comparer);
-            }
 
             // Connecting shouldn't fail due to dependency on other memory pool transactions
             // because we're already processing them in order of dependency
@@ -729,11 +680,9 @@ CBlock* CreateNewBlock(CWallet* pwallet, bool fProofOfStake)
                 continue;
 
             int64_t nTxFees = tx.GetValueIn(mapInputs)-tx.GetValueOut();
-            if (nTxFees < nMinFee)
-                continue;
 
             nTxSigOps += tx.GetP2SHSigOpCount(mapInputs);
-            if (nBlockSigOps + nTxSigOps >= MAX_BLOCK_SIGOPS)
+            if (nBlockSigOps + nTxSigOps >= GetMaxSize(MAX_BLOCK_SIGOPS))
                 continue;
 
             if (!tx.ConnectInputs(txdb, mapInputs, mapTestPoolTmp, CDiskTxPos(1,1,1), pindexPrev, false, true, true, MANDATORY_SCRIPT_VERIFY_FLAGS))
@@ -817,7 +766,7 @@ void IncrementExtraNonce(CBlock* pblock, CBlockIndex* pindexPrev, unsigned int& 
     unsigned int 
         nHeight = pindexPrev->nHeight+1; // Height first in coinbase required for block.version=2
 
-    pblock->vtx[0].vin[0].scriptSig = (CScript() << nHeight << CBigNum(nExtraNonce)) + COINBASE_FLAGS;
+    pblock->vtx[0].vin[0].scriptSig = (CScript() << nHeight << CScriptNum(nExtraNonce)) + COINBASE_FLAGS;
     Yassert(pblock->vtx[0].vin[0].scriptSig.size() <= 100);
     pblock->hashMerkleRoot = pblock->BuildMerkleTree();
 }
@@ -872,6 +821,43 @@ void FormatHashBuffers(CBlock* pblock, char* pmidstate, char* pdata, char* phash
     memcpy(phash1, &tmp.hash1, 64);
 }
 
+void FormatHashBuffers_64bit_nTime(char* pblock, char* pmidstate, char* pdata, char* phash1)
+{
+    //
+    // Pre-build hash buffers
+    //
+    struct
+    {
+        struct block_header block;
+        unsigned char pchPadding0[64];
+        uint256 hash1;
+        unsigned char pchPadding1[64];
+    }
+    tmp;
+    memset(&tmp, 0, sizeof(tmp));
+
+    char *pblockData = (char *) &tmp.block;
+    memcpy((void *)pblockData, (const void*)pblock, 68);
+    memcpy((void *)(pblockData + 68), (const void*)(pblock+72), 16);
+
+    FormatHashBlocks(&tmp.block, sizeof(tmp.block));
+    FormatHashBlocks(&tmp.hash1, sizeof(tmp.hash1));
+
+    // Byte swap all the input buffer
+    for (uint32_t i = 0; i < sizeof(tmp)/sizeof(uint32_t); ++i)
+  //for (unsigned int i = 0; i < sizeof(tmp)/4; ++i)    // this is only true
+    {                                                   // if an unsigned int
+                                                        // is 32 bits!!?? What
+                                                        // if it is 64 bits???????
+        ((uint32_t *)&tmp)[i] = ByteReverse(((uint32_t *)&tmp)[i]);
+    }
+    //tmp.block.nTime = (tmp.block.nTime & 0x00000000FFFFFFFF) << 32 | (tmp.block.nTime & 0xFFFFFFFF00000000) >> 32;
+    // Precalc the first half of the first hash, which stays constant
+    SHA256Transform(pmidstate, &tmp.block, pSHA256InitState);
+
+    memcpy(pdata, &tmp.block, 128);
+    memcpy(phash1, &tmp.hash1, 64);
+}
 
 bool CheckWork(CBlock* pblock, CWallet& wallet, CReserveKey& reservekey)
 {
@@ -882,7 +868,9 @@ bool CheckWork(CBlock* pblock, CWallet& wallet, CReserveKey& reservekey)
         return error("CheckWork () : %s is not a proof-of-work block", hashBlock.GetHex().c_str());
 
     if (hashBlock > hashTarget)
+    {
         return error("CheckWork () : proof-of-work not meeting target");
+    }
 
     //// debug print
     printf(
@@ -985,7 +973,7 @@ void StakeMinter(CWallet *pwallet)
 
     while (true)
     {
-        if (fShutdown)
+        if (fShutdown || (pindexBest && pindexBest->nHeight + 1 >= nMainnetNewLogicBlockNumber))
             return;
 
         while (pwallet->IsLocked())
@@ -1113,13 +1101,13 @@ static void YacoinMiner(CWallet *pwallet)  // here fProofOfStake is always false
     unsigned int 
         nExtraNonce = 0;
 
-    while ( fGenerateBitcoins )
+    while ( fGenerateBitcoins && nBlocksToGenerate!=0)
     {
-        while (
-               IsInitialBlockDownload() || 
+        while (IsInitialBlockDownload() 
+               || 
                (
                 vNodes.empty() 
-                //&& !fTestNet               //TestNet can mine stand alone!
+                && !fTestNet               //TestNet can mine stand alone!
                 // could be that if there is more than one stand alone mining
                 // forks on the blockchain can't be resolved?
                )
@@ -1147,7 +1135,6 @@ static void YacoinMiner(CWallet *pwallet)  // here fProofOfStake is always false
             Sleep(nMillisecondsPerSecond);
         }
         strMintWarning = "";
-
         //
         // Create new block
         //
@@ -1165,10 +1152,10 @@ static void YacoinMiner(CWallet *pwallet)  // here fProofOfStake is always false
         IncrementExtraNonce(pblock.get(), pindexPrev, nExtraNonce);
 
         bool
-            fNotYac1dot0BlockOrTx = true;
-        if( (pindexPrev->nHeight + 1) >= nTestNetNewLogicBlockNumber )
+            fYac1dot0BlockOrTx = false;
+        if( (pindexPrev->nHeight + 1) >= nMainnetNewLogicBlockNumber )
         {
-            fNotYac1dot0BlockOrTx = false;
+        	fYac1dot0BlockOrTx = true;
         }
         printf(
                 "Running YACoinMiner with %" PRIszu " transaction"
@@ -1180,7 +1167,6 @@ static void YacoinMiner(CWallet *pwallet)  // here fProofOfStake is always false
                 , pblock->vtx.size() > 1? "s": ""
                 , ::GetSerializeSize(*pblock, SER_NETWORK, PROTOCOL_VERSION)
               );
-
         //
         // Pre-build hash buffers
         //
@@ -1190,10 +1176,10 @@ static void YacoinMiner(CWallet *pwallet)  // here fProofOfStake is always false
 
         FormatHashBuffers(pblock.get(), pmidstate, pdata, phash1);
 
+        ::int64_t
+            & nBlockTime = *(::int64_t*)(pdata + 64 + 4);
         unsigned int
-            & nBlockTime = *(unsigned int*)(pdata + 64 + 4);
-        unsigned int
-            & nBlockNonce = *(unsigned int*)(pdata + 64 + 12);
+            & nBlockNonce = *(unsigned int*)(pdata + 64 + 16);
 
         Big.randomize_the_nonce( nBlockNonce ); // lazy initialization performed here
 
@@ -1212,9 +1198,6 @@ static void YacoinMiner(CWallet *pwallet)  // here fProofOfStake is always false
                      , hashTarget.GetHex().substr(0,16).c_str()
                     );
 
-        block_header 
-            res_header;
-
         uint256 
             result;
         unsigned int 
@@ -1225,17 +1208,16 @@ static void YacoinMiner(CWallet *pwallet)  // here fProofOfStake is always false
                      "Starting mining loop\n"
                     );
 #endif
-        while( fGenerateBitcoins )
+        while( fGenerateBitcoins && nBlocksToGenerate!=0)
         {
             unsigned int nNonceFound;
 
             nNonceFound = scanhash_scrypt(
-                                            (block_header *)&pblock->nVersion,
+                                            (char *)&pblock->nVersion,
                                             //max_nonce,
                                             nHashesDone,
                                             UBEGIN(result),
-                                            &res_header,
-                                            GetNfactor(pblock->nTime, fNotYac1dot0BlockOrTx)
+                                            GetNfactor(pblock->nTime, fYac1dot0BlockOrTx)
                                             , pindexPrev
                                             , &hashTarget
                                          );
@@ -1278,6 +1260,10 @@ static void YacoinMiner(CWallet *pwallet)  // here fProofOfStake is always false
                             "", 
                             pblock->GetHash().ToString().c_str()
                           ); 
+                    if(nBlocksToGenerate>0) {
+                        nBlocksToGenerate--;
+                        printf("Remaining blocks to mine %d\n",nBlocksToGenerate);
+                    }
                 }
                 SetThreadPriority(THREAD_PRIORITY_LOWEST);
                     break;
@@ -1301,13 +1287,13 @@ static void YacoinMiner(CWallet *pwallet)  // here fProofOfStake is always false
             nHashCounter += nHashesDone;
             nHashesDone = 0;
                 
-#ifdef Yac1dot0
-            (void)printf(
-                         "hash counter %" PRId64 ""
-                         "\n"
-                         , nHashCounter
-                        );
-#endif
+// #ifdef Yac1dot0
+//             (void)printf(
+//                          "hash counter %" PRId64 ""
+//                          "\n"
+//                          , nHashCounter
+//                         );
+// #endif
             ::int64_t 
                 nNow = GetTimeMillis();
 
@@ -1444,7 +1430,7 @@ void static ThreadYacoinMiner(void* parg)
 //_____________________________________________________________________________
 
 // here we add the missing PoW mining code from 0.4.4
-void GenerateYacoins(bool fGenerate, CWallet* pwallet)
+void GenerateYacoins(bool fGenerate, CWallet* pwallet, int nblocks)
 {
     fGenerateBitcoins = fGenerate;
     nLimitProcessors = GetArg("-genproclimit", -1);
@@ -1454,6 +1440,7 @@ void GenerateYacoins(bool fGenerate, CWallet* pwallet)
 
     if (fGenerate)
     {
+        nBlocksToGenerate = nblocks;
         int 
             nProcessors = boost::thread::hardware_concurrency();
 
@@ -1477,6 +1464,10 @@ void GenerateYacoins(bool fGenerate, CWallet* pwallet)
             if (!NewThread(ThreadYacoinMiner, pwallet))
                 printf("Error: NewThread(ThreadBitcoinMiner) failed\n");
             Sleep( nTenMilliseconds );
+        }
+
+        while(nBlocksToGenerate>0) {
+            Sleep(nMillisecondsPerSecond);
         }
     }
 }

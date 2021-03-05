@@ -29,7 +29,8 @@ namespace Checkpoints
     //
     static MapCheckpoints mapCheckpoints =
         boost::assign::map_list_of
-		( 0, std::make_pair(hashGenesisBlock, 1367991220) )
+        ( 0, std::make_pair(hashGenesisBlock, 1367991220) )
+#ifndef LOW_DIFFICULTY_FOR_DEVELOPMENT
         ( 15000, std::make_pair(uint256("0x00000082cab82d04354692fac3b83d19cbe3c3ab4b73610d0e73397545eb012e"), 1368024582) )
         ( 30000, std::make_pair(uint256("0x0000000af2f6e71951d6e8befbd43a3dac36681b5095cb822b5c9c8de626e371"), 1368071548) )
         ( 45000, std::make_pair(uint256("0x00000000591110a1411cf37739cde0c558c0c070aa38686d89b2e70fe39b654f"), 1368188743) )
@@ -54,7 +55,8 @@ namespace Checkpoints
         ( 487658, std::make_pair(uint256("0x00000008dee4518a08084c5b65d647a57faf7ff28bc7d8786719ac13d21356d4"), 1396181452) )
         ( 550177, std::make_pair(uint256("0x000000087d507052cb66d5a3770cf62f8ff9196ab861ffec3452d939b818567b"), 1399962064) )
         ( 612177, std::make_pair(uint256("0x0000004bc02ebb045398fd8cdb249b790892a4fa3a8b03dbbbf5743c53f2a508"), 1404141665) )
-		( 712177, std::make_pair(uint256("0x000001881da9ee73de48a54ebae7d0dec3b453d795b6704d62414e4b581e3aea"), 1410900724) )
+        ( 712177, std::make_pair(uint256("0x000001881da9ee73de48a54ebae7d0dec3b453d795b6704d62414e4b581e3aea"), 1410900724) )
+#endif
         ;
 
     // TestNet has no checkpoints
@@ -106,6 +108,7 @@ namespace Checkpoints
         return NULL;
     }
 
+    /* BELOW CODES ARE DEPRECATED FOR YACOIN 1.0.0 */
     // ppcoin: synchronized checkpoint (centrally broadcasted)
     uint256 hashSyncCheckpoint = 0;
     uint256 hashPendingCheckpoint = 0;
@@ -120,9 +123,7 @@ namespace Checkpoints
         LOCK(cs_hashSyncCheckpoint);
         if (!mapBlockIndex.count(hashSyncCheckpoint))
         {
-#ifndef Yac1dot0
             error("GetSyncCheckpoint: block index missing for current sync-checkpoint %s", hashSyncCheckpoint.ToString().c_str());
-#endif
         }
         else
             return mapBlockIndex[hashSyncCheckpoint];
@@ -238,7 +239,7 @@ namespace Checkpoints
         return false;
     }
 
-    // Automatically select a suitable sync-checkpoint 
+    // Automatically select a suitable sync-checkpoint
     uint256 AutoSelectSyncCheckpoint()
     {
         const CBlockIndex *pindex = pindexBest;
@@ -390,11 +391,11 @@ namespace Checkpoints
         }
 
         // Relay checkpoint
-        {{
+        {
             LOCK(cs_vNodes);
             BOOST_FOREACH(CNode* pnode, vNodes)
                 checkpoint.RelayTo(pnode);
-        }}
+        }
         return true;
     }
 
@@ -405,7 +406,7 @@ namespace Checkpoints
         // sync-checkpoint should always be accepted block
         Yassert(mapBlockIndex.count(hashSyncCheckpoint));
         const CBlockIndex* pindexSync = mapBlockIndex[hashSyncCheckpoint];
-        return (nBestHeight >= pindexSync->nHeight + nCoinbaseMaturity ||
+        return (nBestHeight >= pindexSync->nHeight + GetCoinbaseMaturity() ||
                 pindexSync->GetBlockTime() + nStakeMinAge < GetAdjustedTime());
     }
 }

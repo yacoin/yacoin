@@ -71,11 +71,7 @@ void ThreadRPCServer3(void* parg);
 
 static inline unsigned short GetDefaultRPCPort()
 {
-#if defined(Yac1dot0)
-    return GetBoolArg("-testnet", false)? 7787: 17787;
-#else
-    return GetBoolArg("-testnet", false)? 7687: 17687;
-#endif
+    return GetBoolArg("-testnet", false)? 17687: 7687;
 }
 
 Object JSONRPCError(int code, const string& message)
@@ -144,7 +140,8 @@ Value ValueFromAmount(::int64_t amount)
 
 std::string HexBits(unsigned int nBits)
 {
-    union {
+    union
+    {
         ::int32_t nBits;
         char cBits[4];
     } uBits;
@@ -246,7 +243,10 @@ Value help(const Array& params, bool fHelp)
 {
     if (fHelp || params.size() > 1)
     {
-        throw runtime_error( "help [command]\n" "List commands, or get help for a command." );
+        throw runtime_error(
+                            "help [command]\n"
+                            "List commands, or get help for a command."
+                           );
       //throw invalid_argument( "help [command]\n" "List commands, or get help for a command." );
     }
     string strCommand = "";
@@ -269,6 +269,39 @@ Value stop(const Array& params, bool fHelp)
         bitdb.SetDetach(params[0].get_bool());
     StartShutdown();
     return "YaCoin server stopping";
+}
+
+Value getrpcinfo(const Array& params, bool fHelp){
+    if(fHelp){
+        throw runtime_error(
+            "getrpcinfo\n"
+            "Returns details of the RPC server.\n");
+    }    
+    
+    Object command;
+    command.push_back(Pair("method","getrpcinfo"));
+    command.push_back(Pair("duration",1));
+    
+    Array commands;
+    commands.push_back(command);
+
+    Object res;
+    res.push_back(Pair("active_commands",commands));
+    res.push_back(Pair("logpath",GetDebugLogPathName()));
+    res.push_back(Pair("RPCport", GetArg("-rpcport", GetDefaultRPCPort()) ));
+    return res;
+}
+
+Value setmocktime(const Array& params, bool fHelp){
+    if(fHelp){
+        throw runtime_error(
+            "setmocktime <timestamp>\n"
+            "<timestamp> mocktimestamp to be set\n");
+    }
+
+    SetMockTime(params[0].get_int64());
+
+    return Value::null;
 }
 
 //
@@ -743,30 +776,30 @@ void ThreadRPCServer2(void* parg)
     {
         context.set_options(ssl::context::no_sslv2);
 
-        filesystem::path 
+        filesystem::path
             pathCertFile(GetArg("-rpcsslcertificatechainfile", "server.cert"));
 
         if (!pathCertFile.is_complete()) 
             pathCertFile = filesystem::path(GetDataDir()) / pathCertFile;
-        if (filesystem::exists(pathCertFile)) 
+        if (filesystem::exists(pathCertFile))
             context.use_certificate_chain_file(pathCertFile.string());
-        else 
-            printf("ThreadRPCServer2 ERROR: missing server certificate file %s\n", 
+        else
+            printf("ThreadRPCServer2 ERROR: missing server certificate file %s\n",
                    pathCertFile.string().c_str()
                   );
 
-        filesystem::path 
+        filesystem::path
             pathPKFile(GetArg("-rpcsslprivatekeyfile", "server.pem"));
-        if (!pathPKFile.is_complete()) 
+        if (!pathPKFile.is_complete())
             pathPKFile = filesystem::path(GetDataDir()) / pathPKFile;
-        if (filesystem::exists(pathPKFile)) 
+        if (filesystem::exists(pathPKFile))
             context.use_private_key_file(pathPKFile.string(), ssl::context::pem); // causes exceptions???
-        else 
-            printf("ThreadRPCServer2 ERROR: missing server private key file %s\n", 
+        else
+            printf("ThreadRPCServer2 ERROR: missing server private key file %s\n",
                    pathPKFile.string().c_str()
                   );
 
-        string 
+        string
             strCiphers = GetArg("-rpcsslciphers", "TLSv1+HIGH:!SSLv2:!aNULL:!eNULL:!AH:!3DES:@STRENGTH");
         SSL_CTX_set_cipher_list(context.impl(), strCiphers.c_str());
     }
@@ -858,24 +891,29 @@ public:
     void convertParameterObjectToArray(string method, Value& valParams);
 };
 
-void JSONRequest::convertParameterObjectToArray(string method, Value& valParams){
-    printf("rpc.convert\n");
+void JSONRequest::convertParameterObjectToArray(string method, Value& valParams){    
     params = Array();
-    printf("Converting to array\n");
     if(method == "importprivkey"){
-        printf("params privkey\n");
+        // copy those params in the order as expected by the improvprivkey function
         params.push_back(find_value(valParams.get_obj(), "privkey"));
-        printf("params label\n");
         params.push_back(find_value(valParams.get_obj(), "label"));
-        printf("params done\n");
+    } else if(method == "generatetoaddress"){
+        params.push_back(find_value(valParams.get_obj(), "nblocks"));
+        Value addressValue = find_value(valParams.get_obj(), "address");
+        if(!addressValue.is_null()){
+            params.push_back(addressValue);
+        }        
+        Value maxtriesValue = find_value(valParams.get_obj(), "maxtries");
+        if(!maxtriesValue.is_null()){
+            params.push_back(maxtriesValue);
+        }
     } else if (method == "getblockcount" || method == "getwalletinfo" || method == "stop") {
-        printf("params empty array\n");
+        // these methods do not require any parameter
     }
 }
 
 void JSONRequest::parse(const Value& valRequest)
 {
-    printf("rpc.parse\n");
     // Parse request
     if (valRequest.type() != obj_type)
         throw JSONRPCError(RPC_INVALID_REQUEST, "Invalid Request object");
@@ -891,22 +929,29 @@ void JSONRequest::parse(const Value& valRequest)
     if (valMethod.type() != str_type)
         throw JSONRPCError(RPC_INVALID_REQUEST, "Method must be a string");
     strMethod = valMethod.get_str();
-    if (
-        strMethod != "getwork" && 
-        strMethod != "getworkex" && 
-        strMethod != "getblocktemplate"
-       )
-        printf("ThreadRPCServer method=%s\n", strMethod.c_str());
+//    if (
+//        strMethod != "getwork" &&
+//        strMethod != "getworkex" &&
+//        strMethod != "getblocktemplate"
+//       )
+    printf("ThreadRPCServer method=%s\n", strMethod.c_str());
 
     // Parse params
     Value valParams = find_value(request, "params");
-    if(valParams.type() == obj_type) {
+    if(valParams.type() == obj_type)
+    {
         convertParameterObjectToArray(valMethod.get_str(), valParams);
-    } else if (valParams.type() == array_type) {
+    }
+    else if (valParams.type() == array_type)
+    {
         params = valParams.get_array();
-    } else if (valParams.type() == null_type) {
+    }
+    else if (valParams.type() == null_type)
+    {
         params = Array();
-    } else {
+    }
+    else
+    {
         throw JSONRPCError(RPC_INVALID_REQUEST, "Params must be an array");
     }
 }
@@ -916,7 +961,8 @@ static Object JSONRPCExecOne(const Value& req)
     Object rpc_result;
 
     JSONRequest jreq;
-    try {
+    try
+    {
         jreq.parse(req);
 
         Value result = tableRPC.execute(jreq.strMethod, jreq.params);
@@ -949,7 +995,7 @@ static CCriticalSection cs_THREAD_RPCHANDLER;
 void ThreadRPCServer3(void* parg)
 {
     // Make this thread recognisable as the RPC handler
-    RenameThread("yacoin-rpchand");
+    RenameThread("yacoin-rpchandler");
 
     {
         LOCK(cs_THREAD_RPCHANDLER);
@@ -1064,10 +1110,8 @@ json_spirit::Value CRPCTable::execute(const std::string &strMethod, const json_s
                 result = pcmd->actor(params, false);
             else 
             {
-                {
-                    LOCK2(cs_main, pwalletMain->cs_wallet);
-                    result = pcmd->actor(params, false);
-                }
+                LOCK2(cs_main, pwalletMain->cs_wallet);
+                result = pcmd->actor(params, false);
             }
         }
         return result;
@@ -1162,18 +1206,19 @@ void ConvertTo(Value& value, bool fAllowNull=false)
 // Call Table
 //
 
-
 static const CRPCCommand vRPCCommands[] =
 { //  name                      function                 safemd  unlocked
   //  ------------------------  -----------------------  ------  --------
     { "help",                   &help,                   true,   false },
-    { "stop",                   &stop,                   true,   true },
+    { "stop",                   &stop,                   true,   true  },
     { "getbestblockhash",       &getbestblockhash,       true,   false },
     { "getblockcount",          &getblockcount,          true,   false },
+    { "getwalletinfo",          &getwalletinfo,          true,   false },
+    { "getrpcinfo",             &getrpcinfo,             true,   false },
+    { "setmocktime",            &setmocktime,            true,   false },
 #ifdef WIN32
     { "getblockcountt",         &getcurrentblockandtime, true,   false },
 #endif
-    { "getwalletinfo",          &getwalletinfo,          true,  false },
     { "getyacprice",            &getYACprice,            true,   false },
     { "getconnectioncount",     &getconnectioncount,     true,   false },
     { "getaddrmaninfo",         &getaddrmaninfo,         true,   false },
@@ -1184,6 +1229,7 @@ static const CRPCCommand vRPCCommands[] =
     { "getinfo",                &getinfo,                true,   false },
     { "getgenerate",            &getgenerate,            true,   false },
     { "setgenerate",            &setgenerate,            true,   false },
+    { "generatetoaddress",      &generatetoaddress,      true,   true  },
     { "getsubsidy",             &getsubsidy,             true,   false },
     { "gethashespersec",        &gethashespersec,        true,   false },
     { "getmininginfo",          &getmininginfo,          true,   false },
@@ -1212,13 +1258,16 @@ static const CRPCCommand vRPCCommands[] =
     { "sendfrom",               &sendfrom,               false,  false },
     { "sendmany",               &sendmany,               false,  false },
     { "addmultisigaddress",     &addmultisigaddress,     false,  false },
+	{ "createcltvaddress",     	&createcltvaddress,	     false,  false },
+	{ "spendcltv",     			&spendcltv,	     		 false,  false },
+	{ "createcsvaddress",       &createcsvaddress,       false,  false },
+	{ "spendcsv",               &spendcsv,               false,  false },
     { "addredeemscript",        &addredeemscript,        false,  false },
+    { "describeredeemscript",   &describeredeemscript,   false,  false },
     { "getrawmempool",          &getrawmempool,          true,   false },
     { "getblock",               &getblock,               false,  false },
-
     { "getblockbynumber",       &getblockbynumber,       false,  false },
     { "getblocktimes",          &getblocktimes,          false,  false },
-
     { "getblockhash",           &getblockhash,           false,  false },
     { "gettransaction",         &gettransaction,         false,  false },
     { "listtransactions",       &listtransactions,       false,  false },
@@ -1247,12 +1296,12 @@ static const CRPCCommand vRPCCommands[] =
     { "signrawtransaction",     &signrawtransaction,     false,  false },
     { "sendrawtransaction",     &sendrawtransaction,     false,  false },
     { "getcheckpoint",          &getcheckpoint,          true,   false },
-    { "reservebalance",         &reservebalance,         false,  true},
-    { "checkwallet",            &checkwallet,            false,  true},
-    { "repairwallet",           &repairwallet,           false,  true},
-    { "resendtx",               &resendtx,               false,  true},
-    { "makekeypair",            &makekeypair,            false,  true},
-    { "sendalert",              &sendalert,              false,  false}
+    { "reservebalance",         &reservebalance,         false,  true  },
+    { "checkwallet",            &checkwallet,            false,  true  },
+    { "repairwallet",           &repairwallet,           false,  true  },
+    { "resendtx",               &resendtx,               false,  true  },
+    { "makekeypair",            &makekeypair,            false,  true  },
+    { "sendalert",              &sendalert,              false,  false }
 };
 
 CRPCTable::CRPCTable()
@@ -1305,12 +1354,8 @@ Array RPCConvertValues(std::string &strMethod, const std::vector<std::string> &s
     if (strMethod == "listreceivedbyaccount"  && n > 1) ConvertTo<bool>(params[1]);
     if (strMethod == "getbalance"             && n > 1) ConvertTo<boost::int64_t>(params[1]);
     if (strMethod == "getblock"               && n > 1) ConvertTo<bool>(params[1]);
-
-    if (strMethod == "getblocktimes"          && n > 0) 
-        ConvertTo<int>(params[0]);
-    if (strMethod == "getblockbynumber"       && n > 0) 
-        ConvertTo<int>(params[0]);
-
+    if (strMethod == "getblocktimes"          && n > 0) ConvertTo<int>(params[0]);
+    if (strMethod == "getblockbynumber"       && n > 0) ConvertTo<int>(params[0]);
     if (strMethod == "getblockbynumber"       && n > 1) ConvertTo<bool>(params[1]);
     if (strMethod == "getblockhash"           && n > 0) ConvertTo<boost::int64_t>(params[0]);
     if (strMethod == "move"                   && n > 2) ConvertTo<double>(params[2]);
@@ -1340,6 +1385,11 @@ Array RPCConvertValues(std::string &strMethod, const std::vector<std::string> &s
     if (strMethod == "reservebalance"         && n > 1) ConvertTo<double>(params[1]);
     if (strMethod == "addmultisigaddress"     && n > 0) ConvertTo<boost::int64_t>(params[0]);
     if (strMethod == "addmultisigaddress"     && n > 1) ConvertTo<Array>(params[1]);
+    if (strMethod == "createcltvaddress"      && n > 0) ConvertTo<boost::int64_t>(params[0]);
+    if (strMethod == "spendcltv"         	  && n > 2) ConvertTo<boost::int64_t>(params[2]);
+    if (strMethod == "createcsvaddress"       && n > 0) ConvertTo<boost::int64_t>(params[0]);
+    if (strMethod == "createcsvaddress"       && n > 1) ConvertTo<bool>(params[1]);
+    if (strMethod == "spendcsv"               && n > 2) ConvertTo<boost::int64_t>(params[2]);
     if (strMethod == "listunspent"            && n > 0) ConvertTo<boost::int64_t>(params[0]);
     if (strMethod == "listunspent"            && n > 1) ConvertTo<boost::int64_t>(params[1]);
     if (strMethod == "listunspent"            && n > 2) ConvertTo<Array>(params[2]);
@@ -1353,6 +1403,8 @@ Array RPCConvertValues(std::string &strMethod, const std::vector<std::string> &s
     if (strMethod == "keypoolrefill"          && n > 0) ConvertTo<boost::int64_t>(params[0]);
     if (strMethod == "keypoolreset"           && n > 0) ConvertTo<boost::int64_t>(params[0]);
     if (strMethod == "importaddress"          && n > 2) ConvertTo<bool>(params[2]);
+    if (strMethod == "generatetoaddress"      && n > 2) ConvertTo<int>(params[0]);
+    if (strMethod == "generatetoaddress"      && n > 2) ConvertTo<int>(params[2]);    
 
     return params;
 }

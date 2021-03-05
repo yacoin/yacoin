@@ -133,6 +133,9 @@ $(BITCOIN_TEST_BIN): FORCE
 
 release: all-recursive
 	$(MKDIR_P) $(top_builddir)/release
+	$(MKDIR_P) $(top_builddir)/debug
+	cp $(BITCOIND_BIN) $(top_builddir)/debug/yacoind
+	cp $(BITCOIN_QT_BIN) $(top_builddir)/debug/yacoin-qt
 	$(STRIP) $(BITCOIND_BIN) -o $(top_builddir)/release/yacoind
 	$(STRIP) $(BITCOIN_QT_BIN) -o $(top_builddir)/release/yacoin-qt
 

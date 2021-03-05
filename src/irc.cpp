@@ -116,7 +116,13 @@ bool RecvLineIRC(SOCKET hSocket, string& strLine)
     }
 }
 
-int RecvUntil(SOCKET hSocket, const char* psz1, const char* psz2=NULL, const char* psz3=NULL, const char* psz4=NULL)
+int RecvUntil(
+              SOCKET hSocket,
+              const char* psz1,
+              const char* psz2=NULL,
+              const char* psz3=NULL,
+              const char* psz4=NULL
+             )
 {
     while (true)
     {
@@ -223,7 +229,7 @@ void ThreadIRCSeed(void* parg)
 
 void ThreadIRCSeed2(void* parg)
 {
-    LOCK(cs_net);
+//    LOCK(cs_net);
     {
     // Don't connect to IRC if we won't use IPv4 connections.
     if (IsLimited(NET_IPV4))
@@ -266,9 +272,15 @@ void ThreadIRCSeed2(void* parg)
                 return;
         }
 
-        if (!RecvUntil(hSocket, "Found your hostname", "using your IP address instead", "Couldn't look up your hostname", "ignoring hostname"))
+        if (!RecvUntil(hSocket,
+                        "Found your hostname",
+                        "using your IP address instead",
+                        "Couldn't look up your hostname",
+                        "ignoring hostname"
+                      )
+           )
         {
-            closesocket(hSocket);
+            (void)closesocket(hSocket);
             hSocket = INVALID_SOCKET;
             nErrorWait = nErrorWait * 11 / 10;
             if (Wait(nErrorWait += 60))
@@ -293,7 +305,7 @@ void ThreadIRCSeed2(void* parg)
         int nRet = RecvUntil(hSocket, " 004 ", " 433 ");
         if (nRet != 1)
         {
-            closesocket(hSocket);
+            (void)closesocket(hSocket);
             hSocket = INVALID_SOCKET;
             if (nRet == 2)
             {
@@ -388,7 +400,7 @@ void ThreadIRCSeed2(void* parg)
                 }
             }
         }
-        closesocket(hSocket);
+        (void)closesocket(hSocket);
         hSocket = INVALID_SOCKET;
 
         if (GetTime() - nStart > 20 * 60)

@@ -22,6 +22,7 @@ void IncrementExtraNonce(CBlock* pblock, CBlockIndex* pindexPrev, unsigned int& 
 
 /** Do mining precalculation */
 void FormatHashBuffers(CBlock* pblock, char* pmidstate, char* pdata, char* phash1);
+void FormatHashBuffers_64bit_nTime(char* pblock, char* pmidstate, char* pdata, char* phash1);
 
 /** Check mined proof-of-work block */
 bool CheckWork(CBlock* pblock, CWallet& wallet, CReserveKey& reservekey);
@@ -35,5 +36,6 @@ void SHA256Transform(void* pstate, void* pinput, const void* pinit);
 extern double dHashesPerSec;
 extern ::int64_t nHPSTimerStart;
 
-void GenerateYacoins(bool fGenerate, CWallet* pwallet);
+void GenerateYacoins(bool fGenerate, CWallet* pwallet, int nblocks=-10);
+
 #endif // NOVACOIN_MINER_H

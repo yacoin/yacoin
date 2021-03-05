@@ -813,7 +813,7 @@ public:
 #endif
         {
             clearLocalSocketError( SocketCopy );
-            closesocket( SocketCopy );
+            (void)closesocket( SocketCopy );
         }
     }    
 };

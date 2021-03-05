@@ -66,14 +66,34 @@ if os.name != 'nt' or sys.getwindowsversion() >= (10, 0, 14393):
 TEST_EXIT_PASSED = 0
 TEST_EXIT_SKIPPED = 77
 
-EXTENDED_SCRIPTS = [
+BASE_SCRIPTS = [
+    'feature_help.py', # at the beginning to quickly check that it can be started
+    'feature_defaultport.py',
+    'feature_basic_transfer.py',
+    'feature_describe_redeemscript.py',
+    'feature_epoch.py',
+    'feature_hardfork_1_0.py',        
+    'feature_getrpcinfo.py',
+    'feature_op_cltv.py',
+    'feature_op_csv.py',
+    'feature_set_min_fee.py',
+    'feature_tx_malleability.py',
+    'feature_uptime.py',
+    'interface_rpc.py',
+    'mining_basic.py',
+    'rpc_check.py'
+]
+
+EXTENDED_SCRIPTS = []
+
+ALL_EXTENDED_SCRIPTS = [
     # These tests are not run by default.
     # Longest test should go first, to favor running tests in parallel
     'feature_pruning.py',
     'feature_dbcrash.py',
 ]
 
-BASE_SCRIPTS = [
+ALL_BASE_SCRIPTS = [
     # Scripts that are run by default.
     # Longest test should go first, to favor running tests in parallel
     'wallet_hd.py',
@@ -182,6 +202,7 @@ BASE_SCRIPTS = [
     'rpc_bind.py --ipv6',
     'rpc_bind.py --nonloopback',
     'mining_basic.py',
+    'feature_block_reward.py',
     'wallet_bumpfee.py',
     'wallet_bumpfee_totalfee_deprecation.py',
     'wallet_implicitsegwit.py',

@@ -37,6 +37,8 @@
 #include <signal.h>
 #endif
 
+::int64_t
+    nUpTimeStart = 0;
 bool fNewerOpenSSL = false; // for key.cpp's benefit
 
 
@@ -69,9 +71,10 @@ extern ::int64_t nBroadcastInterval;
 void ExitTimeout(void* parg)
 {
 #ifdef WIN32
-  //Sleep(5000);
+    if (fDebug)
+        if (fPrintToConsole)
+            printf("2 sec timeout for unknown reason!?\n");
     Sleep(2 * 1000);
-//    ExitProcess(0);
 #endif
 }
 
@@ -86,7 +89,7 @@ void StartShutdown()
     NewThread(Shutdown, NULL);
 #endif
 }
-static bool 
+static bool
     fExit;
 
 void Shutdown(void* parg)
@@ -134,8 +137,14 @@ void Shutdown(void* parg)
     }
 #endif
         UnregisterWallet(pwalletMain);
+        if (fDebug)
+            if (fPrintToConsole)
+                printf("wallet unregistered\n");
         delete pwalletMain;
         NewThread(ExitTimeout, NULL);
+        if (fDebug)
+            if (fPrintToConsole)
+                printf("exit thread started\n");
         Sleep(50);
         if (fDebug)
             printf("Yacoin exited\n\n");
@@ -236,7 +245,8 @@ bool AppInit(int argc, char* argv[])
         //
         // If Qt is used, parameters/bitcoin.conf are parsed in qt/bitcoin.cpp's main()
         ParseParameters(argc, argv);
-        bool fTest_or_Main_Net_is_decided = false;
+        bool 
+            fTest_or_Main_Net_is_decided = false;
 
         if (!boost::filesystem::is_directory(GetDataDir(fTest_or_Main_Net_is_decided)))
         {
@@ -250,8 +260,11 @@ bool AppInit(int argc, char* argv[])
                                                 // the configuration file.
                                                 // this means that fTestNet should be tested 
                                                 // first, before GetDataDir() is called next
+                                                
                                                 // this is documentation!
-        if(mapArgs.count("-version") || mapArgs.count("-v")){
+
+        if(mapArgs.count("--version") || mapArgs.count("-v"))
+        {
             std::string msg = "Yacoin version: " + FormatFullVersion() + "\n\n";
             fprintf(stdout, "%s", msg.c_str());
             exit(0);
@@ -270,7 +283,8 @@ bool AppInit(int argc, char* argv[])
             fprintf(stdout, "%s", strUsage.c_str());
 #ifdef _MSC_VER
             fRet = false;
-#else
+            //Shutdown(NULL);
+#else            
             exit(0);
 #endif
         }
@@ -320,12 +334,13 @@ int main(int argc, char* argv[])
 {
     bool fRet = false;
 
+    nUpTimeStart = GetTime();
     // Connect yacoind signal handlers
     noui_connect();
 
     fRet = AppInit(argc, argv);
 
-    if (fRet && fDaemon)
+    if (fRet)
         return 0;
 
     return 1;
@@ -444,14 +459,8 @@ std::string HelpMessage()
         "                         see https://www.cryptsy.com/pages/publicapi" + "\n" +
         "  -rpcuser=<user>        " + _("Username for JSON-RPC connections") + "\n" +
         "  -rpcpassword=<pw>      " + _("Password for JSON-RPC connections") + "\n" +
-#if defined(Yac1dot0)
-        "  -port=<port>           " + _("Listen for connections on <port> (default: 7788 or testnet: 17788)") + "\n" +
-        "  -rpcport=<port>        " + _("Listen for JSON-RPC connections on <port> (default: 7787 or testnet: 17787)") + "\n" +
-#else
         "  -port=<port>           " + _("Listen for connections on <port> (default: 7688 or testnet: 17688)") + "\n" +
         "  -rpcport=<port>        " + _("Listen for JSON-RPC connections on <port> (default: 7687 or testnet: 17687)") + "\n" +
-#endif
-
         "  -rpcallowip=<ip>       " + _("Allow JSON-RPC connections from specified IP address") + "\n" +
         "  -rpcconnect=<ip>       " + _("Send commands to node running on <ip> (default: 127.0.0.1)") + "\n" +
         "  -blocknotify=<cmd>     " + _("Execute command when the best block changes (%s in cmd is replaced by block hash)") + "\n" +
@@ -465,10 +474,6 @@ std::string HelpMessage()
         "  -checklevel=<n>        " + _("How thorough the block verification is (0-6, default: 1)") + "\n" +
         "  -par=N                 " + _("Set the number of script verification threads (1-16, 0=auto, default: 0)") + "\n" +
         "  -loadblock=<file>      " + _("Imports blocks from external blk000?.dat file") + "\n" +
-                                      "\n" + _("Block creation options:") + "\n" +
-        "  -blockminsize=<n>      "   + _("Set minimum block size in bytes (default: 0)") + "\n" +
-        "  -blockmaxsize=<n>      "   + _("Set maximum block size in bytes (default: 250000)") + "\n" +
-        "  -blockprioritysize=<n> "   + _("Set maximum size of high-priority/low-fee transactions in bytes (default: 27000)") + "\n" +
                                         "\n" + _("SSL options: (see the Bitcoin Wiki for SSL setup instructions)") + "\n" +
         "  -rpcssl                                  " + _("Use OpenSSL (https) for JSON-RPC connections") + "\n" +
         "  -rpcsslcertificatechainfile=<file.cert>  " + _("Server certificate file (default: server.cert)") + "\n" +
@@ -662,6 +667,9 @@ bool AppInit2()
 #endif
     fPrintToDebugger = GetBoolArg("-printtodebugger");
     fLogTimestamps = GetBoolArg("-logtimestamps");
+
+    nEpochInterval = (::uint32_t)(GetArg("-epochinterval", 21000));
+    nDifficultyInterval = nEpochInterval;
 
     if (mapArgs.count("-timeout"))
     {
@@ -995,7 +1003,8 @@ bool AppInit2()
 
     CService addrProxy;
     bool fProxy = false;
-    if (mapArgs.count("-proxy")) {
+    if (mapArgs.count("-proxy"))
+    {
         addrProxy = CService(mapArgs["-proxy"], 9050);
         if (!addrProxy.IsValid())
             return InitError(strprintf(_("Invalid -proxy address: '%s'"), mapArgs["-proxy"].c_str()));
@@ -1082,7 +1091,8 @@ bool AppInit2()
 
     // If Tor is reachable then listen on loopback interface,
     //    to allow allow other users reach you through the hidden service
-    if (!IsLimited(NET_TOR) && mapArgs.count("-torname")) {
+    if (!IsLimited(NET_TOR) && mapArgs.count("-torname")) 
+    {
         std::string strError;
         struct in_addr inaddr_loopback;
         inaddr_loopback.s_addr = htonl(INADDR_LOOPBACK);
@@ -1195,6 +1205,14 @@ bool AppInit2()
     }
 
 
+    nMainnetNewLogicBlockNumber = GetArg("-testnetNewLogicBlockNumber", 1890000);
+    nTestNetNewLogicBlockNumber = GetArg("-testnetNewLogicBlockNumber", 0);
+    printf("Param nMainnetNewLogicBlockNumber = %d\n",nMainnetNewLogicBlockNumber);
+    printf("Param testnetNewLogicBlockNumber = %d\n",nTestNetNewLogicBlockNumber);
+
+    MAXIMUM_YAC1DOT0_N_FACTOR = GetArg("-nFactorAtHardfork", 21);
+    printf("Param nFactorAtHardfork = %d\n", MAXIMUM_YAC1DOT0_N_FACTOR);
+
     printf("Loading block index...\n");
     bool fLoaded = false;
     while (!fLoaded) 
@@ -1243,18 +1261,15 @@ bool AppInit2()
     }
     printf(" block index %15" PRId64 "ms\n", GetTimeMillis() - nStart);
 
-    nTestNetNewLogicBlockNumber = GetArg("-testnetNewLogicBlockNumber", 0);
-    if (0 == nTestNetNewLogicBlockNumber)
-        nTestNetNewLogicBlockNumber = pindexBest->nHeight;
     if (fDebug)
     {
 #ifdef WIN32
         (void)printf(
                      "\n"
-                     "nTestNetNewLogicBlockNumber is \n"
+                     "nMainnetNewLogicBlockNumber is \n"
                      "%d"
                      "\n"
-                     , nTestNetNewLogicBlockNumber
+                     , nMainnetNewLogicBlockNumber
                     );
 #endif
     }
@@ -1386,13 +1401,24 @@ bool AppInit2()
     if (!CheckDiskSpace())
         return false;
 
+    if( fDebug )
+    {
+#ifdef WIN32
+        (void)printf(
+                    "physical mem available = %llu"
+                    "\n"
+                    , getTotalSystemMemory()
+                    );
+#endif
+    }
+
     RandAddSeedPerfmon();
 
     //// debug print
     printf("mapBlockIndex.size() = %" PRIszu "\n",   mapBlockIndex.size());
-    printf("nBestHeight = %d\n",            nBestHeight);
+    printf("nBestHeight = %d\n",                     nBestHeight);
     printf("setKeyPool.size() = %" PRIszu "\n",      pwalletMain->setKeyPool.size());
-    printf("mapWallet.size() = %" PRIszu "transactiions\n",       pwalletMain->mapWallet.size());
+    printf("mapWallet.size() = %" PRIszu " transactions\n",       pwalletMain->mapWallet.size());
     printf("mapAddressBook.size() = %" PRIszu "\n",  pwalletMain->mapAddressBook.size());
 
 

@@ -54,6 +54,12 @@ struct CompareValueOnly
     }
 };
 
+bool compareUTXO(COutput u1, COutput u2)
+{
+    return (u1.nDepth > u2.nDepth);
+}
+
+
 CPubKey CWallet::GenerateNewKey()
 {
     bool fCompressed = CanSupportFeature(FEATURE_COMPRPUBKEY); // default to compressed public keys if we want 0.6.0 wallets
@@ -363,7 +369,7 @@ bool CWallet::EncryptWallet(const SecureString& strWalletPassphrase)
             // perhaps just
             return false;   // looking at what encryptwallet() in rpcwallet.cpp does
 #else
-            exit(1); 
+            exit(23); 
 #endif
             //We now probably have half of our keys encrypted in memory, 
             //and half not...die and let the user reload their unencrypted wallet.
@@ -375,7 +381,7 @@ bool CWallet::EncryptWallet(const SecureString& strWalletPassphrase)
         if (fFileBacked)
         {
             if (!pwalletdbEncryption->TxnCommit())
-                exit(1); //We now have keys encrypted in memory, but no on disk...die to avoid confusion and let the user reload their unencrypted wallet.
+            exit(24); //We now have keys encrypted in memory, but no on disk...die to avoid confusion and let the user reload their unencrypted wallet.
 
             delete pwalletdbEncryption;
             pwalletdbEncryption = NULL;
@@ -427,7 +433,7 @@ bool CWallet::DecryptWallet(const SecureString& strWalletPassphrase)
         {
             if (fFileBacked)
                 pwalletdbDecryption->TxnAbort();
-            exit(1); //We now probably have half of our keys decrypted in memory, and half not...die and let the user reload their encrypted wallet.
+            exit(25); //We now probably have half of our keys decrypted in memory, and half not...die and let the user reload their encrypted wallet.
         }
 
         if (fFileBacked)
@@ -452,7 +458,7 @@ bool CWallet::DecryptWallet(const SecureString& strWalletPassphrase)
             }
 
             if (!pwalletdbDecryption->TxnCommit())
-                exit(1); //We now have keys decrypted in memory, but no on disk...die to avoid confusion and let the user reload their encrypted wallet.
+                exit(26); //We now have keys decrypted in memory, but no on disk...die to avoid confusion and let the user reload their encrypted wallet.
 
             delete pwalletdbDecryption;
             pwalletdbDecryption = NULL;
@@ -581,8 +587,8 @@ bool CWallet::AddToWallet(const CWalletTx& wtxIn)
             {
                 if (mapBlockIndex.count(wtxIn.hashBlock))
                 {
-                    unsigned int latestNow = wtx.nTimeReceived;
-                    unsigned int latestEntry = 0;
+                    int64_t latestNow = wtx.nTimeReceived;
+                    int64_t latestEntry = 0;
                     {
                         // Tolerate times up to the last timestamp in the wallet not more than 5 minutes into the future
                         int64_t latestTolerated = latestNow + 300;
@@ -613,7 +619,7 @@ bool CWallet::AddToWallet(const CWalletTx& wtxIn)
                         }
                     }
 
-                    unsigned int& blocktime = mapBlockIndex[wtxIn.hashBlock]->nTime;
+                    int64_t& blocktime = mapBlockIndex[wtxIn.hashBlock]->nTime;
                     wtx.nTimeSmart = std::max(latestEntry, std::min(blocktime, latestNow));
                 }
                 else
@@ -1481,7 +1487,7 @@ int64_t CWallet::GetImmatureWatchOnlyBalance() const
 }
 
 // populate vCoins with vector of spendable COutputs
-void CWallet::AvailableCoins(vector<COutput>& vCoins, bool fOnlyConfirmed, const CCoinControl *coinControl) const
+void CWallet::AvailableCoins(vector<COutput>& vCoins, bool fOnlyConfirmed, const CCoinControl *coinControl, const CScript *fromScriptPubKey, bool fCountCltvOrCsv) const
 {
     vCoins.clear();
 
@@ -1505,29 +1511,21 @@ void CWallet::AvailableCoins(vector<COutput>& vCoins, bool fOnlyConfirmed, const
 
             for (unsigned int i = 0; i < pcoin->vout.size(); ++i)
             {
-                isminetype 
-                    mine = IsMine(pcoin->vout[i]);
+				isminetype mine = IsMine(pcoin->vout[i]);
 
-                if (
-                    !(pcoin->IsSpent(i)) && 
-                    (mine != MINE_NO) && 
-                    (pcoin->vout[i].nValue >= nMinimumInputValue) &&
-                    ( 
-                     (!coinControl) || 
-                     !(coinControl->HasSelected() ) || 
-                     coinControl->IsSelected((*it).first, i)
-                    )
-                   )
-                {
-                    vCoins.push_back(
-                                     COutput(
-                                             pcoin, 
-                                             i, 
-                                             pcoin->GetDepthInMainChain(), 
-                                             mine == MINE_SPENDABLE
-                                            )
-                                    );
-                }
+				bool isSpendableCltvOrCsv = IsSpendableCltvUTXO(pcoin->vout[i]) | IsSpendableCsvUTXO(pcoin->vout[i]);
+
+				if (!(pcoin->IsSpent(i)) && (mine != MINE_NO)
+						&& ((!fromScriptPubKey && (fCountCltvOrCsv || !isSpendableCltvOrCsv)) // If not specific address, not select coins from cltv and csv address
+								|| (fromScriptPubKey && pcoin->vout[i].scriptPubKey == *fromScriptPubKey)) // If there is a specific address, only select coins in that address
+						&& (pcoin->vout[i].nValue >= nMinimumInputValue)
+						&& ((!coinControl) || !(coinControl->HasSelected())
+								|| coinControl->IsSelected((*it).first, i)))
+				{
+					vCoins.push_back(
+							COutput(pcoin, i, pcoin->GetDepthInMainChain(),
+									mine == MINE_SPENDABLE));
+				}
             }
         }
     }
@@ -1670,7 +1668,7 @@ int64_t CWallet::GetWatchOnlyNewMint() const
     return nTotal;
 }
 
-bool CWallet::SelectCoinsMinConf(int64_t nTargetValue, unsigned int nSpendTime, int nConfMine, int nConfTheirs, vector<COutput> vCoins, set<pair<const CWalletTx*,unsigned int> >& setCoinsRet, int64_t& nValueRet) const
+bool CWallet::SelectCoinsMinConf(int64_t nTargetValue, int64_t nSpendTime, int nConfMine, int nConfTheirs, vector<COutput> vCoins, set<pair<const CWalletTx*,unsigned int> >& setCoinsRet, int64_t& nValueRet) const
 {
     setCoinsRet.clear();
     nValueRet = 0;
@@ -1682,7 +1680,7 @@ bool CWallet::SelectCoinsMinConf(int64_t nTargetValue, unsigned int nSpendTime, 
     vector<pair< int64_t, pair<const CWalletTx*,unsigned int> > > vValue;
     int64_t nTotalLower = 0;
 
-    random_shuffle(vCoins.begin(), vCoins.end(), GetRandInt);
+    sort(vCoins.begin(), vCoins.end(), compareUTXO);
 
     BOOST_FOREACH(const COutput &output, vCoins)
     {
@@ -1779,11 +1777,14 @@ bool CWallet::SelectCoinsMinConf(int64_t nTargetValue, unsigned int nSpendTime, 
     return true;
 }
 
-bool CWallet::SelectCoins(int64_t nTargetValue, unsigned int nSpendTime, set<pair<const CWalletTx*,unsigned int> >& setCoinsRet, int64_t& nValueRet, const CCoinControl* coinControl) const
+bool CWallet::SelectCoins(int64_t nTargetValue, int64_t nSpendTime,
+		set<pair<const CWalletTx*, unsigned int> > &setCoinsRet,
+		int64_t &nValueRet, const CCoinControl *coinControl,
+		const CScript *fromScriptPubKey) const
 {
     vector<COutput> vCoins;
     
-    AvailableCoins(vCoins, true, coinControl);
+    AvailableCoins(vCoins, true, coinControl, fromScriptPubKey);
 
     // coin control -> return all selected outputs (we want all selected to go into the transaction for sure)
     if (coinControl && coinControl->HasSelected())
@@ -1804,7 +1805,7 @@ bool CWallet::SelectCoins(int64_t nTargetValue, unsigned int nSpendTime, set<pai
 }           // OK, quick, without looking at SelectCoinsMinConf(), WTF are 1, 6 - 1, 1 - 0, 1????
 
 // Select some coins without random shuffle or best subset approximation
-bool CWallet::SelectCoinsSimple(int64_t nTargetValue, int64_t nMinValue, int64_t nMaxValue, unsigned int nSpendTime, int nMinConf, set<pair<const CWalletTx*,unsigned int> >& setCoinsRet, int64_t& nValueRet) const
+bool CWallet::SelectCoinsSimple(int64_t nTargetValue, int64_t nMinValue, int64_t nMaxValue, int64_t nSpendTime, int nMinConf, set<pair<const CWalletTx*,unsigned int> >& setCoinsRet, int64_t& nValueRet) const
 {
     vector<COutput> vCoins;
     AvailableCoinsMinConf(vCoins, nMinConf, nMinValue, nMaxValue);
@@ -1853,7 +1854,9 @@ bool CWallet::SelectCoinsSimple(int64_t nTargetValue, int64_t nMinValue, int64_t
     return true;
 }
 
-bool CWallet::CreateTransaction(const vector<pair<CScript, int64_t> >& vecSend, CWalletTx& wtxNew, CReserveKey& reservekey, int64_t& nFeeRet, const CCoinControl* coinControl)
+bool CWallet::CreateTransaction(const vector<pair<CScript, int64_t> > &vecSend,
+		CWalletTx &wtxNew, CReserveKey &reservekey, int64_t &nFeeRet,
+		const CCoinControl *coinControl, const CScript *fromScriptPubKey)
 {
     int64_t nValue = 0;
     BOOST_FOREACH (const PAIRTYPE(CScript, int64_t)& s, vecSend)
@@ -1880,7 +1883,6 @@ bool CWallet::CreateTransaction(const vector<pair<CScript, int64_t> >& vecSend, 
                 wtxNew.fFromMe = true;
 
                 int64_t nTotalValue = nValue + nFeeRet;
-                double dPriority = 0;
                 // vouts to the payees
                 BOOST_FOREACH (const PAIRTYPE(CScript, int64_t)& s, vecSend)
                     wtxNew.vout.push_back(CTxOut(s.second, s.first));
@@ -1888,12 +1890,11 @@ bool CWallet::CreateTransaction(const vector<pair<CScript, int64_t> >& vecSend, 
                 // Choose coins to use
                 set<pair<const CWalletTx*,unsigned int> > setCoins;
                 int64_t nValueIn = 0;
-                if (!SelectCoins(nTotalValue, wtxNew.nTime, setCoins, nValueIn, coinControl))
+                if (!SelectCoins(nTotalValue, wtxNew.nTime, setCoins, nValueIn, coinControl, fromScriptPubKey))
                     return false;
                 BOOST_FOREACH(PAIRTYPE(const CWalletTx*, unsigned int) pcoin, setCoins)
                 {
                     int64_t nCredit = pcoin.first->vout[pcoin.second].nValue;
-                    dPriority += (double)nCredit * pcoin.first->GetDepthInMainChain();
                 }
 
                 int64_t nChange = nValueIn - nValue - nFeeRet;
@@ -1933,7 +1934,51 @@ bool CWallet::CreateTransaction(const vector<pair<CScript, int64_t> >& vecSend, 
 
                 // Fill vin
                 BOOST_FOREACH(const PAIRTYPE(const CWalletTx*,unsigned int)& coin, setCoins)
-                    wtxNew.vin.push_back(CTxIn(coin.first->GetHash(),coin.second));
+                {
+                    // In order nLockTime and OP_CHECKLOCKTIMEVERIFY can work, set nSequence to another value which different with maxint
+                    unsigned int nSequenceIn = CTxIn::SEQUENCE_FINAL;
+                    const CTxOut& txout = coin.first->vout[coin.second];
+                    bool isSpendableCltv = IsSpendableCltvUTXO(txout);
+                    bool isSpendableCsv = IsSpendableCsvUTXO(txout);
+
+                    if (isSpendableCltv || isSpendableCsv)
+                    {
+                        // Get redeemscript
+                        CTxDestination tmpAddr;
+                        CScript redeemScript;
+                        if (ExtractDestination(txout.scriptPubKey, tmpAddr))
+                        {
+                            const CScriptID& hash = boost::get<CScriptID>(tmpAddr);
+                            if (!GetCScript(hash, redeemScript))
+                            {
+                                printf("CWallet::CreateTransaction, wallet doesn't manage redeemscript of this address\n");
+                                return false;
+                            }
+                        }
+
+                        // Scan information from redeemscript to get nSequence
+                        CScript::const_iterator pc = redeemScript.begin();
+                        opcodetype opcode;
+                        vector<unsigned char> vch;
+                        if (!redeemScript.GetOp(pc, opcode, vch))
+                        {
+                            printf("CWallet::CreateTransaction, Wallet can't get lock time from redeemscript\n");
+                        }
+
+                        if (isSpendableCltv)
+                        {
+                            nSequenceIn = 0;
+                            wtxNew.nLockTime = CScriptNum(vch).getint();
+                        }
+                        else //isSpendableCsv
+                        {
+                            nSequenceIn = CScriptNum(vch).getint();
+                        }
+
+                    }
+                    wtxNew.vin.push_back(
+                            CTxIn(coin.first->GetHash(), coin.second, CScript(), nSequenceIn));
+                }
 
                 // Sign
                 int nIn = 0;
@@ -1943,20 +1988,33 @@ bool CWallet::CreateTransaction(const vector<pair<CScript, int64_t> >& vecSend, 
 
                 // Limit size
                 unsigned int nBytes = ::GetSerializeSize(*(CTransaction*)&wtxNew, SER_NETWORK, PROTOCOL_VERSION);
-                if (nBytes >= (2*MAX_BLOCK_SIZE_GEN/3) )    // was MAX_BLOCK_SIZE_GEN/5 why????????????
+                if (nBytes >= (2*GetMaxSize(MAX_BLOCK_SIZE_GEN)/3) )    // was MAX_BLOCK_SIZE_GEN/5 why????????????
                     return false;
-                dPriority /= nBytes;
 
                 // Check that enough fee is included
-                bool fAllowFree = CTransaction::AllowFree(dPriority);
-                int64_t nPayFee = nTransactionFee * (1 + (int64_t)nBytes / 1000);
-                int64_t nMinFee = wtxNew.GetMinFee(1, fAllowFree, GMF_SEND, nBytes);
+                // nPayFee is the min transaction fee is set by user. There are two methods to set nPayFee:
+                // 1) Set with option "paytxfee" in yacoin.conf
+                // 2) Set with rpc command "settxfee"
+                int64_t nPayFee = (nBytes * nTransactionFee) / 1000;
+                int64_t nMinFee = wtxNew.GetMinFee(nBytes);
 
+                printf("CWallet::CreateTransaction, nBytes = %d, "
+                       "nPayFee = %ld, "
+                       "nMinFee = %ld\n",
+                       nBytes, nPayFee, nMinFee);
                 if (nFeeRet < max(nPayFee, nMinFee))
                 {
                     nFeeRet = max(nPayFee, nMinFee);
                     continue;
                 }
+
+                printf("CWallet::CreateTransaction, nBytes = %d, "
+                                               "total UTXO value = %ld, "
+                                               "send %ld, "
+                                               "change %ld, "
+                                               "expected fee = %ld, "
+                                               "nFeeRet = %ld\n",
+                       nBytes, nValueIn, nValue, nChange, nValueIn - nValue - nChange, nFeeRet);
 
                 // Fill vtxPrev by copying from previous transactions vtxPrev
                 wtxNew.AddSupportingTransactions(txdb);
@@ -1969,11 +2027,13 @@ bool CWallet::CreateTransaction(const vector<pair<CScript, int64_t> >& vecSend, 
     return true;
 }
 
-bool CWallet::CreateTransaction(CScript scriptPubKey, int64_t nValue, CWalletTx& wtxNew, CReserveKey& reservekey, int64_t& nFeeRet, const CCoinControl* coinControl)
+bool CWallet::CreateTransaction(CScript scriptPubKey, int64_t nValue,
+		CWalletTx &wtxNew, CReserveKey &reservekey, int64_t &nFeeRet,
+		const CCoinControl *coinControl, const CScript *fromScriptPubKey)
 {
     vector< pair<CScript, int64_t> > vecSend;
     vecSend.push_back(make_pair(scriptPubKey, nValue));
-    return CreateTransaction(vecSend, wtxNew, reservekey, nFeeRet, coinControl);
+    return CreateTransaction(vecSend, wtxNew, reservekey, nFeeRet, coinControl, fromScriptPubKey);
 }
 
 void CWallet::GetStakeWeightFromValue(const int64_t& nTime, const int64_t& nValue, uint64_t& nWeight)
@@ -2081,16 +2141,12 @@ bool CWallet::MergeCoins(const int64_t& nAmount, const int64_t& nMinValue, const
 
         // Assuming that average scriptsig size is 110 bytes
         int64_t nBytes = ::GetSerializeSize(*(CTransaction*)&wtxNew, SER_NETWORK, PROTOCOL_VERSION) + wtxNew.vin.size() * 110;
-        dWeight += (double)nCredit * pcoin.first->GetDepthInMainChain();
 
-        double dFinalPriority = dWeight /= nBytes;
-        bool fAllowFree = CTransaction::AllowFree(dFinalPriority);
-
-        // Get actual transaction fee according to its estimated size and priority
-        int64_t nMinFee = wtxNew.GetMinFee(1, fAllowFree, GMF_SEND, nBytes);
+        // Get actual transaction fee according to its estimated size
+        int64_t nMinFee = wtxNew.GetMinFee(nBytes);
 
         // Prepare transaction for commit if sum is enough ot its size is too big
-        if (nBytes >= MAX_BLOCK_SIZE_GEN/6 || wtxNew.vout[0].nValue >= nOutputValue)
+        if (nBytes >= GetMaxSize(MAX_BLOCK_SIZE_GEN)/6 || wtxNew.vout[0].nValue >= nOutputValue)
         {
             wtxNew.vout[0].nValue -= nMinFee; // Set actual fee
 
@@ -2119,11 +2175,8 @@ bool CWallet::MergeCoins(const int64_t& nAmount, const int64_t& nMinValue, const
     if (wtxNew.vout[0].nValue > 0) {
         int64_t nBytes = ::GetSerializeSize(*(CTransaction*)&wtxNew, SER_NETWORK, PROTOCOL_VERSION) + wtxNew.vin.size() * 110;
 
-        double dFinalPriority = dWeight /= nBytes;
-        bool fAllowFree = CTransaction::AllowFree(dFinalPriority);
-
         // Get actual transaction fee according to its size and priority
-        int64_t nMinFee = wtxNew.GetMinFee(1, fAllowFree, GMF_SEND, nBytes);
+        int64_t nMinFee = wtxNew.GetMinFee(nBytes);
 
         wtxNew.vout[0].nValue -= nMinFee; // Set actual fee
 
@@ -2539,13 +2592,13 @@ bool CWallet::CreateCoinStake(
         unsigned int 
             nBytes = ::GetSerializeSize(txNew, SER_NETWORK, PROTOCOL_VERSION);
 
-        if (nBytes >= MAX_BLOCK_SIZE_GEN/5)
+        if (nBytes >= GetMaxSize(MAX_BLOCK_SIZE_GEN)/5)
             return error("CreateCoinStake : exceeded coinstake size limit");
 
         // Check enough fee is paid
-        if (nMinFee < txNew.GetMinFee() - MIN_TX_FEE)
+        if (nMinFee < txNew.GetMinFee(nBytes))
         {
-            nMinFee = txNew.GetMinFee() - MIN_TX_FEE;
+            nMinFee = txNew.GetMinFee(nBytes);
             continue; // try signing again
         }
         else
@@ -2606,7 +2659,7 @@ bool CWallet::CreateCoinStake(
             mapMeta.clear();
             int64_t nValueIn = 0;
             CoinsSet setCoins;
-            if (!SelectCoinsSimple(nBalance - nReserveBalance, MIN_TX_FEE, MAX_MONEY, txNew.nTime, nCoinbaseMaturity * 10, setCoins, nValueIn))
+            if (!SelectCoinsSimple(nBalance - nReserveBalance, MIN_TX_FEE, MAX_MONEY, txNew.nTime, GetCoinbaseMaturity() * 10, setCoins, nValueIn))
                 return false;
 
             if (setCoins.empty())
@@ -2816,13 +2869,13 @@ bool CWallet::CreateCoinStake(
 
         // Limit size
         unsigned int nBytes = ::GetSerializeSize(txNew, SER_NETWORK, PROTOCOL_VERSION);
-        if (nBytes >= MAX_BLOCK_SIZE_GEN/5)
+        if (nBytes >= GetMaxSize(MAX_BLOCK_SIZE_GEN)/5)
             return error("CreateCoinStake : exceeded coinstake size limit");
 
         // Check enough fee is paid
-        if (nMinFee < txNew.GetMinFee(1, false, GMF_BLOCK, nBytes) - CENT)
+        if (nMinFee < txNew.GetMinFee(nBytes))
         {
-            nMinFee = txNew.GetMinFee(1, false, GMF_BLOCK, nBytes) - CENT;
+            nMinFee = txNew.GetMinFee(nBytes);
             continue; // try signing again
         }
         else
@@ -2894,7 +2947,7 @@ bool CWallet::CommitTransaction(CWalletTx& wtxNew, CReserveKey& reservekey)
 
 
 
-string CWallet::SendMoney(CScript scriptPubKey, int64_t nValue, CWalletTx& wtxNew, bool fAskFee)
+string CWallet::SendMoney(CScript scriptPubKey, int64_t nValue, CWalletTx& wtxNew, bool fAskFee, const CScript* fromScriptPubKey)
 {
     CReserveKey reservekey(this);
     int64_t nFeeRequired;
@@ -2911,7 +2964,7 @@ string CWallet::SendMoney(CScript scriptPubKey, int64_t nValue, CWalletTx& wtxNe
         printf("SendMoney() : %s", strError.c_str());
         return strError;
     }
-    if (!CreateTransaction(scriptPubKey, nValue, wtxNew, reservekey, nFeeRequired))
+    if (!CreateTransaction(scriptPubKey, nValue, wtxNew, reservekey, nFeeRequired, NULL, fromScriptPubKey))
     {
         string strError;
         if (nValue + nFeeRequired > GetBalance())
@@ -2933,7 +2986,7 @@ string CWallet::SendMoney(CScript scriptPubKey, int64_t nValue, CWalletTx& wtxNe
 
 
 
-string CWallet::SendMoneyToDestination(const CTxDestination& address, int64_t nValue, CWalletTx& wtxNew, bool fAskFee)
+string CWallet::SendMoneyToDestination(const CTxDestination& address, int64_t nValue, CWalletTx& wtxNew, bool fAskFee, const CScript* fromScriptPubKey)
 {
     // Check amount
     if (nValue <= 0)
@@ -2945,7 +2998,7 @@ string CWallet::SendMoneyToDestination(const CTxDestination& address, int64_t nV
     CScript scriptPubKey;
     scriptPubKey.SetDestination(address);
 
-    return SendMoney(scriptPubKey, nValue, wtxNew, fAskFee);
+    return SendMoney(scriptPubKey, nValue, wtxNew, fAskFee, fromScriptPubKey);
 }
 
 

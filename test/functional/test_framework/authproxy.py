@@ -136,14 +136,10 @@ class AuthServiceProxy():
 
     def __call__(self, *args, **argsn):
         postdata = json.dumps(self.get_request(*args, **argsn), default=EncodeDecimal, ensure_ascii=self.ensure_ascii)
-        print(">>>>>> POSTDATA")
         print(postdata)
         response, status = self._request('POST', self.__url.path, postdata.encode('utf-8'))
-        print(">>>>>> RESPONSE")
-        print(response)
-        print(">>>>>> STATUS")
         print(status)
-        print(">>>>>>>>>>>>>>>")
+        print(response)
         if response['error'] is not None:
             raise JSONRPCException(response['error'], status)
         elif 'result' not in response:
@@ -206,3 +202,6 @@ class AuthServiceProxy():
             self.__conn = http.client.HTTPSConnection(self.__url.hostname, port, timeout=self.timeout)
         else:
             self.__conn = http.client.HTTPConnection(self.__url.hostname, port, timeout=self.timeout)
+
+    def close(self):
+         self.__conn.close()

@@ -59,14 +59,12 @@ extern int
     nStatisticsNumberOfBlocks100,
     nStatisticsNumberOfBlocks;
 
-static const unsigned int MAX_BLOCK_SIZE = 1000000;
-static const unsigned int MAX_BLOCK_SIZE_GEN = MAX_BLOCK_SIZE/2;
-static const unsigned int MAX_BLOCK_SIGOPS = MAX_BLOCK_SIZE/50;
-static const unsigned int MAX_ORPHAN_TRANSACTIONS = MAX_BLOCK_SIZE/100;
+static const unsigned int MAX_GENESIS_BLOCK_SIZE = 1000000;
+static const unsigned int MAX_ORPHAN_TRANSACTIONS = 10000;
 static const unsigned int MAX_INV_SZ = 50000;
 
 static const ::int64_t MIN_TX_FEE = CENT;
-static const ::int64_t MIN_RELAY_TX_FEE = CENT/50;
+static const ::int64_t MIN_RELAY_TX_FEE = MIN_TX_FEE;
 
 static const ::int64_t MAX_MONEY = 2000000000 * COIN;
 static const ::int64_t MAX_MINT_PROOF_OF_WORK = 100 * COIN;
@@ -77,17 +75,35 @@ static const unsigned char MAXIMUM_N_FACTOR = 25;  //30; since uint32_t fails on
                                                    //    when stored as an uint32_t in a block
                                                    //    so there is no point going past Nf = 25
 
+//static const unsigned char MAXIMUM_YAC1DOT0_N_FACTOR = 21;
+
 static const unsigned char YAC20_N_FACTOR = 16;
 
+// block version header
+static const int
+    VERSION_of_block_for_yac_05x_new = 7,
+    VERSION_of_block_for_yac_049     = 6,
+    VERSION_of_block_for_yac_044_old = 3,
+    CURRENT_VERSION_of_block = VERSION_of_block_for_yac_049;
+
+//static const int
+//    CURRENT_VERSION_previous = VERSION_of_block_for_yac_044_old;
+
 inline bool MoneyRange(::int64_t nValue) { return (nValue >= 0 && nValue <= MAX_MONEY); }
-// Threshold for nLockTime: below this value it is interpreted as block number, otherwise as UNIX timestamp.
-static const unsigned int LOCKTIME_THRESHOLD = 500000000; // Tue Nov  5 00:53:20 1985 UTC
 // Maximum number of script-checking threads allowed
 static const int MAX_SCRIPTCHECK_THREADS = 16;
 
-static const uint256 
     // hashGenesisBlock("0x0000060fc90618113cde415ead019a1052a9abc43afcccff38608ff8751353e5");
-    hashGenesisBlock("0x00000f3f5eac1539c4e9216e17c74ff387ac1629884d2f97a3144dc32bf67bda");
+    // hashGenesisBlock("0x00000f3f5eac1539c4e9216e17c74ff387ac1629884d2f97a3144dc32bf67bda");
+    // hashGenesisBlock("0x0ea17bb85e10d8c6ded6783a4ce8f79e75d49b439ff41f55d274e6b15612fff9");
+#ifndef LOW_DIFFICULTY_FOR_DEVELOPMENT
+    static const uint256 hashGenesisBlock("0x0000060fc90618113cde415ead019a1052a9abc43afcccff38608ff8751353e5");
+    static const int64_t INITIAL_MONEY_SUPPLY = 0;
+#else
+    static const uint256 hashGenesisBlock("0x1ddf335eb9c59727928cabf08c4eb1253348acde8f36c6c4b75d0b9686a28848");
+    static const int64_t INITIAL_MONEY_SUPPLY = 1E14;
+#endif
+
 extern const uint256 
     nPoWeasiestTargetLimitTestNet,
     hashGenesisBlockTestNet;
@@ -95,11 +111,8 @@ extern int
     nConsecutiveStakeSwitchHeight;  // see timesamps.h = 420000;
 
 const ::int64_t 
-#ifdef Yac1dot0
-    nMaxClockDrift = 12 * nSecondsPerMinute;
-#else
     nMaxClockDrift = nTwoHoursInSeconds;
-#endif
+
 inline ::int64_t PastDrift(::int64_t nTime)   
     { return nTime - nMaxClockDrift; } // up to 2 hours from the past
 inline ::int64_t FutureDrift(::int64_t nTime) 
@@ -131,6 +144,9 @@ extern CCriticalSection cs_setpwalletRegistered;
 extern std::set<CWallet*> setpwalletRegistered;
 extern unsigned char pchMessageStart[4];
 extern std::map<uint256, CBlock*> mapOrphanBlocks;
+extern ::int64_t nBlockRewardPrev;
+extern const ::int64_t nSimulatedMOneySupplyAtFork;
+extern ::uint32_t nMinEase; // minimum ease corresponds to highest difficulty
 
 // Settings
 extern ::int64_t nTransactionFee;
@@ -141,6 +157,13 @@ extern const uint256 entropyStore[38];
 
 // Minimum disk space required - used in CheckDiskSpace()
 static const ::uint64_t nMinDiskSpace = 52428800;
+
+enum GetMaxSize_mode
+{
+    MAX_BLOCK_SIZE,
+    MAX_BLOCK_SIZE_GEN,
+    MAX_BLOCK_SIGOPS,
+};
 
 class CReserveKey;
 class CTxDB;
@@ -170,10 +193,11 @@ void ThreadScriptCheckQuit();
 
 bool CheckProofOfWork(uint256 hash, unsigned int nBits);
 unsigned int GetNextTargetRequired(const CBlockIndex* pindexLast, bool fProofOfStake);
-::int64_t GetProofOfWorkReward(unsigned int nBits, ::int64_t nFees=0);
+::int64_t GetProofOfWorkReward(unsigned int nBits=0, ::int64_t nFees=0, unsigned int nHeight=0);
 ::int64_t GetProofOfStakeReward(::int64_t nCoinAge, unsigned int nBits, ::int64_t nTime, bool bCoinYearOnly=false);
 
 ::int64_t GetProofOfStakeReward(::int64_t nCoinAge);
+::uint64_t GetMaxSize(enum GetMaxSize_mode mode);
 
 unsigned int ComputeMinWork(unsigned int nBase, ::int64_t nTime);
 unsigned int ComputeMinStake(unsigned int nBase, ::int64_t nTime, unsigned int nBlockTime);
@@ -190,15 +214,37 @@ void ResendWalletTransactions();
 bool VerifySignature(const CTransaction& txFrom, const CTransaction& txTo, unsigned int nIn, unsigned int flags, int nHashType);
 
 // yacoin: calculate Nfactor using timestamp
-extern unsigned char GetNfactor(::int64_t nTimestamp, bool fNotYac1dot0BlockOrTx = false);
+extern unsigned char GetNfactor(::int64_t nTimestamp, bool fYac1dot0BlockOrTx = false);
 
 // yacoin2015: GetProofOfWorkMA, GetProofOfWorkSMA
 unsigned int GetProofOfWorkMA(const CBlockIndex* pIndexLast);
 unsigned int GetProofOfWorkSMA(const CBlockIndex* pIndexLast);
 
+/**
+ * Check if transaction is final per BIP 68 sequence numbers and can be included in a block.
+ * Consensus critical. Takes as input a list of heights at which tx's inputs (in order) confirmed.
+ */
+bool SequenceLocks(const CTransaction &tx, int flags, std::vector<int>* prevHeights, const CBlockIndex& block);
 
+/**
+ * Check if transaction will be BIP 68 final in the next block to be created.
+ */
+bool CheckSequenceLocks(const CTransaction &tx, int flags);
 
+/**
+ * Get minimum confirmations to use coinbase
+ */
+int GetCoinbaseMaturity();
 
+/**
+ * Get an extra confirmations to add coinbase to balance
+ */
+int GetCoinbaseMaturityOffset();
+
+/**
+ * Check if the hardfork happens
+ */
+bool isHardforkHappened();
 
 //bool GetWalletFile(CWallet* pwallet, std::string &strWalletFileOut);
 
@@ -342,19 +388,46 @@ public:
     CScript scriptSig;
     ::uint32_t nSequence;
 
+    /* Setting nSequence to this value for every input in a transaction
+     * disables nLockTime. */
+    static const uint32_t SEQUENCE_FINAL = 0xffffffff;
+
+    /* Below flags apply in the context of BIP 68*/
+    /* If this flag set, CTxIn::nSequence is NOT interpreted as a
+     * relative lock-time. */
+    static const uint32_t SEQUENCE_LOCKTIME_DISABLE_FLAG = (1 << 31);
+
+    /* If CTxIn::nSequence encodes a relative lock-time and this flag
+     * is set, the relative lock-time has units of 1 seconds,
+     * otherwise it specifies blocks with a granularity of 1. */
+    static const uint32_t SEQUENCE_LOCKTIME_TYPE_FLAG = (1 << 30);
+
+    /* If CTxIn::nSequence encodes a relative lock-time, this mask is
+     * applied to extract that lock-time from the sequence field. */
+    static const uint32_t SEQUENCE_LOCKTIME_MASK = 0x3fffffff;
+
+    /* In order to use the same number of bits to encode roughly the
+     * same wall-clock duration, and because blocks are naturally
+     * limited to occur every 60s on average, the minimum granularity
+     * for time-based relative lock-time is fixed at 1 seconds.
+     * Converting from CTxIn::nSequence to seconds is performed by
+     * multiplying by 1 = 2^0, or equivalently shifting up by
+     * 0 bits. */
+    static const int SEQUENCE_LOCKTIME_GRANULARITY = 0;
+
     CTxIn()
     {
-        nSequence = std::numeric_limits<unsigned int>::max();
+        nSequence = SEQUENCE_FINAL;
     }
 
-    explicit CTxIn(COutPoint prevoutIn, CScript scriptSigIn=CScript(), unsigned int nSequenceIn=std::numeric_limits<unsigned int>::max())
+    explicit CTxIn(COutPoint prevoutIn, CScript scriptSigIn=CScript(), unsigned int nSequenceIn=SEQUENCE_FINAL)
     {
         prevout = prevoutIn;
         scriptSig = scriptSigIn;
         nSequence = nSequenceIn;
     }
 
-    CTxIn(uint256 hashPrevTx, unsigned int nOut, CScript scriptSigIn=CScript(), unsigned int nSequenceIn=std::numeric_limits<unsigned int>::max())
+    CTxIn(uint256 hashPrevTx, unsigned int nOut, CScript scriptSigIn=CScript(), unsigned int nSequenceIn=SEQUENCE_FINAL)
     {
         prevout = COutPoint(hashPrevTx, nOut);
         scriptSig = scriptSigIn;
@@ -370,7 +443,7 @@ public:
 
     bool IsFinal() const
     {
-        return (nSequence == std::numeric_limits<unsigned int>::max());
+        return (nSequence == SEQUENCE_FINAL);
     }
 
     friend bool operator==(const CTxIn& a, const CTxIn& b)
@@ -399,7 +472,7 @@ public:
             str += strprintf(", coinbase %s", HexStr(scriptSig).c_str());
         else
             str += strprintf(", scriptSig=%s", scriptSig.ToString().substr(0,24).c_str());
-        if (nSequence != std::numeric_limits<unsigned int>::max())
+        if (nSequence != SEQUENCE_FINAL)
             str += strprintf(", nSequence=%u", nSequence);
         str += ")";
         return str;
@@ -497,16 +570,6 @@ public:
     }
 };
 
-
-
-
-enum GetMinFee_mode
-{
-    GMF_BLOCK,
-    GMF_RELAY,
-    GMF_SEND,
-};
-
 typedef std::map<uint256, std::pair<CTxIndex, CTransaction> > MapPrevTx;
 
 /** The basic transaction that is broadcasted on the network and contained in
@@ -521,10 +584,10 @@ public:
 
     static const int 
       //CURRENT_VERSION_of_Tx = CURRENT_VERSION_of_Tx_for_yac_old;
-        CURRENT_VERSION_of_Tx = CURRENT_VERSION_of_Tx_for_yac_new;
+        CURRENT_VERSION_of_Tx = CURRENT_VERSION_of_Tx_for_yac_old;
 
     int nVersion;
-    ::uint32_t nTime;
+    mutable ::int64_t nTime;
     std::vector<CTxIn> vin;
     std::vector<CTxOut> vout;
     ::uint32_t nLockTime;
@@ -542,7 +605,17 @@ public:
     (
         READWRITE(this->nVersion);
         nVersion = this->nVersion;
-        READWRITE(nTime);
+        // nTime is extended to 64-bit since yacoin 1.0.0
+        if (this->nVersion >= CURRENT_VERSION_of_Tx_for_yac_new) // 64-bit nTime
+        {
+			READWRITE(nTime);
+        }
+        else // 32-bit nTime
+        {
+            ::uint32_t time = (::uint32_t)nTime; // needed for GetSerializeSize, Serialize function
+			READWRITE(time);
+			nTime = time; // needed for Unserialize function
+        }
         READWRITE(vin);
         READWRITE(vout);
         READWRITE(nLockTime);
@@ -550,8 +623,16 @@ public:
 
     void SetNull()
     {
-        nVersion = CTransaction::CURRENT_VERSION_of_Tx;
-        nTime = (::uint32_t) GetAdjustedTime();
+        // TODO: Need update for mainet
+        if (nBestHeight != -1 && pindexGenesisBlock && (nBestHeight + 1) >= nMainnetNewLogicBlockNumber)
+        {
+            nVersion = CTransaction::CURRENT_VERSION_of_Tx_for_yac_new;
+        }
+        else
+        {
+            nVersion = CTransaction::CURRENT_VERSION_of_Tx;
+        }
+        nTime = GetAdjustedTime();
         vin.clear();
         vout.clear();
         nLockTime = 0;
@@ -563,9 +644,41 @@ public:
         return (vin.empty() && vout.empty());
     }
 
+    const uint256 GetNormalizedHash() const
+    {
+        // Coinbase transactions cannot be malleated and may not change after
+        // publication. We cannot zero out the scripts, otherwise we get collisions
+        // among coinbase transactions by the same miner.
+        if (IsCoinBase())
+        {
+            return SerializeHash(*this);
+        }
+        else
+        {
+            CTransaction tmp(*this);
+            // Replace scriptSigs in inputs with empty strings
+            for (unsigned int i = 0; i < tmp.vin.size(); i++)
+            {
+                tmp.vin[i].scriptSig = CScript();
+            }
+
+            CHashWriter ss(SER_GETHASH, 0);
+            ss << tmp;
+            return ss.GetHash();
+        }
+    }
+
     uint256 GetHash() const
     {
-        return SerializeHash(*this);
+        // transaction with version >=2 fixes tx malleability
+        if (this->nVersion >= CURRENT_VERSION_of_Tx_for_yac_new)
+        {
+            return GetNormalizedHash();
+        }
+        else
+        {
+            return SerializeHash(*this);
+        }
     }
 
     bool IsFinal(int nBlockHeight=0, ::int64_t nBlockTime=0) const
@@ -574,7 +687,7 @@ public:
         if (nLockTime == 0)
             return true;
         if (nBlockHeight == 0)
-            nBlockHeight = nBestHeight;
+            nBlockHeight = nBestHeight + 1;
         if (nBlockTime == 0)
             nBlockTime = GetAdjustedTime();
         if ((::int64_t)nLockTime < ((::int64_t)nLockTime < LOCKTIME_THRESHOLD ? (::int64_t)nBlockHeight : nBlockTime))
@@ -594,7 +707,7 @@ public:
                 return false;
 
         bool fNewer = false;
-        unsigned int nLowest = std::numeric_limits<unsigned int>::max();
+        unsigned int nLowest = CTxIn::SEQUENCE_FINAL;
         for (unsigned int i = 0; i < vin.size(); i++)
         {
             if (vin[i].nSequence != old.vin[i].nSequence)
@@ -690,7 +803,7 @@ public:
         return dPriority > COIN * 144 / 250;
     }
 
-    ::int64_t GetMinFee(unsigned int nBlockSize=1, bool fAllowFree=false, enum GetMinFee_mode mode=GMF_BLOCK, unsigned int nBytes = 0) const;
+    ::int64_t GetMinFee(unsigned int nBytes = 0) const;
 
     bool ReadFromDisk(CDiskTxPos pos, FILE** pfileRet=NULL)
     {
@@ -752,7 +865,7 @@ public:
         str += IsCoinBase()? "Coinbase" : (IsCoinStake()? "Coinstake" : "CTransaction");
         str += strprintf(
             "(hash=%s, "
-            "nTime=%d, "
+            "nTime=%" PRId64 ", "
             "ver=%d, "
             "vin.size=%" PRIszu ", "
             "vout.size=%" PRIszu ", "
@@ -973,25 +1086,18 @@ public:
 class CBlock
 {
 public:
-    // header
-    static const int 
-        VERSION_of_block_for_yac_05x_new = 7,
-        VERSION_of_block_for_yac_049     = 6,
-        VERSION_of_block_for_yac_044_old = 3,
-#ifdef Yac1dot0
-        CURRENT_VERSION_of_block = VERSION_of_block_for_yac_05x_new;
-#else
-        CURRENT_VERSION_of_block = VERSION_of_block_for_yac_049;
-#endif
-    //static const int 
-    //    CURRENT_VERSION_previous = VERSION_of_block_for_yac_044_old;
-
+    // Block header
     ::int32_t nVersion;
     uint256 hashPrevBlock;
     uint256 hashMerkleRoot;
-    ::uint32_t nTime;
+    mutable ::int64_t nTime;
     ::uint32_t nBits;
     ::uint32_t nNonce;
+
+    // Store following info to avoid calculating hash many times
+    mutable struct block_header previousBlockHeader;
+    mutable uint256 blockHash;
+    mutable uint256 blockYacoinHash;
 
     // network and disk
     std::vector<CTransaction> vtx;
@@ -1017,7 +1123,17 @@ public:
         nVersion = this->nVersion;
         READWRITE(hashPrevBlock);
         READWRITE(hashMerkleRoot);
-        READWRITE(nTime);
+        // nTime is extended to 64-bit since yacoin 1.0.0
+        if (this->nVersion >= VERSION_of_block_for_yac_05x_new) // 64-bit nTime
+        {
+               READWRITE(nTime);
+        }
+        else // 32-bit nTime
+        {
+               ::uint32_t time = (::uint32_t)nTime; // needed for GetSerializeSize, Serialize function
+               READWRITE(time);
+               nTime = time; // needed for Unserialize function
+        }
         READWRITE(nBits);
         READWRITE(nNonce);
 
@@ -1036,7 +1152,15 @@ public:
 
     void SetNull()
     {
-        nVersion = CBlock::CURRENT_VERSION_of_block;
+        // TODO: Need update for mainnet
+        if (nBestHeight != -1 && pindexGenesisBlock && (nBestHeight + 1) >= nMainnetNewLogicBlockNumber)
+        {
+            nVersion = VERSION_of_block_for_yac_05x_new;
+        }
+        else
+        {
+            nVersion = CURRENT_VERSION_of_block;
+        }
         hashPrevBlock = 0;
         hashMerkleRoot = 0;
         nTime = 0;
@@ -1046,6 +1170,9 @@ public:
         vchBlockSig.clear();
         vMerkleTree.clear();
         nDoS = 0;
+        blockHash = 0;
+        blockYacoinHash = 0;
+        memset(UVOIDBEGIN(previousBlockHeader), 0, sizeof(struct block_header));
     }
 
     bool IsNull() const
@@ -1054,106 +1181,236 @@ public:
     }
 
     // yacoin2015 update
-    uint256 GetHash() const
+    uint256 CalculateHash() const
     {
-        const ::uint64_t
-            nSpanOf4  = 1368515488 - nChainStartTime,                           
-            nSpanOf5  = 1368777632 - nChainStartTime,                           
-            nSpanOf6  = 1369039776 - nChainStartTime,                           
-            nSpanOf7  = 1369826208 - nChainStartTime,                           
-            nSpanOf8  = 1370088352 - nChainStartTime,                           
-            nSpanOf9  = 1372185504 - nChainStartTime,                           
-            nSpanOf10 = 1373234080 - nChainStartTime,                           
-            nSpanOf11 = 1376379808 - nChainStartTime,                           
-            nSpanOf12 = 1380574112 - nChainStartTime,   // Mon, 30 Sep 2013 20:48:32 GMT                        
-            nSpanOf13 = 1384768416 - nChainStartTime,   // Mon, 18 Nov 2013 09:53:36 GMT                    
-            nSpanOf14 = 1401545632 - nChainStartTime,   // Sat, 31 May 2014 14:13:52 GMT                    
-            nSpanOf15 = 1409934240 - nChainStartTime,   // Fri, 05 Sep 2014 16:24:00 GMT (Nf) 16
-            nSpanOf16 = 1435100064 - nChainStartTime,   // Tue, 23 Jun 2015 22:54:24 GMT (Nf) 17
-            nSpanOf17 = 1468654496 - nChainStartTime,   // Sat, 16 Jul 2016 07:34:56 GMT (Nf) 18
-            nSpanOf18 = 1502208928 - nChainStartTime,   // Tue, 08 Aug 2017 16:15:28 GMT (Nf) 19
-            nSpanOf19 = 1602872224 - nChainStartTime,   // Fri, 16 Oct 2020 18:17:04 GMT                        
-            nSpanOf20 = 1636426656 - nChainStartTime,   // Tue, 09 Nov 2021 02:57:36 GMT                        
-            nSpanOf21 = 1904862112 - nChainStartTime,   // Mon, 13 May 2030 00:21:52 GMT                        
-            nSpanOf22 = 2173297568U - nChainStartTime,   // Sat, 13 Nov 2038 21:46:08 GMT                        
-            nSpanOf23 = 2441733024U - nChainStartTime,   // Fri, 17 May 2047 19:10:24 GMT                        
-            nSpanOf24 = 3247039392U - nChainStartTime,   // Tue, 22 Nov 2072 11:23:12 GMT                        
-            nSpanOf25 = 3515474848U - nChainStartTime;   // Mon, 26 May 2081 08:47:28 GMT                        
-            // uint_32 fails here                          Sun, 07 Feb 2106 06:28:15 GMT
-          //nSpanOf26 = 5662958496 - nChainStartTime,   // Sat, 14 Jun 2149 12:01:36 GMT                       
-          //nSpanOf27 = 6736700320 - nChainStartTime,   // Tue, 24 Jun 2183 01:38:40 GMT                        
-          //nSpanOf28 = 9957925792 - nChainStartTime,   // Tue, 21 Jul 2285 18:29:52 GMT                        
-          //nSpanOf29 = 14252893088 - nChainStartTime,  // Sat, 28 Aug 2421 00:58:08 GMT
-          //nSpanOf30 = 18547860384 - nChainStartTime;  // Tue, 04 Oct 2557 07:26:24 GMT
-
-        unsigned char 
-            nfactor;
-        if( !fTestNet )
-        {     // nChainStartTime = 1367991200 is start
-		    if      ( nTime < (nChainStartTime + nSpanOf4 ) ) nfactor = 4;
-            else if ( nTime < (nChainStartTime + nSpanOf5 ) ) nfactor = 5;
-            else if ( nTime < (nChainStartTime + nSpanOf6 ) ) nfactor = 6;
-            else if ( nTime < (nChainStartTime + nSpanOf7 ) ) nfactor = 7;
-            else if ( nTime < (nChainStartTime + nSpanOf8 ) ) nfactor = 8;
-            else if ( nTime < (nChainStartTime + nSpanOf9 ) ) nfactor = 9;
-            else if ( nTime < (nChainStartTime + nSpanOf10) ) nfactor = 10;
-            else if ( nTime < (nChainStartTime + nSpanOf11) ) nfactor = 11;
-            else if ( nTime < (nChainStartTime + nSpanOf12) ) nfactor = 12;
-            else if ( nTime < (nChainStartTime + nSpanOf13) ) nfactor = 13;
-            else if ( nTime < (nChainStartTime + nSpanOf14) ) nfactor = 14;
-            else if ( nTime < (nChainStartTime + nSpanOf15) ) nfactor = 15;
-            else if ( nTime < (nChainStartTime + nSpanOf16) ) nfactor = 16;
-            else if ( nTime < (nChainStartTime + nSpanOf17) ) nfactor = 17;
-            else if ( nTime < (nChainStartTime + nSpanOf18) ) nfactor = 18;
-            else if ( nTime < (nChainStartTime + nSpanOf19) ) nfactor = 19;
-            else if ( nTime < (nChainStartTime + nSpanOf20) ) nfactor = 20;
-            else if ( nTime < (nChainStartTime + nSpanOf21) ) nfactor = 21;
-            else if ( nTime < (nChainStartTime + nSpanOf22) ) nfactor = 22;
-            else if ( nTime < (nChainStartTime + nSpanOf23) ) nfactor = 23;
-            else if ( nTime < (nChainStartTime + nSpanOf24) ) nfactor = 24;
-            else if ( nTime < (nChainStartTime + nSpanOf25) ) nfactor = 25;
-          //  else if ( nTime < (nChainStartTime + nSpanOf26) ) nfactor = 26;
-            // uint_32 fails here
-          //  else if ( nTime < (nChainStartTime + nSpanOf27) ) nfactor = 27;
-          //  else if ( nTime < (nChainStartTime + nSpanOf28) ) nfactor = 28;
-          //  else if ( nTime < (nChainStartTime + nSpanOf29) ) nfactor = 29;
-          //  else if ( nTime < (nChainStartTime + nSpanOf30) ) nfactor = 30;
-            else
-                nfactor = MAXIMUM_N_FACTOR;
-        }
-        else    // is TestNet
-        {
-#if defined(Yac1dot0)
-            nfactor = Nfactor_1dot0;
-#else
-            nfactor = 4;
-#endif
-        }
-
-        if(
-           nYac20BlockNumberTime &&
-           nTime >= (uint32_t)nYac20BlockNumberTime
-          )
-        {
-            nfactor = YAC20_N_FACTOR;
-        }
-
         uint256 
             thash;
 
-        scrypt_hash(CVOIDBEGIN(nVersion), sizeof(block_header), UINTBEGIN(thash), nfactor);
+        if (nVersion >= VERSION_of_block_for_yac_05x_new) // 64-bit nTime
+        {
+            struct block_header block_data;
+            block_data.version = nVersion;
+            block_data.prev_block = hashPrevBlock;
+            block_data.merkle_root = hashMerkleRoot;
+            block_data.timestamp = nTime;
+            block_data.bits = nBits;
+            block_data.nonce = nNonce;
+            if( 
+               !scrypt_hash(
+                           CVOIDBEGIN(block_data),
+                           sizeof(struct block_header),
+                           UINTBEGIN(thash),
+                           MAXIMUM_YAC1DOT0_N_FACTOR
+                          )
+              )
+            {
+                thash = 0;  // perhaps? should error("lack of memory for scrypt hash?");
+            }
+        }
+        else // 32-bit nTime
+        {
+            const ::uint64_t
+                nSpanOf4  = 1368515488 - nChainStartTime,
+                nSpanOf5  = 1368777632 - nChainStartTime,
+                nSpanOf6  = 1369039776 - nChainStartTime,
+                nSpanOf7  = 1369826208 - nChainStartTime,
+                nSpanOf8  = 1370088352 - nChainStartTime,
+                nSpanOf9  = 1372185504 - nChainStartTime,
+                nSpanOf10 = 1373234080 - nChainStartTime,
+                nSpanOf11 = 1376379808 - nChainStartTime,
+                nSpanOf12 = 1380574112 - nChainStartTime,   // Mon, 30 Sep 2013 20:48:32 GMT
+                nSpanOf13 = 1384768416 - nChainStartTime,   // Mon, 18 Nov 2013 09:53:36 GMT
+                nSpanOf14 = 1401545632 - nChainStartTime,   // Sat, 31 May 2014 14:13:52 GMT
+                nSpanOf15 = 1409934240 - nChainStartTime,   // Fri, 05 Sep 2014 16:24:00 GMT (Nf) 16
+                nSpanOf16 = 1435100064 - nChainStartTime,   // Tue, 23 Jun 2015 22:54:24 GMT (Nf) 17
+                nSpanOf17 = 1468654496 - nChainStartTime,   // Sat, 16 Jul 2016 07:34:56 GMT (Nf) 18
+                nSpanOf18 = 1502208928 - nChainStartTime,   // Tue, 08 Aug 2017 16:15:28 GMT (Nf) 19
+                nSpanOf19 = 1602872224 - nChainStartTime,   // Fri, 16 Oct 2020 18:17:04 GMT
+                nSpanOf20 = 1636426656 - nChainStartTime,   // Tue, 09 Nov 2021 02:57:36 GMT
+                nSpanOf21 = 1904862112 - nChainStartTime,   // Mon, 13 May 2030 00:21:52 GMT
+                nSpanOf22 = 2173297568U - nChainStartTime,   // Sat, 13 Nov 2038 21:46:08 GMT
+                nSpanOf23 = 2441733024U - nChainStartTime,   // Fri, 17 May 2047 19:10:24 GMT
+                nSpanOf24 = 3247039392U - nChainStartTime,   // Tue, 22 Nov 2072 11:23:12 GMT
+                nSpanOf25 = 3515474848U - nChainStartTime;   // Mon, 26 May 2081 08:47:28 GMT
+                // uint_32 fails here                          Sun, 07 Feb 2106 06:28:15 GMT
+              //nSpanOf26 = 5662958496 - nChainStartTime,   // Sat, 14 Jun 2149 12:01:36 GMT
+              //nSpanOf27 = 6736700320 - nChainStartTime,   // Tue, 24 Jun 2183 01:38:40 GMT
+              //nSpanOf28 = 9957925792 - nChainStartTime,   // Tue, 21 Jul 2285 18:29:52 GMT
+              //nSpanOf29 = 14252893088 - nChainStartTime,  // Sat, 28 Aug 2421 00:58:08 GMT
+              //nSpanOf30 = 18547860384 - nChainStartTime;  // Tue, 04 Oct 2557 07:26:24 GMT
+
+            unsigned char
+                nfactor;
+            if( !fTestNet )
+            {     // nChainStartTime = 1367991200 is start
+    		    if      ( nTime < (nChainStartTime + nSpanOf4 ) ) nfactor = 4;
+                else if ( nTime < (nChainStartTime + nSpanOf5 ) ) nfactor = 5;
+                else if ( nTime < (nChainStartTime + nSpanOf6 ) ) nfactor = 6;
+                else if ( nTime < (nChainStartTime + nSpanOf7 ) ) nfactor = 7;
+                else if ( nTime < (nChainStartTime + nSpanOf8 ) ) nfactor = 8;
+                else if ( nTime < (nChainStartTime + nSpanOf9 ) ) nfactor = 9;
+                else if ( nTime < (nChainStartTime + nSpanOf10) ) nfactor = 10;
+                else if ( nTime < (nChainStartTime + nSpanOf11) ) nfactor = 11;
+                else if ( nTime < (nChainStartTime + nSpanOf12) ) nfactor = 12;
+                else if ( nTime < (nChainStartTime + nSpanOf13) ) nfactor = 13;
+                else if ( nTime < (nChainStartTime + nSpanOf14) ) nfactor = 14;
+                else if ( nTime < (nChainStartTime + nSpanOf15) ) nfactor = 15;
+                else if ( nTime < (nChainStartTime + nSpanOf16) ) nfactor = 16;
+                else if ( nTime < (nChainStartTime + nSpanOf17) ) nfactor = 17;
+                else if ( nTime < (nChainStartTime + nSpanOf18) ) nfactor = 18;
+                else if ( nTime < (nChainStartTime + nSpanOf19) ) nfactor = 19;
+                else if ( nTime < (nChainStartTime + nSpanOf20) ) nfactor = 20;
+                else if ( nTime < (nChainStartTime + nSpanOf21) ) nfactor = 21;
+                else if ( nTime < (nChainStartTime + nSpanOf22) ) nfactor = 22;
+                else if ( nTime < (nChainStartTime + nSpanOf23) ) nfactor = 23;
+                else if ( nTime < (nChainStartTime + nSpanOf24) ) nfactor = 24;
+                else if ( nTime < (nChainStartTime + nSpanOf25) ) nfactor = 25;
+              //  else if ( nTime < (nChainStartTime + nSpanOf26) ) nfactor = 26;
+                // uint_32 fails here
+              //  else if ( nTime < (nChainStartTime + nSpanOf27) ) nfactor = 27;
+              //  else if ( nTime < (nChainStartTime + nSpanOf28) ) nfactor = 28;
+              //  else if ( nTime < (nChainStartTime + nSpanOf29) ) nfactor = 29;
+              //  else if ( nTime < (nChainStartTime + nSpanOf30) ) nfactor = 30;
+                else
+                    nfactor = MAXIMUM_N_FACTOR;
+            }
+            else    // is TestNet
+            {
+#if defined(Yac1dot0)
+                nfactor = Nfactor_1dot0;
+#else
+                nfactor = 4;
+#endif
+            }
+
+            if(
+               (0 != nYac20BlockNumberTime) &&
+               nTime >= (uint32_t)nYac20BlockNumberTime
+              )
+            {
+                nfactor = YAC20_N_FACTOR;
+            }
+
+            old_block_header oldBlock;
+            oldBlock.version = nVersion;
+            oldBlock.prev_block = hashPrevBlock;
+            oldBlock.merkle_root = hashMerkleRoot;
+            oldBlock.timestamp = nTime;
+            oldBlock.bits = nBits;
+            oldBlock.nonce = nNonce;
+            if(
+               !scrypt_hash(
+                           CVOIDBEGIN(oldBlock),
+                           sizeof(old_block_header),
+                           UINTBEGIN(thash),
+                           nfactor
+                          )
+              )
+            {
+                thash = 0;  // perhaps? should error("lack of memory for scrypt hash?");
+            }
+        }
 		return thash;
     }
 
+    bool IsHeaderDifferent() const
+    {
+        if(
+           (nVersion == previousBlockHeader.version)
+           && (hashPrevBlock == previousBlockHeader.prev_block)
+           && (hashMerkleRoot == previousBlockHeader.merkle_root)
+           && (nTime == previousBlockHeader.timestamp)
+           && (nBits == previousBlockHeader.bits)
+           && (nNonce == previousBlockHeader.nonce)
+          )
+        {
+            return false;
+        }
+        return true;
+    }
+
+    uint256 GetHash(int blockHeight = 0) const
+    {
+        if(blockHash == 0 || IsHeaderDifferent())
+        {
+            blockHash = CalculateHash();
+            previousBlockHeader.version = nVersion;
+            previousBlockHeader.prev_block = hashPrevBlock;
+            previousBlockHeader.merkle_root = hashMerkleRoot;
+            previousBlockHeader.timestamp = nTime;
+            previousBlockHeader.bits = nBits;
+            previousBlockHeader.nonce = nNonce;
+        }
+        return blockHash;
+    }
+
     // yacoin2015
-    uint256 GetYacoinHash() const
+    uint256 CalculateYacoinHash() const
     {
         uint256 
             thash;
-
-        scrypt_hash(CVOIDBEGIN(nVersion), sizeof(block_header), UINTBEGIN(thash), GetNfactor(nTime));
+        unsigned char nfactor;
+        if (nVersion >= VERSION_of_block_for_yac_05x_new) // 64-bit nTime
+        {
+            nfactor = GetNfactor(nTime, true);
+            struct block_header block_data;
+            block_data.version = nVersion;
+            block_data.prev_block = hashPrevBlock;
+            block_data.merkle_root = hashMerkleRoot;
+            block_data.timestamp = nTime;
+            block_data.bits = nBits;
+            block_data.nonce = nNonce;
+            if(
+               !scrypt_hash(
+                           CVOIDBEGIN(block_data),
+                           sizeof(struct block_header),
+                           UINTBEGIN(thash),
+                           nfactor
+                          )
+              )
+            {
+                thash = 0;  // perhaps? should error("lack of memory for scrypt hash?");
+            }
+        }
+        else // 32-bit nTime
+        {
+        	nfactor = GetNfactor(nTime, false);
+            old_block_header oldBlock;
+            oldBlock.version = nVersion;
+            oldBlock.prev_block = hashPrevBlock;
+            oldBlock.merkle_root = hashMerkleRoot;
+            oldBlock.timestamp = nTime;
+            oldBlock.bits = nBits;
+            oldBlock.nonce = nNonce;
+            if(
+               !scrypt_hash(
+                           CVOIDBEGIN(oldBlock),
+                           sizeof(old_block_header),
+                           UINTBEGIN(thash),
+                           nfactor
+                          )
+              )
+            {
+                thash = 0;  // perhaps? should error("lack of memory for scrypt hash?");
+            }
+        }
 
         return thash;
+    }
+
+    uint256 GetYacoinHash(int blockHeight = 0) const
+    {
+        if(blockYacoinHash == 0 || IsHeaderDifferent())
+        {
+            blockYacoinHash = CalculateYacoinHash();
+            previousBlockHeader.version = nVersion;
+            previousBlockHeader.prev_block = hashPrevBlock;
+            previousBlockHeader.merkle_root = hashMerkleRoot;
+            previousBlockHeader.timestamp = nTime;
+            previousBlockHeader.bits = nBits;
+            previousBlockHeader.nonce = nNonce;
+        }
+        return blockYacoinHash;
     }
 
     ::int64_t GetBlockTime() const
@@ -1171,7 +1428,7 @@ public:
             unsigned int nEntropyBit = ((GetHash().Get64()) & 1ULL);
             if (fDebug && GetBoolArg("-printstakemodifier"))
                 printf(
-                        "GetStakeEntropyBit: nTime=%u \nhashBlock=%s\nnEntropyBit=%u\n", 
+                        "GetStakeEntropyBit: nTime=%" PRId64 " \nhashBlock=%s\nnEntropyBit=%u\n",
                         nTime, 
                         GetHash().ToString().c_str(), 
                         nEntropyBit
@@ -1193,7 +1450,7 @@ public:
 
     std::pair<COutPoint, unsigned int> GetProofOfStake() const
     {
-        return IsProofOfStake()? std::make_pair(vtx[1].vin[0].prevout, vtx[1].nTime) : std::make_pair(COutPoint(), (unsigned int)0);
+        return IsProofOfStake()? std::make_pair(vtx[1].vin[0].prevout, (unsigned int)vtx[1].nTime) : std::make_pair(COutPoint(), (unsigned int)0);
     }
 
     // ppcoin: get max transaction timestamp
@@ -1332,7 +1589,7 @@ public:
                 "ver=%d,\n"
                 "hashPrevBlock=%s,\n"
                 "hashMerkleRoot=%s,\n"
-                "nTime=%u, "
+                "nTime=%" PRId64 ", "
                 "nBits=%08x, "
                 "nNonce=%u, "
                 "vtx=%" PRIszu ",\n"
@@ -1393,11 +1650,25 @@ private:
  */
 class CBlockIndex
 {
-//private:
-//public:
-
-//protected:
-//public:
+protected:
+    std::string ToString() const
+    {
+        return strprintf(
+                         "CBlockIndex(nprev=%p, pnext=%p, nFile=%u, nBlockPos=%-6d "
+                         "nHeight=%d, nMint=%s, nMoneySupply=%s, nFlags=(%s)(%d)(%s), "
+                         "nStakeModifier=%016" PRIx64 ", nStakeModifierChecksum=%08x, "
+                         "hashProofOfStake=%s, prevoutStake=(%s), nStakeTime=%d merkle=%s, "
+                         "hashBlock=%s)",
+                         pprev, pnext, nFile, nBlockPos, nHeight,
+                         FormatMoney(nMint).c_str(), FormatMoney(nMoneySupply).c_str(),
+                         GeneratedStakeModifier() ? "MOD" : "-", GetStakeEntropyBit(), IsProofOfStake()? "PoS" : "PoW",
+                         nStakeModifier, nStakeModifierChecksum, 
+                         hashProofOfStake.ToString().c_str(),
+                         prevoutStake.ToString().c_str(), nStakeTime,
+                         hashMerkleRoot.ToString().c_str(),
+                         GetBlockHash().ToString().c_str()
+                        );
+    }
 
 public:
     const uint256* phashBlock;
@@ -1432,9 +1703,11 @@ public:
     // block header
     ::int32_t  nVersion;
     uint256  hashMerkleRoot;
-    ::uint32_t nTime;
+    mutable ::int64_t nTime;
     ::uint32_t nBits;
     ::uint32_t nNonce;
+
+    ::uint256 blockHash; // store hash to avoid calculating many times
 public:
     CBlockIndex()
     {
@@ -1448,7 +1721,7 @@ public:
         nBitsMA = 0;
         bnChainTrust = CBigNum(0);
         nMint = 0;
-        nMoneySupply = 0;
+        nMoneySupply = INITIAL_MONEY_SUPPLY;
         nFlags = 0;
         nStakeModifier = 0;
         nStakeModifierChecksum = 0;
@@ -1461,6 +1734,7 @@ public:
         nTime          = 0;
         nBits          = 0;
         nNonce         = 0;
+        blockHash      = 0;
     }
 
     CBlockIndex(unsigned int nFileIn, unsigned int nBlockPosIn, CBlock& block)
@@ -1475,7 +1749,7 @@ public:
         nBitsMA = 0;
         bnChainTrust = CBigNum(0);
         nMint = 0;
-        nMoneySupply = 0;
+        nMoneySupply = INITIAL_MONEY_SUPPLY;
         nFlags = 0;
         nStakeModifier = 0;
         nStakeModifierChecksum = 0;
@@ -1497,6 +1771,7 @@ public:
         nTime          = block.nTime;
         nBits          = block.nBits;
         nNonce         = block.nNonce;
+        blockHash      = block.blockHash;
     }
 
     CBlock GetBlockHeader() const
@@ -1614,19 +1889,6 @@ public:
             nFlags |= BLOCK_STAKE_MODIFIER;
     }
 
-    std::string ToString() const
-    {
-        return strprintf("CBlockIndex(nprev=%p, pnext=%p, nFile=%u, nBlockPos=%-6d nHeight=%d, nMint=%s, nMoneySupply=%s, nFlags=(%s)(%d)(%s), nStakeModifier=%016" PRIx64 ", nStakeModifierChecksum=%08x, hashProofOfStake=%s, prevoutStake=(%s), nStakeTime=%d merkle=%s, hashBlock=%s)",
-            pprev, pnext, nFile, nBlockPos, nHeight,
-            FormatMoney(nMint).c_str(), FormatMoney(nMoneySupply).c_str(),
-            GeneratedStakeModifier() ? "MOD" : "-", GetStakeEntropyBit(), IsProofOfStake()? "PoS" : "PoW",
-            nStakeModifier, nStakeModifierChecksum, 
-            hashProofOfStake.ToString().c_str(),
-            prevoutStake.ToString().c_str(), nStakeTime,
-            hashMerkleRoot.ToString().c_str(),
-            GetBlockHash().ToString().c_str());
-    }
-
     void print() const
     {
         printf("%s\n", ToString().c_str());
@@ -1638,9 +1900,6 @@ public:
 /** Used to marshal pointers into hashes for db storage. */
 class CDiskBlockIndex : public CBlockIndex
 {
-private:
-    uint256 blockHash;
-
 public:
     uint256 hashPrev;
     uint256 hashNext;
@@ -1649,7 +1908,6 @@ public:
     {
         hashPrev = 0;
         hashNext = 0;
-        blockHash = 0;
     }
 
     explicit CDiskBlockIndex(CBlockIndex* pindex) : CBlockIndex(*pindex)
@@ -1688,7 +1946,17 @@ public:
         READWRITE(this->nVersion);
         READWRITE(hashPrev);
         READWRITE(hashMerkleRoot);
-        READWRITE(nTime);
+        // nTime is extended to 64-bit since yacoin 1.0.0
+        if (this->nVersion >= VERSION_of_block_for_yac_05x_new) // 64-bit nTime
+        {
+            READWRITE(nTime);
+        }
+        else // 32-bit nTime
+        {
+            ::uint32_t time = (::uint32_t)nTime; // needed for GetSerializeSize, Serialize function
+            READWRITE(time);
+            nTime = time; // needed for Unserialize function
+        }
         READWRITE(nBits);
         READWRITE(nNonce);
         READWRITE(blockHash);
@@ -1696,7 +1964,11 @@ public:
 
     uint256 GetBlockHash() const
     {
-        if (fUseFastIndex && (nTime < GetAdjustedTime() - 24 * 60 * 60) && blockHash != 0)
+        if (
+            fUseFastIndex &&
+            (nTime < GetAdjustedTime() - 24 * 60 * 60) &&   // block's time is ~< 1 day old
+            (blockHash != 0)
+           )
             return blockHash;
 
         CBlock block;
@@ -1779,7 +2051,7 @@ public:
         vHave.clear();
     }
 
-    bool IsNull()
+    bool IsNull() const
     {
         return vHave.empty();
     }
@@ -1822,7 +2094,7 @@ public:
         return nDistance;
     }
 
-    CBlockIndex* GetBlockIndex()
+    CBlockIndex* GetBlockIndex() const
     {
         // Find the first block the caller has in the main chain
         BOOST_FOREACH(const uint256& hash, vHave)
@@ -1854,7 +2126,7 @@ public:
         return (!fTestNet ? hashGenesisBlock : hashGenesisBlockTestNet);
     }
 
-    int GetHeight()
+    int GetHeight() const
     {
         CBlockIndex* pindex = GetBlockIndex();
         if (!pindex)

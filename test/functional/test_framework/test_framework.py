@@ -96,11 +96,12 @@ class BitcoinTestFramework(metaclass=BitcoinTestMetaClass):
         self.setup_clean_chain = False
         self.nodes = []
         self.network_thread = None
-        self.rpc_timeout = 60  # Wait for up to 60 seconds for the RPC server to respond
+        self.rpc_timeout = 600  # Wait for up to 600 seconds for the RPC server to respond
         self.supports_cli = True
         self.bind_to_localhost_only = True
+        self.block_fork_1_0=0
         self.set_test_params()
-        self.parse_args()
+        self.parse_args()        
 
     def main(self):
         """Main function. This should not be overridden by the subclass test scripts."""
@@ -180,10 +181,10 @@ class BitcoinTestFramework(metaclass=BitcoinTestMetaClass):
         config = configparser.ConfigParser()
         config.read_file(open(self.options.configfile))
         self.config = config
-        #self.options.bitcoind = os.getenv("BITCOIND", default=config["environment"]["BUILDDIR"] + '/src/bitcoind' + config["environment"]["EXEEXT"])
-        #self.options.bitcoincli = os.getenv("BITCOINCLI", default=config["environment"]["BUILDDIR"] + '/src/bitcoin-cli' + config["environment"]["EXEEXT"])
-        self.options.bitcoind = os.getenv("BITCOIND", default='/home/art/projects/yacoin/dev34253/yacoin/src/yacoind')
-        self.options.bitcoincli = os.getenv("BITCOINCLI", default='/home/art/projects/yacoin/dev34253/yacoin/src/yacoin-cli')
+        self.options.bitcoind = os.getenv("BITCOIND", default=config["environment"]["BUILDDIR"] + '/src/yacoind' + config["environment"]["EXEEXT"])
+        self.options.bitcoincli = os.getenv("BITCOINCLI", default=config["environment"]["BUILDDIR"] + '/src/yacoin-cli' + config["environment"]["EXEEXT"])
+        # self.options.bitcoind = os.getenv("BITCOIND", default='./src/yacoind')
+        # self.options.bitcoincli = os.getenv("BITCOINCLI", default='./src/yacoin-cli')
 
         os.environ['PATH'] = os.pathsep.join([
             os.path.join(config['environment']['BUILDDIR'], 'src'),
@@ -410,6 +411,7 @@ class BitcoinTestFramework(metaclass=BitcoinTestMetaClass):
                 use_cli=self.options.usecli,
                 start_perf=self.options.perf,
                 use_valgrind=self.options.valgrind,
+                block_fork_1_0=self.block_fork_1_0
             ))
 
     def start_node(self, i, *args, **kwargs):
@@ -551,6 +553,7 @@ class BitcoinTestFramework(metaclass=BitcoinTestMetaClass):
                     bitcoin_cli=self.options.bitcoincli,
                     coverage_dir=None,
                     cwd=self.options.tmpdir,
+                    block_fork_1_0=self.block_fork_1_0
                 ))
             self.start_node(CACHE_NODE_ID)
 

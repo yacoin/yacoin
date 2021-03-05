@@ -35,43 +35,8 @@ class RPCInterfaceTest(BitcoinTestFramework):
         assert_greater_than_or_equal(command['duration'], 0)
         assert_equal(info['logpath'], os.path.join(self.nodes[0].datadir, 'debug.log'))
 
-    def test_batch_request(self):
-        self.log.info("Testing basic JSON-RPC batch request...")
-
-        results = self.nodes[0].batch([
-            # A basic request that will work fine.
-            {"method": "getblockcount", "id": 1},
-            # Request that will fail.  The whole batch request should still
-            # work fine.
-            {"method": "invalidmethod", "id": 2},
-            # Another call that should succeed.
-            {"method": "getbestblockhash", "id": 3},
-        ])
-
-        result_by_id = {}
-        for res in results:
-            result_by_id[res["id"]] = res
-
-        assert_equal(result_by_id[1]['error'], None)
-        assert_equal(result_by_id[1]['result'], 0)
-
-        assert_equal(result_by_id[2]['error']['code'], -32601)
-        assert_equal(result_by_id[2]['result'], None)
-
-        assert_equal(result_by_id[3]['error'], None)
-        assert result_by_id[3]['result'] is not None
-
-    def test_http_status_codes(self):
-        self.log.info("Testing HTTP status codes for JSON-RPC requests...")
-
-        expect_http_status(404, -32601, self.nodes[0].invalidmethod)
-        expect_http_status(500, -1, self.nodes[0].getblockhash, 42)
-
     def run_test(self):
         self.test_getrpcinfo()
-        self.test_batch_request()
-        self.test_http_status_codes()
-
 
 if __name__ == '__main__':
     RPCInterfaceTest().main()

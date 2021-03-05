@@ -322,11 +322,13 @@ def initialize_datadir(dirname, n, chain):
         f.write("daemon=0\n")
         f.write("debug=1\n")
         f.write("logtimestamps=1\n")
+        f.write("epochinterval=10\n")
         # f.write("keypool=1\n")
         # f.write("discover=0\n")
         f.write("dnsseed=0\n")
         f.write("printtoconsole=0\n")
         f.write("upnp=0\n")
+        f.write("nFactorAtHardfork=4\n")
         # f.write("shrinkdebugfile=0\n")
         os.makedirs(os.path.join(datadir, 'stderr'), exist_ok=True)
         os.makedirs(os.path.join(datadir, 'stdout'), exist_ok=True)
@@ -395,9 +397,10 @@ def disconnect_nodes(from_connection, node_num):
 def connect_nodes(from_connection, node_num):
     ip_port = "127.0.0.1:" + str(p2p_port(node_num))
     from_connection.addnode(ip_port, "onetry")
+    time.sleep(10)
     # poll until version handshake complete to avoid race conditions
     # with transaction relaying
-    wait_until(lambda:  all(peer['version'] != 0 for peer in from_connection.getpeerinfo()))
+    wait_until(lambda:  all(peer['version'] != 0 for peer in from_connection.getpeerinfo()[:-1]))
 
 def sync_blocks(rpc_connections, *, wait=1, timeout=60):
     """
