@@ -9,10 +9,9 @@ To Build
 ./autogen.sh
 ./configure
 make
-make install # optional
 ```
 
-This will build bitcoin-qt as well if the dependencies are met.
+This will build yacoin-qt as well if the dependencies are met.
 
 Dependencies
 ---------------------
@@ -48,7 +47,15 @@ For the versions used, see [dependencies.md](dependencies.md)
 
 Build requirements:
 
-    sudo apt-get install build-essential libtool autotools-dev automake pkg-config libssl-dev libevent-dev bsdmainutils python3
+    sudo apt-get install build-essential libtool autotools-dev automake pkg-config libevent-dev bsdmainutils python3
+
+Libssl requirement on Ubuntu 16.04:
+
+    sudo apt-get install libssl-dev
+
+Libssl requirement on Ubuntu 18.04:
+    sudo apt-get install libssl1.0-dev
+
 
 Options when installing required Boost library files:
 
@@ -112,10 +119,22 @@ built by default.
 
 #### Summary
 
-Dependencies:
+LibSSL dependency:
+
+Ubuntu 18.04:
+```
+sudo apt-get install libssl1.0-dev
+```
+
+Ubuntu 16.04:
+```
+sudo apt-get install libssl-dev
+```
+
+Other dependencies:
 
 ```bash
-sudo apt-get install build-essential libtool autotools-dev automake pkg-config libssl-dev libevent-dev bsdmainutils python3
+sudo apt-get install build-essential libtool autotools-dev automake pkg-config  libevent-dev bsdmainutils python3
 sudo apt-get install libboost-system-dev libboost-filesystem-dev libboost-chrono-dev libboost-program-options-dev libboost-test-dev libboost-thread-dev
 sudo apt-get install software-properties-common
 sudo add-apt-repository ppa:bitcoin/bitcoin
