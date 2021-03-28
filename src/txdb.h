@@ -15,6 +15,7 @@
   #include "txdb-leveldb.h"
  #endif
 #else
+ // is Berkeley DB for the block chain
  #ifndef BITCOIN_DB_H
   #include "db.h"
  #endif

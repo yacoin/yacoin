@@ -121,7 +121,7 @@ static void handleRunawayException(std::exception *e)
                           QString("\n\n") + 
                           QString::fromStdString(strMiscWarning)
                          );
-    exit(1);
+    exit(20);
 }
 
 #ifndef BITCOIN_QT_TEST
@@ -220,6 +220,7 @@ int main(int argc, char *argv[])
     if (GetBoolArg("-splash", true) && !GetBoolArg("-min"))
     {
         splash.show();
+        splash.move( 200, 200 );
         splash.setAutoFillBackground(true);
         splashref = &splash;
     }

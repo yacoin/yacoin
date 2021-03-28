@@ -974,7 +974,7 @@ std::string BuildTxDetailsFrom(
                         sStandardItemModelElement.c_str()
                         );
     sStandardItemModelElement = strprintf( 
-                                        " %d (local %s)"
+                                        " %ld (local %s)"
                                         , tx.nTime, sTime.c_str()
                                          );
     sTemp += sStandardItemModelElement + "<br />\n";
@@ -1484,21 +1484,21 @@ void ExplorerPage::setNumBlocks( int currentHeight )
                         // add the price update here
                         double 
                             dPrice = 0.0;
-                        try
-                        {   
+                        //try
+                        //{   
                             //temporarily blocked since it causes an exception in Qt somwehow-somewhere
                             //but not always???
                             dPrice = doGetYACprice();
-                        }
-                        catch (std::exception &e) 
-                        {
-                            e;
-                            dPrice = 0.0;
-                        }
-                        catch (...)
-                        {
-                            dPrice = 0.0;
-                        }
+                        //}
+                        //catch (std::exception &e) 
+                        //{
+                        //    e;
+                        //    dPrice = 0.0;
+                        //}
+                        //catch (...)
+                        //{
+                        //    dPrice = 0.0;
+                        //}
                         if ( 0.0 != dPrice )
                         {
                             std::string
@@ -2380,7 +2380,7 @@ std::string BuildBlockinfoDetailsFrom(
                             sStandardItemModelElement.c_str()
                            );
     sStandardItemModelElement = strprintf(
-                        " %u (local %s)"
+                        " %ld (local %s)"
                         , block.nTime, sTime.c_str()
                                          );
     sTemp += sStandardItemModelElement + "<br />\n";

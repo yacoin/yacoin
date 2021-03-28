@@ -56,13 +56,39 @@ typedef int socklen_t;
 #define SOCKET_ERROR        -1
 #endif
 
+extern bool 
+    fDebug;
+
 inline int myclosesocket(SOCKET& hSocket)
 {
+#ifdef WIN32
+    static ::uint32_t 
+        nHowManyValidCloses = 0,
+        nHowManyCloses = 0;
+
+    ++nHowManyCloses;
+#endif
     if (hSocket == INVALID_SOCKET)
         return WSAENOTSOCK;
 #ifdef WIN32
-  //int ret = closesocket(hSocket);
-    int ret = 0;    //closesocket(hSocket);
+    ++nHowManyValidCloses;
+    int 
+        ret = closesocket(hSocket);
+
+    if( fDebug )
+    {
+        if( ret != 0 )
+            (void)printf(
+                        "\n"
+                        "myclosesocket (count, valid %u, %u) returns %d"
+                        "\n"
+                        "\n"
+                        , nHowManyCloses
+                        , nHowManyValidCloses
+                        , ret
+                        );
+    }
+    //int ret = 0;    //closesocket(hSocket);
 #else
     int ret = close(hSocket);
 #endif

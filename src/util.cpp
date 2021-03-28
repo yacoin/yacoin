@@ -91,8 +91,12 @@ bool fDebug = false;
 bool fDebugNet = false;
 bool fTestNetNewLogic = false;
 ::int32_t nTestNetNewLogicBlockNumber;
-::int32_t nYac20BlockNumber = 0;
+::int32_t nMainnetNewLogicBlockNumber;
+unsigned char MAXIMUM_YAC1DOT0_N_FACTOR;
 ::int32_t nYac20BlockNumberTime = 0;
+// Epoch interval is a difficulty period. Right now on testnet, it is 21,000 blocks
+::uint32_t nEpochInterval = 21000;
+::uint32_t nDifficultyInterval = nEpochInterval;
 bool fPrintToConsole = false;
 bool fPrintToDebugger = false;
 bool fRequestShutdown = false;
@@ -102,10 +106,14 @@ bool fServer = false;
 string strMiscWarning;
 bool fTestNet = false;
 bool
-    fUseOld044Rules = false;
+  //fUseOld044Rules = false;
+    fUseOld044Rules = true;
 bool fNoListen = false;
+bool fLogTimestamps = false;
 CMedianFilter< int64_t> vTimeOffsets(200,0);
 bool fReopenDebugLog = false;
+
+static int64_t nMockTime = 0;  // For unit testing
 
 // Extended DecodeDumpTime implementation, see this page for details:
 // http://stackoverflow.com/questions/3786201/parsing-of-date-time-from-string-boost
@@ -128,12 +136,15 @@ std::time_t pt_to_time_t(const bt::ptime& pt)
 
 // Init OpenSSL library multithreading support
 static CCriticalSection** ppmutexOpenSSL;
-void locking_callback(int mode, int i, const char* file, int line)
+static void locking_callback(int mode, int i, const char* file, int line)
 {
-    if (mode & CRYPTO_LOCK) {
-        ENTER_CRITICAL_SECTION(*ppmutexOpenSSL[i]);
-    } else {
-        LEAVE_CRITICAL_SECTION(*ppmutexOpenSSL[i]);
+    if (mode & CRYPTO_LOCK) 
+    {
+        ENTER_CRITICAL_SECTION(*ppmutexOpenSSL[i])
+    } 
+    else 
+    {
+        LEAVE_CRITICAL_SECTION(*ppmutexOpenSSL[i])
     }
 }
 
@@ -151,15 +162,27 @@ static void RandAddSeed()
 // Init
 class CInit
 {
+private:
+    int
+        nUnknownWhy_Crypto_Number_of_Locks;
 public:
-    CInit()
-    {
-        // Init OpenSSL library multithreading support
-        ppmutexOpenSSL = (CCriticalSection**)OPENSSL_malloc(CRYPTO_num_locks() * sizeof(CCriticalSection*));
-        for (int i = 0; i < CRYPTO_num_locks(); i++)
+    CInit() 
+    {   // Init OpenSSL library multithreading support.  How?  Where?  Why?
+
+        //CRYPTO_num_locks()/2                                              // that just crashes on startup!
+        //nUnknownWhy_Crypto_Number_of_Locks = CRYPTO_num_locks() - 10;     // still crashes at startup!
+        //nUnknownWhy_Crypto_Number_of_Locks = CRYPTO_num_locks() - 5;      // this works too!! But causes a rescan of the wallet?!???!!!
+        //nUnknownWhy_Crypto_Number_of_Locks = CRYPTO_num_locks() - 1;      // this works!!
+        //nUnknownWhy_Crypto_Number_of_Locks = CRYPTO_num_locks() - 3;        // this works too!!  So I stop here!
+        nUnknownWhy_Crypto_Number_of_Locks = CRYPTO_num_locks();        // test old value
+                                                                            // does -4 work? WTFK!  NFD!  As usual
+                                                                            // BTW, in the latest bitcoin, litcoin, etc, this
+                                                                            // CInit is completely different!  And that code doesn't
+                                                                            // work with this OpenSSL!  More NFD!!!
+        ppmutexOpenSSL = (CCriticalSection**)OPENSSL_malloc(nUnknownWhy_Crypto_Number_of_Locks * sizeof(CCriticalSection*));
+        for (int i = 0; i < nUnknownWhy_Crypto_Number_of_Locks; ++i)
             ppmutexOpenSSL[i] = new CCriticalSection();
         CRYPTO_set_locking_callback(locking_callback);
-
 #ifdef WIN32
         // Seed random number generator with screen scrape and other hardware sources
         RAND_screen();
@@ -172,19 +195,12 @@ public:
     {
         // Shutdown OpenSSL library multithreading support
         CRYPTO_set_locking_callback(NULL);
-        for (int i = 0; i < CRYPTO_num_locks(); i++)
+        for (int i = 0; i < nUnknownWhy_Crypto_Number_of_Locks; ++i)
             delete ppmutexOpenSSL[i];
         OPENSSL_free(ppmutexOpenSSL);
     }
 }
 instance_of_cinit;
-
-
-
-
-
-
-
 
 void RandAddSeedPerfmon()
 {
@@ -241,9 +257,9 @@ uint256 GetRandHash()
 }
 
 
-
-
-
+std::string GetDebugLogPathName(){
+    return (GetDataDir() / "debug.log").string();
+}
 
 static FILE* fileout = NULL;
 
@@ -264,7 +280,7 @@ inline int OutputDebugStringF(const char* pszFormat, ...)
 
         if (!fileout)
         {
-            boost::filesystem::path pathDebug = GetDataDir() / "debug.log";
+            boost::filesystem::path pathDebug = GetDataDir() / "debug.log"; // not clear if fTestNet is set yet?
             fileout = fopen(pathDebug.string().c_str(), "a");
             if (fileout) 
                 setbuf(fileout, NULL); // unbuffered
@@ -289,14 +305,19 @@ inline int OutputDebugStringF(const char* pszFormat, ...)
             {
                 fReopenDebugLog = false;
                 boost::filesystem::path 
-                    pathDebug = GetDataDir() / "debug.log";
+                    pathDebug = GetDataDir() / "debug.log";     // again, fTestNet
                 if (freopen(pathDebug.string().c_str(),"a",fileout) != NULL)
                     setbuf(fileout, NULL); // unbuffered
             }
 
             // Debug print useful for profiling
-            if (fStartedNewLine)
-                fprintf(fileout, "%s ", DateTimeStrFormat("%x %H:%M:%S", GetTime()).c_str());
+            if (fLogTimestamps && fStartedNewLine)
+            {
+                if(nMockTime == 0)
+                    fprintf(fileout, "%s ", DateTimeStrFormat("%x %H:%M:%S", GetTime()).c_str());
+                else
+                    fprintf(fileout, "Mock %s Real %s ",DateTimeStrFormat("%x %H:%M:%S", GetTime()).c_str(), DateTimeStrFormat("%x %H:%M:%S", time(NULL)).c_str());
+            }
             if (pszFormat[strlen(pszFormat) - 1] == '\n')
                 fStartedNewLine = true;
             else
@@ -636,7 +657,7 @@ int64_t GetArg(const std::string& strArg, int64_t nDefault)
     return nDefault;
 }
 
-bool GetBoolArg(const std::string& strArg, bool fDefault)
+bool GetBoolArg(const std::string& strArg, bool fDefault)   // 2nd arg defaults to false
 {
     if (mapArgs.count(strArg))                  // there is/are an argument(s)
     {                                           // i.e an = sign
@@ -1153,50 +1174,58 @@ boost::filesystem::path GetDefaultDataDir()
         pathRet = fs::path("/");
     else
         pathRet = fs::path(pszHome);
-#ifdef MAC_OSX
+  #ifdef MAC_OSX
     // Mac
     pathRet /= "Library/Application Support";
     fs::create_directory(pathRet);
     return pathRet / "Yacoin";
-#else
+  #else
     // Unix
     return pathRet / ".yacoin";
-#endif
+  #endif
 #endif
 }
 
-const boost::filesystem::path &GetDataDir(bool fNetSpecific)
+const boost::filesystem::path &GetDataDir(bool fTest_or_Main_Net_is_decided)    // defaults to true
 {
     namespace fs = boost::filesystem;
 
-    static fs::path pathCached[2];
-    static CCriticalSection csPathCached;
-    static bool cachedPath[2] = {false, false};
+    static fs::path CachedPathsArray[2];
+  //static bool IsCachedArray[2] = {false, false};
+    static bool IsCachedArray[2];
 
-    fs::path &path = pathCached[fNetSpecific];
+    fs::path &path = CachedPathsArray[ static_cast<int>(fTest_or_Main_Net_is_decided) ];
 
     // This can be called during exceptions by printf, so we cache the
     // value so we don't have to do memory allocations after that.
-    if (cachedPath[fNetSpecific])
+    if (IsCachedArray[ static_cast<int>(fTest_or_Main_Net_is_decided) ] )
         return path;
 
+    static CCriticalSection csPathCached;
     LOCK(csPathCached);
 
-    if (mapArgs.count("-datadir")) {
+    if ( mapArgs.count( "-datadir" ) ) 
+    {
         path = fs::system_complete(mapArgs["-datadir"]);
-        if (!fs::is_directory(path)) {
+        if (!fs::is_directory( path )) 
+        {
             path = "";
-            return path;
+            return path;                // is this a correct exit?
         }
-    } else {
+    }
+    else 
+    {
         path = GetDefaultDataDir();
     }
-    if (fNetSpecific && GetBoolArg("-testnet", false))
+    if (
+        fTest_or_Main_Net_is_decided &&
+        GetBoolArg("-testnet", false)   // this is known after config file is read  
+       )                                // or testnet was set on the command line
         path /= "testnet";
 
     fs::create_directory(path);
 
-    cachedPath[fNetSpecific]=true;
+    IsCachedArray[ static_cast<int>(fTest_or_Main_Net_is_decided) ] = true;
     return path;
 }
 
@@ -1204,13 +1233,28 @@ string randomStrGen(int length) {
     static string charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890";
     string result;
     result.resize(length);
-    for (int32_t i = 0; i < length; i++)
+    for (int32_t i = 0; i < length; ++i)
         result[i] = charset[rand() % charset.length()];
 
     return result;
 }
 
-void createConf()
+boost::filesystem::path GetConfigFile()
+{
+    boost::filesystem::path 
+        pathConfigFile(GetArg("-conf", "yacoin.conf"));
+
+    if (!pathConfigFile.is_complete())
+    {
+        bool 
+            fTest_or_Main_Net_is_decided = false;
+
+        pathConfigFile = GetDataDir(fTest_or_Main_Net_is_decided) / pathConfigFile;
+    }
+    return pathConfigFile;
+}
+
+static void createConf()
 {
     srand(time(NULL));
 
@@ -1229,13 +1273,6 @@ void createConf()
     pConf.close();
 }
 
-boost::filesystem::path GetConfigFile()
-{
-    boost::filesystem::path pathConfigFile(GetArg("-conf", "yacoin.conf"));
-    if (!pathConfigFile.is_complete()) pathConfigFile = GetDataDir(false) / pathConfigFile;
-    return pathConfigFile;
-}
-
 void ReadConfigFile(map<string, string>& mapSettingsRet,
                     map<string, vector<string> >& mapMultiSettingsRet)
 {
@@ -1251,7 +1288,9 @@ void ReadConfigFile(map<string, string>& mapSettingsRet,
     set<string> setOptions;
     setOptions.insert("*");
 
-    for (boost::program_options::detail::config_file_iterator it(streamConfig, setOptions), end; it != end; ++it)
+    for (boost::program_options::detail::config_file_iterator it(streamConfig, setOptions), end; 
+         it != end; 
+         ++it)
     {
         // Don't overwrite existing settings so command line settings override bitcoin.conf
         string strKey = string("-") + it->string_key;
@@ -1268,7 +1307,13 @@ void ReadConfigFile(map<string, string>& mapSettingsRet,
 boost::filesystem::path GetPidFile()
 {
     boost::filesystem::path pathPidFile(GetArg("-pid", "yacoind.pid"));
-    if (!pathPidFile.is_complete()) pathPidFile = GetDataDir() / pathPidFile;
+    if (!pathPidFile.is_complete())
+    {
+        bool
+            fTest_or_Main_Net_is_decided = false;
+
+        pathPidFile = GetDataDir( fTest_or_Main_Net_is_decided ) / pathPidFile;
+    }
     return pathPidFile;
 }
 
@@ -1351,7 +1396,6 @@ void ShrinkDebugFile()
 //  - Median of other nodes clocks
 //  - The user (asking the user to fix the system clock if the first two disagree)
 //
-static int64_t nMockTime = 0;  // For unit testing
 
 int64_t GetTime()
 {
@@ -1700,6 +1744,28 @@ void
 }
 //_____________________________________________________________________________
 #endif
+
+
+#ifdef WIN32
+#include <windows.h>
+#else
+#include <unistd.h>
+#endif
+//
+unsigned long long getTotalSystemMemory( void )
+{
+#ifdef WIN32
+    MEMORYSTATUSEX status;
+    status.dwLength = sizeof(status);
+    GlobalMemoryStatusEx(&status);
+    return status.ullTotalPhys;
+#else
+    long pages = sysconf(_SC_PHYS_PAGES);
+    long page_size = sysconf(_SC_PAGE_SIZE);
+    return pages * page_size;
+#endif
+}
+
 #ifdef _MSC_VER
     #include "msvc_warnings.pop.h"
 #endif

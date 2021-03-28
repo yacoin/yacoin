@@ -27,24 +27,16 @@ using std::map;
 using std::set;
 
 bool CheckSig(vector<unsigned char> vchSig, const vector<unsigned char> &vchPubKey, const CScript &scriptCode, const CTransaction& txTo, unsigned int nIn, int nHashType, int flags);
+bool CheckLockTime(const CTransaction& txTo, unsigned int nIn, const CScriptNum& nLockTime);
+bool CheckSequence(const CTransaction& txTo, unsigned int nIn, const CScriptNum& nSequence);
 
 static const valtype vchFalse(0);
 static const valtype vchZero(0);
 static const valtype vchTrue(1, 1);
-static const CBigNum bnZero(0);
-static const CBigNum bnOne(1);
-static const CBigNum bnFalse(0);
-static const CBigNum bnTrue(1);
-static const size_t nMaxNumSize = 4;
-
-
-CBigNum CastToBigNum(const valtype& vch)
-{
-    if (vch.size() > nMaxNumSize)
-        throw runtime_error("CastToBigNum() : overflow");
-    // Get rid of extra leading zeros
-    return CBigNum(CBigNum(vch).getvch());
-}
+static const CScriptNum bnZero(0);
+static const CScriptNum bnOne(1);
+static const CScriptNum bnFalse(0);
+static const CScriptNum bnTrue(1);
 
 bool CastToBool(const valtype& vch)
 {
@@ -239,8 +231,8 @@ const char* GetOpName(opcodetype opcode)
 
     // expanson
     case OP_NOP1                   : return "OP_NOP1";
-    case OP_NOP2                   : return "OP_NOP2";
-    case OP_NOP3                   : return "OP_NOP3";
+    case OP_CHECKLOCKTIMEVERIFY    : return "OP_CHECKLOCKTIMEVERIFY";
+    case OP_CHECKSEQUENCEVERIFY    : return "OP_CHECKSEQUENCEVERIFY";
     case OP_NOP4                   : return "OP_NOP4";
     case OP_NOP5                   : return "OP_NOP5";
     case OP_NOP6                   : return "OP_NOP6";
@@ -344,7 +336,6 @@ bool EvalScript(
                 int nHashType
                )
 {
-    CAutoBN_CTX pctx;
     CScript::const_iterator pc = script.begin();
     CScript::const_iterator pend = script.end();
     CScript::const_iterator pbegincodehash = script.begin();
@@ -416,7 +407,7 @@ bool EvalScript(
                 case OP_16:
                 {
                     // ( -- value)
-                    CBigNum bn((int)opcode - (int)(OP_1 - 1));
+                	CScriptNum bn((int)opcode - (int)(OP_1 - 1));
                     stack.push_back(bn.getvch());
                 }
                 break;
@@ -426,7 +417,87 @@ bool EvalScript(
                 // Control
                 //
                 case OP_NOP:
-                case OP_NOP1: case OP_NOP2: case OP_NOP3: case OP_NOP4: case OP_NOP5:
+                	break;
+
+                case OP_CHECKLOCKTIMEVERIFY:
+                {
+                    if (!(flags & SCRIPT_VERIFY_CHECKLOCKTIMEVERIFY)) {
+                        // not enabled; treat as a NOP2
+                        break;
+                    }
+
+                    if (stack.size() < 1)
+//                        return set_error(serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
+                    	return false;
+
+                    // Note that elsewhere numeric opcodes are limited to
+                    // operands in the range -2**31+1 to 2**31-1, however it is
+                    // legal for opcodes to produce results exceeding that
+                    // range. This limitation is implemented by CScriptNum's
+                    // default 4-byte limit.
+                    //
+                    // If we kept to that limit we'd have a year 2038 problem,
+                    // even though the nLockTime field in transactions
+                    // themselves is uint32 which only becomes meaningless
+                    // after the year 2106.
+                    //
+                    // Thus as a special case we tell CScriptNum to accept up
+                    // to 5-byte bignums, which are good until 2**39-1, well
+                    // beyond the 2**32-1 limit of the nLockTime field itself.
+                    const CScriptNum nLockTime(stacktop(-1), 5);
+
+                    // In the rare event that the argument may be < 0 due to
+                    // some arithmetic being done first, you can always use
+                    // 0 MAX CHECKLOCKTIMEVERIFY.
+                    if (nLockTime < 0)
+//                        return set_error(serror, SCRIPT_ERR_NEGATIVE_LOCKTIME);
+                    	return false;
+
+                    // Actually compare the specified lock time with the transaction.
+                    if (!CheckLockTime(txTo, nIn, nLockTime))
+//                        return set_error(serror, SCRIPT_ERR_UNSATISFIED_LOCKTIME);
+                    	return false;
+
+                    break;
+                }
+
+                case OP_CHECKSEQUENCEVERIFY:
+                {
+                    if (!(flags & SCRIPT_VERIFY_CHECKSEQUENCEVERIFY)) {
+                        // not enabled; treat as a NOP3
+                        break;
+                    }
+
+                    if (stack.size() < 1)
+//                        return set_error(serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
+                        return false;
+
+                    // nSequence, like nLockTime, is a 32-bit unsigned integer
+                    // field. See the comment in CHECKLOCKTIMEVERIFY regarding
+                    // 5-byte numeric operands.
+                    const CScriptNum nSequence(stacktop(-1), 5);
+
+                    // In the rare event that the argument may be < 0 due to
+                    // some arithmetic being done first, you can always use
+                    // 0 MAX CHECKSEQUENCEVERIFY.
+                    if (nSequence < 0)
+//                        return set_error(serror, SCRIPT_ERR_NEGATIVE_LOCKTIME);
+                        return false;
+
+                    // To provide for future soft-fork extensibility, if the
+                    // operand has the disabled lock-time flag set,
+                    // CHECKSEQUENCEVERIFY behaves as a NOP.
+                    if ((nSequence & CTxIn::SEQUENCE_LOCKTIME_DISABLE_FLAG) != 0)
+                        break;
+
+                    // Compare the specified sequence number with the input.
+                    if (!CheckSequence(txTo, nIn, nSequence))
+//                        return set_error(serror, SCRIPT_ERR_UNSATISFIED_LOCKTIME);
+                        return false;
+
+                    break;
+                }
+                case OP_NOP1: case OP_NOP4: case OP_NOP5:
                 case OP_NOP6: case OP_NOP7: case OP_NOP8: case OP_NOP9: case OP_NOP10:
                 break;
 
@@ -592,7 +663,7 @@ bool EvalScript(
                 case OP_DEPTH:
                 {
                     // -- stacksize
-                    CBigNum bn((::uint16_t) stack.size());
+                	CScriptNum bn(stack.size());
                     stack.push_back(bn.getvch());
                 }
                 break;
@@ -642,7 +713,7 @@ bool EvalScript(
                     // (xn ... x2 x1 x0 n - ... x2 x1 x0 xn)
                     if (stack.size() < 2)
                         return false;
-                    int n = CastToBigNum(stacktop(-1)).getint32();
+                    int n = CScriptNum(stacktop(-1)).getint();
                     popstack(stack);
                     if (n < 0 || n >= (int)stack.size())
                         return false;
@@ -690,7 +761,7 @@ bool EvalScript(
                     // (in -- in size)
                     if (stack.size() < 1)
                         return false;
-                    CBigNum bn((::uint16_t) stacktop(-1).size());
+                    CScriptNum bn(stacktop(-1).size());
                     stack.push_back(bn.getvch());
                 }
                 break;
@@ -741,7 +812,7 @@ bool EvalScript(
                     // (in -- out)
                     if (stack.size() < 1)
                         return false;
-                    CBigNum bn = CastToBigNum(stacktop(-1));
+                    CScriptNum bn(stacktop(-1));
                     switch (opcode)
                     {
                     case OP_1ADD:       bn += bnOne; break;
@@ -776,9 +847,9 @@ bool EvalScript(
                     // (x1 x2 -- out)
                     if (stack.size() < 2)
                         return false;
-                    CBigNum bn1 = CastToBigNum(stacktop(-2));
-                    CBigNum bn2 = CastToBigNum(stacktop(-1));
-                    CBigNum bn;
+                    CScriptNum bn1(stacktop(-2));
+                    CScriptNum bn2(stacktop(-1));
+                    CScriptNum bn(0);
                     switch (opcode)
                     {
                     case OP_ADD:
@@ -823,9 +894,9 @@ bool EvalScript(
                     // (x min max -- out)
                     if (stack.size() < 3)
                         return false;
-                    CBigNum bn1 = CastToBigNum(stacktop(-3));
-                    CBigNum bn2 = CastToBigNum(stacktop(-2));
-                    CBigNum bn3 = CastToBigNum(stacktop(-1));
+                    CScriptNum bn1(stacktop(-3));
+                    CScriptNum bn2(stacktop(-2));
+                    CScriptNum bn3(stacktop(-1));
                     bool fValue = (bn2 <= bn1 && bn1 < bn3);
                     popstack(stack);
                     popstack(stack);
@@ -986,7 +1057,7 @@ bool EvalScript(
                     if ((int)stack.size() < i)
                         return false;
 
-                    int nKeysCount = CastToBigNum(stacktop(-i)).getint32();
+                    int nKeysCount = CScriptNum(stacktop(-i)).getint();
                     if (nKeysCount < 0 || nKeysCount > 20)
                         return false;
                     nOpCount += nKeysCount;
@@ -997,7 +1068,7 @@ bool EvalScript(
                     if ((int)stack.size() < i)
                         return false;
 
-                    int nSigsCount = CastToBigNum(stacktop(-i)).getint32();
+                    int nSigsCount = CScriptNum(stacktop(-i)).getint();
                     if (nSigsCount < 0 || nSigsCount > nKeysCount)
                         return false;
                     int isig = ++i;
@@ -1227,8 +1298,10 @@ public:
         ::int64_t nMaxCacheSize = GetArg("-maxsigcachesize", 50000);
         if (nMaxCacheSize <= 0) return;
 
-        boost::shared_lock<boost::shared_mutex> lock(cs_sigcache);
+        // We must use unique_lock, instead of shared_lock for writer
+//        boost::shared_lock<boost::shared_mutex> lock(cs_sigcache);
         //LOCK(cs_sigcache);
+        boost::unique_lock< boost::shared_mutex > lock(cs_sigcache);
 
         while (static_cast< ::int64_t>(setValid.size()) > nMaxCacheSize)
         {
@@ -1262,7 +1335,9 @@ public:
         ::int64_t nMaxCacheSize = GetArg("-maxsigcachesize", 50000);
         if (nMaxCacheSize <= 0) return;
 
-        boost::shared_lock<boost::shared_mutex> lock(cs_sigcache);
+        // We must use unique_lock, instead of shared_lock for writer
+//        boost::shared_lock<boost::shared_mutex> lock(cs_sigcache);
+        boost::unique_lock< boost::shared_mutex > lock(cs_sigcache);
 
         while (static_cast< ::int64_t>(setValid.size()) > nMaxCacheSize)
         {
@@ -1283,6 +1358,98 @@ public:
         setValid.insert(k);
     }
 };
+
+bool CheckLockTime(const CTransaction& txTo, unsigned int nIn, const CScriptNum& nLockTime)
+{
+    // There are two times of nLockTime: lock-by-blockheight
+    // and lock-by-blocktime, distinguished by whether
+    // nLockTime < LOCKTIME_THRESHOLD.
+    //
+    // We want to compare apples to apples, so fail the script
+    // unless the type of nLockTime being tested is the same as
+    // the nLockTime in the transaction.
+    printf("CheckLockTime(), locktime of cltv address = %d, transaction time = %d\n", nLockTime, txTo.nLockTime);
+    if (!(
+        (txTo.nLockTime <  LOCKTIME_THRESHOLD && nLockTime <  LOCKTIME_THRESHOLD) ||
+        (txTo.nLockTime >= LOCKTIME_THRESHOLD && nLockTime >= LOCKTIME_THRESHOLD)
+    ))
+        return false;
+
+    // Now that we know we're comparing apples-to-apples, the
+    // comparison is a simple numeric one.
+    if (nLockTime > (int64_t)txTo.nLockTime)
+    {
+        printf("CheckLockTime(), coins are still being locked, can't use them until reaching lock time\n");
+        return false;
+    }
+
+    // Finally the nLockTime feature can be disabled and thus
+    // CHECKLOCKTIMEVERIFY bypassed if every txin has been
+    // finalized by setting nSequence to maxint. The
+    // transaction would be allowed into the blockchain, making
+    // the opcode ineffective.
+    //
+    // Testing if this vin is not final is sufficient to
+    // prevent this condition. Alternatively we could test all
+    // inputs, but testing just this input minimizes the data
+    // required to prove correct CHECKLOCKTIMEVERIFY execution.
+    if (txTo.vin[nIn].IsFinal())
+        return false;
+
+    return true;
+}
+
+bool CheckSequence(const CTransaction& txTo, unsigned int nIn, const CScriptNum& nSequence)
+{
+    // Relative lock times are supported by comparing the passed
+    // in operand to the sequence number of the input.
+    const int64_t txToSequence = (int64_t)txTo.vin[nIn].nSequence;
+
+//    // Fail if the transaction's version number is not set high
+//    // enough to trigger BIP 68 rules.
+//    if (static_cast<uint32_t>(txTo.nVersion) < 2)
+//        return false;
+
+    // Sequence numbers with their most significant bit set are not
+    // consensus constrained. Testing that the transaction's sequence
+    // number do not have this bit set prevents using this property
+    // to get around a CHECKSEQUENCEVERIFY check.
+    if (txToSequence & CTxIn::SEQUENCE_LOCKTIME_DISABLE_FLAG)
+        return false;
+
+    // Mask off any bits that do not have consensus-enforced meaning
+    // before doing the integer comparisons
+    const uint32_t nLockTimeMask = CTxIn::SEQUENCE_LOCKTIME_TYPE_FLAG | CTxIn::SEQUENCE_LOCKTIME_MASK;
+    const int64_t txToSequenceMasked = txToSequence & nLockTimeMask;
+    const CScriptNum nSequenceMasked = nSequence & nLockTimeMask;
+
+    printf("CheckLockTime(), sequence of csv address = %d, sequence number of the input = %ld\n", nSequence, txToSequence);
+
+    // There are two kinds of nSequence: lock-by-blockheight
+    // and lock-by-blocktime, distinguished by whether
+    // nSequenceMasked < CTxIn::SEQUENCE_LOCKTIME_TYPE_FLAG.
+    //
+    // We want to compare apples to apples, so fail the script
+    // unless the type of nSequenceMasked being tested is the same as
+    // the nSequenceMasked in the transaction.
+    if (!((txToSequenceMasked < CTxIn::SEQUENCE_LOCKTIME_TYPE_FLAG
+            && nSequenceMasked < CTxIn::SEQUENCE_LOCKTIME_TYPE_FLAG)
+            || (txToSequenceMasked >= CTxIn::SEQUENCE_LOCKTIME_TYPE_FLAG
+                    && nSequenceMasked >= CTxIn::SEQUENCE_LOCKTIME_TYPE_FLAG)))
+    {
+        return false;
+    }
+
+    // Now that we know we're comparing apples-to-apples, the
+    // comparison is a simple numeric one.
+    if (nSequenceMasked > txToSequenceMasked)
+    {
+        printf("CheckSequence(), coins are still being locked, can't use them until reaching lock time\n");
+        return false;
+    }
+
+    return true;
+}
 
 bool CheckSig(
               vector<unsigned char> vchSig, 
@@ -1393,6 +1560,12 @@ bool Solver(
 
         // Sender provides N pubkeys, receivers provides M signatures
         mTemplates.insert(make_pair(TX_MULTISIG, CScript() << OP_SMALLINTEGER << OP_PUBKEYS << OP_SMALLINTEGER << OP_CHECKMULTISIG));
+
+        // CLTV transaction, sender provides hash of pubkey, receiver provides redeemscript and signature
+        mTemplates.insert(make_pair(TX_CLTV, CScript() << OP_SMALLDATA << OP_NOP2 << OP_DROP << OP_PUBKEYS << OP_CHECKSIG));
+
+        // CSV transaction, sender provides hash of pubkey, receiver provides redeemscript and signature
+        mTemplates.insert(make_pair(TX_CSV, CScript() << OP_SMALLDATA << OP_NOP3 << OP_DROP << OP_PUBKEYS << OP_CHECKSIG));
 
         if (!fUseOld044Rules)
         {   // Empty, provably prunable, data-carrying output
@@ -1592,6 +1765,8 @@ bool Solver(
     case TX_NULL_DATA:  // this is not in 0.4.4 code
         return false;
     case TX_PUBKEY:
+    case TX_CLTV:
+    case TX_CSV:
         keyID = CPubKey(vSolutions[0]).GetID();
         return Sign1(keyID, keystore, hash, nHashType, scriptSigRet);
     case TX_PUBKEYHASH:
@@ -1623,6 +1798,8 @@ int ScriptSigArgsExpected(txnouttype t, const std::vector<std::vector<unsigned c
         return -1;
     case TX_NULL_DATA:
         return 1;
+    case TX_CLTV:
+    case TX_CSV:
     case TX_PUBKEY:
         return 1;
     case TX_PUBKEYHASH:
@@ -1695,6 +1872,76 @@ isminetype IsMine(const CKeyStore &keystore, const CTxDestination& dest)
     return IsMine(keystore, script);
 }
 
+bool IsSpendableCltvUTXO(const CKeyStore &keystore,
+		const CScript &scriptPubKey)
+{
+	vector<valtype> vSolutions;
+	txnouttype whichType;
+	if (!Solver(scriptPubKey, whichType, vSolutions)) {
+		return false;
+	}
+
+	switch (whichType)
+	{
+	case TX_SCRIPTHASH:
+	{
+		CScriptID scriptID = CScriptID(uint160(vSolutions[0]));
+		CScript subscript;
+		if (keystore.GetCScript(scriptID, subscript))
+		{
+			return IsSpendableCltvUTXO(keystore, subscript);
+		}
+		break;
+	}
+	case TX_CLTV:
+	{
+		CKeyID keyID = CPubKey(vSolutions[0]).GetID();
+		if (keystore.HaveKey(keyID))
+		{
+			return true;
+		}
+		break;
+	}
+	}
+
+	return false;
+}
+
+bool IsSpendableCsvUTXO(const CKeyStore &keystore,
+        const CScript &scriptPubKey)
+{
+    vector<valtype> vSolutions;
+    txnouttype whichType;
+    if (!Solver(scriptPubKey, whichType, vSolutions)) {
+        return false;
+    }
+
+    switch (whichType)
+    {
+    case TX_SCRIPTHASH:
+    {
+        CScriptID scriptID = CScriptID(uint160(vSolutions[0]));
+        CScript subscript;
+        if (keystore.GetCScript(scriptID, subscript))
+        {
+            return IsSpendableCsvUTXO(keystore, subscript);
+        }
+        break;
+    }
+    case TX_CSV:
+    {
+        CKeyID keyID = CPubKey(vSolutions[0]).GetID();
+        if (keystore.HaveKey(keyID))
+        {
+            return true;
+        }
+        break;
+    }
+    }
+
+    return false;
+}
+
 isminetype IsMine(const CKeyStore &keystore, const CScript& scriptPubKey)
 {
     vector<valtype> vSolutions;
@@ -1742,6 +1989,16 @@ isminetype IsMine(const CKeyStore &keystore, const CScript& scriptPubKey)
         vector<valtype> keys(vSolutions.begin()+1, vSolutions.begin()+vSolutions.size()-1);
         if (HaveKeys(keys, keystore) == keys.size())
             return MINE_SPENDABLE;
+        break;
+    }
+    case TX_CLTV:
+    case TX_CSV:
+    {
+       keyID = CPubKey(vSolutions[0]).GetID();
+        if (keystore.HaveKey(keyID))
+        {
+            return MINE_SPENDABLE;
+        }
         break;
     }
     }
@@ -1911,7 +2168,7 @@ bool SignSignature(const CKeyStore &keystore, const CScript& fromPubKey, CTransa
 
         txnouttype subType;
         bool fSolved =
-            Solver(keystore, subscript, hash2, nHashType, txin.scriptSig, subType) && subType != TX_SCRIPTHASH;
+            Solver(keystore, subscript, hash2, nHashType, txin.scriptSig, subType) && subType != TX_SCRIPTHASH; // IMPORTANT HERE
         // Append serialized subscript whether or not it is completely signed:
         txin.scriptSig << static_cast<valtype>(subscript);
         if (!fSolved) return false;
@@ -1925,9 +2182,9 @@ bool SignSignature(const CKeyStore &keystore, const CTransaction& txFrom, CTrans
 {
     Yassert(nIn < txTo.vin.size());
     CTxIn& txin = txTo.vin[nIn];
-    Yassert(txin.prevout.n < txFrom.vout.size());
-    Yassert(txin.prevout.hash == txFrom.GetHash());
-    const CTxOut& txout = txFrom.vout[txin.prevout.n];
+    Yassert(txin.prevout.COutPointGet_n() < txFrom.vout.size());
+    Yassert(txin.prevout.COutPointGetHash() == txFrom.GetHash());
+    const CTxOut& txout = txFrom.vout[txin.prevout.COutPointGet_n()]; // Get UTXO
 
     return SignSignature(keystore, txout.scriptPubKey, txTo, nIn, nHashType);
 }
@@ -2177,6 +2434,24 @@ void CScript::SetMultisig(int nRequired, const std::vector<CKey>& keys)
     BOOST_FOREACH(const CKey& key, keys)
         *this << key.GetPubKey();
     *this << EncodeOP_N((int)(keys.size())) << OP_CHECKMULTISIG;
+}
+
+void CScript::SetCltv(int nLockTime, const CPubKey& pubKey)
+{
+    this->clear();
+
+    *this << (CScriptNum)nLockTime;
+    *this << OP_CHECKLOCKTIMEVERIFY << OP_DROP;
+	*this << pubKey << OP_CHECKSIG;
+}
+
+void CScript::SetCsv(::uint32_t nSequence, const CPubKey& pubKey)
+{
+    this->clear();
+
+    *this << (CScriptNum)nSequence;
+    *this << OP_CHECKSEQUENCEVERIFY << OP_DROP;
+    *this << pubKey << OP_CHECKSIG;
 }
 #ifdef _MSC_VER
     #include "msvc_warnings.pop.h"

@@ -312,7 +312,7 @@ QString TransactionTableModel::formatTxStatus(const TransactionRecord *wtx) cons
 
     if (wtx->type == TransactionRecord::Generated)
     {
-        nNumConf = nCoinbaseMaturity + 20;
+        nNumConf = GetCoinbaseMaturity() + GetCoinbaseMaturityOffset();
     }
 
     switch(wtx->status.status)
@@ -399,7 +399,7 @@ QString TransactionTableModel::formatTxType(const TransactionRecord *wtx) const
     case TransactionRecord::SendToSelf:
         return tr("Payment to yourself");
     case TransactionRecord::Generated:
-        return tr("Minted");
+        return tr("Mined");
     case TransactionRecord::Mined:
         return tr("Mined");
     default:

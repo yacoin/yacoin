@@ -357,14 +357,14 @@ void MultisigDialog::on_transaction_textChanged()
     int index = -1;
     BOOST_FOREACH(const CTxIn& txin, tx.vin)
     {
-        uint256 prevoutHash = txin.prevout.hash;
+        uint256 prevoutHash = txin.prevout.COutPointGetHash();
         addInput();
         index++;
         MultisigInputEntry *entry = qobject_cast<MultisigInputEntry *>(ui->inputs->itemAt(index)->widget());
         if(entry)
         {
             entry->setTransactionId(QString(prevoutHash.GetHex().c_str()));
-            entry->setTransactionOutputIndex(txin.prevout.n);
+            entry->setTransactionOutputIndex(txin.prevout.COutPointGet_n());
         }
     }
 
@@ -440,9 +440,9 @@ void MultisigDialog::on_signTransactionButton_clicked()
 
         BOOST_FOREACH(const CTxIn& txin, tempTx.vin)
         {
-            const uint256& prevHash = txin.prevout.hash;
-            if(mapPrevTx.count(prevHash) && mapPrevTx[prevHash].second.vout.size() > txin.prevout.n)
-                mapPrevOut[txin.prevout] = mapPrevTx[prevHash].second.vout[txin.prevout.n].scriptPubKey;
+            const uint256& prevHash = txin.prevout.COutPointGetHash();
+            if(mapPrevTx.count(prevHash) && mapPrevTx[prevHash].second.vout.size() > txin.prevout.COutPointGet_n())
+                mapPrevOut[txin.prevout] = mapPrevTx[prevHash].second.vout[txin.prevout.COutPointGet_n()].scriptPubKey;
         }
     }
 

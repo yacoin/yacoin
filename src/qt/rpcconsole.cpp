@@ -188,15 +188,6 @@ void RPCExecutor::request(const QString &command)
         {
             emit reply(RPCConsole::CMD_ERROR, QString("Unknown error!?"));
         }
-        //catch (...) 
-        //{
-        //    emit reply(RPCConsole::CMD_ERROR, QString("unknown error!?"));
-        //}
-    }
-    catch (const std::invalid_argument& ia) 
-    {
-      //emit reply(RPCConsole::CMD_ERROR, QString("Error: ") + QString::fromStdString(e.what()));
-        emit reply(RPCConsole::CMD_ERROR, QString("Error: ") + QString::fromStdString(ia.what()));
     }
     catch (std::exception& e)
     {

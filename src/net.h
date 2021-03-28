@@ -3,20 +3,20 @@
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 #ifndef BITCOIN_NET_H
-#define BITCOIN_NET_H
+ #define BITCOIN_NET_H
 
-#include <deque>
+ #include <deque>
 #ifndef Q_MOC_RUN
-#include <boost/array.hpp>
-#include <boost/foreach.hpp>
+ #include <boost/array.hpp>
+ #include <boost/foreach.hpp>
 #endif
 #include <openssl/rand.h>
 
 #ifdef _MSC_VER
-    #include <stdint.h>
+ #include <stdint.h>
 #endif
 #ifndef WIN32
-#include <arpa/inet.h>
+ #include <arpa/inet.h>
 #endif
 
 #ifndef YACOIN_YASSERT_H
@@ -75,6 +75,24 @@ const ::uint32_t
     nHoursPerDay = 24,
     nSecondsPerDay = nHoursPerDay * nSecondsPerHour;
 
+const ::uint32_t
+    nAverageBlocksPerMinute = 1,
+    nNumberOfDaysPerYear = 365,
+    nNumberOfBlocksPerYear = (nAverageBlocksPerMinute *
+                              nMinutesperHour *
+                              nHoursPerDay *
+                              nNumberOfDaysPerYear
+                             ) +    // that 1/4 of a day for leap years
+                              (nAverageBlocksPerMinute *
+                               nMinutesperHour *
+                              (nHoursPerDay/4)
+                            );
+
+const double
+    nInflation = 0.02;      // 2%
+
+extern ::int64_t
+    nUpTimeStart;
 extern const unsigned int 
     nStakeMaxAge,
     nOnedayOfAverageBlocks;
@@ -350,7 +368,7 @@ public:
     {
         if (hSocket != INVALID_SOCKET)
         {
-            closesocket(hSocket);
+            (void)closesocket(hSocket);
             hSocket = INVALID_SOCKET;
         }
     }
@@ -370,8 +388,10 @@ private:
     static ::uint64_t 
         nTotalBytesSent;
 
-    CNode(const CNode&);
-    void operator=(const CNode&);
+    CNode(const CNode&);    
+
+    CNode& operator=(const CNode&);
+
 public:
     int GetRefCount()
     {
@@ -430,9 +450,9 @@ public:
         // the key is the earliest time the request can be sent
         ::int64_t& nRequestTime = mapAlreadyAskedFor[inv];
         if (fDebugNet)
-            printf("askfor %s   %" PRId64 " (%s)\n", 
-                    inv.ToString().c_str(), 
-                    nRequestTime, 
+            printf("askfor %s   %" PRId64 " (%s)\n",
+                    inv.ToString().c_str(),
+                    nRequestTime,
                     DateTimeStrFormat("%H:%M:%S", nRequestTime/1000000).c_str()
                   );
 
@@ -487,26 +507,26 @@ public:
 
         // Set the size
         ::uint32_t 
-            nSize = (::uint32_t) vSend.size() - nMessageStart;
+            nSize = (::uint32_t)vSend.size() - nMessageStart;
 
         memcpy(
-                (char*)&vSend[nHeaderStart] + CMessageHeader::MESSAGE_SIZE_OFFSET, 
-                &nSize, 
-                sizeof(nSize)
+               (char*)&vSend[nHeaderStart] + CMessageHeader::MESSAGE_SIZE_OFFSET,
+               &nSize,
+               sizeof(nSize)
               );
 
         // Set the checksum
-        uint256 
+        uint256
             hash = Hash(vSend.begin() + nMessageStart, vSend.end());
 
-        ::uint32_t 
+        ::uint32_t
             nChecksum = 0;
 
         memcpy(&nChecksum, &hash, sizeof(nChecksum));
         Yassert(nMessageStart - nHeaderStart >= CMessageHeader::CHECKSUM_OFFSET + sizeof(nChecksum));
         memcpy((char*)&vSend[nHeaderStart] + CMessageHeader::CHECKSUM_OFFSET, &nChecksum, sizeof(nChecksum));
 
-        if (fDebug) 
+        if (fDebug)
         {
             printf("(%d bytes)\n", nSize);
         }
@@ -695,7 +715,7 @@ public:
     void PushRequest(const char* pszCommand,
                      void (*fn)(void*, CDataStream&), void* param1)
     {
-        uint256 
+        uint256
             hashReply;
 
         RAND_bytes((unsigned char*)&hashReply, sizeof(hashReply));

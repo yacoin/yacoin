@@ -4,30 +4,47 @@ VERSION = 0.4.5
 INCLUDEPATH += src src/json src/qt
 QT += core gui network
 greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
-DEFINES += QT_GUI BOOST_THREAD_USE_LIB BOOST_SPIRIT_THREADSAFE __STDC_FORMAT_MACROS WIN32
+DEFINES += QT_GUI BOOST_THREAD_USE_LIB BOOST_SPIRIT_THREADSAFE __STDC_FORMAT_MACROS WIN32 Yac1dot0
 CONFIG += no_include_pwd
 CONFIG += thread
 CONFIG += static
 CONFIG += release
 CONFIG += warn_off
 
-BOOST_INCLUDE_PATH=$$YBOO/include
-BOOST_LIB_PATH=$$YBOO/lib
-BDB_INCLUDE_PATH=$$YBDB/include
-BDB_LIB_PATH=$$YBDB/lib
-OPENSSL_INCLUDE_PATH=$$YOSSL/include
-OPENSSL_LIB_PATH=$$YOSSL/lib
-MINIUPNPC_INCLUDE_PATH=$$YUPNP/include
-MINIUPNPC_LIB_PATH=$$YUPNP/lib
-QRENCODE_INCLUDE_PATH=$$YQR/include
-QRENCODE_LIB_PATH=$$YQR/lib
+BOOST_INCLUDE_PATH =../../sw/boost_1_58_0/include
+BOOST_LIB_PATH     =../../sw/boost_1_58_0/lib
 
+BDB_INCLUDE_PATH =../../sw/db-4.8.30.NC/include
+BDB_LIB_PATH     =../../sw/db-4.8.30.NC/lib
+
+OPENSSL_INCLUDE_PATH =../../sw/openssl-1.0.1u/include
+OPENSSL_LIB_PATH     =../../sw/openssl-1.0.1u/lib
+
+MINIUPNPC_INCLUDE_PATH =../../sw/miniupnpc-1.9.20150206/include
+MINIUPNPC_LIB_PATH     =../../sw/miniupnpc-1.9.20150206/lib
+
+QRENCODE_INCLUDE_PATH =../../sw/qrencode-3.4.4/include
+QRENCODE_LIB_PATH     =../../sw/qrencode-3.4.4/lib
+
+YQT=../../sw/qt-everywhere-opensource-src-4.8.6
+
+DEL_FILE = rm
 OBJECTS_DIR = build
 MOC_DIR = build
 UI_DIR = build
 LIBS += -Wl,-Bstatic
 
 QMAKE_LFLAGS *= -Wl,--dynamicbase -Wl,--nxcompat -Wl,--large-address-aware
+
+# regenerate build.h
+contains(USE_BUILD_INFO, 1) {
+    genbuild.depends = FORCE
+    genbuild.commands = cd $$PWD; /bin/sh share/genbuild.sh build/build.h
+    genbuild.target = build/build.h
+    PRE_TARGETDEPS += build/build.h
+    QMAKE_EXTRA_TARGETS += genbuild
+    DEFINES += HAVE_BUILD_INFO
+}
 
 # use: qmake "USE_UPNP=1" ( enabled by default; default)
 #  or: qmake "USE_UPNP=0" (disabled by default)
@@ -57,7 +74,32 @@ contains(USE_IPV6, -) {
     DEFINES += USE_IPV6=$$USE_IPV6
 }
 
+contains(USE_ASM, 1) {
+    message(Using optimized scrypt core implementation)
+    SOURCES += src/scrypt-arm.S src/scrypt-x86.S src/scrypt-x86_64.S
+    DEFINES += USE_ASM
+} else {
+    message(Using generic scrypt core implementation)
+    SOURCES += src/scrypt-generic.cpp
+}
 
+# use: qmake "USE_QRCODE=1" ( enabled by default; default)
+#  or: qmake "USE_QRCODE=0" (not supported)
+contains(USE_QRCODE, 1) {
+    message(Building with QrEncode support)
+    DEFINES += USE_QRCODE=$$USE_QRCODE STATICLIB QRMINIUPNP_STATICLIB
+    INCLUDEPATH += $$QRENCODE_INCLUDE_PATH
+    LIBS += $$join(QRENCODE_LIB_PATH,,-L,) -lqrencode
+    win32:LIBS += -liphlpapi
+} else {
+    message(Building without QrEncode support)    
+}
+
+#if you start with an empty build directory, you must delete../yacoin/.genjane or
+#scrypt_jane won't be built, spoiling the make
+#
+#I don't know how to invoke QMAKE_CLEAN below, or if it works???  Not how to test it?????
+#
 genjane.target = .genjane
 genjane.commands = touch .genjane; gcc -c -O3 -DSCRYPT_CHACHA -DSCRYPT_KECCAK512 -DSCRYPT_CHOOSE_COMPILETIME -o $$OBJECTS_DIR/scrypt-jane.o src/scrypt-jane/scrypt-jane.c
 LIBS += $$OBJECTS_DIR/scrypt-jane.o
@@ -72,11 +114,12 @@ INCLUDEPATH += src/leveldb/include src/leveldb/helpers
 LIBS += $$PWD/src/leveldb/libleveldb.a $$PWD/src/leveldb/libmemenv.a
 SOURCES += src/txdb-leveldb.cpp
 genleveldb.target = .genleveldb
-genleveldb.commands = touch .genleveldb; cd $$PWD/src/leveldb && { make clean; TARGET_OS=NATIVE_WINDOWS OPT=\"-std=gnu++0x -msse2\" make libleveldb.a libmemenv.a; }
+genleveldb.commands = touch .genleveldb; cd src/leveldb && { make clean; TARGET_OS=NATIVE_WINDOWS OPT=\"-msse2\" make libleveldb.a libmemenv.a; }
 PRE_TARGETDEPS += .genleveldb
 QMAKE_EXTRA_TARGETS += genleveldb
 QMAKE_CLEAN += .genleveldb
 
+genleveldb.commands = touch .genleveldb; cd src/leveldb && { make clean; TARGET_OS=NATIVE_WINDOWS OPT=\"-std=gnu++0x -msse2\" make libleveldb.a libmemenv.a; }
 
 genminiupnpc.target = src/miniupnpc/miniupnpc.h
 genminiupnpc.commands = mkdir -p src/miniupnpc; cp $$MINIUPNPC_INCLUDE_PATH/*.h src/miniupnpc
@@ -125,6 +168,7 @@ HEADERS += \
     src/strlcpy.h \
     src/main.h \
     src/miner.h \
+    src/random_nonce.h \
     src/net.h \
     src/ministun.h \
     src/key.h \
@@ -215,6 +259,7 @@ SOURCES += src/qt/bitcoin.cpp src/qt/bitcoingui.cpp \
     src/init.cpp \
     src/net.cpp \
     src/price.cpp \
+    src/random_nonce.cpp \
     src/stun.cpp \
     src/irc.cpp \
     src/checkpoints.cpp \
@@ -261,9 +306,7 @@ SOURCES += src/qt/bitcoin.cpp src/qt/bitcoingui.cpp \
     src/pbkdf2.cpp \
     src/qt/multisigaddressentry.cpp \
     src/qt/multisiginputentry.cpp \
-    src/qt/multisigdialog.cpp \
-	src/scrypt-x86.S \
-	src/scrypt-x86_64.S
+    src/qt/multisigdialog.cpp
 #	 src/scrypt-jane/scrypt-jane.c
 
 RESOURCES += \
@@ -318,8 +361,16 @@ OTHER_FILES += \
 windows:RC_FILE = src/qt/res/bitcoin-qt.rc
 
 # Set libraries and includes at end, to use platform-defined defaults if not overridden
-INCLUDEPATH += $$BOOST_INCLUDE_PATH $$BDB_INCLUDE_PATH $$OPENSSL_INCLUDE_PATH $$QRENCODE_INCLUDE_PATH
-LIBS += $$join(BOOST_LIB_PATH,,-L,) $$join(BDB_LIB_PATH,,-L,) $$join(OPENSSL_LIB_PATH,,-L,) $$join(QRENCODE_LIB_PATH,,-L,)
+INCLUDEPATH += \
+	$$BOOST_INCLUDE_PATH \
+	$$BDB_INCLUDE_PATH \
+	$$OPENSSL_INCLUDE_PATH \
+	$$QRENCODE_INCLUDE_PATH
+LIBS += \
+	$$join(BOOST_LIB_PATH,,-L,) \
+	$$join(BDB_LIB_PATH,,-L,) \
+	$$join(OPENSSL_LIB_PATH,,-L,) \
+	$$join(QRENCODE_LIB_PATH,,-L,)
 LIBS += -lssl -lcrypto -ldb_cxx$$BDB_LIB_SUFFIX -lqrencode
 # -lgdi32 has to happen after -lcrypto (see  #681)
 windows:LIBS += -lws2_32 -lshlwapi -lmswsock -lole32 -loleaut32 -luuid -lgdi32
