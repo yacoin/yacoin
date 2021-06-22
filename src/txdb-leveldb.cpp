@@ -281,6 +281,16 @@ bool CTxDB::WriteBlockIndex(const CDiskBlockIndex& blockindex)
     return Write(make_pair(string("blockindex"), blockindex.GetBlockHash()), blockindex);
 }
 
+bool CTxDB::WriteBlockHash(const CDiskBlockIndex& blockindex)
+{
+    return Write(make_pair(string("blockhash"), make_pair(blockindex.nFile, blockindex.nBlockPos)), blockindex.GetBlockHash());
+}
+
+bool CTxDB::ReadBlockHash(const unsigned int nFile, const unsigned int nBlockPos, uint256& blockhash)
+{
+    return Read(make_pair(string("blockhash"), make_pair(nFile, nBlockPos)), blockhash);
+}
+
 bool CTxDB::ReadHashBestChain(uint256& hashBestChain)
 {
     return Read(string("hashBestChain"), hashBestChain);

@@ -1349,6 +1349,43 @@ bool CBlock::ReadFromDisk(const CBlockIndex* pindex, bool fReadTransactions, boo
     return true;
 }
 
+bool CBlock::ReadFromDisk(unsigned int nFile, unsigned int nBlockPos,
+        bool fReadTransactions, bool fCheckHeader)
+{
+    SetNull();
+
+    // Open history file to read
+    CAutoFile filein = CAutoFile(OpenBlockFile(nFile, nBlockPos, "rb"),
+            SER_DISK, CLIENT_VERSION);
+    if (!filein)
+        return error("CBlock::ReadFromDisk() : OpenBlockFile failed");
+    if (!fReadTransactions)
+        filein.nType |= SER_BLOCKHEADERONLY;
+
+    // Read block
+    try {
+        filein >> *this;
+    } catch (std::exception &e)
+    //catch (...)
+    {
+        //(void)e;
+        return error("%s() : deserialize or I/O error",
+                BOOST_CURRENT_FUNCTION);
+    }
+
+    CTxDB txdb("r");
+    if (!txdb.ReadBlockHash(nFile, nBlockPos, blockHash))
+    {
+        printf("CBlock::ReadFromDisk(): can't read block hash at file = %d, block pos = %d\n", nFile, nBlockPos);
+    }
+    // Check the header
+    if (fReadTransactions && IsProofOfWork()
+            && (fCheckHeader && !CheckProofOfWork(GetYacoinHash(), nBits)))
+        return error("CBlock::ReadFromDisk() : errors in block header");
+
+    return true;
+}
+
 uint256 static GetOrphanRoot(const CBlock* pblock)
 {
     // Work back to the first block in the orphan chain
@@ -2949,6 +2986,11 @@ bool CBlock::DisconnectBlock(CTxDB& txdb, CBlockIndex* pindex)
         blockindexPrev.hashNext = 0;
         if (!txdb.WriteBlockIndex(blockindexPrev))
             return error("DisconnectBlock() : WriteBlockIndex failed");
+        if (!txdb.WriteBlockHash(blockindexPrev))
+        {
+            printf("CBlock::DisconnectBlock(): Can't WriteBlockHash\n");
+            return error("DisconnectBlock() : WriteBlockHash failed");
+        }
     }
 
     // ppcoin: clean up wallet after disconnecting coinstake
@@ -3137,6 +3179,11 @@ bool CBlock::ConnectBlock(CTxDB& txdb, CBlockIndex* pindex, bool fJustCheck)
     pindex->nMoneySupply = (pindex->pprev? pindex->pprev->nMoneySupply : 0) + nValueOut - nValueIn;
     if (!txdb.WriteBlockIndex(CDiskBlockIndex(pindex)))
         return error("Connect() : WriteBlockIndex for pindex failed");
+    if (!txdb.WriteBlockHash(CDiskBlockIndex(pindex)))
+    {
+        printf("Connect(): Can't WriteBlockHash\n");
+        return error("Connect() : WriteBlockHash failed");
+    }
 
     // fees are not collected by proof-of-stake miners
     // fees are destroyed to compensate the entire network
@@ -3161,6 +3208,11 @@ bool CBlock::ConnectBlock(CTxDB& txdb, CBlockIndex* pindex, bool fJustCheck)
         blockindexPrev.hashNext = pindex->GetBlockHash();
         if (!txdb.WriteBlockIndex(blockindexPrev))
             return error("ConnectBlock() : WriteBlockIndex failed");
+        if (!txdb.WriteBlockHash(blockindexPrev))
+        {
+            printf("ConnectBlock(): Can't WriteBlockHash\n");
+            return error("ConnectBlock() : WriteBlockHash failed");
+        }
     }
 
     // Watch for transactions paying to me
@@ -3602,6 +3654,10 @@ bool CBlock::AddToBlockIndex(unsigned int nFile, unsigned int nBlockPos)
     if (!txdb.TxnBegin())
         return false;
     txdb.WriteBlockIndex(CDiskBlockIndex(pindexNew));
+    if (!txdb.WriteBlockHash(CDiskBlockIndex(pindexNew)))
+    {
+        printf("AddToBlockIndex(): Can't WriteBlockHash\n");
+    }
     if (!txdb.TxnCommit())
         return false;
 

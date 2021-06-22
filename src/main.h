@@ -1539,49 +1539,6 @@ public:
         return true;
     }
 
-    bool ReadFromDisk(
-                      unsigned int nFile, 
-                      unsigned int nBlockPos, 
-                      bool fReadTransactions = true,
-                      bool fCheckHeader = true
-                     )
-    {
-        SetNull();
-
-        // Open history file to read
-        CAutoFile filein = CAutoFile(OpenBlockFile(nFile, nBlockPos, "rb"), SER_DISK, CLIENT_VERSION);
-        if (!filein)
-            return error("CBlock::ReadFromDisk() : OpenBlockFile failed");
-        if (!fReadTransactions)
-            filein.nType |= SER_BLOCKHEADERONLY;
-
-        // Read block
-        try {
-            filein >> *this;
-        }
-        catch (std::exception &e) 
-        //catch (...) 
-        {
-            //(void)e;
-            return error("%s() : deserialize or I/O error", BOOST_CURRENT_FUNCTION);
-        }
-
-        // Check the header
-        if (
-            fReadTransactions && 
-            IsProofOfWork() && 
-            (
-             fCheckHeader &&           
-             !CheckProofOfWork(GetYacoinHash(), nBits)
-            )
-           )
-            return error("CBlock::ReadFromDisk() : errors in block header");
-
-        return true;
-    }
-
-
-
     void print() const
     {
         printf("CBlock(\n"
@@ -1620,6 +1577,8 @@ public:
     bool DisconnectBlock(CTxDB& txdb, CBlockIndex* pindex);
     bool ConnectBlock(CTxDB& txdb, CBlockIndex* pindex, bool fJustCheck=false);
     bool ReadFromDisk(const CBlockIndex* pindex, bool fReadTransactions=true, bool fCheckHeader = true);
+    bool ReadFromDisk(unsigned int nFile, unsigned int nBlockPos,
+            bool fReadTransactions = true, bool fCheckHeader = true);
     bool SetBestChain(CTxDB& txdb, CBlockIndex* pindexNew);
     bool AddToBlockIndex(unsigned int nFile, unsigned int nBlockPos);
     bool CheckBlock(bool fCheckPOW=true, bool fCheckMerkleRoot=true, bool fCheckSig=true) const;
