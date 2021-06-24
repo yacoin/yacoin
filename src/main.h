@@ -1097,7 +1097,6 @@ public:
     // Store following info to avoid calculating hash many times
     mutable struct block_header previousBlockHeader;
     mutable uint256 blockHash;
-    mutable uint256 blockYacoinHash;
 
     // network and disk
     std::vector<CTransaction> vtx;
@@ -1171,7 +1170,6 @@ public:
         vMerkleTree.clear();
         nDoS = 0;
         blockHash = 0;
-        blockYacoinHash = 0;
         memset(UVOIDBEGIN(previousBlockHeader), 0, sizeof(struct block_header));
     }
 
@@ -1342,75 +1340,6 @@ public:
             previousBlockHeader.nonce = nNonce;
         }
         return blockHash;
-    }
-
-    // yacoin2015
-    uint256 CalculateYacoinHash() const
-    {
-        uint256 
-            thash;
-        unsigned char nfactor;
-        if (nVersion >= VERSION_of_block_for_yac_05x_new) // 64-bit nTime
-        {
-            nfactor = GetNfactor(nTime, true);
-            struct block_header block_data;
-            block_data.version = nVersion;
-            block_data.prev_block = hashPrevBlock;
-            block_data.merkle_root = hashMerkleRoot;
-            block_data.timestamp = nTime;
-            block_data.bits = nBits;
-            block_data.nonce = nNonce;
-            if(
-               !scrypt_hash(
-                           CVOIDBEGIN(block_data),
-                           sizeof(struct block_header),
-                           UINTBEGIN(thash),
-                           nfactor
-                          )
-              )
-            {
-                thash = 0;  // perhaps? should error("lack of memory for scrypt hash?");
-            }
-        }
-        else // 32-bit nTime
-        {
-        	nfactor = GetNfactor(nTime, false);
-            old_block_header oldBlock;
-            oldBlock.version = nVersion;
-            oldBlock.prev_block = hashPrevBlock;
-            oldBlock.merkle_root = hashMerkleRoot;
-            oldBlock.timestamp = nTime;
-            oldBlock.bits = nBits;
-            oldBlock.nonce = nNonce;
-            if(
-               !scrypt_hash(
-                           CVOIDBEGIN(oldBlock),
-                           sizeof(old_block_header),
-                           UINTBEGIN(thash),
-                           nfactor
-                          )
-              )
-            {
-                thash = 0;  // perhaps? should error("lack of memory for scrypt hash?");
-            }
-        }
-
-        return thash;
-    }
-
-    uint256 GetYacoinHash(int blockHeight = 0) const
-    {
-        if(blockYacoinHash == 0 || IsHeaderDifferent())
-        {
-            blockYacoinHash = CalculateYacoinHash();
-            previousBlockHeader.version = nVersion;
-            previousBlockHeader.prev_block = hashPrevBlock;
-            previousBlockHeader.merkle_root = hashMerkleRoot;
-            previousBlockHeader.timestamp = nTime;
-            previousBlockHeader.bits = nBits;
-            previousBlockHeader.nonce = nNonce;
-        }
-        return blockYacoinHash;
     }
 
     ::int64_t GetBlockTime() const

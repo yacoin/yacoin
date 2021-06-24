@@ -1380,7 +1380,7 @@ bool CBlock::ReadFromDisk(unsigned int nFile, unsigned int nBlockPos,
     }
     // Check the header
     if (fReadTransactions && IsProofOfWork()
-            && (fCheckHeader && !CheckProofOfWork(GetYacoinHash(), nBits)))
+            && (fCheckHeader && !CheckProofOfWork(GetHash(), nBits)))
         return error("CBlock::ReadFromDisk() : errors in block header");
 
     return true;
@@ -3773,7 +3773,7 @@ bool CBlock::CheckBlock(bool fCheckPOW, bool fCheckMerkleRoot, bool fCheckSig) c
             return DoS(50, error("CheckBlock () : zero nonce in proof-of-work block"));
 
         // Check proof of work matches claimed amount
-        if (fCheckPOW && !CheckProofOfWork(GetYacoinHash(), nBits))
+        if (fCheckPOW && !CheckProofOfWork(GetHash(), nBits))
             return DoS(50, error("CheckBlock () : proof of work failed"));
 
         // Check timestamp
@@ -4380,7 +4380,7 @@ bool CBlock::SignBlock044(const CKeyStore& keystore)
                     continue;
                 if(
                     !key.Sign(
-                                GetYacoinHash(),    //<<<<<<<<<<<<<<< test
+                                GetHash(),    //<<<<<<<<<<<<<<< test
                                 //GetHash(), 
                                 vchBlockSig
                              )
