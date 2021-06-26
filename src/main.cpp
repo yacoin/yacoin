@@ -1374,7 +1374,7 @@ bool CBlock::ReadFromDisk(unsigned int nFile, unsigned int nBlockPos,
     }
 
     CTxDB txdb("r");
-    if (!txdb.ReadBlockHash(nFile, nBlockPos, blockHash))
+    if (fStoreBlockHashToDb && !txdb.ReadBlockHash(nFile, nBlockPos, blockHash))
     {
         printf("CBlock::ReadFromDisk(): can't read block hash at file = %d, block pos = %d\n", nFile, nBlockPos);
     }
@@ -2986,7 +2986,7 @@ bool CBlock::DisconnectBlock(CTxDB& txdb, CBlockIndex* pindex)
         blockindexPrev.hashNext = 0;
         if (!txdb.WriteBlockIndex(blockindexPrev))
             return error("DisconnectBlock() : WriteBlockIndex failed");
-        if (!txdb.WriteBlockHash(blockindexPrev))
+        if (fStoreBlockHashToDb && !txdb.WriteBlockHash(blockindexPrev))
         {
             printf("CBlock::DisconnectBlock(): Can't WriteBlockHash\n");
             return error("DisconnectBlock() : WriteBlockHash failed");
@@ -3179,7 +3179,7 @@ bool CBlock::ConnectBlock(CTxDB& txdb, CBlockIndex* pindex, bool fJustCheck)
     pindex->nMoneySupply = (pindex->pprev? pindex->pprev->nMoneySupply : 0) + nValueOut - nValueIn;
     if (!txdb.WriteBlockIndex(CDiskBlockIndex(pindex)))
         return error("Connect() : WriteBlockIndex for pindex failed");
-    if (!txdb.WriteBlockHash(CDiskBlockIndex(pindex)))
+    if (fStoreBlockHashToDb && !txdb.WriteBlockHash(CDiskBlockIndex(pindex)))
     {
         printf("Connect(): Can't WriteBlockHash\n");
         return error("Connect() : WriteBlockHash failed");
@@ -3208,7 +3208,7 @@ bool CBlock::ConnectBlock(CTxDB& txdb, CBlockIndex* pindex, bool fJustCheck)
         blockindexPrev.hashNext = pindex->GetBlockHash();
         if (!txdb.WriteBlockIndex(blockindexPrev))
             return error("ConnectBlock() : WriteBlockIndex failed");
-        if (!txdb.WriteBlockHash(blockindexPrev))
+        if (fStoreBlockHashToDb && !txdb.WriteBlockHash(blockindexPrev))
         {
             printf("ConnectBlock(): Can't WriteBlockHash\n");
             return error("ConnectBlock() : WriteBlockHash failed");
@@ -3654,7 +3654,7 @@ bool CBlock::AddToBlockIndex(unsigned int nFile, unsigned int nBlockPos)
     if (!txdb.TxnBegin())
         return false;
     txdb.WriteBlockIndex(CDiskBlockIndex(pindexNew));
-    if (!txdb.WriteBlockHash(CDiskBlockIndex(pindexNew)))
+    if (fStoreBlockHashToDb && !txdb.WriteBlockHash(CDiskBlockIndex(pindexNew)))
     {
         printf("AddToBlockIndex(): Can't WriteBlockHash\n");
     }
