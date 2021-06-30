@@ -3902,39 +3902,6 @@ bool CBlock::AcceptBlock()
     if (!Checkpoints::CheckHardened(nHeight, hash))
         return DoS(100, error("AcceptBlock () : rejected by hardened checkpoint lock-in at %d", nHeight));
 
-    if (nBestHeight < nMainnetNewLogicBlockNumber)
-    {
-        bool cpSatisfies = Checkpoints::CheckSync(hash, pindexPrev);
-
-        // Check that the block satisfies synchronized checkpoint
-        if (
-            (CheckpointsMode == Checkpoints::STRICT_) &&
-    /**************
-        // using STRICT instead of STRICT_ collides with windef.h
-        // and strangely cause gcc to fail when WIN32 is true & QT_GUI
-        // but not WIN32 gcc compiling the daemon???
-        // so I changed to STRICT_ which doesn't collide!
-        // if we don't then this if would have to look like
-        if (
-            (CheckpointsMode ==
-    #ifdef WIN32 && QT_GUI
-             0
-    #else
-             Checkpoints::STRICT
-    #endif
-            ) &&
-    ***************/
-            !cpSatisfies
-           )
-            return error("AcceptBlock () : rejected by synchronized checkpoint");
-
-        if (
-            (CheckpointsMode == Checkpoints::ADVISORY) &&
-            !cpSatisfies
-           )
-            strMiscWarning = _("WARNING: syncronized checkpoint violation detected, but skipped!");
-    }
-
     // Enforce rule that the coinbase starts with serialized block height
     CScript expect = CScript() << nHeight;
     if (
