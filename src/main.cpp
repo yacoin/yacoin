@@ -5890,10 +5890,17 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
         pfrom->AddInventoryKnown(inv);
 
         Sleep( nOneMillisecond );  // let's try this arbitrary value? 
+
+        MeasureTime processBlock;
         if (ProcessBlock(pfrom, &block))
         {
             mapAlreadyAskedFor.erase(inv);
         }
+        processBlock.mEnd.stamp();
+
+        printf("Process block message, total time for ProcessBlock = %lu us\n",
+                processBlock.getExecutionTime());
+
         //if( !IsInitialBlockDownload() )        {}
         if (block.nDoS) 
         {

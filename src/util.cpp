@@ -1563,6 +1563,28 @@ bool NewThread(void(*pfn)(void*), void* parg)
     return true;
 }
 
+void Timestamp::stamp()
+{
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+    mValue = tv.tv_sec * 1000000 + tv.tv_usec;
+}
+
+uint64_t Timestamp::getValue() const
+{
+    return mValue;
+}
+
+MeasureTime::MeasureTime()
+{
+    mStart.stamp();
+}
+
+uint64_t MeasureTime::getExecutionTime() const
+{
+    return mEnd.getValue() - mStart.getValue();
+}
+
 #ifdef WIN32
 //_____________________________________________________________________________
 void
