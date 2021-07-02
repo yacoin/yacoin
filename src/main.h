@@ -1148,6 +1148,12 @@ public:
             const_cast<CBlock*>(this)->vtx.clear();
             const_cast<CBlock*>(this)->vchBlockSig.clear();
         }
+        previousBlockHeader.version = this->nVersion;
+        previousBlockHeader.prev_block = hashPrevBlock;
+        previousBlockHeader.merkle_root = hashMerkleRoot;
+        previousBlockHeader.timestamp = nTime;
+        previousBlockHeader.bits = nBits;
+        previousBlockHeader.nonce = nNonce;
     )
 
     void SetNull()
