@@ -553,7 +553,7 @@ bool AppInit2()
 
     nNodeLifespan = (unsigned int)(GetArg("-addrlifespan", 7));
     fUseFastIndex = GetBoolArg("-fastindex", true);
-    fStoreBlockHashToDb = GetBoolArg("-storeblockhash", false);
+    fStoreBlockHashToDb = GetBoolArg("-storeblockhash", true);
     fUseMemoryLog = GetBoolArg("-memorylog", true);
     nMinerSleep = (unsigned int)(GetArg("-minersleep", nOneHundredMilliseconds));
 
