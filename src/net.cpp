@@ -691,10 +691,13 @@ void CNode::CloseSocketDisconnect()
         int
             nErr = closesocket(hSocket);
 
-        printf( 
-                "disconnecting node %s", 
-                addrName.c_str()
-              );
+        printf(
+                "disconnecting node %s, lastsend = %s, lastrecv = %s, conntime = %s, startingheight = %d, banscore = %d\n",
+                addrName.c_str(),
+                DateTimeStrFormat("%Y-%m-%d %H:%M:%S", nLastSend).c_str(),
+                DateTimeStrFormat("%Y-%m-%d %H:%M:%S", nLastRecv).c_str(),
+                DateTimeStrFormat("%Y-%m-%d %H:%M:%S", nTimeConnected).c_str(),
+                nStartingHeight, nMisbehavior);
         if( nErr )
         {   // close socket errored!
             nErr = WSAGetLastError();
@@ -879,6 +882,7 @@ bool CNode::Misbehaving(int howmuch)    // banned if banscore  exceeeded
             if (setBanned[addr] < banTime)
                 setBanned[addr] = banTime;
         }
+        printf("(Node %s) Close connection to node due to misbehaving\n", addrName.c_str());
         CloseSocketDisconnect();
         return true;
     }
@@ -1052,7 +1056,8 @@ void ThreadSocketHandler2(void* parg)
                      pnode->vSend.empty()
                     )
                    )
-                {   // remove from vNodes using the standard C++ idiom          
+                {
+                    // remove from vNodes using the standard C++ idiom
                     vNodes.erase(                 
                                  remove(  
                                         vNodes.begin(), 
@@ -1067,6 +1072,7 @@ void ThreadSocketHandler2(void* parg)
                     // release outbound grant (if any)
                     pnode->grantOutbound.Release();
 
+                    printf("(Node %s) Disconnect unused node, pnode->fDisconnect = %d\n", pnode->addrName.c_str(), pnode->fDisconnect);
                     pnode->CloseSocketDisconnect();
                     pnode->Cleanup();
 
@@ -1167,7 +1173,10 @@ void ThreadSocketHandler2(void* parg)
                 {
                     TRY_LOCK(pnode->cs_vSend, lockSend);
                     if (lockSend && !pnode->vSend.empty())
+                    {
+                        printf("(Node %s) There is a message will be sent to node\n", pnode->addrName.c_str());
                         FD_SET(pnode->hSocket, &fdsetSend);
+                    }
                 }
             Sleep( nOneMillisecond ); //nTenMilliseconds );  // try this instead of //Sleep( nOneHundredMilliseconds );
             }
@@ -1254,6 +1263,10 @@ void ThreadSocketHandler2(void* parg)
                   //if (nInbound >= GetArg("-maxconnections", 125) - MAX_OUTBOUND_CONNECTIONS)
                     if ( nInbound >= GetMaxConnections() - GetMaxOutboundConnections() )
                     {
+                        printf(
+                                "close connection %s due to reaching maximum connection, GetMaxConnections() = %d, GetMaxOutboundConnections() = %d\n",
+                                addr.ToString().c_str(), GetMaxConnections(),
+                                GetMaxOutboundConnections());
                         {
                             LOCK(cs_setservAddNodeAddresses);
                             if (!setservAddNodeAddresses.count(addr))
@@ -1325,9 +1338,12 @@ void ThreadSocketHandler2(void* parg)
                     if (nPos > ReceiveBufferSize())
                     {
                         if (!pnode->fDisconnect)
-                            printf("socket recv flood control disconnect (%" PRIszu " bytes)\n", 
-                                    vRecv.size()
+                            printf("(Node %s) socket recv flood control disconnect (%" PRIszu " bytes)\n",
+                                    pnode->addrName.c_str(), vRecv.size()
                                   );
+                        printf(
+                                "(Node %s) Close connection to node due to receive buffer overflow (%" PRIszu " bytes)\n",
+                                pnode->addrName.c_str(), vRecv.size());
                         pnode->CloseSocketDisconnect();
                     }
                     else
@@ -1343,6 +1359,7 @@ void ThreadSocketHandler2(void* parg)
                         {
                             vRecv.resize(nPos + nBytes);
                             memcpy(&vRecv[nPos], pchBuf, nBytes);
+                            printf("(Node %s) Received %d bytes from node\n", pnode->addrName.c_str(), nBytes);
                             pnode->nLastRecv = GetTime();
                             pnode->nRecvBytes += nBytes;
                             pnode->RecordBytesRecv(nBytes);
@@ -1353,6 +1370,7 @@ void ThreadSocketHandler2(void* parg)
                             {   // socket closed gracefully
                                 if (!pnode->fDisconnect)
                                     printf("socket closed\n");
+                                printf("(Node %s) Close connection to node gracefully (closed from remote)\n", pnode->addrName.c_str());
                                 pnode->CloseSocketDisconnect();
                             }
                             else
@@ -1471,6 +1489,10 @@ void ThreadSocketHandler2(void* parg)
                                             }
 #endif
                                         }
+                                        printf(
+                                                "(Node %s) Close connection to node due to error code = %d (%s)\n",
+                                                pnode->addrName.c_str(), nErr,
+                                                strerror(nErr));
                                         pnode->CloseSocketDisconnect();
                                     }
                                     // the implication here is
@@ -1561,6 +1583,7 @@ void ThreadSocketHandler2(void* parg)
                         int nBytes = send(pnode->hSocket, &vSend[0], vSend.size(), MSG_NOSIGNAL | MSG_DONTWAIT);
                         if (nBytes > 0)
                         {
+                            printf("(Node %s) Sending successfully nBytes = %d\n", pnode->addrName.c_str(), nBytes);
                             vSend.erase(vSend.begin(), vSend.begin() + nBytes);
                             pnode->nLastSend = GetTime();
                             pnode->nSendBytes += nBytes;
@@ -1570,6 +1593,7 @@ void ThreadSocketHandler2(void* parg)
                         {
                             // error
                             int nErr = WSAGetLastError();
+                            printf("(Node %s) Sending failed with error code = %d (%s)\n", pnode->addrName.c_str(), nErr, strerror(nErr));
                             if (
                                 (nErr != WSAEWOULDBLOCK) && 
                                 (nErr != WSAEMSGSIZE) && 
@@ -1577,7 +1601,7 @@ void ThreadSocketHandler2(void* parg)
                                 (nErr != WSAEINPROGRESS)
                                )
                             {
-                                printf("socket send error %d\n", nErr);
+                                printf("(Node %s) socket send error %d\n", pnode->addrName.c_str(), nErr);
                                 clearLocalSocketError( pnode->hSocket );
                                 pnode->CloseSocketDisconnect();
                             }
@@ -1593,16 +1617,19 @@ void ThreadSocketHandler2(void* parg)
                 LOCK(cs_vNodes);
 
                 if (pnode->vSend.empty())
+                {
                     pnode->nLastSendEmpty = GetTime();
+                }
               //if ((GetTime() - pnode->nTimeConnected) > 60) // what is this here? Seconds??  Why???
                 if ((GetTime() - pnode->nTimeConnected) > 3 * nOneMinuteInSeconds) // test<<<<<<<<<<< try 3 minutes
                 {
                     if (pnode->nLastRecv == 0 || pnode->nLastSend == 0)
                     {
-                        printf("socket no message in first 60 seconds, %d %d\n", 
-                               pnode->nLastRecv != 0, 
-                               pnode->nLastSend != 0
-                              );
+                        printf("(Node %s) socket no message in first 60 seconds, %d %d\n",
+                                pnode->addrName.c_str(),
+                                pnode->nLastRecv != 0,
+                                pnode->nLastSend != 0
+                        );
                         pnode->fDisconnect = true;
                     }
                     else
@@ -1612,14 +1639,14 @@ void ThreadSocketHandler2(void* parg)
                             GetTime() - pnode->nLastSendEmpty > (90 * 60)   // "
                             )
                         {
-                            printf("socket not sending\n");
+                            printf("(Node %s) socket not sending\n", pnode->addrName.c_str());
                             pnode->fDisconnect = true;
                         }
                         else 
                         {
                             if (GetTime() - pnode->nLastRecv > (90 * 60))  // is this 90 minutes?
                             {
-                                printf("socket inactivity timeout\n");
+                                printf("(Node %s) socket inactivity timeout\n", pnode->addrName.c_str());
                                 pnode->fDisconnect = true;
                             }
                         }

@@ -5126,7 +5126,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
 {
     RandAddSeedPerfmon();
     if (fDebug)
-        printf("received: %s (%" PRIszu " bytes)\n", strCommand.c_str(), vRecv.size());
+        printf("received: %s (%" PRIszu " bytes) from node %s\n", strCommand.c_str(), vRecv.size(), pfrom->addrName.c_str());
     if (mapArgs.count("-dropmessagestest") && GetRand(atoi(mapArgs["-dropmessagestest"])) == 0)
     {
         printf("dropmessagestest DROPPING RECV MESSAGE\n");
@@ -5471,7 +5471,10 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
         if (vAddr.size() < 1000)
             pfrom->fGetAddr = false;
         if (pfrom->fOneShot)                // what is the logic here?
+        {
+            printf("Node (%s) is oneshot client\n", pfrom->addrName.c_str());
             pfrom->fDisconnect = true;
+        }
     }
     //_________________________________________________________________________
 

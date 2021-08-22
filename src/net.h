@@ -477,7 +477,7 @@ public:
         vSend << CMessageHeader(pszCommand, 0);
         nMessageStart = (::uint32_t)vSend.size();
         if (fDebug)
-            printf("sending: %s ", pszCommand);
+            printf("sending: %s to node %s", pszCommand, addrName.c_str());
     }
 
     void AbortMessage()
