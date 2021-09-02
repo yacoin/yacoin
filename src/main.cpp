@@ -1349,6 +1349,43 @@ bool CBlock::ReadFromDisk(const CBlockIndex* pindex, bool fReadTransactions, boo
     return true;
 }
 
+bool CBlock::ReadFromDisk(unsigned int nFile, unsigned int nBlockPos,
+        bool fReadTransactions, bool fCheckHeader)
+{
+    SetNull();
+
+    // Open history file to read
+    CAutoFile filein = CAutoFile(OpenBlockFile(nFile, nBlockPos, "rb"),
+            SER_DISK, CLIENT_VERSION);
+    if (!filein)
+        return error("CBlock::ReadFromDisk() : OpenBlockFile failed");
+    if (!fReadTransactions)
+        filein.nType |= SER_BLOCKHEADERONLY;
+
+    // Read block
+    try {
+        filein >> *this;
+    } catch (std::exception &e)
+    //catch (...)
+    {
+        //(void)e;
+        return error("%s() : deserialize or I/O error",
+                BOOST_CURRENT_FUNCTION);
+    }
+
+    CTxDB txdb("r");
+    if (fStoreBlockHashToDb && !txdb.ReadBlockHash(nFile, nBlockPos, blockHash))
+    {
+        printf("CBlock::ReadFromDisk(): can't read block hash at file = %d, block pos = %d\n", nFile, nBlockPos);
+    }
+    // Check the header
+    if (fReadTransactions && IsProofOfWork()
+            && (fCheckHeader && !CheckProofOfWork(GetHash(), nBits)))
+        return error("CBlock::ReadFromDisk() : errors in block header");
+
+    return true;
+}
+
 uint256 static GetOrphanRoot(const CBlock* pblock)
 {
     // Work back to the first block in the orphan chain
@@ -2949,6 +2986,11 @@ bool CBlock::DisconnectBlock(CTxDB& txdb, CBlockIndex* pindex)
         blockindexPrev.hashNext = 0;
         if (!txdb.WriteBlockIndex(blockindexPrev))
             return error("DisconnectBlock() : WriteBlockIndex failed");
+        if (fStoreBlockHashToDb && !txdb.WriteBlockHash(blockindexPrev))
+        {
+            printf("CBlock::DisconnectBlock(): Can't WriteBlockHash\n");
+            return error("DisconnectBlock() : WriteBlockHash failed");
+        }
     }
 
     // ppcoin: clean up wallet after disconnecting coinstake
@@ -3137,6 +3179,11 @@ bool CBlock::ConnectBlock(CTxDB& txdb, CBlockIndex* pindex, bool fJustCheck)
     pindex->nMoneySupply = (pindex->pprev? pindex->pprev->nMoneySupply : 0) + nValueOut - nValueIn;
     if (!txdb.WriteBlockIndex(CDiskBlockIndex(pindex)))
         return error("Connect() : WriteBlockIndex for pindex failed");
+    if (fStoreBlockHashToDb && !txdb.WriteBlockHash(CDiskBlockIndex(pindex)))
+    {
+        printf("Connect(): Can't WriteBlockHash\n");
+        return error("Connect() : WriteBlockHash failed");
+    }
 
     // fees are not collected by proof-of-stake miners
     // fees are destroyed to compensate the entire network
@@ -3161,6 +3208,11 @@ bool CBlock::ConnectBlock(CTxDB& txdb, CBlockIndex* pindex, bool fJustCheck)
         blockindexPrev.hashNext = pindex->GetBlockHash();
         if (!txdb.WriteBlockIndex(blockindexPrev))
             return error("ConnectBlock() : WriteBlockIndex failed");
+        if (fStoreBlockHashToDb && !txdb.WriteBlockHash(blockindexPrev))
+        {
+            printf("ConnectBlock(): Can't WriteBlockHash\n");
+            return error("ConnectBlock() : WriteBlockHash failed");
+        }
     }
 
     // Watch for transactions paying to me
@@ -3602,6 +3654,10 @@ bool CBlock::AddToBlockIndex(unsigned int nFile, unsigned int nBlockPos)
     if (!txdb.TxnBegin())
         return false;
     txdb.WriteBlockIndex(CDiskBlockIndex(pindexNew));
+    if (fStoreBlockHashToDb && !txdb.WriteBlockHash(CDiskBlockIndex(pindexNew)))
+    {
+        printf("AddToBlockIndex(): Can't WriteBlockHash\n");
+    }
     if (!txdb.TxnCommit())
         return false;
 
@@ -3717,7 +3773,7 @@ bool CBlock::CheckBlock(bool fCheckPOW, bool fCheckMerkleRoot, bool fCheckSig) c
             return DoS(50, error("CheckBlock () : zero nonce in proof-of-work block"));
 
         // Check proof of work matches claimed amount
-        if (fCheckPOW && !CheckProofOfWork(GetYacoinHash(), nBits))
+        if (fCheckPOW && !CheckProofOfWork(GetHash(), nBits))
             return DoS(50, error("CheckBlock () : proof of work failed"));
 
         // Check timestamp
@@ -3845,39 +3901,6 @@ bool CBlock::AcceptBlock()
     // Check that the block chain matches the known block chain up to a checkpoint
     if (!Checkpoints::CheckHardened(nHeight, hash))
         return DoS(100, error("AcceptBlock () : rejected by hardened checkpoint lock-in at %d", nHeight));
-
-    if (nBestHeight < nMainnetNewLogicBlockNumber)
-    {
-        bool cpSatisfies = Checkpoints::CheckSync(hash, pindexPrev);
-
-        // Check that the block satisfies synchronized checkpoint
-        if (
-            (CheckpointsMode == Checkpoints::STRICT_) &&
-    /**************
-        // using STRICT instead of STRICT_ collides with windef.h
-        // and strangely cause gcc to fail when WIN32 is true & QT_GUI
-        // but not WIN32 gcc compiling the daemon???
-        // so I changed to STRICT_ which doesn't collide!
-        // if we don't then this if would have to look like
-        if (
-            (CheckpointsMode ==
-    #ifdef WIN32 && QT_GUI
-             0
-    #else
-             Checkpoints::STRICT
-    #endif
-            ) &&
-    ***************/
-            !cpSatisfies
-           )
-            return error("AcceptBlock () : rejected by synchronized checkpoint");
-
-        if (
-            (CheckpointsMode == Checkpoints::ADVISORY) &&
-            !cpSatisfies
-           )
-            strMiscWarning = _("WARNING: syncronized checkpoint violation detected, but skipped!");
-    }
 
     // Enforce rule that the coinbase starts with serialized block height
     CScript expect = CScript() << nHeight;
@@ -4324,7 +4347,7 @@ bool CBlock::SignBlock044(const CKeyStore& keystore)
                     continue;
                 if(
                     !key.Sign(
-                                GetYacoinHash(),    //<<<<<<<<<<<<<<< test
+                                GetHash(),    //<<<<<<<<<<<<<<< test
                                 //GetHash(), 
                                 vchBlockSig
                              )
@@ -5867,10 +5890,17 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
         pfrom->AddInventoryKnown(inv);
 
         Sleep( nOneMillisecond );  // let's try this arbitrary value? 
+
+        MeasureTime processBlock;
         if (ProcessBlock(pfrom, &block))
         {
             mapAlreadyAskedFor.erase(inv);
         }
+        processBlock.mEnd.stamp();
+
+        printf("Process block message, total time for ProcessBlock = %lu us\n",
+                processBlock.getExecutionTime());
+
         //if( !IsInitialBlockDownload() )        {}
         if (block.nDoS) 
         {
