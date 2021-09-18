@@ -129,7 +129,7 @@ extern unsigned int nNodeLifespan;
 //extern unsigned int nStakeMinAge;
 extern int nCoinbaseMaturity;
 extern CBigNum bnBestChainTrust;
-extern CBigNum bnBestInvalidTrust;
+extern CBlockIndex *pindexBestInvalid;
 extern uint256 hashBestChain;
 extern unsigned int nTransactionsUpdated;
 extern ::uint64_t nLastBlockTx;

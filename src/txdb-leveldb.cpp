@@ -910,7 +910,7 @@ bool CTxDB::LoadBlockIndex()
               );
     }
     // Load bnBestInvalidTrust, OK if it doesn't exist
-    ReadBestInvalidTrust(bnBestInvalidTrust);
+//    ReadBestInvalidTrust(bnBestInvalidTrust);
 
     // Verify blocks in the best chain
     int nCheckLevel = GetArg("-checklevel", 1);

@@ -231,7 +231,7 @@ bool CTxDB::LoadBlockIndex()
     printf("LoadBlockIndex(): synchronized checkpoint %s\n", Checkpoints::hashSyncCheckpoint.ToString().c_str());
 
     // Load bnBestInvalidTrust, OK if it doesn't exist
-    ReadBestInvalidTrust(bnBestInvalidTrust);
+//    ReadBestInvalidTrust(bnBestInvalidTrust);
 
     // Verify blocks in the best chain
     int nCheckLevel = GetArg("-checklevel", 1);

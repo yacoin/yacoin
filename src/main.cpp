@@ -184,7 +184,7 @@ int
 CChain chainActive;
 
 CBigNum bnBestChainTrust(0);
-CBigNum bnBestInvalidTrust(0);
+CBlockIndex *pindexBestInvalid;
 
 uint256 hashBestChain = 0;
 ::int64_t nTimeBestReceived = 0;
@@ -2512,10 +2512,10 @@ bool IsInitialBlockDownload()
 
 void static InvalidChainFound(CBlockIndex* pindexNew)
 {
-    if (pindexNew->bnChainTrust > bnBestInvalidTrust)
+    if (!pindexBestInvalid || pindexNew->bnChainTrust > pindexBestInvalid->bnChainTrust)
     {
-        bnBestInvalidTrust = pindexNew->bnChainTrust;
-        CTxDB().WriteBestInvalidTrust(bnBestInvalidTrust);
+        pindexBestInvalid = pindexNew;
+        CTxDB().WriteBestInvalidTrust(pindexBestInvalid->bnChainTrust);
 #ifdef QT_GUI
         //uiInterface.NotifyBlocksChanged();
 #endif
@@ -4686,7 +4686,7 @@ void UnloadBlockIndex()
     mapBlockIndex.clear();
     setStakeSeen.clear();
     bnBestChainTrust = CBigNum(0);
-    bnBestInvalidTrust = CBigNum(0);
+    pindexBestInvalid = NULL;
     hashBestChain = 0;
     chainActive.SetTip(NULL);
 }
