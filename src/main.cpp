@@ -3718,6 +3718,8 @@ bool CBlock::AddToBlockIndex(unsigned int nFile, unsigned int nBlockPos)
     if (pindexNew->IsProofOfStake())
         setStakeSeen.insert(make_pair(pindexNew->prevoutStake, pindexNew->nStakeTime));
     pindexNew->phashBlock = &((*mi).first);
+    pindexNew->nStatus = BLOCK_VALID_TRANSACTIONS | BLOCK_HAVE_DATA;
+    setBlockIndexValid.insert(pindexNew);
 
     // Write to disk block index
     CTxDB txdb;
@@ -4687,6 +4689,7 @@ void UnloadBlockIndex()
     mapBlockIndex.clear();
     setStakeSeen.clear();
     bnBestChainTrust = CBigNum(0);
+    setBlockIndexValid.clear();
     pindexBestInvalid = NULL;
     hashBestChain = 0;
     chainActive.SetTip(NULL);

@@ -847,6 +847,8 @@ bool CTxDB::LoadBlockIndex()
                 return error("CTxDB::LoadBlockIndex() : Failed stake modifier checkpoint height=%d, modifier=0x%016" PRIx64, pindex->nHeight, pindex->nStakeModifier);
             if ((pindex->nStatus & BLOCK_VALID_MASK) >= BLOCK_VALID_TRANSACTIONS && !(pindex->nStatus & BLOCK_FAILED_MASK))
                 setBlockIndexValid.insert(pindex);
+            if (pindex->nStatus & BLOCK_FAILED_MASK && (!pindexBestInvalid || pindex->bnChainTrust > pindexBestInvalid->bnChainTrust))
+                pindexBestInvalid = pindex;
 #ifdef WIN32
             ++nCounter;
             if (0 == (nCounter % nUpdatePeriod))
