@@ -575,6 +575,7 @@ bool CTxDB::LoadBlockIndex()
         pindexNew->nTime = diskindex.nTime;
         pindexNew->nBits = diskindex.nBits;
         pindexNew->nNonce = diskindex.nNonce;
+        pindexNew->nStatus = diskindex.nStatus;
 
         uint256 tmpBlockhash;
         if (fStoreBlockHashToDb && !ReadBlockHash(diskindex.nFile, diskindex.nBlockPos, tmpBlockhash))
@@ -844,6 +845,8 @@ bool CTxDB::LoadBlockIndex()
             pindex->nStakeModifierChecksum = GetStakeModifierChecksum(pindex);
             if (!CheckStakeModifierCheckpoints(pindex->nHeight, pindex->nStakeModifierChecksum))
                 return error("CTxDB::LoadBlockIndex() : Failed stake modifier checkpoint height=%d, modifier=0x%016" PRIx64, pindex->nHeight, pindex->nStakeModifier);
+            if ((pindex->nStatus & BLOCK_VALID_MASK) >= BLOCK_VALID_TRANSACTIONS && !(pindex->nStatus & BLOCK_FAILED_MASK))
+                setBlockIndexValid.insert(pindex);
 #ifdef WIN32
             ++nCounter;
             if (0 == (nCounter % nUpdatePeriod))

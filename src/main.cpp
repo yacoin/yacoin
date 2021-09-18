@@ -187,6 +187,7 @@ CBigNum bnBestChainTrust(0);
 CBlockIndex *pindexBestInvalid;
 
 uint256 hashBestChain = 0;
+set<CBlockIndex*, CBlockIndexWorkComparator> setBlockIndexValid; // may contain all CBlockIndex*'s that have validness >=BLOCK_VALID_TRANSACTIONS, and must contain those who aren't failed
 ::int64_t nTimeBestReceived = 0;
 int nScriptCheckThreads = 0;
 

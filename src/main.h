@@ -45,6 +45,7 @@ class CAddress;
 class CInv;
 class CRequestTracker;
 class CNode;
+class CBlockIndexWorkComparator;
 
 //
 // Global state
@@ -124,6 +125,7 @@ extern const ::int64_t
 extern CScript COINBASE_FLAGS;
 extern CCriticalSection cs_main;
 extern std::map<uint256, CBlockIndex*> mapBlockIndex;
+extern std::set<CBlockIndex*, CBlockIndexWorkComparator> setBlockIndexValid;
 extern std::set<std::pair<COutPoint, unsigned int> > setStakeSeen;
 extern unsigned int nNodeLifespan;
 //extern unsigned int nStakeMinAge;
@@ -161,6 +163,24 @@ enum GetMaxSize_mode
     MAX_BLOCK_SIZE,
     MAX_BLOCK_SIZE_GEN,
     MAX_BLOCK_SIGOPS,
+};
+
+enum BlockStatus {
+    BLOCK_VALID_UNKNOWN      =    0,
+    BLOCK_VALID_HEADER       =    1, // parsed, version ok, hash satisfies claimed PoW, 1 <= vtx count <= max, timestamp not in future
+    BLOCK_VALID_TREE         =    2, // parent found, difficulty matches, timestamp >= median previous, checkpoint
+    BLOCK_VALID_TRANSACTIONS =    3, // only first tx is coinbase, 2 <= coinbase input script length <= 100, transactions valid, no duplicate txids, sigops, size, merkle root
+    BLOCK_VALID_CHAIN        =    4, // outputs do not overspend inputs, no double spends, coinbase output ok, immature coinbase spends, BIP30
+    BLOCK_VALID_SCRIPTS      =    5, // scripts/signatures ok
+    BLOCK_VALID_MASK         =    7,
+
+    BLOCK_HAVE_DATA          =    8, // full block available in blk*.dat
+    BLOCK_HAVE_UNDO          =   16, // undo data available in rev*.dat
+    BLOCK_HAVE_MASK          =   24,
+
+    BLOCK_FAILED_VALID       =   32, // stage after last reached validness failed
+    BLOCK_FAILED_CHILD       =   64, // descends from failed block
+    BLOCK_FAILED_MASK        =   96
 };
 
 class CReserveKey;
@@ -1652,6 +1672,8 @@ public:
     ::uint32_t nNonce;
 
     ::uint256 blockHash; // store hash to avoid calculating many times
+    // Verification status of this block. See enum BlockStatus
+    unsigned int nStatus;
 public:
     CBlockIndex()
     {
@@ -1679,6 +1701,7 @@ public:
         nBits          = 0;
         nNonce         = 0;
         blockHash      = 0;
+        nStatus = 0;
     }
 
     CBlockIndex(unsigned int nFileIn, unsigned int nBlockPosIn, CBlock& block)
@@ -1698,6 +1721,7 @@ public:
         nStakeModifier = 0;
         nStakeModifierChecksum = 0;
         hashProofOfStake = 0;
+        nStatus = 0;
         if (block.IsProofOfStake())
         {
             SetProofOfStake();
@@ -1904,6 +1928,7 @@ public:
         READWRITE(nBits);
         READWRITE(nNonce);
         READWRITE(blockHash);
+        READWRITE(nStatus);
     )
 
     uint256 GetBlockHash() const
@@ -1941,11 +1966,18 @@ public:
     }
 };
 
+struct CBlockIndexWorkComparator
+{
+    bool operator()(CBlockIndex *pa, CBlockIndex *pb) {
+        if (pa->bnChainTrust > pb->bnChainTrust) return false;
+        if (pa->bnChainTrust < pb->bnChainTrust) return true;
 
+        if (pa->GetBlockHash() < pb->GetBlockHash()) return false;
+        if (pa->GetBlockHash() > pb->GetBlockHash()) return true;
 
-
-
-
+        return false; // identical blocks
+    }
+};
 
 
 /** Describes a place in the block chain to another node such that if the
