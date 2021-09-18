@@ -1298,7 +1298,7 @@ void CWallet::ReacceptWalletTransactions()
         if (!vMissingTx.empty())
         {
             // TODO: optimize this to scan just part of the block chain?
-            if (ScanForWalletTransactions(pindexGenesisBlock))
+            if (ScanForWalletTransactions(chainActive.Genesis()))
                 fRepeat = true;  // Found missing transactions: re-do re-accept.
         }
     }
@@ -2259,7 +2259,7 @@ bool CWallet::CreateCoinStake(
     // Keep combining coins until 10 times POW reward is reached.
     // Really!  That's news to me.
     ::int64_t
-        nCombineThreshold = GetProofOfWorkReward(GetLastBlockIndex(pindexBest, false)->nBits) * 10;
+        nCombineThreshold = GetProofOfWorkReward(GetLastBlockIndex(chainActive.Tip(), false)->nBits) * 10;
     // Minimum age for coins that will be combined.
     unsigned int 
         nStakeCombineAge = fTestNet? nStakeMinAge: nOneDayInSeconds * 31;   // in seconds??
@@ -3561,8 +3561,8 @@ void CWallet::GetKeyBirthTimes(std::map<CKeyID, int64_t> &mapKeyBirth) const
     }
     // map in which we'll infer heights of other keys
     CBlockIndex                                 // if this is one day in btc? then what for yac??
-      //*pindexMax = FindBlockByHeight(std::max(0, nBestHeight - 144)); // the tip can be reorganised; use a 144-block safety margin
-        *pindexMax = FindBlockByHeight(std::max(0, nBestHeight
+      //*pindexMax = FindBlockByHeight(std::max(0, chainActive.Height() - 144)); // the tip can be reorganised; use a 144-block safety margin
+        *pindexMax = FindBlockByHeight(std::max(0, chainActive.Height()
          - (int)nOnedayOfAverageBlocks)); // the tip can be reorganised; use a 144-block safety margin
 
     std::map<CKeyID, CBlockIndex*> mapKeyFirstBlock;

@@ -242,9 +242,9 @@ namespace Checkpoints
     // Automatically select a suitable sync-checkpoint
     uint256 AutoSelectSyncCheckpoint()
     {
-        const CBlockIndex *pindex = pindexBest;
+        const CBlockIndex *pindex = chainActive.Tip();
         // Search backward for a block within max span and maturity window
-        while (pindex->pprev && (pindex->GetBlockTime() + CHECKPOINT_MAX_SPAN > pindexBest->GetBlockTime() || pindex->nHeight + 8 > pindexBest->nHeight))
+        while (pindex->pprev && (pindex->GetBlockTime() + CHECKPOINT_MAX_SPAN > chainActive.Tip()->GetBlockTime() || pindex->nHeight + 8 > chainActive.Tip()->nHeight))
             pindex = pindex->pprev;
         return pindex->GetBlockHash();
     }
@@ -406,7 +406,7 @@ namespace Checkpoints
         // sync-checkpoint should always be accepted block
         Yassert(mapBlockIndex.count(hashSyncCheckpoint));
         const CBlockIndex* pindexSync = mapBlockIndex[hashSyncCheckpoint];
-        return (nBestHeight >= pindexSync->nHeight + GetCoinbaseMaturity() ||
+        return (chainActive.Height() >= pindexSync->nHeight + GetCoinbaseMaturity() ||
                 pindexSync->GetBlockTime() + nStakeMinAge < GetAdjustedTime());
     }
 }
@@ -448,7 +448,7 @@ bool CSyncCheckpoint::ProcessSyncCheckpoint(CNode* pfrom)
         // Ask this guy to fill in what we're missing
         if (pfrom)
         {
-            pfrom->PushGetBlocks(pindexBest, hashCheckpoint);
+            pfrom->PushGetBlocks(chainActive.Tip(), hashCheckpoint);
             // ask directly as well in case rejected earlier by duplicate
             // proof-of-stake because getblocks may not get it this time
             pfrom->AskFor(CInv(MSG_BLOCK, mapOrphanBlocks.count(hashCheckpoint)? WantedByOrphan(mapOrphanBlocks[hashCheckpoint]) : hashCheckpoint));

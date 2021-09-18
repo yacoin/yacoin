@@ -46,7 +46,6 @@
 class CRequestTracker;
 class CNode;
 class CBlockIndex;
-extern int nBestHeight;
 
 //extern CCriticalSection cs_net;
 

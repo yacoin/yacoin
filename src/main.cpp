@@ -181,14 +181,12 @@ int
 int
     nCoinbaseMaturityAfterHardfork = 6;
 
-CBlockIndex* pindexGenesisBlock = NULL;
-int nBestHeight = -1;
+CChain chainActive;
 
 CBigNum bnBestChainTrust(0);
 CBigNum bnBestInvalidTrust(0);
 
 uint256 hashBestChain = 0;
-CBlockIndex* pindexBest = NULL;
 ::int64_t nTimeBestReceived = 0;
 int nScriptCheckThreads = 0;
 
@@ -496,14 +494,14 @@ bool CheckSequenceLocks(const CTransaction &tx, int flags)
     LOCK2(cs_main, mempool.cs);
 
     CBlockIndex index;
-    index.pprev = pindexBest;
-    // CheckSequenceLocks() uses pindexBest->nHeight+1 to evaluate
+    index.pprev = chainActive.Tip();
+    // CheckSequenceLocks() uses chainActive.Tip()->nHeight+1 to evaluate
     // height based locks because when SequenceLocks() is called within
     // ConnectBlock(), the height of the block *being*
     // evaluated is what is used.
     // Thus if we want to know if a transaction can be part of the
-    // *next* block, we need to use one more than pindexBest->nHeight
-    index.nHeight = pindexBest->nHeight + 1;
+    // *next* block, we need to use one more than chainActive.Tip()->nHeight
+    index.nHeight = chainActive.Tip()->nHeight + 1;
 
     std::vector<int> prevheights;
     prevheights.resize(tx.vin.size());
@@ -514,7 +512,7 @@ bool CheckSequenceLocks(const CTransaction &tx, int flags)
         if (mempool.exists(prevout.COutPointGetHash()))
         {
             // Assume all mempool transaction confirm in the next block
-            prevheights[txinIndex] = pindexBest->nHeight + 1;
+            prevheights[txinIndex] = chainActive.Tip()->nHeight + 1;
         }
         else // Check from txdb
         {
@@ -557,7 +555,7 @@ bool CheckSequenceLocks(const CTransaction &tx, int flags)
 
 int GetCoinbaseMaturity()
 {
-    if (nBestHeight != -1 && pindexGenesisBlock && nBestHeight >= nMainnetNewLogicBlockNumber)
+    if (chainActive.Height() != -1 && chainActive.Genesis() && chainActive.Height() >= nMainnetNewLogicBlockNumber)
     {
         return nCoinbaseMaturityAfterHardfork;
     }
@@ -569,7 +567,7 @@ int GetCoinbaseMaturity()
 
 int GetCoinbaseMaturityOffset()
 {
-    if (nBestHeight != -1 && pindexGenesisBlock && nBestHeight >= nMainnetNewLogicBlockNumber)
+    if (chainActive.Height() != -1 && chainActive.Genesis() && chainActive.Height() >= nMainnetNewLogicBlockNumber)
     {
         return 0;
     }
@@ -581,7 +579,7 @@ int GetCoinbaseMaturityOffset()
 
 bool isHardforkHappened()
 {
-    if (nBestHeight != -1 && pindexGenesisBlock && nBestHeight >= nMainnetNewLogicBlockNumber)
+    if (chainActive.Height() != -1 && chainActive.Genesis() && chainActive.Height() >= nMainnetNewLogicBlockNumber)
     {
         return true;
     }
@@ -871,7 +869,7 @@ int CMerkleTx::SetMerkleBranch(const CBlock* pblock)
     if (!pindex || !pindex->IsInMainChain())
         return 0;
 
-    return pindexBest->nHeight - pindex->nHeight + 1;
+    return chainActive.Tip()->nHeight - pindex->nHeight + 1;
 }
 
 
@@ -1066,7 +1064,7 @@ bool CTxMemPool::accept(CTxDB& txdb, CTransaction &tx, bool fCheckInputs,
                               mapInputs, 
                               mapUnused, 
                               CDiskTxPos(1,1,1), 
-                              pindexBest, 
+                              chainActive.Tip(), 
                               false, 
                               false, 
                               true, 
@@ -1188,7 +1186,7 @@ int CMerkleTx::GetDepthInMainChain(CBlockIndex* &pindexRet) const
     }
 
     pindexRet = pindex;
-    return pindexBest->nHeight - pindex->nHeight + 1;
+    return chainActive.Tip()->nHeight - pindex->nHeight + 1;
 }
 
 
@@ -1266,7 +1264,7 @@ int CTxIndex::GetDepthInMainChain() const
     CBlockIndex* pindex = (*mi).second;
     if (!pindex || !pindex->IsInMainChain())
         return 0;
-    return 1 + nBestHeight - pindex->nHeight;
+    return 1 + chainActive.Height() - pindex->nHeight;
 }
 
 // Return transaction in tx, and if it was found inside a block, its hash is placed in hashBlock
@@ -1313,14 +1311,14 @@ CBlockIndex* FindBlockByHeight(int nHeight)
     CBlockIndex *pblockindex;
     // Check input parameter
     if (nHeight <= 0)
-        return pindexGenesisBlock;
-    if (nHeight >= pindexBest->nHeight)
-        return pindexBest;
+        return chainActive.Genesis();
+    if (nHeight >= chainActive.Tip()->nHeight)
+        return chainActive.Tip();
 
-    if (nHeight < nBestHeight / 2)
-        pblockindex = pindexGenesisBlock;
+    if (nHeight < chainActive.Height() / 2)
+        pblockindex = chainActive.Genesis();
     else
-        pblockindex = pindexBest;
+        pblockindex = chainActive.Tip();
     if (pblockindexFBBHLast && abs(nHeight - pblockindex->nHeight) > abs(nHeight - pblockindexFBBHLast->nHeight))
         pblockindex = pblockindexFBBHLast;
     while (pblockindex->nHeight > nHeight)
@@ -1576,7 +1574,7 @@ CBigNum inline GetProofOfStakeLimit(int nHeight, unsigned int nTime)
 
 // Before hardfork, miner's coin base reward based on nBits
 // After hardfork, calculate coinbase reward based on nHeight. If not specify nHeight, always
-// calculate coinbase reward based on pindexBest->nHeight + 1 (reward of next best block)
+// calculate coinbase reward based on chainActive.Tip()->nHeight + 1 (reward of next best block)
 ::int64_t GetProofOfWorkReward(unsigned int nBits, ::int64_t nFees, unsigned int nHeight)
 {
 #ifdef Yac1dot0
@@ -1588,7 +1586,7 @@ CBigNum inline GetProofOfStakeLimit(int nHeight, unsigned int nTime)
         return (pindexMoneySupplyBlock->nMoneySupply * nInflation / nNumberOfBlocksPerYear);
     }
 
-    if (pindexBest && (pindexBest->nHeight + 1) >= nMainnetNewLogicBlockNumber)
+    if (chainActive.Tip() && (chainActive.Tip()->nHeight + 1) >= nMainnetNewLogicBlockNumber)
     {
         // Get reward of current mining block
         ::int64_t nBlockRewardExcludeFees;
@@ -1596,11 +1594,11 @@ CBigNum inline GetProofOfStakeLimit(int nHeight, unsigned int nTime)
         {
             recalculateBlockReward = false;
             bool reorgToHardforkBlock = false;
-            if (pindexBest->nHeight / nEpochInterval == nMainnetNewLogicBlockNumber / nEpochInterval)
+            if (chainActive.Tip()->nHeight / nEpochInterval == nMainnetNewLogicBlockNumber / nEpochInterval)
             {
                 reorgToHardforkBlock = true;
             }
-            ::int32_t startEpochBlockHeight = (pindexBest->nHeight / nEpochInterval) * nEpochInterval;
+            ::int32_t startEpochBlockHeight = (chainActive.Tip()->nHeight / nEpochInterval) * nEpochInterval;
             ::int32_t moneySupplyBlockHeight =
                 reorgToHardforkBlock ? nMainnetNewLogicBlockNumber - 1 : startEpochBlockHeight - 1;
             const CBlockIndex* pindexMoneySupplyBlock = FindBlockByHeight(moneySupplyBlockHeight);
@@ -1610,11 +1608,11 @@ CBigNum inline GetProofOfStakeLimit(int nHeight, unsigned int nTime)
         else // normal case
         {
             // Default: nEpochInterval = 21000 blocks, recalculated with each epoch
-            if ((pindexBest->nHeight + 1) % nEpochInterval == 0 || (pindexBest->nHeight + 1) == nMainnetNewLogicBlockNumber)
+            if ((chainActive.Tip()->nHeight + 1) % nEpochInterval == 0 || (chainActive.Tip()->nHeight + 1) == nMainnetNewLogicBlockNumber)
             {
                 // recalculated
                 // PoW reward is 2%
-                nBlockRewardExcludeFees = (::int64_t)(pindexBest->nMoneySupply * nInflation / nNumberOfBlocksPerYear);
+                nBlockRewardExcludeFees = (::int64_t)(chainActive.Tip()->nMoneySupply * nInflation / nNumberOfBlocksPerYear);
                 nBlockRewardPrev = nBlockRewardExcludeFees;
             }
             else
@@ -1671,7 +1669,7 @@ CBigNum inline GetProofOfStakeLimit(int nHeight, unsigned int nTime)
 ::uint64_t GetMaxSize(enum GetMaxSize_mode mode)
 {
     ::uint64_t nMaxSize = 0;
-    if (pindexGenesisBlock == NULL || (pindexBest->nHeight + 1) < nMainnetNewLogicBlockNumber)
+    if (chainActive.Genesis() == NULL || (chainActive.Tip()->nHeight + 1) < nMainnetNewLogicBlockNumber)
     {
         nMaxSize = MAX_GENESIS_BLOCK_SIZE;
     }
@@ -1920,7 +1918,7 @@ bool HaveWeSwitchedToNewLogicRules( bool &fUsingOld044Rules )
            fTestNet &&    // may use new rules, ATM only in TestNet
            (
             fTestNetNewLogic &&
-            (nMainnetNewLogicBlockNumber <= nBestHeight)
+            (nMainnetNewLogicBlockNumber <= chainActive.Height())
            )
           )
         {
@@ -2052,7 +2050,7 @@ static unsigned int GetNextTargetRequired044(const CBlockIndex* pindexLast, bool
         nRelativeTargetDelta = (nTarget >> 3);  // i.e. 1/8 of the current target
 
     // Yacoind version 1.0.0
-    if ((pindexBest->nHeight + 1) >= nMainnetNewLogicBlockNumber)
+    if ((chainActive.Tip()->nHeight + 1) >= nMainnetNewLogicBlockNumber)
     {
         // COMMENT THIS BLOCK CODE OUT , WE MAY USE IT IN CASE OF AN EMERGENCY HARDFORK
 //        const ::int64_t
@@ -2062,7 +2060,7 @@ static unsigned int GetNextTargetRequired044(const CBlockIndex* pindexLast, bool
         if (recalculateMinEase)
         {
             recalculateMinEase = false;
-            ::int32_t currentEpochNumber = pindexBest->nHeight / nEpochInterval;
+            ::int32_t currentEpochNumber = chainActive.Tip()->nHeight / nEpochInterval;
             ::int32_t firstEpochNumberSinceHardfork = nMainnetNewLogicBlockNumber / nEpochInterval;
             ::uint32_t tempMinEase = bnEasiestTargetLimit.GetCompact();
             for (int i = firstEpochNumberSinceHardfork; i < currentEpochNumber; i++)
@@ -2457,19 +2455,19 @@ bool IsInitialBlockDownload()
         fIsIBD = true;      // presume still downloading blocks
 
     if (
-        pindexBest == NULL || 
-        (nBestHeight < Checkpoints::GetTotalBlocksEstimate())
+        chainActive.Tip() == NULL || 
+        (chainActive.Height() < Checkpoints::GetTotalBlocksEstimate())
        )
         return fIsIBD;
 
     fIsIBD = false;         // presume downloading blocks is done
     if( 
-        (0 == nBestHeight) 
+        (0 == chainActive.Height()) 
       )
         return fIsIBD;
 
     ::int64_t
-        nTimeOfBestBlockInSeconds = pindexBest->GetBlockTime(),
+        nTimeOfBestBlockInSeconds = chainActive.Tip()->GetBlockTime(),
         nCurrentTime = GetTime();
 
     const ::int64_t 
@@ -2496,16 +2494,16 @@ bool IsInitialBlockDownload()
             nLastUpdate;
         static CBlockIndex
             * pindexLastBest;
-        if (pindexBest != pindexLastBest)   // we just got a new block
+        if (chainActive.Tip() != pindexLastBest)   // we just got a new block
         {                           // first time through, we set the values
-            pindexLastBest = pindexBest;
+            pindexLastBest = chainActive.Tip();
             nLastUpdate = GetTime();
         }
         //else  // nLastUpdate gets older & older
         fIsBestBlockYoungEnough =
               !(
                 ((GetTime() - nLastUpdate) < nTenSeconds) && // < 10 seconds between calls?
-                (pindexBest->GetBlockTime() < (GetTime() - nOneDayInSeconds)) // block is > 1 day old
+                (chainActive.Tip()->GetBlockTime() < (GetTime() - nOneDayInSeconds)) // block is > 1 day old
                );                                   // we take this to mean still IBD, I think???
     }
     //else  // fIsBestBlockYoungEnough is true, meaning done with IBD
@@ -2524,17 +2522,17 @@ void static InvalidChainFound(CBlockIndex* pindexNew)
     }
 
     CBigNum bnBestInvalidBlockTrust = pindexNew->bnChainTrust - pindexNew->pprev->bnChainTrust;
-    CBigNum bnBestBlockTrust = pindexBest->nHeight != 0 ? (pindexBest->bnChainTrust - pindexBest->pprev->bnChainTrust) : pindexBest->bnChainTrust;
+    CBigNum bnBestBlockTrust = chainActive.Tip()->nHeight != 0 ? (chainActive.Tip()->bnChainTrust - chainActive.Tip()->pprev->bnChainTrust) : chainActive.Tip()->bnChainTrust;
 
     printf("InvalidChainFound: invalid block=%s  height=%d  trust=%s  blocktrust=%" PRId64 "  date=%s\n",
       pindexNew->GetBlockHash().ToString().substr(0,20).c_str(), pindexNew->nHeight,
       (pindexNew->bnChainTrust).ToString().c_str(), bnBestInvalidBlockTrust.getuint64(),
       DateTimeStrFormat("%x %H:%M:%S", pindexNew->GetBlockTime()).c_str());
     printf("InvalidChainFound:  current best=%s  height=%d  trust=%s  blocktrust=%" PRId64 "  date=%s\n",
-      hashBestChain.ToString().substr(0,20).c_str(), nBestHeight,
-      (pindexBest->bnChainTrust).ToString().c_str(),
+      hashBestChain.ToString().substr(0,20).c_str(), chainActive.Height(),
+      (chainActive.Tip()->bnChainTrust).ToString().c_str(),
       bnBestBlockTrust.getuint64(),
-      DateTimeStrFormat("%x %H:%M:%S", pindexBest->GetBlockTime()).c_str());
+      DateTimeStrFormat("%x %H:%M:%S", chainActive.Tip()->GetBlockTime()).c_str());
 }
 
 
@@ -2783,7 +2781,7 @@ bool CTransaction::ConnectInputs(
             {
                 // Fix off-by-one error in coinbase maturity check after hardfork
                 int coinbaseMaturityOffset = 0;
-                if (nBestHeight != -1 && pindexGenesisBlock && nBestHeight >= nMainnetNewLogicBlockNumber)
+                if (chainActive.Height() != -1 && chainActive.Genesis() && chainActive.Height() >= nMainnetNewLogicBlockNumber)
                 {
                     coinbaseMaturityOffset = 1;
                 }
@@ -3052,6 +3050,7 @@ bool CBlock::ConnectBlock(CTxDB& txdb, CBlockIndex* pindex, bool fJustCheck)
     ::int64_t nValueIn = 0;
     ::int64_t nValueOut = 0;
     unsigned int nSigOps = 0;
+    // Iterate through all transaction to check double spent, connect inputs
     BOOST_FOREACH(CTransaction& tx, vtx)
     {
         uint256 hashTx = tx.GetHash();
@@ -3228,7 +3227,7 @@ bool static Reorganize(CTxDB& txdb, CBlockIndex* pindexNew)
     printf("REORGANIZE\n");
 
     // Find the fork
-    CBlockIndex* pfork = pindexBest;
+    CBlockIndex* pfork = chainActive.Tip();
     CBlockIndex* plonger = pindexNew;
     while (pfork != plonger)
     {
@@ -3244,16 +3243,16 @@ bool static Reorganize(CTxDB& txdb, CBlockIndex* pindexNew)
 
     // List of what to disconnect
     vector<CBlockIndex*> vDisconnect;
-    for (CBlockIndex* pindex = pindexBest; pindex != pfork; pindex = pindex->pprev)
+    for (CBlockIndex* pindex = chainActive.Tip(); pindex != pfork; pindex = pindex->pprev)
         vDisconnect.push_back(pindex);
 
     // Not allow to reorg back to blocks which before last checkpoint
     CBlockIndex* pcheckpoint = Checkpoints::GetLastCheckpoint(mapBlockIndex);
-    if (pindexBest->nHeight - vDisconnect.size() < pcheckpoint->nHeight)
+    if (chainActive.Tip()->nHeight - vDisconnect.size() < pcheckpoint->nHeight)
     {
         return error(
                 "Reorganize() : Not allow to reorg back to blocks before last checkpoint, current best height = %d, last checkpoint height = %d, number of reorg blocks = %d",
-                pindexBest->nHeight, pcheckpoint->nHeight, vDisconnect.size());
+                chainActive.Tip()->nHeight, pcheckpoint->nHeight, vDisconnect.size());
     }
 
     // List of what to connect
@@ -3262,7 +3261,7 @@ bool static Reorganize(CTxDB& txdb, CBlockIndex* pindexNew)
         vConnect.push_back(pindex);
     reverse(vConnect.begin(), vConnect.end());
 
-    printf("REORGANIZE: Disconnect %" PRIszu " blocks; %s..%s\n", vDisconnect.size(), pfork->GetBlockHash().ToString().substr(0,20).c_str(), pindexBest->GetBlockHash().ToString().substr(0,20).c_str());
+    printf("REORGANIZE: Disconnect %" PRIszu " blocks; %s..%s\n", vDisconnect.size(), pfork->GetBlockHash().ToString().substr(0,20).c_str(), chainActive.Tip()->GetBlockHash().ToString().substr(0,20).c_str());
     printf("REORGANIZE: Connect %" PRIszu " blocks; %s..%s\n", vConnect.size(), pfork->GetBlockHash().ToString().substr(0,20).c_str(), pindexNew->GetBlockHash().ToString().substr(0,20).c_str());
 
     // Disconnect shorter branch
@@ -3365,14 +3364,14 @@ bool CBlock::SetBestChain(CTxDB& txdb, CBlockIndex* pindexNew)
         return error("SetBestChain () : TxnBegin failed");
 
     if (
-        (pindexGenesisBlock == NULL) && 
+        (chainActive.Genesis() == NULL) && 
         (hash == (!fTestNet ? hashGenesisBlock : hashGenesisBlockTestNet))
        )
     {
         txdb.WriteHashBestChain(hash);
         if (!txdb.TxnCommit())
             return error("SetBestChain () : TxnCommit failed");
-        pindexGenesisBlock = pindexNew;
+        chainActive.SetTip(pindexNew);
     }
     else if (hashPrevBlock == hashBestChain)
     {
@@ -3391,7 +3390,7 @@ bool CBlock::SetBestChain(CTxDB& txdb, CBlockIndex* pindexNew)
         // Try to limit how much needs to be done inside
         while (
                 pindexIntermediate->pprev && 
-                pindexIntermediate->pprev->bnChainTrust > pindexBest->bnChainTrust
+                pindexIntermediate->pprev->bnChainTrust > chainActive.Tip()->bnChainTrust
               )
         {
             vpindexSecondary.push_back(pindexIntermediate);
@@ -3442,21 +3441,20 @@ bool CBlock::SetBestChain(CTxDB& txdb, CBlockIndex* pindexNew)
     // New best block
     hashBestChain = hash;
     pblockindexFBBHLast = NULL;
-    pindexBest = pindexNew;
     // Reorg through two or many epochs
-    if ((abs(nBestHeight - pindexBest->nHeight) >= 2) &&
-        (abs((::int32_t)(nBestHeight / nEpochInterval) - (::int32_t)(pindexBest->nHeight / nEpochInterval)) >= 1))
+    if ((abs(chainActive.Tip()->nHeight - pindexNew->nHeight) >= 2) &&
+        (abs((::int32_t)(chainActive.Height() / nEpochInterval) - (::int32_t)(pindexNew->nHeight / nEpochInterval)) >= 1))
     {
         recalculateBlockReward = true;
         recalculateMinEase = true;
     }
     // Update minimum ease for next target calculation
-    if ((pindexBest->nHeight >= nMainnetNewLogicBlockNumber)
-        && (nMinEase > pindexBest->nBits))
+    if ((pindexNew->nHeight >= nMainnetNewLogicBlockNumber)
+        && (nMinEase > pindexNew->nBits))
     {
-        nMinEase = pindexBest->nBits;
+        nMinEase = pindexNew->nBits;
     }
-    nBestHeight = pindexBest->nHeight;
+    chainActive.SetTip(pindexNew);
 
     // good place to test for new logic
     (void)HaveWeSwitchedToNewLogicRules( fUseOld044Rules );
@@ -3466,17 +3464,17 @@ bool CBlock::SetBestChain(CTxDB& txdb, CBlockIndex* pindexNew)
     nTransactionsUpdated++;
 
     CBigNum bnBestBlockTrust = 
-        (pindexBest->nHeight != 0)? 
-        (pindexBest->bnChainTrust - pindexBest->pprev->bnChainTrust):
-        pindexBest->bnChainTrust;
+        (chainActive.Tip()->nHeight != 0)? 
+        (chainActive.Tip()->bnChainTrust - chainActive.Tip()->pprev->bnChainTrust):
+        chainActive.Tip()->bnChainTrust;
 
     printf(
             "SetBestChain: new best=%s height=%d trust=%s\nblocktrust=%" PRId64 "  date=%s\n",
-            hashBestChain.ToString().substr(0,20).c_str(), nBestHeight,
+            hashBestChain.ToString().substr(0,20).c_str(), chainActive.Height(),
             bnBestChainTrust.ToString().c_str(),
             bnBestBlockTrust.getuint64(),
             DateTimeStrFormat("%x %H:%M:%S", 
-            pindexBest->GetBlockTime()).c_str()
+            chainActive.Tip()->GetBlockTime()).c_str()
           );
 #ifdef QT_GUI
     //uiInterface.NotifyBlocksChanged();
@@ -3486,7 +3484,7 @@ bool CBlock::SetBestChain(CTxDB& txdb, CBlockIndex* pindexNew)
     if (!fIsInitialDownload)
     {
         int nUpgraded = 0;
-        const CBlockIndex* pindex = pindexBest;
+        const CBlockIndex* pindex = chainActive.Tip();
         for (int i = 0; i < 100 && pindex != NULL; ++i)
         {
             // TODO: Temporary fix to avoid warning for yacoind 1.0.0. Because in yacoind 1.0.0, there are two times
@@ -3514,6 +3512,77 @@ bool CBlock::SetBestChain(CTxDB& txdb, CBlockIndex* pindexNew)
     }
 
     return true;
+}
+
+//////////////////////////////////////////////////////////////////////////////
+//
+// CChain implementation
+//
+/** Efficiently check whether a block is present in this chain. */
+bool CChain::Contains(const CBlockIndex *pindex) const {
+    return (*this)[pindex->nHeight] == pindex;
+}
+
+/** Find the successor of a block in this chain, or NULL if the given index is not found or is the tip. */
+CBlockIndex *CChain::Next(const CBlockIndex *pindex) const {
+    if (Contains(pindex))
+        return (*this)[pindex->nHeight + 1];
+    else
+        return NULL;
+}
+
+CBlockIndex *CChain::SetTip(CBlockIndex *pindex) {
+    if (pindex == NULL) {
+        vChain.clear();
+        return NULL;
+    }
+    vChain.resize(pindex->nHeight + 1);
+    while (pindex && vChain[pindex->nHeight] != pindex) {
+        vChain[pindex->nHeight] = pindex;
+        pindex = pindex->pprev;
+    }
+    return pindex;
+}
+
+CBlockLocator CChain::GetLocator(const CBlockIndex *pindex) const {
+    int nStep = 1;
+    std::vector<uint256> vHave;
+    vHave.reserve(32);
+
+    if (!pindex)
+        pindex = Tip();
+    while (pindex) {
+        vHave.push_back(pindex->GetBlockHash());
+        // Stop when we have added the genesis block.
+        if (pindex->nHeight == 0)
+            break;
+        // Exponentially larger steps back, plus the genesis block.
+        int nHeight = std::max(pindex->nHeight - nStep, 0);
+        // In case pindex is not in this chain, iterate pindex->pprev to find blocks.
+        while (pindex->nHeight > nHeight && !Contains(pindex))
+            pindex = pindex->pprev;
+        // If pindex is in this chain, use direct height-based access.
+        if (pindex->nHeight > nHeight)
+            pindex = (*this)[nHeight];
+        if (vHave.size() > 10)
+            nStep *= 2;
+    }
+
+    return CBlockLocator(vHave);
+}
+
+CBlockIndex *CChain::FindFork(const CBlockLocator &locator) const {
+    // Find the first block the caller has in the main chain
+    BOOST_FOREACH(const uint256& hash, locator.vHave) {
+        std::map<uint256, CBlockIndex*>::iterator mi = mapBlockIndex.find(hash);
+        if (mi != mapBlockIndex.end())
+        {
+            CBlockIndex* pindex = (*mi).second;
+            if (Contains(pindex))
+                return pindex;
+        }
+    }
+    return Genesis();
 }
 
 // ppcoin: total coin age spent in transaction, in the unit of coin-days.
@@ -3629,7 +3698,7 @@ bool CBlock::AddToBlockIndex(unsigned int nFile, unsigned int nBlockPos)
         pindexNew->hashProofOfStake = mapProofOfStake[hash];
     }
 
-    if (!pindexBest || (pindexBest->nHeight + 1) < nMainnetNewLogicBlockNumber)
+    if (!chainActive.Tip() || (chainActive.Tip()->nHeight + 1) < nMainnetNewLogicBlockNumber)
     {
         // ppcoin: compute stake modifier
         ::uint64_t nStakeModifier = 0;
@@ -3669,7 +3738,7 @@ bool CBlock::AddToBlockIndex(unsigned int nFile, unsigned int nBlockPos)
         if (!SetBestChain(txdb, pindexNew))
             return false;
 
-    if (pindexNew == pindexBest)
+    if (pindexNew == chainActive.Tip())
     {
         // Notify UI to display prev block's coinbase if it was ours
         static uint256 hashPrevBestCoinBase;
@@ -3930,7 +3999,7 @@ bool CBlock::AcceptBlock()
         LOCK(cs_vNodes);
         BOOST_FOREACH(CNode* pnode, vNodes)
             if (
-                nBestHeight > (
+                chainActive.Height() > (
                 (pnode->nStartingHeight != -1) ? 
                 pnode->nStartingHeight - 2000 : 
                 nBlockEstimate )
@@ -3939,7 +4008,7 @@ bool CBlock::AcceptBlock()
     }}
 
     // ppcoin: check pending sync-checkpoint
-    if (nBestHeight < nMainnetNewLogicBlockNumber)
+    if (chainActive.Height() < nMainnetNewLogicBlockNumber)
     {
         Checkpoints::AcceptPendingSyncCheckpoint();
     }
@@ -4179,7 +4248,7 @@ bool ProcessBlock(CNode* pfrom, CBlock* pblock)
     }
 
     CBlockIndex* pcheckpoint;
-    if (nBestHeight >= nMainnetNewLogicBlockNumber)
+    if (chainActive.Height() >= nMainnetNewLogicBlockNumber)
     {
         pcheckpoint = Checkpoints::GetLastSyncCheckpoint();
     }
@@ -4189,7 +4258,7 @@ bool ProcessBlock(CNode* pfrom, CBlock* pblock)
     }
 
     if (pcheckpoint && pblock->hashPrevBlock != hashBestChain
-            && ((nBestHeight >= nMainnetNewLogicBlockNumber)
+            && ((chainActive.Height() >= nMainnetNewLogicBlockNumber)
                     || !Checkpoints::WantedByPendingSyncCheckpoint(hash))) {
         // Extra checks to prevent "fill up memory by spamming with bogus blocks"
         ::int64_t 
@@ -4242,7 +4311,7 @@ bool ProcessBlock(CNode* pfrom, CBlock* pblock)
     }
 
     // ppcoin: ask for pending sync-checkpoint if any
-    if (!IsInitialBlockDownload() && nBestHeight < nMainnetNewLogicBlockNumber)
+    if (!IsInitialBlockDownload() && chainActive.Height() < nMainnetNewLogicBlockNumber)
         Checkpoints::AskForPendingSyncCheckpoint(pfrom);
 
     // If don't already have its previous block, shunt it off to holding area until we get it
@@ -4269,7 +4338,7 @@ bool ProcessBlock(CNode* pfrom, CBlock* pblock)
         // Ask this guy to fill in what we're missing
         if (pfrom)
         {
-            pfrom->PushGetBlocks(pindexBest, GetOrphanRoot(pblock2));
+            pfrom->PushGetBlocks(chainActive.Tip(), GetOrphanRoot(pblock2));
             // ppcoin: getblocks may not obtain the ancestor block rejected
             // earlier by duplicate-stake check so we ask for it again directly
             if (!IsInitialBlockDownload())
@@ -4309,7 +4378,7 @@ bool ProcessBlock(CNode* pfrom, CBlock* pblock)
     printf("ProcessBlock: ACCEPTED %s BLOCK\n", pblock->IsProofOfStake()?"POS":"POW");
 
     // ppcoin: if responsible for sync-checkpoint send it
-    if (nBestHeight < nMainnetNewLogicBlockNumber && pfrom && !CSyncCheckpoint::strMasterPrivKey.empty())
+    if (chainActive.Height() < nMainnetNewLogicBlockNumber && pfrom && !CSyncCheckpoint::strMasterPrivKey.empty())
         Checkpoints::SendSyncCheckpoint(Checkpoints::AutoSelectSyncCheckpoint());
 #ifdef QT_GUI
     //uiInterface.NotifyBlocksChanged();
@@ -4434,16 +4503,16 @@ bool CBlock::SignBlock(CWallet& wallet)
         {
             if (
                 txCoinStake.nTime >= max(
-                                         pindexBest->GetMedianTimePast() + 1, 
-                                         PastDrift( pindexBest->GetBlockTime() )
+                                         chainActive.Tip()->GetMedianTimePast() + 1, 
+                                         PastDrift( chainActive.Tip()->GetBlockTime() )
                                         )
                )
             {
                 // make sure coinstake would meet timestamp protocol
                 //    as it would be the same as the block timestamp
                 vtx[0].nTime = nTime = txCoinStake.nTime;
-                nTime = max(pindexBest->GetMedianTimePast()+1, GetMaxTransactionTime());
-                nTime = max(GetBlockTime(), PastDrift(pindexBest->GetBlockTime()));
+                nTime = max(chainActive.Tip()->GetMedianTimePast()+1, GetMaxTransactionTime());
+                nTime = max(GetBlockTime(), PastDrift(chainActive.Tip()->GetBlockTime()));
 
                 // we have to make sure that we have no future timestamps in
                 //    our transactions set
@@ -4616,12 +4685,10 @@ void UnloadBlockIndex()
 {
     mapBlockIndex.clear();
     setStakeSeen.clear();
-    pindexGenesisBlock = NULL;
-    nBestHeight = 0;
     bnBestChainTrust = CBigNum(0);
     bnBestInvalidTrust = CBigNum(0);
     hashBestChain = 0;
-    pindexBest = NULL;
+    chainActive.SetTip(NULL);
 }
 
 bool LoadBlockIndex(bool fAllowNew)
@@ -4876,7 +4943,7 @@ void PrintBlockTree()
     }
 
     vector<pair<int, CBlockIndex*> > vStack;
-    vStack.push_back(make_pair(0, pindexGenesisBlock));
+    vStack.push_back(make_pair(0, chainActive.Genesis()));
 
     int nPrevCol = 0;
     while (!vStack.empty())
@@ -5297,8 +5364,8 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
         if (
             !pfrom->fClient && 
             !pfrom->fOneShot &&
-          //(pfrom->nStartingHeight > (nBestHeight - 144)) &&   // this is probably Bitcoin???, so
-            (pfrom->nStartingHeight > (nBestHeight - (int)nOnedayOfAverageBlocks)) 
+          //(pfrom->nStartingHeight > (chainActive.Height() - 144)) &&   // this is probably Bitcoin???, so
+            (pfrom->nStartingHeight > (chainActive.Height() - (int)nOnedayOfAverageBlocks)) 
             // this is unneccessary since nodeis known to be >= 60006, see l. 3605
             //&&
             //(
@@ -5312,7 +5379,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
            )
         {
             ++nAskedForBlocks;
-            pfrom->PushGetBlocks(pindexBest, uint256(0));   // why the 0 hash, I wonder?
+            pfrom->PushGetBlocks(chainActive.Tip(), uint256(0));   // why the 0 hash, I wonder?
         }
 
         // Relay alerts
@@ -5342,7 +5409,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
         cPeerBlockCounts.input(pfrom->nStartingHeight);
 
         // ppcoin: ask for pending sync-checkpoint if any
-        if (!IsInitialBlockDownload() && nBestHeight < nMainnetNewLogicBlockNumber)
+        if (!IsInitialBlockDownload() && chainActive.Height() < nMainnetNewLogicBlockNumber)
             Checkpoints::AskForPendingSyncCheckpoint(pfrom);
     }
 
@@ -5535,7 +5602,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
                     mapOrphanBlocks.count(inv.hash)     // & it's an orphan
                    ) 
                 {                                       // and what does this intend?
-                    pfrom->PushGetBlocks(pindexBest, GetOrphanRoot(mapOrphanBlocks[inv.hash]));
+                    pfrom->PushGetBlocks(chainActive.Tip(), GetOrphanRoot(mapOrphanBlocks[inv.hash]));
                 } 
                 else        // it's a Tx or it's not an orphan block
                 {
@@ -5610,7 +5677,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
                             vInv;
 
                         vInv.push_back(CInv(MSG_BLOCK, 
-                                            GetLastBlockIndex(pindexBest, false)->GetBlockHash()
+                                            GetLastBlockIndex(chainActive.Tip(), false)->GetBlockHash()
                                            )
                                       );
                         pfrom->PushMessage("inv", vInv);
@@ -5702,7 +5769,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
                 // without risk being rejected due to stake connection check
                 if (
                     (hashStop != hashBestChain) && 
-                    ((pindex->GetBlockTime() + nStakeMinAge) > pindexBest->GetBlockTime())
+                    ((pindex->GetBlockTime() + nStakeMinAge) > chainActive.Tip()->GetBlockTime())
                    )
                     pfrom->PushInventory(CInv(MSG_BLOCK, hashBestChain));
                 break;
@@ -5730,7 +5797,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
     //_________________________________________________________________________
     // rx'ed a checkpoint relay request?
 
-    else if (strCommand == "checkpoint" && nBestHeight < nMainnetNewLogicBlockNumber)
+    else if (strCommand == "checkpoint" && chainActive.Height() < nMainnetNewLogicBlockNumber)
     {
         CSyncCheckpoint checkpoint;
         vRecv >> checkpoint;
@@ -6286,7 +6353,7 @@ void SendMessages(CNode* pto, bool fSendTrickle)
         if (pto->fStartSync) 
         {
             pto->fStartSync = false;
-            pto->PushGetBlocks(pindexBest, uint256(0));  // what is the 0 here represent, if anything?
+            pto->PushGetBlocks(chainActive.Tip(), uint256(0));  // what is the 0 here represent, if anything?
         }
 *****************/
         // Resend wallet transactions that haven't gotten in a block yet

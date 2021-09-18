@@ -213,18 +213,17 @@ bool CTxDB::LoadBlockIndex()
     // Load hashBestChain pointer to end of best chain
     if (!ReadHashBestChain(hashBestChain))
     {
-        if (pindexGenesisBlock == NULL)
+        if (chainActive.Genesis() == NULL)
             return true;
         return error("CTxDB::LoadBlockIndex() : hashBestChain not loaded");
     }
     if (!mapBlockIndex.count(hashBestChain))
         return error("CTxDB::LoadBlockIndex() : hashBestChain not found in the block index");
-    pindexBest = mapBlockIndex[hashBestChain];
-    nBestHeight = pindexBest->nHeight;
-    bnBestChainTrust = pindexBest->bnChainTrust;
+    chainActive.SetTip(mapBlockIndex[hashBestChain]);
+    bnBestChainTrust = chainActive.Tip()->bnChainTrust;
     printf("LoadBlockIndex(): hashBestChain=%s  height=%d  trust=%s  date=%s\n",
-      hashBestChain.ToString().substr(0,20).c_str(), nBestHeight, bnBestChainTrust.ToString().c_str(),
-      DateTimeStrFormat("%x %H:%M:%S", pindexBest->GetBlockTime()).c_str());
+      hashBestChain.ToString().substr(0,20).c_str(), chainActive.Height(), bnBestChainTrust.ToString().c_str(),
+      DateTimeStrFormat("%x %H:%M:%S", chainActive.Tip()->GetBlockTime()).c_str());
 
     // ppcoin: load hashSyncCheckpoint
     if (!ReadSyncCheckpoint(Checkpoints::hashSyncCheckpoint))
@@ -239,14 +238,14 @@ bool CTxDB::LoadBlockIndex()
     int nCheckDepth = GetArg( "-checkblocks", 750);
     if (nCheckDepth == 0)
         nCheckDepth = 1000000000; // suffices until the year 19000
-    if (nCheckDepth > nBestHeight)
-        nCheckDepth = nBestHeight;
+    if (nCheckDepth > chainActive.Height())
+        nCheckDepth = chainActive.Height();
     printf("Verifying last %i blocks at level %i\n", nCheckDepth, nCheckLevel);
     CBlockIndex* pindexFork = NULL;
     map<pair<unsigned int, unsigned int>, CBlockIndex*> mapBlockPos;
-    for (CBlockIndex* pindex = pindexBest; pindex && pindex->pprev; pindex = pindex->pprev)
+    for (CBlockIndex* pindex = chainActive.Tip(); pindex && pindex->pprev; pindex = pindex->pprev)
     {
-        if (fRequestShutdown || pindex->nHeight < nBestHeight-nCheckDepth)
+        if (fRequestShutdown || pindex->nHeight < chainActive.Height()-nCheckDepth)
             break;
         CBlock block;
         if (!block.ReadFromDisk(pindex))
@@ -425,8 +424,8 @@ bool CTxDB::LoadBlockIndexGuts()
             pindexNew->nNonce         = diskindex.nNonce;
 
             // Watch for genesis block
-            if (pindexGenesisBlock == NULL && blockHash == (!fTestNet ? hashGenesisBlock : hashGenesisBlockTestNet))
-                pindexGenesisBlock = pindexNew;
+            if (chainActive.Genesis() == NULL && blockHash == (!fTestNet ? hashGenesisBlock : hashGenesisBlockTestNet))
+                chainActive.SetTip(pindexNew);
 
             if (!pindexNew->CheckIndex())
                 return error("LoadBlockIndex() : CheckIndex failed at %d", pindexNew->nHeight);

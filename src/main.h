@@ -125,15 +125,12 @@ extern CScript COINBASE_FLAGS;
 extern CCriticalSection cs_main;
 extern std::map<uint256, CBlockIndex*> mapBlockIndex;
 extern std::set<std::pair<COutPoint, unsigned int> > setStakeSeen;
-extern CBlockIndex* pindexGenesisBlock;
 extern unsigned int nNodeLifespan;
 //extern unsigned int nStakeMinAge;
 extern int nCoinbaseMaturity;
-extern int nBestHeight;
 extern CBigNum bnBestChainTrust;
 extern CBigNum bnBestInvalidTrust;
 extern uint256 hashBestChain;
-extern CBlockIndex* pindexBest;
 extern unsigned int nTransactionsUpdated;
 extern ::uint64_t nLastBlockTx;
 extern ::uint64_t nLastBlockSize;
@@ -170,6 +167,58 @@ class CReserveKey;
 class CTxDB;
 class CTxIndex;
 class CScriptCheck;
+class CBlockLocator;
+/** The currently-connected chain of blocks. */
+/** An in-memory indexed chain of blocks. */
+class CChain {
+private:
+    std::vector<CBlockIndex*> vChain;
+
+public:
+    /** Returns the index entry for the genesis block of this chain, or NULL if none. */
+    CBlockIndex *Genesis() const {
+        return vChain.size() > 0 ? vChain[0] : NULL;
+    }
+
+    /** Returns the index entry for the tip of this chain, or NULL if none. */
+    CBlockIndex *Tip() const {
+        return vChain.size() > 0 ? vChain[vChain.size() - 1] : NULL;
+    }
+
+    /** Returns the index entry at a particular height in this chain, or NULL if no such height exists. */
+    CBlockIndex *operator[](int nHeight) const {
+        if (nHeight < 0 || nHeight >= (int)vChain.size())
+            return NULL;
+        return vChain[nHeight];
+    }
+
+    /** Compare two chains efficiently. */
+    friend bool operator==(const CChain &a, const CChain &b) {
+        return a.vChain.size() == b.vChain.size() &&
+               a.vChain[a.vChain.size() - 1] == b.vChain[b.vChain.size() - 1];
+    }
+
+    /** Efficiently check whether a block is present in this chain. */
+    bool Contains(const CBlockIndex *pindex) const;
+
+    /** Find the successor of a block in this chain, or NULL if the given index is not found or is the tip. */
+    CBlockIndex *Next(const CBlockIndex *pindex) const;
+
+    /** Return the maximal height in the chain. Is equal to chain.Tip() ? chain.Tip()->nHeight : -1. */
+    int Height() const {
+        return vChain.size() - 1;
+    }
+
+    /** Set/initialize a chain with a given tip. Returns the forking point. */
+    CBlockIndex *SetTip(CBlockIndex *pindex);
+
+    /** Return a CBlockLocator that refers to a block in this chain (by default the tip). */
+    CBlockLocator GetLocator(const CBlockIndex *pindex = NULL) const;
+
+    /** Find the last common block between this chain and a locator. */
+    CBlockIndex *FindFork(const CBlockLocator &locator) const;
+};
+extern CChain chainActive;
 
 void RegisterWallet(CWallet* pwalletIn);
 void UnregisterWallet(CWallet* pwalletIn);
@@ -625,7 +674,7 @@ public:
     void SetNull()
     {
         // TODO: Need update for mainet
-        if (nBestHeight != -1 && pindexGenesisBlock && (nBestHeight + 1) >= nMainnetNewLogicBlockNumber)
+        if (chainActive.Height() != -1 && chainActive.Genesis() && (chainActive.Height() + 1) >= nMainnetNewLogicBlockNumber)
         {
             nVersion = CTransaction::CURRENT_VERSION_of_Tx_for_yac_new;
         }
@@ -688,7 +737,7 @@ public:
         if (nLockTime == 0)
             return true;
         if (nBlockHeight == 0)
-            nBlockHeight = nBestHeight + 1;
+            nBlockHeight = chainActive.Height() + 1;
         if (nBlockTime == 0)
             nBlockTime = GetAdjustedTime();
         if ((::int64_t)nLockTime < ((::int64_t)nLockTime < LOCKTIME_THRESHOLD ? (::int64_t)nBlockHeight : nBlockTime))
@@ -1159,7 +1208,7 @@ public:
     void SetNull()
     {
         // TODO: Need update for mainnet
-        if (nBestHeight != -1 && pindexGenesisBlock && (nBestHeight + 1) >= nMainnetNewLogicBlockNumber)
+        if (chainActive.Height() != -1 && chainActive.Genesis() && (chainActive.Height() + 1) >= nMainnetNewLogicBlockNumber)
         {
             nVersion = VERSION_of_block_for_yac_05x_new;
         }
@@ -1469,7 +1518,7 @@ public:
 
         // Flush stdio buffers and commit to disk before returning
         fflush(fileout);
-        if (!IsInitialBlockDownload() || (nBestHeight+1) % 500 == 0)
+        if (!IsInitialBlockDownload() || (chainActive.Height()+1) % 500 == 0)
             FileCommit(fileout);
 
         return true;
@@ -1700,7 +1749,7 @@ public:
 
     bool IsInMainChain() const
     {
-        return (pnext || this == pindexBest);
+        return (pnext || this == chainActive.Tip());
     }
 
     bool CheckIndex() const
@@ -1905,9 +1954,8 @@ public:
  */
 class CBlockLocator
 {
-protected:
-    std::vector<uint256> vHave;
 public:
+    std::vector<uint256> vHave;
 
     CBlockLocator()
     {
@@ -1998,7 +2046,7 @@ public:
                     return pindex;
             }
         }
-        return pindexGenesisBlock;
+        return chainActive.Genesis();
     }
 
     uint256 GetBlockHash()

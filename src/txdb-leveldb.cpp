@@ -600,7 +600,7 @@ bool CTxDB::LoadBlockIndex()
         // Watch for genesis block
         if( 
             (0 == diskindex.nHeight) &&
-            (NULL != pindexGenesisBlock)
+            (NULL != chainActive.Genesis())
            )
         {
             if (fPrintToConsole)
@@ -612,12 +612,12 @@ bool CTxDB::LoadBlockIndex()
         }
         if (
             (0 == diskindex.nHeight) &&     // ought to be faster than a hash check!?
-            (NULL == pindexGenesisBlock)
+            (NULL == chainActive.Genesis())
            )
         {
             if (blockHash == (!fTestNet ? hashGenesisBlock : hashGenesisBlockTestNet))// check anyway, but only if block 0
             {
-                pindexGenesisBlock = pindexNew;
+                chainActive.SetTip(pindexNew);
                 /*************
 #ifdef WIN32
                 if (fPrintToConsole)
@@ -644,7 +644,7 @@ bool CTxDB::LoadBlockIndex()
         else
         {
             if(
-                (NULL != pindexGenesisBlock) && 
+                (NULL != chainActive.Genesis()) && 
                 (0 == diskindex.nHeight) 
               )
             {
@@ -887,19 +887,18 @@ bool CTxDB::LoadBlockIndex()
     // Load hashBestChain pointer to end of best chain
     if (!ReadHashBestChain(hashBestChain))
     {
-        if (pindexGenesisBlock == NULL)
+        if (chainActive.Genesis() == NULL)
             return true;
         return error("CTxDB::LoadBlockIndex() : hashBestChain not loaded");
     }
     if (!mapBlockIndex.count(hashBestChain))
         return error("CTxDB::LoadBlockIndex() : hashBestChain not found in the block index");
-    pindexBest = mapBlockIndex[hashBestChain];
-    nBestHeight = pindexBest->nHeight;
-    bnBestChainTrust = pindexBest->bnChainTrust;
+    chainActive.SetTip(mapBlockIndex[hashBestChain]);
+    bnBestChainTrust = chainActive.Tip()->bnChainTrust;
 
     printf("LoadBlockIndex(): hashBestChain=%s  height=%d  trust=%s  date=%s\n",
-      hashBestChain.ToString().substr(0,20).c_str(), nBestHeight, bnBestChainTrust.ToString().c_str(),
-      DateTimeStrFormat("%x %H:%M:%S", pindexBest->GetBlockTime()).c_str());
+      hashBestChain.ToString().substr(0,20).c_str(), chainActive.Height(), bnBestChainTrust.ToString().c_str(),
+      DateTimeStrFormat("%x %H:%M:%S", chainActive.Tip()->GetBlockTime()).c_str());
 
     // NovaCoin: load hashSyncCheckpoint
     if( !fTestNet )
@@ -918,8 +917,8 @@ bool CTxDB::LoadBlockIndex()
     int nCheckDepth = GetArg( "-checkblocks", 750);
     if (nCheckDepth == 0)
         nCheckDepth = 1000000000; // suffices until the year 19000
-    if (nCheckDepth > nBestHeight)
-        nCheckDepth = nBestHeight;
+    if (nCheckDepth > chainActive.Height())
+        nCheckDepth = chainActive.Height();
 
 #ifdef WIN32
     nCounter = 0;
@@ -950,9 +949,9 @@ bool CTxDB::LoadBlockIndex()
     printf("Verifying last %i blocks at level %i\n", nCheckDepth, nCheckLevel);
     CBlockIndex* pindexFork = NULL;
     map<pair<unsigned int, unsigned int>, CBlockIndex*> mapBlockPos;
-    for (CBlockIndex* pindex = pindexBest; pindex && pindex->pprev; pindex = pindex->pprev)
+    for (CBlockIndex* pindex = chainActive.Tip(); pindex && pindex->pprev; pindex = pindex->pprev)
     {
-        if (fRequestShutdown || pindex->nHeight < nBestHeight-nCheckDepth)
+        if (fRequestShutdown || pindex->nHeight < chainActive.Height()-nCheckDepth)
             break;
         CBlock block;
         if (!block.ReadFromDisk(pindex))

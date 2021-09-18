@@ -803,7 +803,7 @@ void CNode::PushVersion()
             "\n"
             "\n", 
             PROTOCOL_VERSION, 
-            nBestHeight, 
+            chainActive.Height(), 
             addrMe.ToString().c_str(), 
             addrYou.ToString().c_str(), 
             addr.ToString().c_str()
@@ -817,7 +817,7 @@ void CNode::PushVersion()
                 addrMe,
                 nLocalHostNonce, 
                 FormatSubVersion(CLIENT_NAME, CLIENT_VERSION, std::vector<string>()), 
-                nBestHeight
+                chainActive.Height()
                );
 }
 
@@ -2541,8 +2541,8 @@ void static StartSync(const vector<CNode*> &vNodes)
                 !pnode->fOneShot &&
                 !pnode->fDisconnect && 
                 pnode->fSuccessfullyConnected &&
-              //(pnode->nStartingHeight > (nBestHeight - 144)) &&   // within one day if BTC !!!???
-                (pnode->nStartingHeight > (nBestHeight - (int)nOnedayOfAverageBlocks)) &&   // perhaps
+              //(pnode->nStartingHeight > (chainActive.Height() - 144)) &&   // within one day if BTC !!!???
+                (pnode->nStartingHeight > (chainActive.Height() - (int)nOnedayOfAverageBlocks)) &&   // perhaps
                 (
                  (pnode->nVersion < NOBLKS_VERSION_START) || // why <60002 || >= 60005
                  (pnode->nVersion >= NOBLKS_VERSION_END)    // why are 60002, 3, 4 taboo?
@@ -2970,7 +2970,7 @@ void StartNode(void* parg)
     if (!NewThread(ThreadDumpAddress, NULL))
         printf("Error; NewThread(ThreadDumpAddress) failed\n");
 
-    if (!pindexBest || (pindexBest->nHeight + 1) < nMainnetNewLogicBlockNumber)
+    if (!chainActive.Tip() || (chainActive.Tip()->nHeight + 1) < nMainnetNewLogicBlockNumber)
     {
         // ppcoin: mint proof-of-stake blocks in the background
         if (!NewThread(ThreadStakeMinter, pwalletMain))

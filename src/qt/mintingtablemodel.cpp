@@ -405,7 +405,7 @@ QString MintingTableModel::lookupAddress(const std::string &address, bool toolti
 QString MintingTableModel::formatTxPoSReward(KernelRecord *wtx) const
 {
     QString posReward;
-    int nBits = GetLastBlockIndex(pindexBest, true)->nBits;
+    int nBits = GetLastBlockIndex(chainActive.Tip(), true)->nBits;
     posReward += QString(QObject::tr("from  %1 to %2")).arg(BitcoinUnits::formatWithUnit(walletModel->getOptionsModel()->getDisplayUnit(), wtx->getPoSReward(nBits, 0)), 
         BitcoinUnits::formatWithUnit(walletModel->getOptionsModel()->getDisplayUnit(), wtx->getPoSReward(nBits, mintingInterval))); 
     return posReward;
@@ -413,7 +413,7 @@ QString MintingTableModel::formatTxPoSReward(KernelRecord *wtx) const
 
 double MintingTableModel::getDayToMint(KernelRecord *wtx) const
 {
-    const CBlockIndex *p = GetLastBlockIndex(pindexBest, true);
+    const CBlockIndex *p = GetLastBlockIndex(chainActive.Tip(), true);
     double difficulty = GetDifficulty(p);
 
     double prob = wtx->getProbToMintWithinNMinutes(difficulty, mintingInterval);

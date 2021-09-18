@@ -144,10 +144,10 @@ public:
     {
         if(
             false 
-            //((pindexBest->nTime < YACOIN_NEW_LOGIC_SWITCH_TIME) && !fTestNet )
+            //((chainActive.Tip()->nTime < YACOIN_NEW_LOGIC_SWITCH_TIME) && !fTestNet )
           )
         {
-            SetMockTime( (int64_t)(pindexBest->nTime + nOneMinuteInSeconds) );
+            SetMockTime( (int64_t)(chainActive.Tip()->nTime + nOneMinuteInSeconds) );
         }
     }
 
@@ -155,7 +155,7 @@ public:
     {
         if(
             false 
-            //((pindexBest->nTime < YACOIN_NEW_LOGIC_SWITCH_TIME) && !fTestNet )
+            //((chainActive.Tip()->nTime < YACOIN_NEW_LOGIC_SWITCH_TIME) && !fTestNet )
           )
         {
             SetMockTime( 0 );   // restores time to now
@@ -179,7 +179,7 @@ CBlock* CreateNewBlock(CWallet* pwallet, bool fProofOfStake)
     {
       //pblock->nVersion = CBlock::VERSION_of_block_for_yac_044_old;
     	// TODO: Need update for mainet
-    	if (pindexGenesisBlock && (nBestHeight + 1) >= nMainnetNewLogicBlockNumber)
+    	if (chainActive.Genesis() && (chainActive.Height() + 1) >= nMainnetNewLogicBlockNumber)
     	{
             pblock->nVersion = VERSION_of_block_for_yac_05x_new;
     	}
@@ -221,12 +221,12 @@ CBlock* CreateNewBlock(CWallet* pwallet, bool fProofOfStake)
         nMinTxFee = MIN_TX_FEE;
 
     CBlockIndex
-        * pindexPrev = pindexBest;
+        * pindexPrev = chainActive.Tip();
 /*********************/
     // ppcoin: if coinstake available add coinstake tx
     static ::int64_t 
         nLastCoinStakeSearchTime = GetAdjustedTime();  // only initialized at startup
-    //CBlockIndex* pindexPrev = pindexBest;
+    //CBlockIndex* pindexPrev = chainActive.Tip();
 
     if (fProofOfStake)  // attempt to find a coinstake
     {
@@ -300,7 +300,7 @@ CBlock* CreateNewBlock(CWallet* pwallet, bool fProofOfStake)
         {
             LOCK2(cs_main, mempool.cs);
             CBlockIndex
-                * pindexPrev = pindexBest;
+                * pindexPrev = chainActive.Tip();
             const int nHeight = pindexPrev->nHeight + 1;
             CTxDB 
                 txdb("r");
@@ -544,7 +544,7 @@ CBlock* CreateNewBlock(CWallet* pwallet, bool fProofOfStake)
     {
         LOCK2(cs_main, mempool.cs);
         CBlockIndex
-            * pindexPrev = pindexBest;
+            * pindexPrev = chainActive.Tip();
         const int nHeight = pindexPrev->nHeight + 1;
         CTxDB 
             txdb("r");
@@ -991,7 +991,7 @@ void StakeMinter(CWallet *pwallet)
 
     while (true)
     {
-        if (fShutdown || (pindexBest && pindexBest->nHeight + 1 >= nMainnetNewLogicBlockNumber))
+        if (fShutdown || (chainActive.Tip() && chainActive.Tip()->nHeight + 1 >= nMainnetNewLogicBlockNumber))
             return;
 
         while (pwallet->IsLocked())
@@ -1007,7 +1007,7 @@ void StakeMinter(CWallet *pwallet)
                 vNodes.empty() 
                 //&& !fTestNet      //TestNet can mint stand alone!
                )
-               //|| (fTestNet && (pindexBest->nHeight < nCoinbaseMaturity))
+               //|| (fTestNet && (chainActive.Tip()->nHeight < nCoinbaseMaturity))
               )
         {
             Sleep(1000);
@@ -1018,7 +1018,7 @@ void StakeMinter(CWallet *pwallet)
         // to temporarily stop mining
         //continue;
         CBlockIndex
-            * pindexPrev = pindexBest;
+            * pindexPrev = chainActive.Tip();
 
         if ( fUseOld044Rules )
         {                                                   // behave as previously
@@ -1087,7 +1087,7 @@ bool
     check_for_stop_mining( CBlockIndex *pindexPrev )
 {
     if (
-        (pindexPrev != pindexBest) ||
+        (pindexPrev != chainActive.Tip()) ||
         !fGenerateBitcoins ||
         fShutdown
        )
@@ -1160,7 +1160,7 @@ static void YacoinMiner(CWallet *pwallet)  // here fProofOfStake is always false
             nTransactionsUpdatedLast = nTransactionsUpdated;
 
         CBlockIndex
-            * pindexPrev = pindexBest;
+            * pindexPrev = chainActive.Tip();
 
         auto_ptr<CBlock> 
             pblock(CreateNewBlock(pwallet, false));

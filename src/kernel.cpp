@@ -194,7 +194,7 @@ static bool SelectBlockFromCandidates(
 // blocks.
 bool ComputeNextStakeModifier(const CBlockIndex* pindexCurrent, uint64_t& nStakeModifier, bool& fGeneratedStakeModifier)
 {
-    if (pindexBest && (pindexBest->nHeight + 1) >= nMainnetNewLogicBlockNumber)
+    if (chainActive.Tip() && (chainActive.Tip()->nHeight + 1) >= nMainnetNewLogicBlockNumber)
     {
         return true;
     }
@@ -385,7 +385,7 @@ uint8_t GetStakeNfactor (uint64_t nTime, uint64_t nCoinDayWeight)
 	// coin day weight factor, used for ProofOfStake kernel hash
 	// human friendly notation: nCoinDayWeight / ( ( nTime - 268435456 ) / 131072 - 8192 );
 	uint64_t cdwfactor = nCoinDayWeight / ( ( ( nTime - ( 1<<28 ) ) >> 17 ) - ( 1<<13 ) ) ;
-	uint8_t nfactor = GetNfactor(nTime, nBestHeight + 1 >= nMainnetNewLogicBlockNumber? true : false);
+	uint8_t nfactor = GetNfactor(nTime, chainActive.Height() + 1 >= nMainnetNewLogicBlockNumber? true : false);
 
 	if ( cdwfactor > (uint64_t)( nfactor - 4 ) )
 		return 4;
@@ -975,7 +975,7 @@ uint32_t GetStakeModifierChecksum(const CBlockIndex* pindex)
 // Check stake modifier hard checkpoints
 bool CheckStakeModifierCheckpoints(int nHeight, uint32_t nStakeModifierChecksum)
 {
-    if (pindexBest && (pindexBest->nHeight + 1) >= nMainnetNewLogicBlockNumber)
+    if (chainActive.Tip() && (chainActive.Tip()->nHeight + 1) >= nMainnetNewLogicBlockNumber)
     {
         return true;
     }

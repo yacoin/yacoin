@@ -128,7 +128,7 @@ void Shutdown(void* parg)
         {
             LOCK(cs_main);
             if (pwalletMain)
-                pwalletMain->SetBestChain(CBlockLocator(pindexBest));
+                pwalletMain->SetBestChain(CBlockLocator(chainActive.Tip()));
         }
         bitdb.Flush(true);
 #if !defined(WIN32) && !defined(QT_GUI)
@@ -1326,9 +1326,9 @@ bool AppInit2()
 
     RegisterWallet(pwalletMain);
 
-    CBlockIndex *pindexRescan = pindexBest;
+    CBlockIndex *pindexRescan = chainActive.Tip();
     if (GetBoolArg("-rescan"))
-        pindexRescan = pindexGenesisBlock;
+        pindexRescan = chainActive.Genesis();
     else
     {
         CWalletDB walletdb(strWalletFileName);
@@ -1336,10 +1336,10 @@ bool AppInit2()
         if (walletdb.ReadBestBlock(locator))
             pindexRescan = locator.GetBlockIndex();
     }
-    if (pindexBest != pindexRescan && pindexBest && pindexRescan && pindexBest->nHeight > pindexRescan->nHeight)
+    if (chainActive.Tip() != pindexRescan && chainActive.Tip() && pindexRescan && chainActive.Tip()->nHeight > pindexRescan->nHeight)
     {
         uiInterface.InitMessage(_("<b>Please wait, rescanning blocks...</b>"));
-        printf("Rescanning last %i blocks (from block %i)...\n", pindexBest->nHeight - pindexRescan->nHeight, pindexRescan->nHeight);
+        printf("Rescanning last %i blocks (from block %i)...\n", chainActive.Tip()->nHeight - pindexRescan->nHeight, pindexRescan->nHeight);
         nStart = GetTimeMillis();
 #ifdef WIN32
         int
@@ -1348,7 +1348,7 @@ bool AppInit2()
         nNumberOfTxs = pwalletMain->ScanForWalletTransactions(
                                         pindexRescan, 
                                         true,   // will modify Tx's in wallet
-                                        pindexBest->nHeight - pindexRescan->nHeight
+                                        chainActive.Tip()->nHeight - pindexRescan->nHeight
                                                              );
 #else
         pwalletMain->ScanForWalletTransactions(pindexRescan, true);
@@ -1418,7 +1418,7 @@ bool AppInit2()
 
     //// debug print
     printf("mapBlockIndex.size() = %" PRIszu "\n",   mapBlockIndex.size());
-    printf("nBestHeight = %d\n",                     nBestHeight);
+    printf("chainActive.Height() = %d\n",                     chainActive.Height());
     printf("setKeyPool.size() = %" PRIszu "\n",      pwalletMain->setKeyPool.size());
     printf("mapWallet.size() = %" PRIszu " transactions\n",       pwalletMain->mapWallet.size());
     printf("mapAddressBook.size() = %" PRIszu "\n",  pwalletMain->mapAddressBook.size());
