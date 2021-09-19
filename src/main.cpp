@@ -3515,6 +3515,67 @@ bool CBlock::SetBestChain(CTxDB& txdb, CBlockIndex* pindexNew)
     return true;
 }
 
+bool CBlock::ConnectBestBlock(CTxDB& txdb) {
+    do {
+        CBlockIndex *pindexNewBest;
+
+        {
+            std::set<CBlockIndex*,CBlockIndexWorkComparator>::reverse_iterator it = setBlockIndexValid.rbegin();
+            if (it == setBlockIndexValid.rend())
+                return true;
+            pindexNewBest = *it;
+        }
+
+        if (pindexNewBest == chainActive.Tip() || (chainActive.Tip() && pindexNewBest->nChainWork <= chainActive.Tip()->nChainWork))
+            return true; // nothing to do
+
+        // check ancestry
+        CBlockIndex *pindexTest = pindexNewBest;
+        std::vector<CBlockIndex*> vAttach;
+        do {
+            if (pindexTest->nStatus & BLOCK_FAILED_MASK) {
+                // mark descendants failed
+                CBlockIndex *pindexFailed = pindexNewBest;
+                while (pindexTest != pindexFailed) {
+                    pindexFailed->nStatus |= BLOCK_FAILED_CHILD;
+                    setBlockIndexValid.erase(pindexFailed);
+                    // Write to disk block index
+                    if (!txdb.TxnBegin())
+                        return false;
+                    txdb.WriteBlockIndex(CDiskBlockIndex(pindexFailed));
+                    if (fStoreBlockHashToDb && !txdb.WriteBlockHash(CDiskBlockIndex(pindexFailed)))
+                    {
+                        printf("ConnectBestBlock(): Can't WriteBlockHash\n");
+                    }
+                    if (!txdb.TxnCommit())
+                        return false;
+                    pindexFailed = pindexFailed->pprev;
+                }
+                InvalidChainFound(pindexNewBest);
+                break;
+            }
+
+            if (chainActive.Tip() == NULL || pindexTest->nChainWork > chainActive.Tip()->nChainWork)
+                vAttach.push_back(pindexTest);
+
+            if (pindexTest->pprev == NULL || chainActive.Next(pindexTest)) {
+                reverse(vAttach.begin(), vAttach.end());
+                BOOST_FOREACH(CBlockIndex *pindexSwitch, vAttach) {
+                    boost::this_thread::interruption_point();
+                    try {
+                        if (!SetBestChain(txdb, pindexSwitch))
+                            return false;
+                    } catch(std::runtime_error &e) {
+                        return state.Abort(_("System error: ") + e.what());
+                    }
+                }
+                return true;
+            }
+            pindexTest = pindexTest->pprev;
+        } while(true);
+    } while(true);
+}
+
 //////////////////////////////////////////////////////////////////////////////
 //
 // CChain implementation
@@ -3734,12 +3795,10 @@ bool CBlock::AddToBlockIndex(unsigned int nFile, unsigned int nBlockPos)
         return false;
 
     // New best
-    if (
-        (pindexNew->bnChainTrust > bnBestChainTrust)
-        || fTestNet     //<<<<<<<<<<<<<<<<<<<<<<<<<<
-       )
-        if (!SetBestChain(txdb, pindexNew))
-            return false;
+    if (!SetBestChain(txdb, pindexNew))
+        return false;
+    if (!ConnectBestBlock(txdb))
+        return false;
 
     if (pindexNew == chainActive.Tip())
     {

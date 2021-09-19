@@ -1585,6 +1585,8 @@ public:
     bool ReadFromDisk(unsigned int nFile, unsigned int nBlockPos,
             bool fReadTransactions = true, bool fCheckHeader = true);
     bool SetBestChain(CTxDB& txdb, CBlockIndex* pindexNew);
+    /** Find the best known block, and make it the tip of the block chain */
+    bool ConnectBestBlock(CTxDB& txdb);
     bool AddToBlockIndex(unsigned int nFile, unsigned int nBlockPos);
     bool CheckBlock(bool fCheckPOW=true, bool fCheckMerkleRoot=true, bool fCheckSig=true) const;
     bool AcceptBlock();
