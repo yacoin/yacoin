@@ -318,6 +318,10 @@ bool isHardforkHappened();
 
 //bool GetWalletFile(CWallet* pwallet, std::string &strWalletFileOut);
 
+bool SetBestChain(CTxDB& txdb, CBlockIndex* pindexNew);
+/** Find the best known block, and make it the tip of the block chain */
+bool ConnectBestBlock(CTxDB& txdb);
+
 /** Position on disk for a particular transaction. */
 class CDiskTxPos
 {
@@ -1584,9 +1588,6 @@ public:
     bool ReadFromDisk(const CBlockIndex* pindex, bool fReadTransactions=true, bool fCheckHeader = true);
     bool ReadFromDisk(unsigned int nFile, unsigned int nBlockPos,
             bool fReadTransactions = true, bool fCheckHeader = true);
-    bool SetBestChain(CTxDB& txdb, CBlockIndex* pindexNew);
-    /** Find the best known block, and make it the tip of the block chain */
-    bool ConnectBestBlock(CTxDB& txdb);
     bool AddToBlockIndex(unsigned int nFile, unsigned int nBlockPos);
     bool CheckBlock(bool fCheckPOW=true, bool fCheckMerkleRoot=true, bool fCheckSig=true) const;
     bool AcceptBlock();
@@ -1594,9 +1595,6 @@ public:
     bool SignBlock044(const CKeyStore& keystore);
     bool SignBlock(CWallet& keystore);
     bool CheckBlockSignature() const;
-
-private:
-    bool SetBestChainInner(CTxDB& txdb, CBlockIndex *pindexNew);
 };
 
 
