@@ -406,8 +406,9 @@ Value signrawtransaction(const Array& params, bool fHelp)
         bool fInvalid;
 
         // FetchInputs aborts on failure, so we go one at a time.
+        CValidationState state;
         tempTx.vin.push_back(mergedTx.vin[i]);
-        tempTx.FetchInputs(txdb, unused, false, false, mapPrevTx, fInvalid);
+        tempTx.FetchInputs(state, txdb, unused, false, false, mapPrevTx, fInvalid);
 
         // Copy results into mapPrevOut:
         BOOST_FOREACH(const CTxIn& txin, tempTx.vin)
@@ -596,7 +597,8 @@ Value sendrawtransaction(const Array& params, bool fHelp)
     {
         // push to local node
         CTxDB txdb("r");
-        if (!tx.AcceptToMemoryPool(txdb))
+        CValidationState state;
+        if (!tx.AcceptToMemoryPool(state, txdb))
             throw JSONRPCError(RPC_DESERIALIZATION_ERROR, "TX rejected");
 
         SyncWithWallets(tx, NULL, true);

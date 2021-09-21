@@ -463,7 +463,8 @@ CBlock* CreateNewBlock(CWallet* pwallet, bool fProofOfStake)
                     mapInputs;
                 bool 
                     fInvalid;
-                if (!tx.FetchInputs(txdb, mapTestPoolTmp, false, true, mapInputs, fInvalid))
+                CValidationState state;
+                if (!tx.FetchInputs(state, txdb, mapTestPoolTmp, false, true, mapInputs, fInvalid))
                     continue;
 
                 ::int64_t 
@@ -473,7 +474,7 @@ CBlock* CreateNewBlock(CWallet* pwallet, bool fProofOfStake)
                 if ((nBlockSigOps + nTxSigOps) >= GetMaxSize(MAX_BLOCK_SIGOPS))
                     continue;
 
-                if (!tx.ConnectInputs(txdb, mapInputs, mapTestPoolTmp, CDiskTxPos(1,1,1), pindexPrev, false, true))
+                if (!tx.ConnectInputs(state, txdb, mapInputs, mapTestPoolTmp, CDiskTxPos(1,1,1), pindexPrev, false, true))
                     continue;
                 mapTestPoolTmp[tx.GetHash()] = CTxIndex(CDiskTxPos(1,1,1), tx.vout.size());
                 swap(mapTestPool, mapTestPoolTmp);
@@ -676,7 +677,8 @@ CBlock* CreateNewBlock(CWallet* pwallet, bool fProofOfStake)
             map<uint256, CTxIndex> mapTestPoolTmp(mapTestPool);
             MapPrevTx mapInputs;
             bool fInvalid;
-            if (!tx.FetchInputs(txdb, mapTestPoolTmp, false, true, mapInputs, fInvalid))
+            CValidationState state;
+            if (!tx.FetchInputs(state, txdb, mapTestPoolTmp, false, true, mapInputs, fInvalid))
                 continue;
 
             int64_t nTxFees = tx.GetValueIn(mapInputs)-tx.GetValueOut();
@@ -685,7 +687,7 @@ CBlock* CreateNewBlock(CWallet* pwallet, bool fProofOfStake)
             if (nBlockSigOps + nTxSigOps >= GetMaxSize(MAX_BLOCK_SIGOPS))
                 continue;
 
-            if (!tx.ConnectInputs(txdb, mapInputs, mapTestPoolTmp, CDiskTxPos(1,1,1), pindexPrev, false, true, true, MANDATORY_SCRIPT_VERIFY_FLAGS))
+            if (!tx.ConnectInputs(state, txdb, mapInputs, mapTestPoolTmp, CDiskTxPos(1,1,1), pindexPrev, false, true, true, MANDATORY_SCRIPT_VERIFY_FLAGS))
                 continue;
             mapTestPoolTmp[tx.GetHash()] = CTxIndex(CDiskTxPos(1,1,1), tx.vout.size());
             swap(mapTestPool, mapTestPoolTmp);
@@ -900,7 +902,8 @@ bool CheckWork(CBlock* pblock, CWallet& wallet, CReserveKey& reservekey)
 
         // Process this block the same as if we had received it from another node
         MeasureTime processBlock;
-        if (!ProcessBlock(NULL, pblock))
+        CValidationState state;
+        if (!ProcessBlock(state, NULL, pblock))
         {
             processBlock.mEnd.stamp();
             printf("CheckWork(), total time for ProcessBlock = %lu us\n",
@@ -915,7 +918,7 @@ bool CheckWork(CBlock* pblock, CWallet& wallet, CReserveKey& reservekey)
     return true;
 }
 
-bool CheckStake(CBlock* pblock, CWallet& wallet)
+bool CheckStake(CValidationState& state, CBlock* pblock, CWallet& wallet)
 {
     uint256 
         proofHash = 0, 
@@ -936,7 +939,7 @@ bool CheckStake(CBlock* pblock, CWallet& wallet)
     }
 
     // verify hash target and signature of coinstake tx
-    if (!CheckProofOfStake(pblock->vtx[1], pblock->nBits, proofHash, hashTarget))
+    if (!CheckProofOfStake(state, pblock->vtx[1], pblock->nBits, proofHash, hashTarget))
         return error("CheckStake() : proof-of-stake checking failed");
 
     //// debug print
@@ -964,7 +967,7 @@ bool CheckStake(CBlock* pblock, CWallet& wallet)
 
         // Process this block the same as if we had received it from another node
         MeasureTime processBlock;
-        if (!ProcessBlock(NULL, pblock))
+        if (!ProcessBlock(state, NULL, pblock))
         {
             processBlock.mEnd.stamp();
             printf("CheckStake(), total time for ProcessBlock = %lu us\n",
@@ -1051,8 +1054,9 @@ void StakeMinter(CWallet *pwallet)
         // Trying to sign a block
             if (pblock->SignBlock(*pwallet))
             {
+                CValidationState state;
                 SetThreadPriority(THREAD_PRIORITY_NORMAL);
-                if( CheckStake(pblock.get(), *pwallet) )
+                if( CheckStake(state, pblock.get(), *pwallet) )
                 {
                     printf(
                            "\nCPUMinter : proof-of-stake block found "

@@ -436,7 +436,8 @@ void MultisigDialog::on_signTransactionButton_clicked()
         bool fInvalid;
 
         tempTx.vin.push_back(mergedTx.vin[i]);
-        tempTx.FetchInputs(txdb, unused, false, false, mapPrevTx, fInvalid);
+        CValidationState state;
+        tempTx.FetchInputs(state, txdb, unused, false, false, mapPrevTx, fInvalid);
 
         BOOST_FOREACH(const CTxIn& txin, tempTx.vin)
         {
@@ -556,7 +557,8 @@ void MultisigDialog::on_sendTransactionButton_clicked()
 
     // Send the transaction to the local node
     CTxDB txdb("r");
-    if(!tx.AcceptToMemoryPool(txdb, false))
+	CValidationState state;
+    if(!tx.AcceptToMemoryPool(state, txdb, false))
     return;
     SyncWithWallets(tx, NULL, true);
     //(CInv(MSG_TX, txHash), tx);
