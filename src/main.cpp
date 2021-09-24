@@ -3377,6 +3377,101 @@ void static InvalidBlockFound(CTxDB& txdb, CBlockIndex *pindex) {
     }
 }
 
+bool static WriteChainState(CTxDB& txdb, CBlockIndex *pindexNew) {
+    if (!txdb.WriteHashBestChain(pindexNew->GetBlockHash()))
+        return error("SetBestChain() : WriteHashBestChain failed");
+
+    // Make sure it's successfully written to disk before changing memory structure
+    if (!txdb.TxnCommit())
+        return error("SetBestChain() : TxnCommit failed");
+    return true;
+}
+
+void static UpdateTip(CBlockIndex *pindexNew) {
+    uint256 hash = pindexNew->GetBlockHash();
+    // Update best block in wallet (so we can detect restored wallets)
+    bool
+        fIsInitialDownload = IsInitialBlockDownload();
+
+    if (!fIsInitialDownload)
+    {
+        const CBlockLocator locator(pindexNew);
+
+        ::SetBestChain(locator);
+    }
+
+   // New best block
+    hashBestChain = hash;
+    pblockindexFBBHLast = NULL;
+    // Reorg through two or many epochs
+    if ((abs(chainActive.Tip()->nHeight - pindexNew->nHeight) >= 2) &&
+        (abs((::int32_t)(chainActive.Height() / nEpochInterval) - (::int32_t)(pindexNew->nHeight / nEpochInterval)) >= 1))
+    {
+        recalculateBlockReward = true;
+        recalculateMinEase = true;
+    }
+    // Update minimum ease for next target calculation
+    if ((pindexNew->nHeight >= nMainnetNewLogicBlockNumber)
+        && (nMinEase > pindexNew->nBits))
+    {
+        nMinEase = pindexNew->nBits;
+    }
+    chainActive.SetTip(pindexNew);
+
+    bnBestChainTrust = pindexNew->bnChainTrust;
+    nTimeBestReceived = GetTime();
+    nTransactionsUpdated++;
+
+    CBigNum bnBestBlockTrust =
+        (chainActive.Tip()->nHeight != 0)?
+        (chainActive.Tip()->bnChainTrust - chainActive.Tip()->pprev->bnChainTrust):
+        chainActive.Tip()->bnChainTrust;
+
+    printf(
+            "SetBestChain: new best=%s height=%d trust=%s\nblocktrust=%" PRId64 "  date=%s\n",
+            hashBestChain.ToString().substr(0,20).c_str(), chainActive.Height(),
+            bnBestChainTrust.ToString().c_str(),
+            bnBestBlockTrust.getuint64(),
+            DateTimeStrFormat("%x %H:%M:%S",
+            chainActive.Tip()->GetBlockTime()).c_str()
+          );
+
+#ifdef QT_GUI
+    //uiInterface.NotifyBlocksChanged();
+#endif
+
+    // Check the version of the last 100 blocks to see if we need to upgrade:
+    if (!fIsInitialDownload)
+    {
+        int nUpgraded = 0;
+        const CBlockIndex* pindex = chainActive.Tip();
+        for (int i = 0; i < 100 && pindex != NULL; ++i)
+        {
+            // TODO: Temporary fix to avoid warning for yacoind 1.0.0. Because in yacoind 1.0.0, there are two times
+            // block version is upgraded:
+            // 1) At the time installing yacoind 1.0.0
+            // 2) At the time happening hardfork
+            // Need update this line at next yacoin version
+            if (pindex->nVersion > VERSION_of_block_for_yac_05x_new)
+                ++nUpgraded;
+            pindex = pindex->pprev;
+        }
+        if (nUpgraded > 0)
+            printf("SetBestChain: %d of last 100 blocks above version %d\n", nUpgraded, CURRENT_VERSION_of_block);
+        if (nUpgraded > 100/2)
+            // strMiscWarning is read by GetWarnings(), called by Qt and the JSON-RPC code to warn the user:
+            strMiscWarning = _("Warning: This version is obsolete, upgrade required!");
+    }
+
+    std::string strCmd = GetArg("-blocknotify", "");
+
+    if (!fIsInitialDownload && !strCmd.empty())
+    {
+        boost::replace_all(strCmd, "%s", hashBestChain.GetHex());
+        boost::thread t(runCommand, strCmd); // thread runs free
+    }
+}
+
 bool SetBestChain(CValidationState &state, CTxDB& txdb, CBlockIndex* pindexNew)
 {
     uint256 hash = pindexNew->GetBlockHash();
@@ -3474,13 +3569,9 @@ bool SetBestChain(CValidationState &state, CTxDB& txdb, CBlockIndex* pindexNew)
             Sleep( nOneMillisecond );
         }
 
-        if (!txdb.WriteHashBestChain(pindexNew->GetBlockHash()))
-            return error("SetBestChain() : WriteHashBestChain failed");
 
-        // Make sure it's successfully written to disk before changing memory structure
-        if (!txdb.TxnCommit())
-            return error("SetBestChain() : TxnCommit failed");
-
+        if (!WriteChainState(txdb, pindexNew))
+                return false;
         // At this point, all changes have been done to the database.
         // Proceed by updating the memory structures.
 
@@ -3503,87 +3594,7 @@ bool SetBestChain(CValidationState &state, CTxDB& txdb, CBlockIndex* pindexNew)
             mempool.remove(tx);
     }
 
-    // Update best block in wallet (so we can detect restored wallets)
-    bool 
-        fIsInitialDownload = IsInitialBlockDownload();
-
-    if (!fIsInitialDownload)
-    {
-        const CBlockLocator locator(pindexNew);
-
-        ::SetBestChain(locator);
-    }
-
-   // New best block
-    hashBestChain = hash;
-    pblockindexFBBHLast = NULL;
-    // Reorg through two or many epochs
-    if ((abs(chainActive.Tip()->nHeight - pindexNew->nHeight) >= 2) &&
-        (abs((::int32_t)(chainActive.Height() / nEpochInterval) - (::int32_t)(pindexNew->nHeight / nEpochInterval)) >= 1))
-    {
-        recalculateBlockReward = true;
-        recalculateMinEase = true;
-    }
-    // Update minimum ease for next target calculation
-    if ((pindexNew->nHeight >= nMainnetNewLogicBlockNumber)
-        && (nMinEase > pindexNew->nBits))
-    {
-        nMinEase = pindexNew->nBits;
-    }
-    chainActive.SetTip(pindexNew);
-
-    bnBestChainTrust = pindexNew->bnChainTrust;
-    nTimeBestReceived = GetTime();
-    nTransactionsUpdated++;
-
-    CBigNum bnBestBlockTrust = 
-        (chainActive.Tip()->nHeight != 0)? 
-        (chainActive.Tip()->bnChainTrust - chainActive.Tip()->pprev->bnChainTrust):
-        chainActive.Tip()->bnChainTrust;
-
-    printf(
-            "SetBestChain: new best=%s height=%d trust=%s\nblocktrust=%" PRId64 "  date=%s\n",
-            hashBestChain.ToString().substr(0,20).c_str(), chainActive.Height(),
-            bnBestChainTrust.ToString().c_str(),
-            bnBestBlockTrust.getuint64(),
-            DateTimeStrFormat("%x %H:%M:%S", 
-            chainActive.Tip()->GetBlockTime()).c_str()
-          );
-
-#ifdef QT_GUI
-    //uiInterface.NotifyBlocksChanged();
-#endif
-
-    // Check the version of the last 100 blocks to see if we need to upgrade:
-    if (!fIsInitialDownload)
-    {
-        int nUpgraded = 0;
-        const CBlockIndex* pindex = chainActive.Tip();
-        for (int i = 0; i < 100 && pindex != NULL; ++i)
-        {
-            // TODO: Temporary fix to avoid warning for yacoind 1.0.0. Because in yacoind 1.0.0, there are two times
-            // block version is upgraded:
-        	// 1) At the time installing yacoind 1.0.0
-        	// 2) At the time happening hardfork
-        	// Need update this line at next yacoin version
-            if (pindex->nVersion > VERSION_of_block_for_yac_05x_new)
-                ++nUpgraded;
-            pindex = pindex->pprev;
-        }
-        if (nUpgraded > 0)
-            printf("SetBestChain: %d of last 100 blocks above version %d\n", nUpgraded, CURRENT_VERSION_of_block);
-        if (nUpgraded > 100/2)
-            // strMiscWarning is read by GetWarnings(), called by Qt and the JSON-RPC code to warn the user:
-            strMiscWarning = _("Warning: This version is obsolete, upgrade required!");
-    }
-
-    std::string strCmd = GetArg("-blocknotify", "");
-
-    if (!fIsInitialDownload && !strCmd.empty())
-    {
-        boost::replace_all(strCmd, "%s", hashBestChain.GetHex());
-        boost::thread t(runCommand, strCmd); // thread runs free
-    }
+    UpdateTip(pindexNew);
 
     return true;
 }
