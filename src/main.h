@@ -239,7 +239,11 @@ public:
     /** Find the last common block between this chain and a locator. */
     CBlockIndex *FindFork(const CBlockLocator &locator) const;
 };
+/** The currently-connected chain of blocks. */
 extern CChain chainActive;
+
+/** The currently best known chain of headers (some of which may be invalid). */
+extern CChain chainMostWork;
 
 void RegisterWallet(CWallet* pwalletIn);
 void UnregisterWallet(CWallet* pwalletIn);
@@ -322,7 +326,7 @@ bool isHardforkHappened();
 
 bool SetBestChain(CValidationState &state, CTxDB& txdb, CBlockIndex* pindexNew);
 /** Find the best known block, and make it the tip of the block chain */
-bool ConnectBestBlock(CValidationState &state, CTxDB& txdb);
+bool ActivateBestChain(CValidationState &state, CTxDB& txdb);
 
 /** Position on disk for a particular transaction. */
 class CDiskTxPos
@@ -1666,6 +1670,8 @@ public:
     ::uint256 blockHash; // store hash to avoid calculating many times
     // Verification status of this block. See enum BlockStatus
     unsigned int nStatus;
+    // (memory only) Sequencial id assigned to distinguish order in which blocks are received.
+    uint32_t nSequenceId;
 public:
     CBlockIndex()
     {
@@ -1694,6 +1700,7 @@ public:
         nNonce         = 0;
         blockHash      = 0;
         nStatus = 0;
+        nSequenceId = 0;
     }
 
     CBlockIndex(unsigned int nFileIn, unsigned int nBlockPosIn, CBlock& block)
@@ -1714,6 +1721,7 @@ public:
         nStakeModifierChecksum = 0;
         hashProofOfStake = 0;
         nStatus = 0;
+        nSequenceId = 0;
         if (block.IsProofOfStake())
         {
             SetProofOfStake();
@@ -1961,13 +1969,21 @@ public:
 struct CBlockIndexWorkComparator
 {
     bool operator()(CBlockIndex *pa, CBlockIndex *pb) {
+        // First sort by most total work, ...
         if (pa->bnChainTrust > pb->bnChainTrust) return false;
         if (pa->bnChainTrust < pb->bnChainTrust) return true;
 
-        if (pa->GetBlockHash() < pb->GetBlockHash()) return false;
-        if (pa->GetBlockHash() > pb->GetBlockHash()) return true;
+        // ... then by earliest time received, ...
+        if (pa->nSequenceId < pb->nSequenceId) return false;
+        if (pa->nSequenceId > pb->nSequenceId) return true;
 
-        return false; // identical blocks
+        // Use pointer address as tie breaker (should only happen with blocks
+        // loaded from disk, as those all have id 0).
+        if (pa < pb) return false;
+        if (pa > pb) return true;
+
+        // Identical blocks.
+        return false;
     }
 };
 
@@ -2009,23 +2025,23 @@ public:
         AbortNode(msg);
         return Error();
     }
-    bool IsValid() {
+    bool IsValid() const {
         return mode == MODE_VALID;
     }
-    bool IsInvalid() {
+    bool IsInvalid() const {
         return mode == MODE_INVALID;
     }
-    bool IsError() {
+    bool IsError() const {
         return mode == MODE_ERROR;
     }
-    bool IsInvalid(int &nDoSOut) {
+    bool IsInvalid(int &nDoSOut) const {
         if (IsInvalid()) {
             nDoSOut = nDoS;
             return true;
         }
         return false;
     }
-    bool CorruptionPossible() {
+    bool CorruptionPossible() const {
         return corruptionPossible;
     }
     unsigned char GetRejectCode() const { return chRejectCode; }

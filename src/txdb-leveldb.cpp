@@ -1072,9 +1072,10 @@ bool CTxDB::LoadBlockIndex()
         CBlock block;
         if (!block.ReadFromDisk(pindexFork))
             return error("LoadBlockIndex() : block.ReadFromDisk failed");
+        setBlockIndexValid.insert(pindexFork);
         CTxDB txdb;
         CValidationState state;
-        SetBestChain(state, txdb, pindexFork);
+        ActivateBestChain(state, txdb);
     }
 
     return true;

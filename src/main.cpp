@@ -182,6 +182,7 @@ int
     nCoinbaseMaturityAfterHardfork = 6;
 
 CChain chainActive;
+CChain chainMostWork;
 
 CBigNum bnBestChainTrust(0);
 CBlockIndex *pindexBestInvalid;
@@ -224,6 +225,16 @@ const string strMessageMagic = "Yacoin Signed Message:\n";
 
 extern enum Checkpoints::CPMode CheckpointsMode;
 
+
+// Every received block is assigned a unique and increasing identifier, so we
+// know which one to give priority in case of a fork.
+CCriticalSection cs_nBlockSequenceId;
+// Blocks loaded from disk are assigned id 0, so start the counter at 1.
+uint32_t nBlockSequenceId = 1;
+
+// Sources of received blocks, to be able to send them reject messages or ban
+// them, if processing happens afterwards. Protected by cs_main.
+map<uint256, CNode*> mapBlockSource;
 //////////////////////////////////////////////////////////////////////////////
 //
 // dispatching functions
@@ -1175,7 +1186,7 @@ int CMerkleTx::GetDepthInMainChain(CBlockIndex* &pindexRet) const
     if (mi == mapBlockIndex.end())
         return 0;
     CBlockIndex* pindex = (*mi).second;
-    if (!pindex || !pindex->IsInMainChain())
+    if (!pindex || !chainActive.Contains(pindex))
         return 0;
 
     // Make sure the merkle branch connects to this block
@@ -1187,7 +1198,7 @@ int CMerkleTx::GetDepthInMainChain(CBlockIndex* &pindexRet) const
     }
 
     pindexRet = pindex;
-    return chainActive.Tip()->nHeight - pindex->nHeight + 1;
+    return chainActive.Height() - pindex->nHeight + 1;
 }
 
 
@@ -2512,30 +2523,7 @@ bool IsInitialBlockDownload()
     return !fIsBestBlockYoungEnough;
 }
 
-void static InvalidChainFound(CBlockIndex* pindexNew)
-{
-    if (!pindexBestInvalid || pindexNew->bnChainTrust > pindexBestInvalid->bnChainTrust)
-    {
-        pindexBestInvalid = pindexNew;
-        CTxDB().WriteBestInvalidTrust(pindexBestInvalid->bnChainTrust);
-#ifdef QT_GUI
-        //uiInterface.NotifyBlocksChanged();
-#endif
-    }
 
-    CBigNum bnBestInvalidBlockTrust = pindexNew->bnChainTrust - pindexNew->pprev->bnChainTrust;
-    CBigNum bnBestBlockTrust = chainActive.Tip()->nHeight != 0 ? (chainActive.Tip()->bnChainTrust - chainActive.Tip()->pprev->bnChainTrust) : chainActive.Tip()->bnChainTrust;
-
-    printf("InvalidChainFound: invalid block=%s  height=%d  trust=%s  blocktrust=%" PRId64 "  date=%s\n",
-      pindexNew->GetBlockHash().ToString().substr(0,20).c_str(), pindexNew->nHeight,
-      (pindexNew->bnChainTrust).ToString().c_str(), bnBestInvalidBlockTrust.getuint64(),
-      DateTimeStrFormat("%x %H:%M:%S", pindexNew->GetBlockTime()).c_str());
-    printf("InvalidChainFound:  current best=%s  height=%d  trust=%s  blocktrust=%" PRId64 "  date=%s\n",
-      hashBestChain.ToString().substr(0,20).c_str(), chainActive.Height(),
-      (chainActive.Tip()->bnChainTrust).ToString().c_str(),
-      bnBestBlockTrust.getuint64(),
-      DateTimeStrFormat("%x %H:%M:%S", chainActive.Tip()->GetBlockTime()).c_str());
-}
 
 
 void CBlock::UpdateTime(const CBlockIndex* pindexPrev)
@@ -3358,32 +3346,81 @@ bool CBlock::ConnectBlock(CValidationState &state, CTxDB& txdb, CBlockIndex* pin
 //    return true;
 //}
 
-void static InvalidBlockFound(CTxDB& txdb, CBlockIndex *pindex) {
-    pindex->nStatus |= BLOCK_FAILED_VALID;
-    InvalidChainFound(pindex);
-    // Write to disk block index
-    txdb.WriteBlockIndex(CDiskBlockIndex(pindex));
-    if (fStoreBlockHashToDb && !txdb.WriteBlockHash(CDiskBlockIndex(pindex)))
+void static InvalidChainFound(CBlockIndex* pindexNew)
+{
+    if (!pindexBestInvalid || pindexNew->bnChainTrust > pindexBestInvalid->bnChainTrust)
     {
-        printf("ConnectBestBlock(): Can't WriteBlockHash\n");
+        pindexBestInvalid = pindexNew;
+        CTxDB().WriteBestInvalidTrust(pindexBestInvalid->bnChainTrust);
+#ifdef QT_GUI
+        //uiInterface.NotifyBlocksChanged();
+#endif
     }
-    if (!txdb.TxnCommit()) {
-        printf("InvalidBlockFound(): TxnCommit failed\n");
+
+    CBigNum bnBestInvalidBlockTrust = pindexNew->bnChainTrust - pindexNew->pprev->bnChainTrust;
+    CBigNum bnBestBlockTrust = chainActive.Tip()->nHeight != 0 ? (chainActive.Tip()->bnChainTrust - chainActive.Tip()->pprev->bnChainTrust) : chainActive.Tip()->bnChainTrust;
+
+    printf("InvalidChainFound: invalid block=%s  height=%d  trust=%s  blocktrust=%" PRId64 "  date=%s\n",
+      pindexNew->GetBlockHash().ToString().substr(0,20).c_str(), pindexNew->nHeight,
+      (pindexNew->bnChainTrust).ToString().c_str(), bnBestInvalidBlockTrust.getuint64(),
+      DateTimeStrFormat("%x %H:%M:%S", pindexNew->GetBlockTime()).c_str());
+    printf("InvalidChainFound:  current best=%s  height=%d  trust=%s  blocktrust=%" PRId64 "  date=%s\n",
+      hashBestChain.ToString().substr(0,20).c_str(), chainActive.Height(),
+      (chainActive.Tip()->bnChainTrust).ToString().c_str(),
+      bnBestBlockTrust.getuint64(),
+      DateTimeStrFormat("%x %H:%M:%S", chainActive.Tip()->GetBlockTime()).c_str());
+}
+
+//void static InvalidBlockFound(CTxDB& txdb, CBlockIndex *pindex) {
+//    pindex->nStatus |= BLOCK_FAILED_VALID;
+//    InvalidChainFound(pindex);
+//    // Write to disk block index
+//    txdb.WriteBlockIndex(CDiskBlockIndex(pindex));
+//    if (fStoreBlockHashToDb && !txdb.WriteBlockHash(CDiskBlockIndex(pindex)))
+//    {
+//        printf("ConnectBestBlock(): Can't WriteBlockHash\n");
+//    }
+//    if (!txdb.TxnCommit()) {
+//        printf("InvalidBlockFound(): TxnCommit failed\n");
+//    }
+//    setBlockIndexValid.erase(pindex);
+//    if (chainActive.Next(pindex)) {
+//        CValidationState stateDummy;
+//        ConnectBestBlock(stateDummy, txdb); // reorganise away from the failed block
+//    }
+//}
+
+void static InvalidBlockFound(const CValidationState &state, CTxDB& txdb, CBlockIndex *pindex) {
+    int nDoS = 0;
+    if (state.IsInvalid(nDoS)) {
+        std::map<uint256, CNode*>::iterator it = mapBlockSource.find(pindex->GetBlockHash());
+        if (it != mapBlockSource.end() && nDoS > 0) {
+            it->second->Misbehaving(nDoS);
+        }
     }
-    setBlockIndexValid.erase(pindex);
-    if (chainActive.Next(pindex)) {
-        CValidationState stateDummy;
-        ConnectBestBlock(stateDummy, txdb); // reorganise away from the failed block
+    if (!state.CorruptionPossible()) {
+        pindex->nStatus |= BLOCK_FAILED_VALID;
+        InvalidChainFound(pindex);
+        // Write to disk block index
+        txdb.WriteBlockIndex(CDiskBlockIndex(pindex));
+        if (fStoreBlockHashToDb && !txdb.WriteBlockHash(CDiskBlockIndex(pindex)))
+        {
+            printf("InvalidBlockFound(): Can't WriteBlockHash\n");
+        }
+        if (!txdb.TxnCommit()) {
+            printf("InvalidBlockFound(): TxnCommit failed\n");
+        }
+        setBlockIndexValid.erase(pindex);
     }
 }
 
 bool static WriteChainState(CTxDB& txdb, CBlockIndex *pindexNew) {
     if (!txdb.WriteHashBestChain(pindexNew->GetBlockHash()))
-        return error("SetBestChain() : WriteHashBestChain failed");
+        return error("WriteChainState() : WriteHashBestChain failed");
 
     // Make sure it's successfully written to disk before changing memory structure
     if (!txdb.TxnCommit())
-        return error("SetBestChain() : TxnCommit failed");
+        return error("WriteChainState() : TxnCommit failed");
     return true;
 }
 
@@ -3428,7 +3465,7 @@ void static UpdateTip(CBlockIndex *pindexNew) {
         chainActive.Tip()->bnChainTrust;
 
     printf(
-            "SetBestChain: new best=%s height=%d trust=%s\nblocktrust=%" PRId64 "  date=%s\n",
+            "UpdateTip: new best=%s height=%d trust=%s\nblocktrust=%" PRId64 "  date=%s\n",
             hashBestChain.ToString().substr(0,20).c_str(), chainActive.Height(),
             bnBestChainTrust.ToString().c_str(),
             bnBestBlockTrust.getuint64(),
@@ -3457,19 +3494,86 @@ void static UpdateTip(CBlockIndex *pindexNew) {
             pindex = pindex->pprev;
         }
         if (nUpgraded > 0)
-            printf("SetBestChain: %d of last 100 blocks above version %d\n", nUpgraded, CURRENT_VERSION_of_block);
+            printf("UpdateTip: %d of last 100 blocks above version %d\n", nUpgraded, CURRENT_VERSION_of_block);
         if (nUpgraded > 100/2)
             // strMiscWarning is read by GetWarnings(), called by Qt and the JSON-RPC code to warn the user:
             strMiscWarning = _("Warning: This version is obsolete, upgrade required!");
     }
 
-    std::string strCmd = GetArg("-blocknotify", "");
+}
 
-    if (!fIsInitialDownload && !strCmd.empty())
-    {
-        boost::replace_all(strCmd, "%s", hashBestChain.GetHex());
-        boost::thread t(runCommand, strCmd); // thread runs free
+// Disconnect chainActive's tip.
+bool static DisconnectTip(CValidationState &state, CTxDB& txdb) {
+    CBlockIndex *pindexDelete = chainActive.Tip();
+    assert(pindexDelete);
+    // Read block from disk.
+    CBlock block;
+    if (!block.ReadFromDisk(pindexDelete))
+        return state.Abort(_("DisconnectTip() : ReadFromDisk for disconnect failed"));
+    if (!block.DisconnectBlock(state, txdb, pindexDelete))
+        return error("DisconnectTip() : DisconnectBlock %s failed", pindexDelete->GetBlockHash().ToString().substr(0,20).c_str());
+    // Write the chain state to disk, if necessary.
+    if (!WriteChainState(txdb, pindexDelete->pprev))
+        return false;
+    // Ressurect mempool transactions from the disconnected block.
+    BOOST_FOREACH(CTransaction &tx, block.vtx) {
+        // ignore validation errors in resurrected transactions
+        CValidationState stateDummy;
+        if (!(tx.IsCoinBase() || tx.IsCoinStake()))
+        {
+            tx.AcceptToMemoryPool(stateDummy, txdb, false);
+        }
     }
+    // Disconnect shorter branch, SPECIFIC FOR YACOIN
+    if (pindexDelete->pprev)
+        pindexDelete->pprev->pnext = NULL;
+
+    // Update chainActive and related variables.
+    UpdateTip(pindexDelete->pprev);
+    return true;
+}
+
+// Connect a new block to chainActive.
+bool static ConnectTip(CValidationState &state, CTxDB& txdb, CBlockIndex *pindexNew) {
+    uint256 hash = pindexNew->GetBlockHash();
+
+    if ((chainActive.Genesis() == NULL)
+            && (hash == (!fTestNet ? hashGenesisBlock : hashGenesisBlockTestNet)))
+    {
+        if (!WriteChainState(txdb, pindexNew))
+            return false;
+        chainActive.SetTip(pindexNew);
+        UpdateTip(pindexNew);
+    }
+    else
+    {
+        assert(pindexNew->pprev == chainActive.Tip());
+        // Read block from disk.
+        CBlock block;
+        if (!block.ReadFromDisk(pindexNew))
+            return state.Abort(_("ConnectTip() : ReadFromDisk for connect failed"));
+        // Apply the block atomically to the chain state.
+        CInv inv(MSG_BLOCK, hash);
+        if (!block.ConnectBlock(state, txdb, pindexNew)) {
+            if (state.IsInvalid())
+                InvalidBlockFound(state, txdb, pindexNew);
+            return error("ConnectTip() : ConnectBlock %s failed", pindexNew->GetBlockHash().ToString().substr(0,20).c_str());
+        }
+        mapBlockSource.erase(inv.hash);
+        // Write the chain state to disk, if necessary.
+        if (!WriteChainState(txdb, pindexNew))
+            return false;
+        // Remove conflicting transactions from the mempool.
+        BOOST_FOREACH(CTransaction &tx, block.vtx) {
+            mempool.remove(tx);
+        }
+        // Connect longer branch, SPECIFIC FOR YACOIN
+        if (pindexNew->pprev)
+            pindexNew->pprev->pnext = pindexNew;
+        // Update chainActive & related variables.
+        UpdateTip(pindexNew);
+    }
+    return true;
 }
 
 bool SetBestChain(CValidationState &state, CTxDB& txdb, CBlockIndex* pindexNew)
@@ -3479,9 +3583,8 @@ bool SetBestChain(CValidationState &state, CTxDB& txdb, CBlockIndex* pindexNew)
     if ((chainActive.Genesis() == NULL)
             && (hash == (!fTestNet ? hashGenesisBlock : hashGenesisBlockTestNet)))
     {
-        txdb.WriteHashBestChain(hash);
-        if (!txdb.TxnCommit())
-            return error("SetBestChain () : TxnCommit failed");
+        if (!WriteChainState(txdb, pindexNew))
+            return false;
         chainActive.SetTip(pindexNew);
     }
     else
@@ -3559,7 +3662,7 @@ bool SetBestChain(CValidationState &state, CTxDB& txdb, CBlockIndex* pindexNew)
             {
                 // Invalid block
                 InvalidChainFound(pindexNew);
-                InvalidBlockFound(txdb, pindex);
+                InvalidBlockFound(state, txdb, pindex);
                 return error("SetBestChain() : ConnectBlock %s failed", pindex->GetBlockHash().ToString().substr(0,20).c_str());
             }
 
@@ -3571,16 +3674,16 @@ bool SetBestChain(CValidationState &state, CTxDB& txdb, CBlockIndex* pindexNew)
 
 
         if (!WriteChainState(txdb, pindexNew))
-                return false;
+            return false;
         // At this point, all changes have been done to the database.
         // Proceed by updating the memory structures.
 
-        // Disconnect shorter branch
+        // Disconnect shorter branch, SPECIFIC FOR YACOIN
         BOOST_FOREACH(CBlockIndex* pindex, vDisconnect)
             if (pindex->pprev)
                 pindex->pprev->pnext = NULL;
 
-        // Connect longer branch
+        // Connect longer branch, SPECIFIC FOR YACOIN
         BOOST_FOREACH(CBlockIndex* pindex, vConnect)
             if (pindex->pprev)
                 pindex->pprev->pnext = pindex;
@@ -3595,6 +3698,118 @@ bool SetBestChain(CValidationState &state, CTxDB& txdb, CBlockIndex* pindexNew)
     }
 
     UpdateTip(pindexNew);
+
+    return true;
+}
+
+// Make chainMostWork correspond to the chain with the most work in it, that isn't
+// known to be invalid (it's however far from certain to be valid).
+void static FindMostWorkChain() {
+    CBlockIndex *pindexNew = NULL;
+
+    // In case the current best is invalid, do not consider it.
+    while (chainMostWork.Tip() && (chainMostWork.Tip()->nStatus & BLOCK_FAILED_MASK)) {
+        setBlockIndexValid.erase(chainMostWork.Tip());
+        chainMostWork.SetTip(chainMostWork.Tip()->pprev);
+    }
+
+    do {
+        // Find the best candidate header.
+        {
+            std::set<CBlockIndex*, CBlockIndexWorkComparator>::reverse_iterator it = setBlockIndexValid.rbegin();
+            if (it == setBlockIndexValid.rend())
+                return;
+            pindexNew = *it;
+        }
+
+        // Check whether all blocks on the path between the currently active chain and the candidate are valid.
+        // Just going until the active chain is an optimization, as we know all blocks in it are valid already.
+        CBlockIndex *pindexTest = pindexNew;
+        bool fInvalidAncestor = false;
+        while (pindexTest && !chainActive.Contains(pindexTest)) {
+            if (pindexTest->nStatus & BLOCK_FAILED_MASK) {
+                // Candidate has an invalid ancestor, remove entire chain from the set.
+                if (pindexBestInvalid == NULL || pindexNew->bnChainTrust > pindexBestInvalid->bnChainTrust)
+                    pindexBestInvalid = pindexNew;                CBlockIndex *pindexFailed = pindexNew;
+                while (pindexTest != pindexFailed) {
+                    pindexFailed->nStatus |= BLOCK_FAILED_CHILD;
+                    setBlockIndexValid.erase(pindexFailed);
+                    pindexFailed = pindexFailed->pprev;
+                }
+                fInvalidAncestor = true;
+                break;
+            }
+            pindexTest = pindexTest->pprev;
+        }
+        if (fInvalidAncestor)
+            continue;
+
+        break;
+    } while(true);
+
+    // Check whether it's actually an improvement.
+    if (chainMostWork.Tip() && !CBlockIndexWorkComparator()(chainMostWork.Tip(), pindexNew))
+        return;
+
+    // We have a new best.
+    chainMostWork.SetTip(pindexNew);
+}
+
+// Try to activate to the most-work chain (thereby connecting it).
+bool ActivateBestChain(CValidationState &state, CTxDB& txdb) {
+    CBlockIndex *pindexOldTip = chainActive.Tip();
+    bool fComplete = false;
+    while (!fComplete) {
+        FindMostWorkChain();
+        fComplete = true;
+
+        // Check whether we have something to do.
+        if (chainMostWork.Tip() == NULL) break;
+
+        // Disconnect active blocks which are no longer in the best chain.
+        while (chainActive.Tip() && !chainMostWork.Contains(chainActive.Tip())) {
+            if (!txdb.TxnBegin()) {
+                return error("ActivateBestChain () : TxnBegin 1 failed");
+            }
+            if (!DisconnectTip(state, txdb))
+            {
+                txdb.TxnAbort();
+                return false;
+            }
+        }
+
+        // Connect new blocks.
+        while (!chainActive.Contains(chainMostWork.Tip())) {
+            if (!txdb.TxnBegin()) {
+                return error("ActivateBestChain () : TxnBegin 2 failed");
+            }
+            CBlockIndex *pindexConnect = chainMostWork[chainActive.Height() + 1];
+            if (!ConnectTip(state, txdb, pindexConnect)) {
+                if (state.IsInvalid()) {
+                    // The block violates a consensus rule.
+                    if (!state.CorruptionPossible())
+                        InvalidChainFound(chainMostWork.Tip());
+                    fComplete = false;
+                    state = CValidationState();
+                    txdb.TxnAbort();
+                    break;
+                } else {
+                    // A system error occurred (disk space, database error, ...).
+                    txdb.TxnAbort();
+                    return false;
+                }
+            }
+        }
+    }
+
+    if (chainActive.Tip() != pindexOldTip) {
+        std::string strCmd = GetArg("-blocknotify", "");
+        if (!IsInitialBlockDownload() && !strCmd.empty())
+        {
+            boost::replace_all(strCmd, "%s", chainActive.Tip()->GetBlockHash().GetHex());
+            boost::thread t(runCommand, strCmd); // thread runs free
+        }
+    }
 
     return true;
 }
@@ -3757,74 +3972,74 @@ bool SetBestChain(CValidationState &state, CTxDB& txdb, CBlockIndex* pindexNew)
 //    return true;
 //}
 
-bool ConnectBestBlock(CValidationState &state, CTxDB& txdb) {
-    do {
-        CBlockIndex *pindexNewBest;
-
-        {
-            std::set<CBlockIndex*,CBlockIndexWorkComparator>::reverse_iterator it = setBlockIndexValid.rbegin();
-            if (it == setBlockIndexValid.rend())
-                return true;
-            pindexNewBest = *it;
-        }
-
-        if (pindexNewBest == chainActive.Tip() || (chainActive.Tip() && pindexNewBest->bnChainTrust <= chainActive.Tip()->bnChainTrust))
-            return true; // nothing to do
-
-        // check ancestry
-        CBlockIndex *pindexTest = pindexNewBest;
-        std::vector<CBlockIndex*> vAttach;
-        do {
-            if (pindexTest->nStatus & BLOCK_FAILED_MASK) {
-                // mark descendants failed
-                CBlockIndex *pindexFailed = pindexNewBest;
-                if (!txdb.TxnBegin()) {
-                    return error("ConnectBestBlock () : TxnBegin failed");
-                }
-                while (pindexTest != pindexFailed) {
-                    pindexFailed->nStatus |= BLOCK_FAILED_CHILD;
-                    setBlockIndexValid.erase(pindexFailed);
-                    // Write to disk block index
-                    txdb.WriteBlockIndex(CDiskBlockIndex(pindexFailed));
-                    if (fStoreBlockHashToDb && !txdb.WriteBlockHash(CDiskBlockIndex(pindexFailed)))
-                    {
-                        printf("ConnectBestBlock(): Can't WriteBlockHash\n");
-                    }
-
-                    pindexFailed = pindexFailed->pprev;
-                }
-                if (!txdb.TxnCommit()) {
-                    return error("ConnectBestBlock () : TxnCommit failed");
-                }
-                InvalidChainFound(pindexNewBest);
-                break;
-            }
-
-            if (chainActive.Tip() == NULL || pindexTest->bnChainTrust > chainActive.Tip()->bnChainTrust)
-                vAttach.push_back(pindexTest);
-
-            if (pindexTest->pprev == NULL || chainActive.Next(pindexTest)) {
-                reverse(vAttach.begin(), vAttach.end());
-                BOOST_FOREACH(CBlockIndex *pindexSwitch, vAttach) {
-                    if (!txdb.TxnBegin()) {
-                        return error("ConnectBestBlock () : TxnBegin 2 failed");
-                    }
-                    boost::this_thread::interruption_point();
-                    try {
-                        if (!SetBestChain(state, txdb, pindexSwitch)) {
-                            txdb.TxnAbort();
-                            return false;
-                        }
-                    } catch(std::runtime_error &e) {
-                        return error("System error: %s", e.what());
-                    }
-                }
-                return true;
-            }
-            pindexTest = pindexTest->pprev;
-        } while(true);
-    } while(true);
-}
+//bool ConnectBestBlock(CValidationState &state, CTxDB& txdb) {
+//    do {
+//        CBlockIndex *pindexNewBest;
+//
+//        {
+//            std::set<CBlockIndex*,CBlockIndexWorkComparator>::reverse_iterator it = setBlockIndexValid.rbegin();
+//            if (it == setBlockIndexValid.rend())
+//                return true;
+//            pindexNewBest = *it;
+//        }
+//
+//        if (pindexNewBest == chainActive.Tip() || (chainActive.Tip() && pindexNewBest->bnChainTrust <= chainActive.Tip()->bnChainTrust))
+//            return true; // nothing to do
+//
+//        // check ancestry
+//        CBlockIndex *pindexTest = pindexNewBest;
+//        std::vector<CBlockIndex*> vAttach;
+//        do {
+//            if (pindexTest->nStatus & BLOCK_FAILED_MASK) {
+//                // mark descendants failed
+//                CBlockIndex *pindexFailed = pindexNewBest;
+//                if (!txdb.TxnBegin()) {
+//                    return error("ConnectBestBlock () : TxnBegin failed");
+//                }
+//                while (pindexTest != pindexFailed) {
+//                    pindexFailed->nStatus |= BLOCK_FAILED_CHILD;
+//                    setBlockIndexValid.erase(pindexFailed);
+//                    // Write to disk block index
+//                    txdb.WriteBlockIndex(CDiskBlockIndex(pindexFailed));
+//                    if (fStoreBlockHashToDb && !txdb.WriteBlockHash(CDiskBlockIndex(pindexFailed)))
+//                    {
+//                        printf("ConnectBestBlock(): Can't WriteBlockHash\n");
+//                    }
+//
+//                    pindexFailed = pindexFailed->pprev;
+//                }
+//                if (!txdb.TxnCommit()) {
+//                    return error("ConnectBestBlock () : TxnCommit failed");
+//                }
+//                InvalidChainFound(pindexNewBest);
+//                break;
+//            }
+//
+//            if (chainActive.Tip() == NULL || pindexTest->bnChainTrust > chainActive.Tip()->bnChainTrust)
+//                vAttach.push_back(pindexTest);
+//
+//            if (pindexTest->pprev == NULL || chainActive.Next(pindexTest)) {
+//                reverse(vAttach.begin(), vAttach.end());
+//                BOOST_FOREACH(CBlockIndex *pindexSwitch, vAttach) {
+//                    if (!txdb.TxnBegin()) {
+//                        return error("ConnectBestBlock () : TxnBegin 2 failed");
+//                    }
+//                    boost::this_thread::interruption_point();
+//                    try {
+//                        if (!SetBestChain(state, txdb, pindexSwitch)) {
+//                            txdb.TxnAbort();
+//                            return false;
+//                        }
+//                    } catch(std::runtime_error &e) {
+//                        return error("System error: %s", e.what());
+//                    }
+//                }
+//                return true;
+//            }
+//            pindexTest = pindexTest->pprev;
+//        } while(true);
+//    } while(true);
+//}
 
 //////////////////////////////////////////////////////////////////////////////
 //
@@ -3974,6 +4189,10 @@ bool CBlock::AddToBlockIndex(CValidationState &state, unsigned int nFile, unsign
 
     // Construct new block index object
     CBlockIndex* pindexNew = new CBlockIndex(nFile, nBlockPos, *this);
+    {
+         LOCK(cs_nBlockSequenceId);
+         pindexNew->nSequenceId = nBlockSequenceId++;
+    }
     if (!pindexNew)
         return error("AddToBlockIndex() : new CBlockIndex failed");
     pindexNew->phashBlock = &hash;
@@ -4025,6 +4244,7 @@ bool CBlock::AddToBlockIndex(CValidationState &state, unsigned int nFile, unsign
     }
 
     // Add to mapBlockIndex
+    mapAlreadyAskedFor.erase(CInv(MSG_BLOCK, hash));
     map<uint256, CBlockIndex*>::iterator mi = mapBlockIndex.insert(make_pair(hash, pindexNew)).first;
     if (pindexNew->IsProofOfStake())
         setStakeSeen.insert(make_pair(pindexNew->prevoutStake, pindexNew->nStakeTime));
@@ -4053,7 +4273,7 @@ bool CBlock::AddToBlockIndex(CValidationState &state, unsigned int nFile, unsign
     // New best
 //    if (!SetBestChain(txdb, pindexNew))
 //        return false;
-    if (!ConnectBestBlock(state, txdb))
+    if (!ActivateBestChain(state, txdb))
         return false;
 
     if (pindexNew == chainActive.Tip())
@@ -4539,7 +4759,11 @@ bool ProcessBlock(CValidationState &state, CNode* pfrom, CBlock* pblock)
     // Preliminary checks
     if (!pblock->CheckBlock(state, true, true,
             (pblock->nTime > Checkpoints::GetLastCheckpointTime())))
+    {
+//        if (state.CorruptionPossible())
+        mapAlreadyAskedFor.erase(CInv(MSG_BLOCK, hash));
         return error("ProcessBlock () : CheckBlock FAILED");
+    }
 
     // ppcoin: verify hash target and signature of coinstake tx
     if (pblock->IsProofOfStake())
@@ -6291,24 +6515,24 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
 
         Sleep( nOneMillisecond );  // let's try this arbitrary value? 
 
+        // Remember who we got this block from.
+        mapBlockSource[inv.hash] = pfrom;
+
         MeasureTime processBlock;
         CValidationState state;
-        if (ProcessBlock(state, pfrom, &block))
-        {
-            mapAlreadyAskedFor.erase(inv);
-        }
+        ProcessBlock(state, pfrom, &block);
         processBlock.mEnd.stamp();
 
         printf("Process block message, total time for ProcessBlock = %lu us\n",
                 processBlock.getExecutionTime());
 
         //if( !IsInitialBlockDownload() )        {}
-        int nDoS = 0;
-        if (state.IsInvalid(nDoS))
-        {
-            if (nDoS > 0)
-                (void)pfrom->Misbehaving(nDoS);
-        }
+//        int nDoS = 0;
+//        if (state.IsInvalid(nDoS))
+//        {
+//            if (nDoS > 0)
+//                (void)pfrom->Misbehaving(nDoS);
+//        }
     }
 
     //_________________________________________________________________________
