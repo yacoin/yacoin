@@ -3,142 +3,131 @@
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 #ifndef BITCOIN_NET_H
- #define BITCOIN_NET_H
+#define BITCOIN_NET_H
 
- #include <deque>
+#include <deque>
 #ifndef Q_MOC_RUN
- #include <boost/array.hpp>
- #include <boost/foreach.hpp>
+#include <boost/array.hpp>
+#include <boost/foreach.hpp>
 #endif
 #include <openssl/rand.h>
 
 #ifdef _MSC_VER
- #include <stdint.h>
+#include <stdint.h>
 #endif
 #ifndef WIN32
- #include <arpa/inet.h>
+#include <arpa/inet.h>
 #endif
 
 #ifndef YACOIN_YASSERT_H
- #include "Yassert.h"
+#include "Yassert.h"
 #endif
 
 #ifndef BITCOIN_MRUSET_H
- #include "mruset.h"
+#include "mruset.h"
 #endif
 
 #ifndef BITCOIN_NETBASE_H
- #include "netbase.h"
+#include "netbase.h"
 #endif
 
 #ifndef __INCLUDED_PROTOCOL_H__
- #include "protocol.h"
+#include "protocol.h"
 #endif
 
 #ifndef _BITCOIN_ADDRMAN
- #include "addrman.h"
+#include "addrman.h"
 #endif
 
 #ifndef BITCOIN_HASH_H
- #include "hash.h"
+#include "hash.h"
 #endif
 
 class CRequestTracker;
 class CNode;
 class CBlockIndex;
 
-//extern CCriticalSection cs_net;
+// extern CCriticalSection cs_net;
 
-const ::int64_t
-    nSecondsPerMinute = 60,
-    nMinutesPerHour = 60,
-    nOneHourInSeconds = nSecondsPerMinute * nMinutesPerHour,
-    nTwoHoursInSeconds = 2 * nOneHourInSeconds,
-    nTwelveHoursInSeconds = 12 * nOneHourInSeconds,
-    nOneDayInSeconds = 24 * nOneHourInSeconds;
+const ::int64_t nSecondsPerMinute = 60, nMinutesPerHour = 60,
+                nOneHourInSeconds = nSecondsPerMinute * nMinutesPerHour,
+                nTwoHoursInSeconds = 2 * nOneHourInSeconds,
+                nTwelveHoursInSeconds = 12 * nOneHourInSeconds,
+                nOneDayInSeconds = 24 * nOneHourInSeconds;
 
-const int
-    DEFAULT_HTTP_PORT = 80,
-    DEFAULT_HTTPS_PORT = 443,
-    DEFAULT_char_offset = 3,
-    nOneMinuteInSeconds = 60,
-    nTenMilliseconds = 10,
-    nOneHundredMilliseconds = 100;
+const int DEFAULT_HTTP_PORT = 80, DEFAULT_HTTPS_PORT = 443,
+          DEFAULT_char_offset = 3, nOneMinuteInSeconds = 60,
+          nTenMilliseconds = 10, nOneHundredMilliseconds = 100;
 
-const ::uint32_t
-    nOneMillisecond = 1,
-    nMillisecondsPerSecond = 1000,
-    nSecondsperMinute = 60,
-    nMinutesperHour = 60,
-    nSecondsPerHour = nSecondsperMinute * nMinutesperHour,
-    nHoursPerDay = 24,
-    nSecondsPerDay = nHoursPerDay * nSecondsPerHour;
+const ::uint32_t nOneMillisecond = 1, nMillisecondsPerSecond = 1000,
+                 nSecondsperMinute = 60, nMinutesperHour = 60,
+                 nSecondsPerHour = nSecondsperMinute * nMinutesperHour,
+                 nHoursPerDay = 24,
+                 nSecondsPerDay = nHoursPerDay * nSecondsPerHour;
 
 const ::uint32_t
     nAverageBlocksPerMinute = 1,
     nNumberOfDaysPerYear = 365,
-    nNumberOfBlocksPerYear = (nAverageBlocksPerMinute *
-                              nMinutesperHour *
-                              nHoursPerDay *
-                              nNumberOfDaysPerYear
-                             ) +    // that 1/4 of a day for leap years
-                              (nAverageBlocksPerMinute *
-                               nMinutesperHour *
-                              (nHoursPerDay/4)
-                            );
+    nNumberOfBlocksPerYear =
+        (nAverageBlocksPerMinute * nMinutesperHour * nHoursPerDay *
+         nNumberOfDaysPerYear) + // that 1/4 of a day for leap years
+        (nAverageBlocksPerMinute * nMinutesperHour * (nHoursPerDay / 4));
 
-const double
-    nInflation = 0.02;      // 2%
+const double nInflation = 0.02; // 2%
 
-extern ::int64_t
-    nUpTimeStart;
-extern const unsigned int 
-    nStakeMaxAge,
-    nOnedayOfAverageBlocks;
-extern unsigned int     // not const because of fTestNet
+extern ::int64_t nUpTimeStart;
+extern const unsigned int nStakeMaxAge, nOnedayOfAverageBlocks;
+extern unsigned int // not const because of fTestNet
     nStakeMinAge,
-    nStakeTargetSpacing,
-    nModifierInterval;
+    nStakeTargetSpacing, nModifierInterval;
 
-inline ::uint64_t ReceiveBufferSize() { return 1000*GetArg("-maxreceivebuffer", 5*1000); }
-inline ::uint64_t SendBufferSize() { return 1000*GetArg("-maxsendbuffer", 1*1000); }
+inline ::uint64_t ReceiveBufferSize()
+{
+    return 1000 * GetArg("-maxreceivebuffer", 5 * 1000);
+}
+inline ::uint64_t SendBufferSize()
+{
+    return 1000 * GetArg("-maxsendbuffer", 1 * 1000);
+}
 
 void AddOneShot(std::string strDest);
-bool RecvLine(SOCKET hSocket, std::string& strLine);
+bool RecvLine(SOCKET hSocket, std::string &strLine);
 //#ifdef WIN32
-    class CProvider
-    {
-    public:
-        std::string 
-            sDomain,
-            sPriceRatioKey,
-            sApi;
-        int
-            nOffset;
-        //static const int
-            //nOffset = DEFAULT_char_offset,
-        //    nPort = DEFAULT_HTTP_PORT;
-        int
+class CProvider
+{
+public:
+    std::string sDomain, sPriceRatioKey, sApi;
+    int nOffset;
+    // static const int
+    // nOffset = DEFAULT_char_offset,
+    //    nPort = DEFAULT_HTTP_PORT;
+    int
         //    nOffset;
-            nPort;
-    };
-    extern std::vector< CProvider > vBTCtoYACProviders;
-    extern std::vector< CProvider > vUSDtoBTCProviders;
+        nPort;
+};
+extern std::vector<CProvider> vBTCtoYACProviders;
+extern std::vector<CProvider> vUSDtoBTCProviders;
 
-    extern void initialize_price_vectors( int & nIndexBtcToYac, int & nIndexUsdToBtc );
-    extern bool GetMyExternalWebPage1( int & nIndex, std::string & strBuffer, double & dPrice );
-    extern bool GetMyExternalWebPage2( int & nIndex, std::string & strBuffer, double & dPrice );
+extern void initialize_price_vectors(int &nIndexBtcToYac, int &nIndexUsdToBtc);
+extern bool GetMyExternalWebPage1(int &nIndex, std::string &strBuffer,
+                                  double &dPrice);
+extern bool GetMyExternalWebPage2(int &nIndex, std::string &strBuffer,
+                                  double &dPrice);
 //#endif
-bool GetMyExternalIP(CNetAddr& ipRet);
-void AddressCurrentlyConnected(const CService& addr);
-//CNode* FindNode(const CNetAddr& ip);
-//CNode* FindNode(const CService& ip);
-CNode* ConnectNode(CAddress addrConnect, const char *strDest = NULL, ::int64_t nTimeout=0);
-bool OpenNetworkConnection(const CAddress& addrConnect, CSemaphoreGrant *grantOutbound = NULL, const char *strDest = NULL, bool fOneShot = false);
+bool GetMyExternalIP(CNetAddr &ipRet);
+void AddressCurrentlyConnected(const CService &addr);
+// CNode* FindNode(const CNetAddr& ip);
+// CNode* FindNode(const CService& ip);
+CNode *ConnectNode(CAddress addrConnect, const char *strDest = NULL,
+                   ::int64_t nTimeout = 0);
+bool OpenNetworkConnection(const CAddress &addrConnect,
+                           CSemaphoreGrant *grantOutbound = NULL,
+                           const char *strDest = NULL, bool fOneShot = false);
 void MapPort();
 unsigned short GetListenPort();
-bool BindListenPort(const CService &bindAddr, std::string& strError=REF(std::string()));
-void StartNode(void* parg);
+bool BindListenPort(const CService &bindAddr,
+                    std::string &strError = REF(std::string()));
+void StartNode(void *parg);
 bool StopNode();
 
 enum
@@ -154,20 +143,19 @@ enum
     LOCAL_MAX
 };
 
-extern void clearLocalSocketError( SOCKET hSocket );
+extern void clearLocalSocketError(SOCKET hSocket);
 
 void SetLimited(enum Network net, bool fLimited = true);
 bool IsLimited(enum Network net);
-bool IsLimited(const CNetAddr& addr);
-bool AddLocal(const CService& addr, int nScore = LOCAL_NONE);
-bool AddLocal(const CNetAddr& addr, int nScore = LOCAL_NONE);
-bool SeenLocal(const CService& addr);
-bool IsLocal(const CService& addr);
+bool IsLimited(const CNetAddr &addr);
+bool AddLocal(const CService &addr, int nScore = LOCAL_NONE);
+bool AddLocal(const CNetAddr &addr, int nScore = LOCAL_NONE);
+bool SeenLocal(const CService &addr);
+bool IsLocal(const CService &addr);
 bool GetLocal(CService &addr, const CNetAddr *paddrPeer = NULL);
 bool IsReachable(const CNetAddr &addr);
 void SetReachable(enum Network net, bool fFlag = true);
 CAddress GetLocalAddress(const CNetAddr *paddrPeer = NULL);
-
 
 enum
 {
@@ -178,21 +166,18 @@ enum
 class CRequestTracker
 {
 public:
-    void (*fn)(void*, CDataStream&);
-    void* param1;
+    void (*fn)(void *, CDataStream &);
+    void *param1;
 
-    explicit CRequestTracker(void (*fnIn)(void*, CDataStream&)=NULL, void* param1In=NULL)
+    explicit CRequestTracker(void (*fnIn)(void *, CDataStream &) = NULL,
+                             void *param1In = NULL)
     {
         fn = fnIn;
         param1 = param1In;
     }
 
-    bool IsNull()
-    {
-        return fn == NULL;
-    }
+    bool IsNull() { return fn == NULL; }
 };
-
 
 /** Thread types */
 enum threadId
@@ -222,7 +207,7 @@ extern CAddress addrSeenByPeer;
 extern boost::array<int, THREAD_MAX> vnThreadsRunning;
 extern CAddrMan addrman;
 
-extern std::vector<CNode*> vNodes;
+extern std::vector<CNode *> vNodes;
 extern CCriticalSection cs_vNodes;
 extern std::vector<std::string> vAddedNodes;
 extern CCriticalSection cs_vAddedNodes;
@@ -230,9 +215,6 @@ extern std::map<CInv, CDataStream> mapRelay;
 extern std::deque<std::pair< ::int64_t, CInv> > vRelayExpiration;
 extern CCriticalSection cs_mapRelay;
 extern std::map<CInv, ::int64_t> mapAlreadyAskedFor;
-
-
-
 
 class CNodeStats
 {
@@ -252,10 +234,6 @@ public:
     ::uint64_t nRecvBytes;
     bool fSyncNode;
 };
-
-
-
-
 
 /** Information about a peer */
 class CNode
@@ -288,6 +266,7 @@ public:
     bool fSuccessfullyConnected;
     bool fDisconnect;
     CSemaphoreGrant grantOutbound;
+
 protected:
     int nRefCount;
 
@@ -302,7 +281,7 @@ public:
     std::map<uint256, CRequestTracker> mapRequests;
     CCriticalSection cs_mapRequests;
     uint256 hashContinue;
-    CBlockIndex* pindexLastGetBlocksBegin;
+    CBlockIndex *pindexLastGetBlocksBegin;
     uint256 hashLastGetBlocksEnd;
     ::int32_t nStartingHeight;
     bool fStartSync;
@@ -320,8 +299,10 @@ public:
     CCriticalSection cs_inventory;
     std::multimap< ::int64_t, CInv> mapAskFor;
 
-    CNode(SOCKET hSocketIn, CAddress addrIn, std::string addrNameIn = "", bool fInboundIn=false) 
-        : vSend(SER_NETWORK, MIN_PROTO_VERSION), vRecv(SER_NETWORK, MIN_PROTO_VERSION)
+    CNode(SOCKET hSocketIn, CAddress addrIn, std::string addrNameIn = "",
+          bool fInboundIn = false)
+        : vSend(SER_NETWORK, MIN_PROTO_VERSION),
+          vRecv(SER_NETWORK, MIN_PROTO_VERSION)
     {
         nServices = 0;
         hSocket = hSocketIn;
@@ -358,8 +339,7 @@ public:
         // Be shy and don't send version until we hear
         if (
             //(hSocket != INVALID_SOCKET) && // TEST<<<<<<<<<<<<<<<<<<<< 1/16/16
-            !fInbound
-           )
+            !fInbound)
             PushVersion();
     }
 
@@ -372,24 +352,19 @@ public:
         }
     }
 
-
 private:
     // Network usage totals
-    static CCriticalSection 
-        cs_totalBytesRecv;
+    static CCriticalSection cs_totalBytesRecv;
 
-    static CCriticalSection 
-        cs_totalBytesSent;
+    static CCriticalSection cs_totalBytesSent;
 
-    static ::uint64_t 
-        nTotalBytesRecv;
+    static ::uint64_t nTotalBytesRecv;
 
-    static ::uint64_t 
-        nTotalBytesSent;
+    static ::uint64_t nTotalBytesSent;
 
-    CNode(const CNode&);    
+    CNode(const CNode &);
 
-    CNode& operator=(const CNode&);
+    CNode &operator=(const CNode &);
 
 public:
     int GetRefCount()
@@ -397,7 +372,7 @@ public:
         return std::max(nRefCount, 0) + (GetTime() < nReleaseTime ? 1 : 0);
     }
 
-    CNode* AddRef(::int64_t nTimeout=0)
+    CNode *AddRef(::int64_t nTimeout = 0)
     {
         if (nTimeout != 0)
             nReleaseTime = std::max(nReleaseTime, GetTime() + nTimeout);
@@ -406,17 +381,11 @@ public:
         return this;
     }
 
-    void Release()
-    {
-        --nRefCount;
-    }
+    void Release() { --nRefCount; }
 
-    void AddAddressKnown(const CAddress& addr)
-    {
-        setAddrKnown.insert(addr);
-    }
+    void AddAddressKnown(const CAddress &addr) { setAddrKnown.insert(addr); }
 
-    void PushAddress(const CAddress& addr)
+    void PushAddress(const CAddress &addr)
     {
         // Known checking here is only to save space from duplicates.
         // SendMessages will filter it again for knowns that were added
@@ -425,8 +394,7 @@ public:
             vAddrToSend.push_back(addr);
     }
 
-
-    void AddInventoryKnown(const CInv& inv)
+    void AddInventoryKnown(const CInv &inv)
     {
         {
             LOCK(cs_inventory);
@@ -434,7 +402,7 @@ public:
         }
     }
 
-    void PushInventory(const CInv& inv)
+    void PushInventory(const CInv &inv)
     {
         {
             LOCK(cs_inventory);
@@ -443,17 +411,15 @@ public:
         }
     }
 
-    void AskFor(const CInv& inv)
+    void AskFor(const CInv &inv)
     {
         // We're using mapAskFor as a priority queue,
         // the key is the earliest time the request can be sent
-        ::int64_t& nRequestTime = mapAlreadyAskedFor[inv];
+        ::int64_t &nRequestTime = mapAlreadyAskedFor[inv];
         if (fDebugNet)
-            printf("askfor %s   %" PRId64 " (%s)\n",
-                    inv.ToString().c_str(),
-                    nRequestTime,
-                    DateTimeStrFormat("%H:%M:%S", nRequestTime/1000000).c_str()
-                  );
+            printf("askfor %s   %" PRId64 " (%s)\n", inv.ToString().c_str(),
+                   nRequestTime,
+                   DateTimeStrFormat("%H:%M:%S", nRequestTime / 1000000).c_str());
 
         // Make sure not to reuse time indexes to keep things in the same order
         ::int64_t nNow = (GetTime() - 1) * 1000000;
@@ -467,7 +433,7 @@ public:
         mapAskFor.insert(std::make_pair(nRequestTime, inv));
     }
 
-    void BeginMessage(const char* pszCommand)
+    void BeginMessage(const char *pszCommand)
     {
         ENTER_CRITICAL_SECTION(cs_vSend);
         if (nHeaderStart != -1)
@@ -494,7 +460,8 @@ public:
 
     void EndMessage()
     {
-        if (mapArgs.count("-dropmessagestest") && GetRand(atoi(mapArgs["-dropmessagestest"])) == 0)
+        if (mapArgs.count("-dropmessagestest") &&
+            GetRand(atoi(mapArgs["-dropmessagestest"])) == 0)
         {
             printf("dropmessages DROPPING SEND MESSAGE\n");
             AbortMessage();
@@ -505,25 +472,21 @@ public:
             return;
 
         // Set the size
-        ::uint32_t 
-            nSize = (::uint32_t)vSend.size() - nMessageStart;
+        ::uint32_t nSize = (::uint32_t)vSend.size() - nMessageStart;
 
-        memcpy(
-               (char*)&vSend[nHeaderStart] + CMessageHeader::MESSAGE_SIZE_OFFSET,
-               &nSize,
-               sizeof(nSize)
-              );
+        memcpy((char *)&vSend[nHeaderStart] + CMessageHeader::MESSAGE_SIZE_OFFSET,
+               &nSize, sizeof(nSize));
 
         // Set the checksum
-        uint256
-            hash = Hash(vSend.begin() + nMessageStart, vSend.end());
+        uint256 hash = Hash(vSend.begin() + nMessageStart, vSend.end());
 
-        ::uint32_t
-            nChecksum = 0;
+        ::uint32_t nChecksum = 0;
 
         memcpy(&nChecksum, &hash, sizeof(nChecksum));
-        Yassert(nMessageStart - nHeaderStart >= CMessageHeader::CHECKSUM_OFFSET + sizeof(nChecksum));
-        memcpy((char*)&vSend[nHeaderStart] + CMessageHeader::CHECKSUM_OFFSET, &nChecksum, sizeof(nChecksum));
+        Yassert(nMessageStart - nHeaderStart >=
+                CMessageHeader::CHECKSUM_OFFSET + sizeof(nChecksum));
+        memcpy((char *)&vSend[nHeaderStart] + CMessageHeader::CHECKSUM_OFFSET,
+               &nChecksum, sizeof(nChecksum));
 
         if (fDebug)
         {
@@ -540,19 +503,16 @@ public:
         if (nHeaderStart < 0)
             return;
 
-        int nSize = (int) vSend.size() - nMessageStart;
+        int nSize = (int)vSend.size() - nMessageStart;
         if (nSize > 0)
             EndMessage();
         else
             AbortMessage();
     }
 
-
-
     void PushVersion();
 
-
-    void PushMessage(const char* pszCommand)
+    void PushMessage(const char *pszCommand)
     {
         try
         {
@@ -566,8 +526,8 @@ public:
         }
     }
 
-    template<typename T1>
-    void PushMessage(const char* pszCommand, const T1& a1)
+    template <typename T1>
+    void PushMessage(const char *pszCommand, const T1 &a1)
     {
         try
         {
@@ -582,8 +542,8 @@ public:
         }
     }
 
-    template<typename T1, typename T2>
-    void PushMessage(const char* pszCommand, const T1& a1, const T2& a2)
+    template <typename T1, typename T2>
+    void PushMessage(const char *pszCommand, const T1 &a1, const T2 &a2)
     {
         try
         {
@@ -598,8 +558,9 @@ public:
         }
     }
 
-    template<typename T1, typename T2, typename T3>
-    void PushMessage(const char* pszCommand, const T1& a1, const T2& a2, const T3& a3)
+    template <typename T1, typename T2, typename T3>
+    void PushMessage(const char *pszCommand, const T1 &a1, const T2 &a2,
+                     const T3 &a3)
     {
         try
         {
@@ -614,8 +575,9 @@ public:
         }
     }
 
-    template<typename T1, typename T2, typename T3, typename T4>
-    void PushMessage(const char* pszCommand, const T1& a1, const T2& a2, const T3& a3, const T4& a4)
+    template <typename T1, typename T2, typename T3, typename T4>
+    void PushMessage(const char *pszCommand, const T1 &a1, const T2 &a2,
+                     const T3 &a3, const T4 &a4)
     {
         try
         {
@@ -630,8 +592,9 @@ public:
         }
     }
 
-    template<typename T1, typename T2, typename T3, typename T4, typename T5>
-    void PushMessage(const char* pszCommand, const T1& a1, const T2& a2, const T3& a3, const T4& a4, const T5& a5)
+    template <typename T1, typename T2, typename T3, typename T4, typename T5>
+    void PushMessage(const char *pszCommand, const T1 &a1, const T2 &a2,
+                     const T3 &a3, const T4 &a4, const T5 &a5)
     {
         try
         {
@@ -646,8 +609,10 @@ public:
         }
     }
 
-    template<typename T1, typename T2, typename T3, typename T4, typename T5, typename T6>
-    void PushMessage(const char* pszCommand, const T1& a1, const T2& a2, const T3& a3, const T4& a4, const T5& a5, const T6& a6)
+    template <typename T1, typename T2, typename T3, typename T4, typename T5,
+              typename T6>
+    void PushMessage(const char *pszCommand, const T1 &a1, const T2 &a2,
+                     const T3 &a3, const T4 &a4, const T5 &a5, const T6 &a6)
     {
         try
         {
@@ -662,8 +627,11 @@ public:
         }
     }
 
-    template<typename T1, typename T2, typename T3, typename T4, typename T5, typename T6, typename T7>
-    void PushMessage(const char* pszCommand, const T1& a1, const T2& a2, const T3& a3, const T4& a4, const T5& a5, const T6& a6, const T7& a7)
+    template <typename T1, typename T2, typename T3, typename T4, typename T5,
+              typename T6, typename T7>
+    void PushMessage(const char *pszCommand, const T1 &a1, const T2 &a2,
+                     const T3 &a3, const T4 &a4, const T5 &a5, const T6 &a6,
+                     const T7 &a7)
     {
         try
         {
@@ -678,8 +646,11 @@ public:
         }
     }
 
-    template<typename T1, typename T2, typename T3, typename T4, typename T5, typename T6, typename T7, typename T8>
-    void PushMessage(const char* pszCommand, const T1& a1, const T2& a2, const T3& a3, const T4& a4, const T5& a5, const T6& a6, const T7& a7, const T8& a8)
+    template <typename T1, typename T2, typename T3, typename T4, typename T5,
+              typename T6, typename T7, typename T8>
+    void PushMessage(const char *pszCommand, const T1 &a1, const T2 &a2,
+                     const T3 &a3, const T4 &a4, const T5 &a5, const T6 &a6,
+                     const T7 &a7, const T8 &a8)
     {
         try
         {
@@ -694,8 +665,11 @@ public:
         }
     }
 
-    template<typename T1, typename T2, typename T3, typename T4, typename T5, typename T6, typename T7, typename T8, typename T9>
-    void PushMessage(const char* pszCommand, const T1& a1, const T2& a2, const T3& a3, const T4& a4, const T5& a5, const T6& a6, const T7& a7, const T8& a8, const T9& a9)
+    template <typename T1, typename T2, typename T3, typename T4, typename T5,
+              typename T6, typename T7, typename T8, typename T9>
+    void PushMessage(const char *pszCommand, const T1 &a1, const T2 &a2,
+                     const T3 &a3, const T4 &a4, const T5 &a5, const T6 &a6,
+                     const T7 &a7, const T8 &a8, const T9 &a9)
     {
         try
         {
@@ -710,14 +684,12 @@ public:
         }
     }
 
-
-    void PushRequest(const char* pszCommand,
-                     void (*fn)(void*, CDataStream&), void* param1)
+    void PushRequest(const char *pszCommand, void (*fn)(void *, CDataStream &),
+                     void *param1)
     {
-        uint256
-            hashReply;
+        uint256 hashReply;
 
-        RAND_bytes((unsigned char*)&hashReply, sizeof(hashReply));
+        RAND_bytes((unsigned char *)&hashReply, sizeof(hashReply));
 
         {
             LOCK(cs_mapRequests);
@@ -727,12 +699,12 @@ public:
         PushMessage(pszCommand, hashReply);
     }
 
-    template<typename T1>
-    void PushRequest(const char* pszCommand, const T1& a1,
-                     void (*fn)(void*, CDataStream&), void* param1)
+    template <typename T1>
+    void PushRequest(const char *pszCommand, const T1 &a1,
+                     void (*fn)(void *, CDataStream &), void *param1)
     {
         uint256 hashReply;
-        RAND_bytes((unsigned char*)&hashReply, sizeof(hashReply));
+        RAND_bytes((unsigned char *)&hashReply, sizeof(hashReply));
 
         {
             LOCK(cs_mapRequests);
@@ -742,12 +714,12 @@ public:
         PushMessage(pszCommand, hashReply, a1);
     }
 
-    template<typename T1, typename T2>
-    void PushRequest(const char* pszCommand, const T1& a1, const T2& a2,
-                     void (*fn)(void*, CDataStream&), void* param1)
+    template <typename T1, typename T2>
+    void PushRequest(const char *pszCommand, const T1 &a1, const T2 &a2,
+                     void (*fn)(void *, CDataStream &), void *param1)
     {
         uint256 hashReply;
-        RAND_bytes((unsigned char*)&hashReply, sizeof(hashReply));
+        RAND_bytes((unsigned char *)&hashReply, sizeof(hashReply));
 
         {
             LOCK(cs_mapRequests);
@@ -757,9 +729,9 @@ public:
         PushMessage(pszCommand, hashReply, a1, a2);
     }
 
-    void PushGetBlocks(CBlockIndex* pindexBegin, uint256 hashEnd);
+    void PushGetBlocks(CBlockIndex *pindexBegin, uint256 hashEnd);
     bool IsSubscribed(unsigned int nChannel);
-    void Subscribe(unsigned int nChannel, unsigned int nHops=0);
+    void Subscribe(unsigned int nChannel, unsigned int nHops = 0);
     void CancelSubscribe(unsigned int nChannel);
     void CloseSocketDisconnect();
     void Cleanup();
@@ -790,21 +762,22 @@ public:
     static ::uint64_t GetTotalBytesSent();
 };
 
-inline void RelayInventory(const CInv& inv)
+inline void RelayInventory(const CInv &inv)
 {
     // Put on lists to offer to the other nodes
     {
         LOCK(cs_vNodes);
-        BOOST_FOREACH(CNode* pnode, vNodes)
+        BOOST_FOREACH (CNode *pnode, vNodes)
             pnode->PushInventory(inv);
     }
 }
 
 class CTransaction;
-void RelayTransaction(const CTransaction& tx, const uint256& hash);
-void RelayTransaction(const CTransaction& tx, const uint256& hash, const CDataStream& ss);
+void RelayTransaction(const CTransaction &tx, const uint256 &hash);
+void RelayTransaction(const CTransaction &tx, const uint256 &hash,
+                      const CDataStream &ss);
 
 // just for test purposes
-//void do_https_test();
+// void do_https_test();
 //_____________________________________________________________________________
 #endif

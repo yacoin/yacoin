@@ -6362,11 +6362,10 @@ void ProcessMessages(CNode* pfrom)
     return;
 }
 
-
-void SendMessages(CNode* pto, bool fSendTrickle)
+void SendMessages(CNode *pto, bool fSendTrickle)
 {
     TRY_LOCK(cs_main, lockMain);
-    if (lockMain) 
+    if (lockMain)
     {
         // Don't send anything until we get their version message
         if (pto->nVersion == 0)
@@ -6374,14 +6373,10 @@ void SendMessages(CNode* pto, bool fSendTrickle)
 
         // Keep-alive ping. We send a nonce of zero because we don't use it anywhere
         // right now.
-        if (
-            pto->nLastSend && 
-            ((GetTime() - pto->nLastSend) > nPingInterval) && 
-            pto->vSend.empty()
-           ) 
+        if (pto->nLastSend && ((GetTime() - pto->nLastSend) > nPingInterval) &&
+            pto->vSend.empty())
         {
-            ::uint64_t 
-                nonce = 0;
+            ::uint64_t nonce = 0;
 
             if (pto->nVersion > BIP0031_VERSION)
                 pto->PushMessage("ping", nonce);
@@ -6389,28 +6384,26 @@ void SendMessages(CNode* pto, bool fSendTrickle)
                 pto->PushMessage("ping");
         }
 
-/*****************
-        // Start block sync
-        if (pto->fStartSync) 
-        {
-            pto->fStartSync = false;
-            pto->PushGetBlocks(chainActive.Tip(), uint256(0));  // what is the 0 here represent, if anything?
-        }
+        /*****************
+    // Start block sync
+    if (pto->fStartSync)
+    {
+        pto->fStartSync = false;
+        pto->PushGetBlocks(chainActive.Tip(), uint256(0));  // what is the 0
+here represent, if anything?
+    }
 *****************/
         // Resend wallet transactions that haven't gotten in a block yet
         ResendWalletTransactions();
 
         // Address refresh broadcast
-        static ::int64_t 
-            nLastRebroadcast;   // remember, statics are initialized to 0
-        if (
-            !IsInitialBlockDownload() && 
-            ((GetTime() - nLastRebroadcast) > nBroadcastInterval)
-           )
+        static ::int64_t nLastRebroadcast; // remember, statics are initialized to 0
+        if (!IsInitialBlockDownload() &&
+            ((GetTime() - nLastRebroadcast) > nBroadcastInterval))
         {
             {
                 LOCK(cs_vNodes);
-                BOOST_FOREACH(CNode* pnode, vNodes)
+                BOOST_FOREACH (CNode *pnode, vNodes)
                 {
                     // Periodically clear setAddrKnown to allow refresh broadcasts
                     if (nLastRebroadcast)
@@ -6435,14 +6428,14 @@ void SendMessages(CNode* pto, bool fSendTrickle)
         {
             vector<CAddress> vAddr;
             vAddr.reserve(pto->vAddrToSend.size());
-            BOOST_FOREACH(const CAddress& addr, pto->vAddrToSend)
+            BOOST_FOREACH (const CAddress &addr, pto->vAddrToSend)
             {
                 // returns true if wasn't already contained in the set
                 if (pto->setAddrKnown.insert(addr).second)
                 {
                     vAddr.push_back(addr);
                     // receiver rejects addr messages larger than 1000
-                    if (vAddr.size() >= 1000)       // why? What does 1000 mean?
+                    if (vAddr.size() >= 1000) // why? What does 1000 mean?
                     {
                         pto->PushMessage("addr", vAddr);
                         vAddr.clear();
@@ -6454,7 +6447,6 @@ void SendMessages(CNode* pto, bool fSendTrickle)
                 pto->PushMessage("addr", vAddr);
         }
 
-
         //
         // Message: inventory
         //
@@ -6464,7 +6456,7 @@ void SendMessages(CNode* pto, bool fSendTrickle)
             LOCK(pto->cs_inventory);
             vInv.reserve(pto->vInventoryToSend.size());
             vInvWait.reserve(pto->vInventoryToSend.size());
-            BOOST_FOREACH(const CInv& inv, pto->vInventoryToSend)
+            BOOST_FOREACH (const CInv &inv, pto->vInventoryToSend)
             {
                 if (pto->setInventoryKnown.count(inv))
                     continue;
@@ -6473,25 +6465,21 @@ void SendMessages(CNode* pto, bool fSendTrickle)
                 if (inv.type == MSG_TX && !fSendTrickle)
                 {
                     // 1/4 of tx invs blast to all immediately
-                    static uint256 
-                        hashSalt;
+                    static uint256 hashSalt;
 
                     if (hashSalt == 0)
                         hashSalt = GetRandHash();
 
-                    uint256 
-                        hashRand = inv.hash ^ hashSalt;
+                    uint256 hashRand = inv.hash ^ hashSalt;
 
                     hashRand = Hash(BEGIN(hashRand), END(hashRand));
 
-                    bool 
-                        fTrickleWait = ((hashRand & 3) != 0);
+                    bool fTrickleWait = ((hashRand & 3) != 0);
 
                     // always trickle our own transactions
                     if (!fTrickleWait)
                     {
-                        CWalletTx 
-                            wtx;
+                        CWalletTx wtx;
 
                         if (GetTransaction(inv.hash, wtx))
                             if (wtx.fFromMe)
@@ -6521,25 +6509,20 @@ void SendMessages(CNode* pto, bool fSendTrickle)
         if (!vInv.empty())
             pto->PushMessage("inv", vInv);
 
-
         //
         // Message: getdata
         //
-        vector<CInv> 
-            vGetData;
+        vector<CInv> vGetData;
 
-        ::int64_t 
-            nNow = GetTime() * 1000000;   //??? time now * 1,000,000 what is this about???
+        ::int64_t nNow =
+            GetTime() * 1000000; //??? time now * 1,000,000 what is this about???
 
-        CTxDB 
-            txdb("r");
+        CTxDB txdb("r");
 
-        while (
-                !pto->mapAskFor.empty() && 
-                ((*pto->mapAskFor.begin()).first <= nNow)
-              )
+        while (!pto->mapAskFor.empty() &&
+               ((*pto->mapAskFor.begin()).first <= nNow))
         {
-            const CInv& inv = (*pto->mapAskFor.begin()).second;
+            const CInv &inv = (*pto->mapAskFor.begin()).second;
             if (!AlreadyHave(txdb, inv))
             {
                 if (fDebugNet)
@@ -6556,7 +6539,6 @@ void SendMessages(CNode* pto, bool fSendTrickle)
         }
         if (!vGetData.empty())
             pto->PushMessage("getdata", vGetData);
-
     }
     return;
 }
