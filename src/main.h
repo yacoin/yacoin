@@ -190,6 +190,8 @@ class CTxIndex;
 class CScriptCheck;
 class CBlockLocator;
 class CValidationState;
+struct CNodeStateStats;
+
 /** The currently-connected chain of blocks. */
 /** An in-memory indexed chain of blocks. */
 class CChain {
@@ -249,6 +251,10 @@ extern CChain chainMostWork;
 void RegisterWallet(CWallet* pwalletIn);
 void UnregisterWallet(CWallet* pwalletIn);
 void SyncWithWallets(const CTransaction& tx, const CBlock* pblock = NULL, bool fUpdate = false, bool fConnect = true);
+/** Register with a network node to receive its signals */
+void RegisterNodeSignals(CNodeSignals& nodeSignals);
+/** Unregister a network node */
+void UnregisterNodeSignals(CNodeSignals& nodeSignals);
 bool ProcessBlock(CValidationState &state, CNode* pfrom, CBlock* pblock);
 bool CheckDiskSpace(::uint64_t nAdditionalBytes=0);
 FILE* OpenBlockFile(unsigned int nFile, unsigned int nBlockPos, const char* pszMode="rb");
@@ -258,8 +264,8 @@ void UnloadBlockIndex();
 bool LoadBlockIndex(bool fAllowNew=true);
 void PrintBlockTree();
 CBlockIndex* FindBlockByHeight(int nHeight);
-void ProcessMessages(CNode* pfrom);
-void SendMessages(CNode* pto, bool fSendTrickle);
+bool ProcessMessages(CNode* pfrom);
+bool SendMessages(CNode* pto, bool fSendTrickle);
 bool LoadExternalBlockFile(FILE* fileIn);
 
 // Run an instance of the script checking thread
@@ -289,6 +295,8 @@ void ResendWalletTransactions();
 
 bool VerifySignature(const CTransaction& txFrom, const CTransaction& txTo, unsigned int nIn, unsigned int flags, int nHashType);
 bool AbortNode(const std::string &msg);
+/** Get statistics from node state */
+bool GetNodeStateStats(NodeId nodeid, CNodeStateStats &stats);
 
 // yacoin: calculate Nfactor using timestamp
 extern unsigned char GetNfactor(::int64_t nTimestamp, bool fYac1dot0BlockOrTx = false);
@@ -328,6 +336,10 @@ bool isHardforkHappened();
 bool SetBestChain(CValidationState &state, CTxDB& txdb, CBlockIndex* pindexNew);
 /** Find the best known block, and make it the tip of the block chain */
 bool ActivateBestChain(CValidationState &state, CTxDB& txdb);
+
+struct CNodeStateStats {
+    int nMisbehavior;
+};
 
 /** Position on disk for a particular transaction. */
 class CDiskTxPos

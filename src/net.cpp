@@ -85,15 +85,6 @@ unsigned int nStakeMinAge = 30 * nSecondsPerDay, // 60 * 60 * 24 * 30; // 30
                          // WHAT ARE THE UNITS, seconds or blocks?????????? so I
                          // guess it IS seconds, actually 6 hours.
 
-static const int
-#ifdef WIN32
-    nDEFAULT_BAN_SCORE = 1000,
-    nDEFAULT_BAN_TIME_in_seconds = 3 * nSecondsperMinute;
-#else
-    nDEFAULT_BAN_SCORE = 100,
-    nDEFAULT_BAN_TIME_in_seconds = nHoursPerDay * nSecondsPerHour; // one day
-#endif
-
 // WM - static const int MAX_OUTBOUND_CONNECTIONS = 8;
 static const int DEFAULT_MAX_CONNECTIONS =
     125; // WM - Default value for -maxconnections= parameter.
@@ -160,7 +151,14 @@ CCriticalSection cs_vOneShots;
 CCriticalSection cs_setservAddNodeAddresses;
 CCriticalSection cs_vAddedNodes;
 
+NodeId nLastNodeId = 0;
+CCriticalSection cs_nLastNodeId;
+
 static CSemaphore *semOutbound = NULL;
+
+// Signals for message handling
+static CNodeSignals g_signals;
+CNodeSignals& GetNodeSignals() { return g_signals; }
 
 void AddOneShot(string strDest)
 {
@@ -659,12 +657,12 @@ void CNode::CloseSocketDisconnect()
         int nErr = closesocket(hSocket);
 
         printf("disconnecting node %s, lastsend = %s, lastrecv = %s, conntime = "
-               "%s, startingheight = %d, banscore = %d\n",
+               "%s, startingheight = %d\n",
                addrName.c_str(),
                DateTimeStrFormat("%Y-%m-%d %H:%M:%S", nLastSend).c_str(),
                DateTimeStrFormat("%Y-%m-%d %H:%M:%S", nLastRecv).c_str(),
                DateTimeStrFormat("%Y-%m-%d %H:%M:%S", nTimeConnected).c_str(),
-               nStartingHeight, nMisbehavior);
+               nStartingHeight);
         if (nErr)
         { // close socket errored!
             nErr = WSAGetLastError();
@@ -792,45 +790,21 @@ bool CNode::IsBanned(CNetAddr ip)
     return fResult;
 }
 
-bool CNode::Misbehaving(int howmuch) // banned if banscore  exceeeded
-{
-    if (addr.IsLocal())
+bool CNode::Ban(const CNetAddr &addr) {
+    int64_t banTime = GetTime()+GetArg("-bantime", nDEFAULT_BAN_TIME_in_seconds);  // Default 24-hour ban
     {
-        printf("Warning: Local node %s misbehaving (delta: %d)!\n",
-               addrName.c_str(), howmuch);
-        return false;
+        LOCK(cs_setBanned);
+        if (setBanned[addr] < banTime)
+            setBanned[addr] = banTime;
     }
-
-    nMisbehavior += howmuch;
-    printf("Misbehaving: %s (%d -> %d)", addr.ToString().c_str(),
-           nMisbehavior - howmuch, nMisbehavior);
-    if (nMisbehavior >= GetArg("-banscore", nDEFAULT_BAN_SCORE))
-    {
-        //::int64_t banTime = GetTime()+GetArg("-bantime", 60*60*24);  // Default
-        //24-hour ban YOU CAN MAKE THIS CLEAR WITHOUT A COMMENT!!
-
-        ::int64_t banTime =
-            GetTime() + GetArg("-bantime", nDEFAULT_BAN_TIME_in_seconds);
-
-        printf(" DISCONNECTING");
-        {
-            LOCK(cs_setBanned);
-            if (setBanned[addr] < banTime)
-                setBanned[addr] = banTime;
-        }
-        printf("(Node %s) Close connection to node due to misbehaving\n",
-               addrName.c_str());
-        CloseSocketDisconnect();
-        return true;
-    }
-    printf("\n");
-    return false;
+    return true;
 }
 
 #undef X
 #define X(name) stats.name = name
 void CNode::copyStats(CNodeStats &stats)
 {
+    stats.nodeid = this->GetId();
     X(nServices);
     X(nLastSend);
     X(nLastRecv);
@@ -841,7 +815,6 @@ void CNode::copyStats(CNodeStats &stats)
     X(fInbound);
     X(nReleaseTime);
     X(nStartingHeight);
-    X(nMisbehavior);
     X(nSendBytes);
     X(nRecvBytes);
     stats.fSyncNode = (this == pnodeSync);
@@ -2526,11 +2499,14 @@ void ThreadMessageHandler2(void *parg)
             pnodeTrickle = vNodesCopy[GetRand(vNodesCopy.size())];
 
         BOOST_FOREACH (CNode *pnode, vNodesCopy)
-        { // Receive messages
+        {
+            if (pnode->fDisconnect)
+                continue;
+            // Receive messages
             {
                 TRY_LOCK(pnode->cs_vRecv, lockRecv);
                 if (lockRecv)
-                    ProcessMessages(pnode);
+                    g_signals.ProcessMessages(pnode);
             }
             if (fShutdown)
             {
@@ -2545,7 +2521,7 @@ void ThreadMessageHandler2(void *parg)
             {
                 TRY_LOCK(pnode->cs_vSend, lockSend);
                 if (lockSend)
-                    SendMessages(pnode, pnode == pnodeTrickle);
+                    g_signals.SendMessages(pnode, pnode == pnodeTrickle);
             }
             if (fShutdown)
             {

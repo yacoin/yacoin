@@ -126,6 +126,7 @@ void Shutdown(void* parg)
 //        CTxDB().Close();
         bitdb.Flush(false);
         StopNode();
+        UnregisterNodeSignals(GetNodeSignals());
         {
             LOCK(cs_main);
             if (pwalletMain)
@@ -945,7 +946,7 @@ bool AppInit2()
     }
 
     // ********************************************************* Step 6: network initialization
-
+    RegisterNodeSignals(GetNodeSignals());
     int nSocksVersion = (int)(GetArg("-socks", 5));
 
 #ifdef WIN32

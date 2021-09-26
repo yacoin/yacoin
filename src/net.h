@@ -9,6 +9,7 @@
 #ifndef Q_MOC_RUN
 #include <boost/array.hpp>
 #include <boost/foreach.hpp>
+#include <boost/signals2/signal.hpp>
 #endif
 #include <openssl/rand.h>
 
@@ -75,6 +76,15 @@ const ::uint32_t
 
 const double nInflation = 0.02; // 2%
 
+static const int
+#ifdef WIN32
+    nDEFAULT_BAN_SCORE = 1000,
+    nDEFAULT_BAN_TIME_in_seconds = 3 * nSecondsperMinute;
+#else
+    nDEFAULT_BAN_SCORE = 100,
+    nDEFAULT_BAN_TIME_in_seconds = nHoursPerDay * nSecondsPerHour; // one day
+#endif
+
 extern ::int64_t nUpTimeStart;
 extern const unsigned int nStakeMaxAge, nOnedayOfAverageBlocks;
 extern unsigned int // not const because of fTestNet
@@ -129,6 +139,18 @@ bool BindListenPort(const CService &bindAddr,
                     std::string &strError = REF(std::string()));
 void StartNode(void *parg);
 bool StopNode();
+
+typedef int NodeId;
+
+// Signals for message handling
+struct CNodeSignals
+{
+    boost::signals2::signal<bool (CNode*)> ProcessMessages;
+    boost::signals2::signal<bool (CNode*, bool)> SendMessages;
+    boost::signals2::signal<void (NodeId, const CNode*)> InitializeNode;
+    boost::signals2::signal<void (NodeId)> FinalizeNode;
+};
+CNodeSignals& GetNodeSignals();
 
 enum
 {
@@ -215,10 +237,13 @@ extern std::map<CInv, CDataStream> mapRelay;
 extern std::deque<std::pair< ::int64_t, CInv> > vRelayExpiration;
 extern CCriticalSection cs_mapRelay;
 extern std::map<CInv, ::int64_t> mapAlreadyAskedFor;
+extern NodeId nLastNodeId;
+extern CCriticalSection cs_nLastNodeId;
 
 class CNodeStats
 {
 public:
+    NodeId nodeid;
     ::uint64_t nServices;
     ::int64_t nLastSend;
     ::int64_t nLastRecv;
@@ -229,7 +254,6 @@ public:
     bool fInbound;
     ::int64_t nReleaseTime;
     ::int32_t nStartingHeight;
-    ::int32_t nMisbehavior;
     ::uint64_t nSendBytes;
     ::uint64_t nRecvBytes;
     bool fSyncNode;
@@ -266,6 +290,7 @@ public:
     bool fSuccessfullyConnected;
     bool fDisconnect;
     CSemaphoreGrant grantOutbound;
+    NodeId id;
 
 protected:
     int nRefCount;
@@ -274,7 +299,6 @@ protected:
     // Key is IP address, value is banned-until-time
     static std::map<CNetAddr, ::int64_t> setBanned;
     static CCriticalSection cs_setBanned;
-    int nMisbehavior;
 
 public:
     ::int64_t nReleaseTime;
@@ -332,15 +356,20 @@ public:
         nStartingHeight = -1;
         fStartSync = false;
         fGetAddr = false;
-        nMisbehavior = 0;
         hashCheckpointKnown = 0;
         setInventoryKnown.max_size((size_t)SendBufferSize() / 1000);
+
+        {
+            LOCK(cs_nLastNodeId);
+            id = nLastNodeId++;
+        }
 
         // Be shy and don't send version until we hear
         if (
             //(hSocket != INVALID_SOCKET) && // TEST<<<<<<<<<<<<<<<<<<<< 1/16/16
             !fInbound)
             PushVersion();
+        GetNodeSignals().InitializeNode(GetId(), this);
     }
 
     ~CNode()
@@ -350,6 +379,7 @@ public:
             (void)closesocket(hSocket);
             hSocket = INVALID_SOCKET;
         }
+        GetNodeSignals().FinalizeNode(GetId());
     }
 
 private:
@@ -367,6 +397,10 @@ private:
     CNode &operator=(const CNode &);
 
 public:
+    NodeId GetId() const {
+      return id;
+    }
+
     int GetRefCount()
     {
         return std::max(nRefCount, 0) + (GetTime() < nReleaseTime ? 1 : 0);
@@ -752,7 +786,7 @@ public:
     // new code.
     static void ClearBanned(); // needed for unit testing
     static bool IsBanned(CNetAddr ip);
-    bool Misbehaving(int howmuch); // 1 == a little, 100 == a lot
+    static bool Ban(const CNetAddr &ip);
     void copyStats(CNodeStats &stats);
     // Network stats
     static void RecordBytesRecv(::uint64_t bytes);

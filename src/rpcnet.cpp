@@ -153,6 +153,8 @@ Value getpeerinfo(const Array& params, bool fHelp)
     BOOST_FOREACH(const CNodeStats& stats, vstats) {
         Object obj;
 
+        CNodeStateStats statestats;
+        bool fStateStats = GetNodeStateStats(stats.nodeid, statestats);
         obj.push_back(Pair("addr", stats.addrName));
         obj.push_back(Pair("services", strprintf("%08" PRIx64, stats.nServices)));
       //obj.push_back(Pair("lastsend", (boost::int64_t)stats.nLastSend));
@@ -168,7 +170,9 @@ Value getpeerinfo(const Array& params, bool fHelp)
         obj.push_back(Pair("inbound", stats.fInbound));
         obj.push_back(Pair("releasetime", (boost::int64_t)stats.nReleaseTime));
         obj.push_back(Pair("startingheight", stats.nStartingHeight));
-        obj.push_back(Pair("banscore", stats.nMisbehavior));
+        if (fStateStats) {
+            obj.push_back(Pair("banscore", statestats.nMisbehavior));
+        }
         if (stats.fSyncNode)
             obj.push_back(Pair("syncnode", true));
         ret.push_back(obj);

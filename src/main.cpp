@@ -234,7 +234,7 @@ uint32_t nBlockSequenceId = 1;
 
 // Sources of received blocks, to be able to send them reject messages or ban
 // them, if processing happens afterwards. Protected by cs_main.
-map<uint256, CNode*> mapBlockSource;
+map<uint256, NodeId> mapBlockSource;
 //////////////////////////////////////////////////////////////////////////////
 //
 // dispatching functions
@@ -340,9 +340,83 @@ void ResendWalletTransactions()
         pwallet->ResendWalletTransactions();
 }
 
+//////////////////////////////////////////////////////////////////////////////
+//
+// Registration of network node signals.
+//
 
+namespace {
 
+// Maintain validation-specific state about nodes, protected by cs_main, instead
+// by CNode's own locks. This simplifies asynchronous operation, where
+// processing of incoming data is done after the ProcessMessage call returns,
+// and we're no longer holding the node's locks.
+struct CNodeState {
+    // Accumulated misbehaviour score for this peer.
+    int nMisbehavior;
+    // Whether this peer should be disconnected and banned.
+    bool fShouldBan;
+    // String name of this peer (debugging/logging purposes).
+    std::string name;
 
+    CNodeState() {
+        nMisbehavior = 0;
+        fShouldBan = false;
+    }
+};
+
+// Map maintaining per-node state. Requires cs_main.
+map<NodeId, CNodeState> mapNodeState;
+
+// Requires cs_main.
+CNodeState *State(NodeId pnode) {
+    map<NodeId, CNodeState>::iterator it = mapNodeState.find(pnode);
+    if (it == mapNodeState.end())
+        return NULL;
+    return &it->second;
+}
+
+void InitializeNode(NodeId nodeid, const CNode *pnode) {
+    LOCK(cs_main);
+    CNodeState &state = mapNodeState.insert(std::make_pair(nodeid, CNodeState())).first->second;
+    state.name = pnode->addrName;
+}
+
+void FinalizeNode(NodeId nodeid) {
+    LOCK(cs_main);
+    mapNodeState.erase(nodeid);
+}
+}
+
+bool GetNodeStateStats(NodeId nodeid, CNodeStateStats &stats) {
+    LOCK(cs_main);
+    CNodeState *state = State(nodeid);
+    if (state == NULL)
+        return false;
+    stats.nMisbehavior = state->nMisbehavior;
+    return true;
+}
+
+//////////////////////////////////////////////////////////////////////////////
+//
+// Registration of network node signals.
+//
+
+void RegisterNodeSignals(CNodeSignals& nodeSignals)
+{
+    nodeSignals.ProcessMessages.connect(&ProcessMessages);
+    nodeSignals.SendMessages.connect(&SendMessages);
+    nodeSignals.InitializeNode.connect(&InitializeNode);
+    nodeSignals.FinalizeNode.connect(&FinalizeNode);
+}
+
+void UnregisterNodeSignals(CNodeSignals& nodeSignals)
+{
+    nodeSignals.ProcessMessages.disconnect(&ProcessMessages);
+    nodeSignals.SendMessages.disconnect(&SendMessages);
+    nodeSignals.InitializeNode.disconnect(&InitializeNode);
+    nodeSignals.FinalizeNode.disconnect(&FinalizeNode);
+}
 
 
 
@@ -3212,6 +3286,26 @@ bool CBlock::ConnectBlock(CValidationState &state, CTxDB& txdb, CBlockIndex* pin
     return true;
 }
 
+void Misbehaving(NodeId pnode, int howmuch)
+{
+    if (howmuch == 0)
+        return;
+
+    CNodeState *state = State(pnode);
+    if (state == NULL)
+        return;
+
+    state->nMisbehavior += howmuch;
+    if (state->nMisbehavior >= GetArg("-banscore", nDEFAULT_BAN_SCORE))
+    {
+        printf("Misbehaving: %s (%d -> %d) BAN THRESHOLD EXCEEDED\n", state->name.c_str(), state->nMisbehavior-howmuch, state->nMisbehavior);
+        printf("(Node %s) Close connection to node due to misbehaving\n",
+                state->name.c_str());
+        state->fShouldBan = true;
+    } else
+        printf("Misbehaving: %s (%d -> %d)\n", state->name.c_str(), state->nMisbehavior-howmuch, state->nMisbehavior);
+}
+
 void static InvalidChainFound(CBlockIndex* pindexNew)
 {
     if (!pindexBestInvalid || pindexNew->bnChainTrust > pindexBestInvalid->bnChainTrust)
@@ -3240,9 +3334,9 @@ void static InvalidChainFound(CBlockIndex* pindexNew)
 void static InvalidBlockFound(const CValidationState &state, CTxDB& txdb, CBlockIndex *pindex) {
     int nDoS = 0;
     if (state.IsInvalid(nDoS)) {
-        std::map<uint256, CNode*>::iterator it = mapBlockSource.find(pindex->GetBlockHash());
-        if (it != mapBlockSource.end() && nDoS > 0) {
-            it->second->Misbehaving(nDoS);
+        std::map<uint256, NodeId>::iterator it = mapBlockSource.find(pindex->GetBlockHash());
+        if (it != mapBlockSource.end() && State(it->second) && nDoS > 0) {
+            Misbehaving(it->second, nDoS);
         }
     }
     if (!state.CorruptionPossible()) {
@@ -4334,7 +4428,7 @@ bool ProcessBlock(CValidationState &state, CNode* pfrom, CBlock* pblock)
         if (bnNewBlock > bnRequired)
         {
             if (pfrom)
-                (void)pfrom->Misbehaving(100);
+                Misbehaving(pfrom->GetId(), 100);
             return error("ProcessBlock () : block with too little %s", pblock->IsProofOfStake()? "proof-of-stake" : "proof-of-work");
         }
     }
@@ -5302,7 +5396,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
         // Each connection can only send one version message
         if (pfrom->nVersion != 0)
         {
-            (void)pfrom->Misbehaving(1);
+            Misbehaving(pfrom->GetId(), 1);
             return false;
         }
 
@@ -5434,7 +5528,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
     {
         // Must have a version message before anything else
         printf("Misbehaving received version = 0\n");
-        (void)pfrom->Misbehaving(1);      // tell me what the 1 means? Or intends?? If anything???
+        Misbehaving(pfrom->GetId(), 1);      // tell me what the 1 means? Or intends?? If anything???
         return false;
     }
 
@@ -5463,7 +5557,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
             return true;    // meaning what?
         if (vAddr.size() > 1000)
         {
-            (void)pfrom->Misbehaving(20);
+            Misbehaving(pfrom->GetId(), 20);
             return error("message addr size() = %" PRIszu " too big!?", vAddr.size());
         }
 
@@ -5571,7 +5665,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
         vRecv >> vInv;
         if (vInv.size() > MAX_INV_SZ)
         {
-            (void)pfrom->Misbehaving(20);
+            Misbehaving(pfrom->GetId(), 20);
             return error("message inv size() = %" PRIszu " too big!", vInv.size());
         }
 
@@ -5647,7 +5741,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
         vRecv >> vInv;      // how does this allocate into a vector?
         if (vInv.size() > MAX_INV_SZ)
         {
-            (void)pfrom->Misbehaving(20);     // OK, what's the magic 20 about? units? intent??
+            Misbehaving(pfrom->GetId(), 20);     // OK, what's the magic 20 about? units? intent??
             return error("message getdata size() = %" PRIszu " too big!", vInv.size());
         }
 
@@ -5952,7 +6046,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
         if (state.IsInvalid(nDoS))
         {
             if (nDoS > 0)
-                (void)pfrom->Misbehaving(nDoS);
+                Misbehaving(pfrom->GetId(), nDoS);
         }
     }
 
@@ -5983,7 +6077,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
         Sleep( nOneMillisecond );  // let's try this arbitrary value? 
 
         // Remember who we got this block from.
-        mapBlockSource[inv.hash] = pfrom;
+        mapBlockSource[inv.hash] = pfrom->GetId();
 
         MeasureTime processBlock;
         CValidationState state;
@@ -6145,7 +6239,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
                 // This isn't a Misbehaving(100) (immediate ban) because the
                 // peer might be an older or different implementation with
                 // a different signature key, etc.
-                (void)pfrom->Misbehaving(10);
+                Misbehaving(pfrom->GetId(), 10);
             }
         }
     }
@@ -6174,13 +6268,13 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
     return true;
 }
 
-void ProcessMessages(CNode* pfrom)
+bool ProcessMessages(CNode* pfrom)
 {
     CDataStream& 
         vRecv = pfrom->vRecv;
 
     if (vRecv.empty())
-        return;
+        return true;
     //if (fDebug)
     //    printf("ProcessMessages(%u bytes)\n", vRecv.size());
 
@@ -6287,7 +6381,7 @@ void ProcessMessages(CNode* pfrom)
                 fRet = ProcessMessage(pfrom, strCommand, vMsg);
             }
             if (fShutdown)
-                return;
+                return true;
         }
         catch (std::ios_base::failure& e)
         {
@@ -6334,17 +6428,17 @@ void ProcessMessages(CNode* pfrom)
     }
 
     vRecv.Compact();
-    return;
+    return true;
 }
 
-void SendMessages(CNode *pto, bool fSendTrickle)
+bool SendMessages(CNode *pto, bool fSendTrickle)
 {
     TRY_LOCK(cs_main, lockMain);
     if (lockMain)
     {
         // Don't send anything until we get their version message
         if (pto->nVersion == 0)
-            return;
+            return true;
 
         // Keep-alive ping. We send a nonce of zero because we don't use it anywhere
         // right now.
@@ -6359,15 +6453,6 @@ void SendMessages(CNode *pto, bool fSendTrickle)
                 pto->PushMessage("ping");
         }
 
-        /*****************
-    // Start block sync
-    if (pto->fStartSync)
-    {
-        pto->fStartSync = false;
-        pto->PushGetBlocks(chainActive.Tip(), uint256(0));  // what is the 0
-here represent, if anything?
-    }
-*****************/
         // Resend wallet transactions that haven't gotten in a block yet
         ResendWalletTransactions();
 
@@ -6420,6 +6505,17 @@ here represent, if anything?
             pto->vAddrToSend.clear();
             if (!vAddr.empty())
                 pto->PushMessage("addr", vAddr);
+        }
+
+        CNodeState &state = *State(pto->GetId());
+        if (state.fShouldBan) {
+            if (pto->addr.IsLocal())
+                printf("Warning: not banning local node %s!\n", pto->addrName.c_str());
+            else {
+                pto->fDisconnect = true;
+                CNode::Ban(pto->addr);
+            }
+            state.fShouldBan = false;
         }
 
         // Start block sync
@@ -6521,7 +6617,7 @@ here represent, if anything?
         if (!vGetData.empty())
             pto->PushMessage("getdata", vGetData);
     }
-    return;
+    return true;
 }
 
 class CMainCleanup
