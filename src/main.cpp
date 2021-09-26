@@ -51,6 +51,7 @@
 
 using namespace boost;
 
+using std::list;
 using std::set;
 using std::string;
 using std::vector;
@@ -235,6 +236,15 @@ uint32_t nBlockSequenceId = 1;
 // Sources of received blocks, to be able to send them reject messages or ban
 // them, if processing happens afterwards. Protected by cs_main.
 map<uint256, NodeId> mapBlockSource;
+// Blocks that are in flight, and that are in the queue to be downloaded.
+// Protected by cs_main.
+struct QueuedBlock {
+    uint256 hash;
+    int64_t nTime;  // Time of "getdata" request in microseconds.
+    int nQueuedBefore;  // Number of blocks in flight at the time of request.
+};
+map<uint256, pair<NodeId, list<QueuedBlock>::iterator> > mapBlocksInFlight;
+map<uint256, pair<NodeId, list<uint256>::iterator> > mapBlocksToDownload;
 //////////////////////////////////////////////////////////////////////////////
 //
 // dispatching functions
@@ -358,10 +368,20 @@ struct CNodeState {
     bool fShouldBan;
     // String name of this peer (debugging/logging purposes).
     std::string name;
+    list<QueuedBlock> vBlocksInFlight;
+    int nBlocksInFlight;
+    list<uint256> vBlocksToDownload;
+    int nBlocksToDownload;
+    int64_t nLastBlockReceive;
+    int64_t nLastBlockProcess;
 
     CNodeState() {
         nMisbehavior = 0;
         fShouldBan = false;
+        nBlocksToDownload = 0;
+        nBlocksInFlight = 0;
+        nLastBlockReceive = 0;
+        nLastBlockProcess = 0;
     }
 };
 
@@ -384,8 +404,70 @@ void InitializeNode(NodeId nodeid, const CNode *pnode) {
 
 void FinalizeNode(NodeId nodeid) {
     LOCK(cs_main);
+    CNodeState *state = State(nodeid);
+
+    BOOST_FOREACH(const QueuedBlock& entry, state->vBlocksInFlight)
+        mapBlocksInFlight.erase(entry.hash);
+    BOOST_FOREACH(const uint256& hash, state->vBlocksToDownload)
+        mapBlocksToDownload.erase(hash);
     mapNodeState.erase(nodeid);
 }
+
+// Requires cs_main.
+void MarkBlockAsReceived(const uint256 &hash, NodeId nodeFrom = -1) {
+    map<uint256, pair<NodeId, list<uint256>::iterator> >::iterator itToDownload = mapBlocksToDownload.find(hash);
+    if (itToDownload != mapBlocksToDownload.end()) {
+        CNodeState *state = State(itToDownload->second.first);
+        state->vBlocksToDownload.erase(itToDownload->second.second);
+        state->nBlocksToDownload--;
+        mapBlocksToDownload.erase(itToDownload);
+    }
+
+    map<uint256, pair<NodeId, list<QueuedBlock>::iterator> >::iterator itInFlight = mapBlocksInFlight.find(hash);
+    if (itInFlight != mapBlocksInFlight.end()) {
+        CNodeState *state = State(itInFlight->second.first);
+        state->vBlocksInFlight.erase(itInFlight->second.second);
+        state->nBlocksInFlight--;
+        if (itInFlight->second.first == nodeFrom)
+            state->nLastBlockReceive = GetTime();
+        mapBlocksInFlight.erase(itInFlight);
+    }
+
+}
+
+// Requires cs_main.
+bool AddBlockToQueue(NodeId nodeid, const uint256 &hash) {
+    if (mapBlocksToDownload.count(hash) || mapBlocksInFlight.count(hash))
+        return false;
+
+    CNodeState *state = State(nodeid);
+    if (state == NULL)
+        return false;
+
+    list<uint256>::iterator it = state->vBlocksToDownload.insert(state->vBlocksToDownload.end(), hash);
+    state->nBlocksToDownload++;
+    if (state->nBlocksToDownload > 5000)
+        Misbehaving(nodeid, 10);
+    mapBlocksToDownload[hash] = std::make_pair(nodeid, it);
+    return true;
+}
+
+// Requires cs_main.
+void MarkBlockAsInFlight(NodeId nodeid, const uint256 &hash) {
+    CNodeState *state = State(nodeid);
+    assert(state != NULL);
+
+    // Make sure it's not listed somewhere already.
+    MarkBlockAsReceived(hash);
+
+    QueuedBlock newentry = {hash, GetTime(), state->nBlocksInFlight};
+    if (state->nBlocksInFlight == 0)
+        state->nLastBlockReceive = newentry.nTime; // Reset when a first request is sent.
+    list<QueuedBlock>::iterator it = state->vBlocksInFlight.insert(state->vBlocksInFlight.end(), newentry);
+    state->nBlocksInFlight++;
+    mapBlocksInFlight[hash] = std::make_pair(nodeid, it);
+}
+
 }
 
 bool GetNodeStateStats(NodeId nodeid, CNodeStateStats &stats) {
@@ -3286,6 +3368,7 @@ bool CBlock::ConnectBlock(CValidationState &state, CTxDB& txdb, CBlockIndex* pin
     return true;
 }
 
+// Requires cs_main.
 void Misbehaving(NodeId pnode, int howmuch)
 {
     if (howmuch == 0)
@@ -4346,8 +4429,6 @@ bool ProcessBlock(CValidationState &state, CNode* pfrom, CBlock* pblock)
     if (!pblock->CheckBlock(state, true, true,
             (pblock->nTime > Checkpoints::GetLastCheckpointTime())))
     {
-//        if (state.CorruptionPossible())
-        mapAlreadyAskedFor.erase(CInv(MSG_BLOCK, hash));
         return error("ProcessBlock () : CheckBlock FAILED");
     }
 
@@ -5334,6 +5415,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
         return true;
     }
 
+    State(pfrom->GetId())->nLastBlockProcess = GetTime();
 /******************
     if (strCommand == "version")
     else if (strCommand == "verack")
@@ -5654,13 +5736,11 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
     }
     //_________________________________________________________________________
 
-
     // rx'ed an inv(entory) of Tx's or Blocks
 
     else if (strCommand == "inv")
     {
-        vector<CInv> 
-            vInv;
+        vector<CInv> vInv;
 
         vRecv >> vInv;
         if (vInv.size() > MAX_INV_SZ)
@@ -5669,62 +5749,36 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
             return error("message inv size() = %" PRIszu " too big!", vInv.size());
         }
 
-        // find last block in inv vector
-        unsigned int 
-            nLastBlock = (unsigned int)(-1);
-        for (unsigned int nInv = 0; nInv < vInv.size(); ++nInv) 
-        {
-            if (vInv[vInv.size() - 1 - nInv].type == MSG_BLOCK) 
-            {
-                nLastBlock = vInv.size() - 1 - nInv;
-                break;
-            }
-        }
-        CTxDB 
-            txdb("r");
+        CTxDB txdb("r");
 
         for (unsigned int nInv = 0; nInv < vInv.size(); ++nInv)
         {
-            const CInv 
-                &inv = vInv[nInv];
+            const CInv &inv = vInv[nInv];
 
             if (fShutdown)
                 return true;
             pfrom->AddInventoryKnown(inv);
 
-            bool 
-                fAlreadyHave = AlreadyHave(txdb, inv);
+            bool fAlreadyHave = AlreadyHave(txdb, inv);
 
             if (fDebug)
-                printf(
-                        "  got inventory: %s  %s\n", 
-                        inv.ToString().c_str(), 
-                        fAlreadyHave ? "have" : "new"
-                      );
+                printf("  got inventory: %s  %s\n", inv.ToString().c_str(),
+                       fAlreadyHave ? "have" : "new");
 
-            if (!fAlreadyHave)      // that is, it's new to us
-                pfrom->AskFor(inv);
-            else    // we already have these Txs or blocks in our inventory
+            if (!fAlreadyHave) // that is, it's new to us
             {
-                if (                                    // what is this test in aid of, I wonder?
-                    (inv.type == MSG_BLOCK) &&          // it's a block we have
-                    mapOrphanBlocks.count(inv.hash)     // & it's an orphan
-                   ) 
-                {                                       // and what does this intend?
-                    pfrom->PushGetBlocks(chainActive.Tip(), GetOrphanRoot(mapOrphanBlocks[inv.hash]));
-                } 
-                else        // it's a Tx or it's not an orphan block
-                {
-                    if (nInv == nLastBlock) 
-                    {
-                        // In case we are on a very long side-chain, it is possible that we already have
-                        // the last block in an inv bundle sent in response to getblocks. Try to detect
-                        // this situation and push another getblocks to continue.
-                        pfrom->PushGetBlocks(mapBlockIndex[inv.hash], uint256(0));
-                        if (fDebug)
-                            printf("force request: %s\n", inv.ToString().c_str());
-                    }
-                }
+                if (inv.type == MSG_BLOCK)
+                    AddBlockToQueue(pfrom->GetId(), inv.hash);
+                else
+                    pfrom->AskFor(inv);
+            }
+            else if (                           // what is this test in aid of, I wonder?
+                (inv.type == MSG_BLOCK) &&      // it's a block we have
+                mapOrphanBlocks.count(inv.hash) // & it's an orphan
+            )
+            { // and what does this intend?
+                pfrom->PushGetBlocks(chainActive.Tip(),
+                                     GetOrphanRoot(mapOrphanBlocks[inv.hash]));
             }
             // Track requests for our stuff
             Inventory(inv.hash);
@@ -5732,109 +5786,94 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
     }
 
     //_________________________________________________________________________
-    // rx'ed a getdata request 
+    // rx'ed a getdata request
 
-    else if (strCommand == "getdata")
-    {
-        vector<CInv> 
-            vInv;
-        vRecv >> vInv;      // how does this allocate into a vector?
-        if (vInv.size() > MAX_INV_SZ)
+    else if (strCommand == "getdata") {
+      vector<CInv> vInv;
+      vRecv >> vInv; // how does this allocate into a vector?
+      if (vInv.size() > MAX_INV_SZ) {
+        Misbehaving(pfrom->GetId(),
+                    20); // OK, what's the magic 20 about? units? intent??
+        return error("message getdata size() = %" PRIszu " too big!",
+                     vInv.size());
+      }
+
+      if (fDebugNet || (vInv.size() != 1)) // what if it is 1?
+        printf("rx'd a getdata request (%" PRIszu " invsz) from %s\n",
+               vInv.size(), pfrom->addr.ToString().c_str());
+
+      BOOST_FOREACH (const CInv &inv, vInv) {
+        if (fShutdown)
+          return true;
+        if (fDebugNet || (vInv.size() == 1))
+          printf("rx'd a getdata request for: %s from %s\n",
+                 inv.ToString().c_str(), pfrom->addr.ToString().c_str());
+        // there are only 2 types" a block or a transaction being requested as
+        // inventory
+        if (inv.type ==
+            MSG_BLOCK) // I persume this means the node requested a block
         {
-            Misbehaving(pfrom->GetId(), 20);     // OK, what's the magic 20 about? units? intent??
-            return error("message getdata size() = %" PRIszu " too big!", vInv.size());
+          // Send block from disk
+          map<uint256, CBlockIndex *>::iterator mi =
+              mapBlockIndex.find(inv.hash);
+
+          if (mi != mapBlockIndex.end()) // means we found it
+          {
+            CBlock block;
+
+            block.ReadFromDisk((*mi).second);
+            pfrom->PushMessage("block", block);
+
+            // Trigger them to send a getblocks request for the next batch of
+            // inventory what does that mean, exactly?
+            if (inv.hash == pfrom->hashContinue) {
+              // ppcoin: send latest proof-of-work block to allow the
+              // download node to accept as orphan (proof-of-stake
+              // block might be rejected by stake connection check)
+              vector<CInv> vInv;
+
+              vInv.push_back(CInv(
+                  MSG_BLOCK,
+                  GetLastBlockIndex(chainActive.Tip(), false)->GetBlockHash()));
+              pfrom->PushMessage("inv", vInv);
+              pfrom->hashContinue = 0;
+            }
+          }
+          Sleep(nOneMillisecond);     // just to test if RPC can run?
+        } else if (inv.IsKnownType()) // it must be a transaction
+        {
+          // Send stream from relay memory
+          bool pushed = false;
+          {
+            LOCK(cs_mapRelay);
+            map<CInv, CDataStream>::iterator mi = mapRelay.find(inv);
+
+            if (mi != mapRelay.end()) // we found it
+            {
+              pfrom->PushMessage(inv.GetCommand(), (*mi).second);
+              pushed = true;
+            }
+          }
+          if (!pushed &&           // not from relay memory
+              (inv.type == MSG_TX) // by analogy, I presume a Tx is requested?
+              )                    // inventory is not here
+          {
+            LOCK(mempool.cs);
+            if (mempool.exists(inv.hash)) {
+              CTransaction tx = mempool.lookup(inv.hash);
+
+              CDataStream ss(SER_NETWORK, PROTOCOL_VERSION);
+
+              ss.reserve(1000); // is this related to anything else?
+              ss << tx;
+              pfrom->PushMessage("tx", ss);
+            }
+          }
         }
 
-        if (fDebugNet || (vInv.size() != 1))    // what if it is 1?
-            printf("rx'd a getdata request (%" PRIszu " invsz) from %s\n", 
-                    vInv.size()
-                    , pfrom->addr.ToString().c_str()
-                  );
-
-        BOOST_FOREACH(const CInv& inv, vInv)
-        {
-            if (fShutdown)
-                return true;
-            if (fDebugNet || (vInv.size() == 1))
-                printf("rx'd a getdata request for: %s from %s\n", 
-                        inv.ToString().c_str()
-                        , pfrom->addr.ToString().c_str()
-                      );
-            // there are only 2 types" a block or a transaction being requested as inventory
-            if (inv.type == MSG_BLOCK)      // I persume this means the node requested a block
-            {
-                // Send block from disk
-                map<uint256, CBlockIndex*>::iterator 
-                    mi = mapBlockIndex.find(inv.hash);
-
-                if (mi != mapBlockIndex.end())  // means we found it
-                {
-                    CBlock 
-                        block;
-
-                    block.ReadFromDisk((*mi).second);
-                    pfrom->PushMessage("block", block);
-
-                    // Trigger them to send a getblocks request for the next batch of inventory
-                    // what does that mean, exactly?
-                    if (inv.hash == pfrom->hashContinue)
-                    {
-                        // ppcoin: send latest proof-of-work block to allow the
-                        // download node to accept as orphan (proof-of-stake 
-                        // block might be rejected by stake connection check)
-                        vector<CInv> 
-                            vInv;
-
-                        vInv.push_back(CInv(MSG_BLOCK, 
-                                            GetLastBlockIndex(chainActive.Tip(), false)->GetBlockHash()
-                                           )
-                                      );
-                        pfrom->PushMessage("inv", vInv);
-                        pfrom->hashContinue = 0;
-                    }
-                }
-                Sleep( nOneMillisecond );   // just to test if RPC can run?
-            }
-            else if (inv.IsKnownType()) // it must be a transaction
-            {
-                // Send stream from relay memory
-                bool 
-                    pushed = false;
-                {
-                    LOCK(cs_mapRelay);
-                    map<CInv, CDataStream>::iterator 
-                        mi = mapRelay.find(inv);
-
-                    if (mi != mapRelay.end())   // we found it
-                    {
-                        pfrom->PushMessage(inv.GetCommand(), (*mi).second);
-                        pushed = true;
-                    }
-                }
-                if (
-                    !pushed &&                  // not from relay memory
-                    (inv.type == MSG_TX)        // by analogy, I presume a Tx is requested?
-                   ) // inventory is not here
-                {
-                    LOCK(mempool.cs);
-                    if (mempool.exists(inv.hash)) 
-                    {
-                        CTransaction 
-                            tx = mempool.lookup(inv.hash);
-
-                        CDataStream 
-                            ss(SER_NETWORK, PROTOCOL_VERSION);
-
-                        ss.reserve(1000);           // is this related to anything else?
-                        ss << tx;
-                        pfrom->PushMessage("tx", ss);
-                    }
-                }
-            }
-
-            // Track requests for our stuff
-            Inventory(inv.hash);
-        }
+        // Track requests for our stuff
+        Inventory(inv.hash);
+      }
     }
 
     //_________________________________________________________________________
@@ -6078,6 +6117,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
 
         // Remember who we got this block from.
         mapBlockSource[inv.hash] = pfrom->GetId();
+        MarkBlockAsReceived(inv.hash, pfrom->GetId());
 
         MeasureTime processBlock;
         CValidationState state;
@@ -6586,18 +6626,42 @@ bool SendMessages(CNode *pto, bool fSendTrickle)
         if (!vInv.empty())
             pto->PushMessage("inv", vInv);
 
+        // Detect stalled peers. Require that blocks are in flight, we haven't
+        // received a (requested) block in one minute, and that all blocks are
+        // in flight for over 3 minutes, since we first had a chance to
+        // process an incoming block.
+//        if (!pto->fDisconnect && state.nBlocksInFlight &&
+//            state.nLastBlockReceive < state.nLastBlockProcess - BLOCK_DOWNLOAD_TIMEOUT &&
+//            state.vBlocksInFlight.front().nTime < state.nLastBlockProcess - 3*BLOCK_DOWNLOAD_TIMEOUT) {
+//            printf("Peer %s is stalling block download, disconnecting\n", state.name.c_str());
+//            pto->fDisconnect = true;
+//        }
+
+        //
+        // Message: getdata (blocks)
+        //
+        vector<CInv> vGetData;
+        while (!pto->fDisconnect && state.nBlocksToDownload && state.nBlocksInFlight <= MAX_BLOCKS_IN_TRANSIT_PER_PEER) {
+            uint256 hash = state.vBlocksToDownload.front();
+            vGetData.push_back(CInv(MSG_BLOCK, hash));
+            MarkBlockAsInFlight(pto->GetId(), hash);
+            printf("Requesting block %s from %s\n", hash.ToString().c_str(), state.name.c_str());
+            if (vGetData.size() >= 1000)
+            {
+                pto->PushMessage("getdata", vGetData);
+                vGetData.clear();
+            }
+        }
+
         //
         // Message: getdata
         //
-        vector<CInv> vGetData;
-
         ::int64_t nNow =
             GetTime() * 1000000; //??? time now * 1,000,000 what is this about???
 
         CTxDB txdb("r");
 
-        while (!pto->mapAskFor.empty() &&
-               ((*pto->mapAskFor.begin()).first <= nNow))
+        while (!pto->fDisconnect && !pto->mapAskFor.empty() && (*pto->mapAskFor.begin()).first <= nNow)
         {
             const CInv &inv = (*pto->mapAskFor.begin()).second;
             if (!AlreadyHave(txdb, inv))
