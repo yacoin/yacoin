@@ -5397,31 +5397,6 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
             }
         }
 
-        // Ask the first connected node for block updates
-        static int 
-            nAskedForBlocks = 0;
-
-        if (
-            !pfrom->fClient && 
-            !pfrom->fOneShot &&
-          //(pfrom->nStartingHeight > (chainActive.Height() - 144)) &&   // this is probably Bitcoin???, so
-            (pfrom->nStartingHeight > (chainActive.Height() - (int)nOnedayOfAverageBlocks)) 
-            // this is unneccessary since nodeis known to be >= 60006, see l. 3605
-            //&&
-            //(
-            // (pnode->nVersion < NOBLKS_VERSION_START) || // why <60002 || >= 60005
-            // (pnode->nVersion >= NOBLKS_VERSION_END)    // why are 60002, 3, 4 taboo?
-            //) 
-            &&
-            (
-             (nAskedForBlocks < 1) || (vNodes.size() <= 1)
-            )
-           )
-        {
-            ++nAskedForBlocks;
-            pfrom->PushGetBlocks(chainActive.Tip(), uint256(0));   // why the 0 hash, I wonder?
-        }
-
         // Relay alerts
         {
             LOCK(cs_mapAlerts);
@@ -6445,6 +6420,12 @@ here represent, if anything?
             pto->vAddrToSend.clear();
             if (!vAddr.empty())
                 pto->PushMessage("addr", vAddr);
+        }
+
+        // Start block sync
+        if (pto->fStartSync) {
+            pto->fStartSync = false;
+            pto->PushGetBlocks(chainActive.Tip(), uint256(0));
         }
 
         //

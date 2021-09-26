@@ -2426,7 +2426,10 @@ bool OpenNetworkConnection(const CAddress &addrConnect,
 
 // for now, use a very simple selection metric: the node from which we received
 // most recently
-double static NodeSyncScore(const CNode *pnode) { return -pnode->nLastRecv; }
+double static NodeSyncScore(const CNode *pnode)
+{
+    return -pnode->nLastRecv;
+}
 
 void static StartSync(const vector<CNode *> &vNodes)
 {
@@ -2441,8 +2444,6 @@ void static StartSync(const vector<CNode *> &vNodes)
             // check preconditions for allowing a sync
             if (!pnode->fClient && !pnode->fOneShot && !pnode->fDisconnect &&
                 pnode->fSuccessfullyConnected &&
-                //(pnode->nStartingHeight > (chainActive.Height() - 144)) &&   //
-                //within one day if BTC !!!???
                 (pnode->nStartingHeight >
                  (chainActive.Height() - (int)nOnedayOfAverageBlocks)) && // perhaps
                 ((pnode->nVersion < NOBLKS_VERSION_START) ||              // why <60002 || >= 60005
@@ -2514,10 +2515,10 @@ void ThreadMessageHandler2(void *parg)
                     fHaveSyncNode = true;
             }
         }
-        /*******************
-    if (!fHaveSyncNode)
-        StartSync(vNodesCopy);
-*******************/
+
+        if (!fHaveSyncNode)
+            StartSync(vNodesCopy);
+
         // Poll the connected nodes for messages
         CNode *pnodeTrickle = NULL;
 
