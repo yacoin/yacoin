@@ -151,6 +151,7 @@ extern ::uint32_t nMinEase; // minimum ease corresponds to highest difficulty
 extern ::int64_t nTransactionFee;
 extern ::int64_t nMinimumInputValue;
 extern bool fUseFastIndex;
+extern bool fReindex;
 extern int nScriptCheckThreads;
 extern const uint256 entropyStore[38];
 extern bool fStoreBlockHashToDb;
@@ -1928,7 +1929,10 @@ public:
         READWRITE(nBits);
         READWRITE(nNonce);
         READWRITE(blockHash);
-        READWRITE(nStatus);
+        if (!fReindex)
+        {
+            READWRITE(nStatus);
+        }
     )
 
     uint256 GetBlockHash() const

@@ -56,6 +56,7 @@ unsigned int nNodeLifespan;
 unsigned int nMinerSleep;
 bool fUseFastIndex;
 bool fStoreBlockHashToDb;
+bool fReindex;
 bool fUseFastStakeMiner;
 bool fUseMemoryLog;
 enum Checkpoints::CPMode CheckpointsMode;
@@ -554,6 +555,7 @@ bool AppInit2()
     nNodeLifespan = (unsigned int)(GetArg("-addrlifespan", 7));
     fUseFastIndex = GetBoolArg("-fastindex", true);
     fStoreBlockHashToDb = GetBoolArg("-storeblockhash", true);
+    fReindex = GetBoolArg("-reindex", false);
     fUseMemoryLog = GetBoolArg("-memorylog", true);
     nMinerSleep = (unsigned int)(GetArg("-minersleep", nOneHundredMilliseconds));
 
