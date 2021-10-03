@@ -129,7 +129,6 @@ extern CScript COINBASE_FLAGS;
 extern CCriticalSection cs_main;
 extern std::map<uint256, CBlockIndex*> mapBlockIndex;
 extern std::set<CBlockIndex*, CBlockIndexWorkComparator> setBlockIndexValid;
-extern std::set<std::pair<COutPoint, unsigned int> > setStakeSeen;
 extern unsigned int nNodeLifespan;
 //extern unsigned int nStakeMinAge;
 extern int nCoinbaseMaturity;
@@ -305,10 +304,6 @@ void Misbehaving(NodeId nodeid, int howmuch);
 
 // yacoin: calculate Nfactor using timestamp
 extern unsigned char GetNfactor(::int64_t nTimestamp, bool fYac1dot0BlockOrTx = false);
-
-// yacoin2015: GetProofOfWorkMA, GetProofOfWorkSMA
-unsigned int GetProofOfWorkMA(const CBlockIndex* pIndexLast);
-unsigned int GetProofOfWorkSMA(const CBlockIndex* pIndexLast);
 
 /**
  * Check if transaction is final per BIP 68 sequence numbers and can be included in a block.
@@ -1176,7 +1171,7 @@ public:
  * Blocks are appended to blk0001.dat files on disk.  Their location on disk
  * is indexed by CBlockIndex objects in memory.
  */
-class CBlock
+class CBlockHeader
 {
 public:
     // Block header
@@ -1191,16 +1186,7 @@ public:
     mutable struct block_header previousBlockHeader;
     mutable uint256 blockHash;
 
-    // network and disk
-    std::vector<CTransaction> vtx;
-
-    // ppcoin: block signature - signed by one of the coin base txout[N]'s owner
-    std::vector<unsigned char> vchBlockSig;
-
-    // memory only
-    mutable std::vector<uint256> vMerkleTree;
-
-    CBlock()
+    CBlockHeader()
     {
         SetNull();
     }
@@ -1224,18 +1210,6 @@ public:
         }
         READWRITE(nBits);
         READWRITE(nNonce);
-
-        // ConnectBlock depends on vtx following header to generate CDiskTxPos
-        if (!(nType & (SER_GETHASH|SER_BLOCKHEADERONLY)))
-        {
-            READWRITE(vtx);
-            READWRITE(vchBlockSig);
-        }
-        else if (fRead)
-        {
-            const_cast<CBlock*>(this)->vtx.clear();
-            const_cast<CBlock*>(this)->vchBlockSig.clear();
-        }
         previousBlockHeader.version = this->nVersion;
         previousBlockHeader.prev_block = hashPrevBlock;
         previousBlockHeader.merkle_root = hashMerkleRoot;
@@ -1260,9 +1234,6 @@ public:
         nTime = 0;
         nBits = 0;
         nNonce = 0;
-        vtx.clear();
-        vchBlockSig.clear();
-        vMerkleTree.clear();
         blockHash = 0;
         memset(UVOIDBEGIN(previousBlockHeader), 0, sizeof(struct block_header));
     }
@@ -1436,9 +1407,67 @@ public:
         return blockHash;
     }
 
-    ::int64_t GetBlockTime() const
+    int64_t GetBlockTime() const
     {
-        return (::int64_t)nTime;
+        return (int64_t)nTime;
+    }
+
+    // ppcoin: two types of block: proof-of-work or proof-of-stake
+    bool IsProofOfStake() const
+    {
+        bool proofOfStake = false;
+        if (nTime <= nYac10HardforkTime && nNonce == 0 &&
+                ((nBits <= 486801407 && blockHash != uint256("0x0000000009415c983b503189080df17423b193176634b6e489120e0189a6829c"))
+                        || (blockHash == uint256("0x5fc9a11b3ffd0118a0031eeb9ed2860bd8ceb8c71e3226e02e6eb82c90cbbf99"))
+                        || (blockHash == uint256("0x5dc2a000963f075f3dec7fa8f220987bff3c4a978528594e5408448155cdc8e4"))))
+        {
+            proofOfStake = true;
+        }
+        return proofOfStake;
+    }
+
+    bool IsProofOfWork() const
+    {
+        return !IsProofOfStake();
+    }
+};
+
+class CBlock : public CBlockHeader
+{
+public:
+    // network and disk
+    std::vector<CTransaction> vtx;
+
+    // ppcoin: block signature - signed by one of the coin base txout[N]'s owner
+    std::vector<unsigned char> vchBlockSig;
+
+    // memory only
+    mutable std::vector<uint256> vMerkleTree;
+
+    CBlock()
+    {
+        SetNull();
+    }
+
+    CBlock(const CBlockHeader &blockHeader)
+        : CBlockHeader(blockHeader)
+    {
+        SetNull();
+    }
+
+    IMPLEMENT_SERIALIZE
+    (
+        READWRITE(*(CBlockHeader*)this);
+        READWRITE(vtx);
+        READWRITE(vchBlockSig);
+    )
+
+    void SetNull()
+    {
+        CBlockHeader::SetNull();
+        vtx.clear();
+        vchBlockSig.clear();
+        vMerkleTree.clear();
     }
 
     void UpdateTime(const CBlockIndex* pindexPrev);
@@ -1458,17 +1487,6 @@ public:
                       );
    			return nEntropyBit;
  
-    }
-
-    // ppcoin: two types of block: proof-of-work or proof-of-stake
-    bool IsProofOfStake() const
-    {
-        return (vtx.size() > 1 && vtx[1].IsCoinStake());
-    }
-
-    bool IsProofOfWork() const
-    {
-        return !IsProofOfStake();
     }
 
     std::pair<COutPoint, unsigned int> GetProofOfStake() const
@@ -1656,8 +1674,6 @@ public:
     ::uint32_t nBlockPos;
     CBigNum bnChainTrust; // ppcoin: trust score of block chain
     ::int32_t nHeight;
-    ::int32_t nPosBlockCount;	// yacoin2015
-    ::int32_t nBitsMA;		// yacoin2015
 
     ::int64_t nMint;
     ::int64_t nMoneySupply;
@@ -1699,8 +1715,6 @@ public:
         nFile = 0;
         nBlockPos = 0;
         nHeight = 0;
-        nPosBlockCount = 0;
-        nBitsMA = 0;
         bnChainTrust = CBigNum(0);
         nMint = 0;
         nMoneySupply = INITIAL_MONEY_SUPPLY;
@@ -1721,7 +1735,7 @@ public:
         nSequenceId = 0;
     }
 
-    CBlockIndex(unsigned int nFileIn, unsigned int nBlockPosIn, CBlock& block)
+    CBlockIndex(unsigned int nFileIn, unsigned int nBlockPosIn, CBlockHeader& blockHeader)
     {
         phashBlock = NULL;
         pprev = NULL;
@@ -1729,8 +1743,6 @@ public:
         nFile = nFileIn;
         nBlockPos = nBlockPosIn;
         nHeight = 0;
-        nPosBlockCount = 0;
-        nBitsMA = 0;
         bnChainTrust = CBigNum(0);
         nMint = 0;
         nMoneySupply = INITIAL_MONEY_SUPPLY;
@@ -1740,37 +1752,32 @@ public:
         hashProofOfStake = 0;
         nStatus = 0;
         nSequenceId = 0;
-        if (block.IsProofOfStake())
+        if (blockHeader.IsProofOfStake())
         {
             SetProofOfStake();
-            prevoutStake = block.vtx[1].vin[0].prevout;
-            nStakeTime = block.vtx[1].nTime;
         }
-        else
-        {
-            prevoutStake.SetNull();
-            nStakeTime = 0;
-        }
+        prevoutStake.SetNull();
+        nStakeTime = 0;
 
-        nVersion       = block.nVersion;
-        hashMerkleRoot = block.hashMerkleRoot;
-        nTime          = block.nTime;
-        nBits          = block.nBits;
-        nNonce         = block.nNonce;
-        blockHash      = block.blockHash;
+        nVersion       = blockHeader.nVersion;
+        hashMerkleRoot = blockHeader.hashMerkleRoot;
+        nTime          = blockHeader.nTime;
+        nBits          = blockHeader.nBits;
+        nNonce         = blockHeader.nNonce;
+        blockHash      = blockHeader.blockHash;
     }
 
-    CBlock GetBlockHeader() const
+    CBlockHeader GetBlockHeader() const
     {
-        CBlock block;
-        block.nVersion       = nVersion;
+        CBlockHeader blockHeader;
+        blockHeader.nVersion       = nVersion;
         if (pprev)
-            block.hashPrevBlock = pprev->GetBlockHash();
-        block.hashMerkleRoot = hashMerkleRoot;
-        block.nTime          = nTime;
-        block.nBits          = nBits;
-        block.nNonce         = nNonce;
-        return block;
+            blockHeader.hashPrevBlock = pprev->GetBlockHash();
+        blockHeader.hashMerkleRoot = hashMerkleRoot;
+        blockHeader.nTime          = nTime;
+        blockHeader.nBits          = nBits;
+        blockHeader.nNonce         = nNonce;
+        return blockHeader;
     }
 
     uint256 GetBlockHash() const
@@ -1782,10 +1789,6 @@ public:
     {
         return (::int64_t)nTime;
     }
-
-    double GetPoWPoSRatio() const;
-
-    ::int32_t GetSpacingThreshold() const;
 
     CBigNum GetBlockTrust() const;
 

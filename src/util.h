@@ -192,6 +192,8 @@ extern ::int32_t
 extern ::uint32_t
     nDifficultyInterval,
     nEpochInterval;
+extern ::int64_t
+    nYac10HardforkTime;
 extern std::string strMiscWarning;
 extern unsigned char MAXIMUM_YAC1DOT0_N_FACTOR;
 

@@ -132,8 +132,6 @@ CTxMemPool mempool;
 unsigned int nTransactionsUpdated = 0;
 
 map<uint256, CBlockIndex*> mapBlockIndex;
-set<pair<COutPoint, unsigned int> > setStakeSeen;
-
 // are all of these undocumented numbers a function of Nfactor?  Cpu power? Other???
 #ifndef LOW_DIFFICULTY_FOR_DEVELOPMENT
 CBigNum bnProofOfWorkLimit(~uint256(0) >> 20);
@@ -197,7 +195,6 @@ CMedianFilter<int> cPeerBlockCounts(5, 0); // Amount of blocks that other nodes 
 
 map<uint256, CBlock*> mapOrphanBlocks;
 multimap<uint256, CBlock*> mapOrphanBlocksByPrev;
-set<pair<COutPoint, unsigned int> > setStakeSeenOrphan;
 map<uint256, uint256> mapProofOfStake;
 
 map<uint256, CTransaction> mapOrphanTransactions;
@@ -1646,90 +1643,6 @@ unsigned char GetNfactor(::int64_t nTimestamp, bool fYac1dot0BlockOrTx)
     return min(max(N, minNfactor), maxNfactor);
 }
 
-
-// yacoin2015: ProofOfWork target Weighted Moving Average
-unsigned int GetProofOfWorkMA(const CBlockIndex* pIndexLast)
-{
-    CBigNum wma(0);    // Weighted Moving Average of PoW target
-    unsigned int nCount = 0;
-
-    if (
-        fUseOld044Rules
-       )
-        return 0;
-
-    if ( pIndexLast->IsProofOfStake() )
-    {
-        return ( pIndexLast->nBitsMA > 0 ) ? pIndexLast->nBitsMA : GetProofOfWorkSMA( pIndexLast );
-    }
-    else
-    {
-        CBigNum bn;
-
-        const CBlockIndex* pindex = pIndexLast;
-        const CBlockIndex* ppos = GetLastBlockIndex( pindex->pprev, true ); // last ProofOfStake block preceeding
-
-        if ( ppos->IsProofOfStake() && ppos->nBitsMA > 0 )
-        {
-            int overstep = ( pindex->nHeight - ppos->nHeight ) - ppos->GetSpacingThreshold();
-
-            // ignore overstepped blocks, they get punished with higher difficulty, but we exclude that from MA
-            for ( int i = 0; i < overstep; i++ )
-                pindex = pindex->pprev;
-        }
-        else    // ProofOfWork came after, last ProofOfStake block before YACOIN_NEW_LOGIC_SWITCH_TIME
-        {
-            return GetProofOfWorkSMA( pIndexLast );
-        }
-
-
-        while ( pindex->IsProofOfWork() )
-        {
-            wma += bn.SetCompact( pindex->nBits );
-            nCount++;
-            pindex = pindex->pprev;
-        }
-
-        bn.SetCompact( ppos->nBitsMA );
-        bn = bn << 10;  // previous MA multiplication *1024
-        wma = wma << 1;   // multiplication *2
-        wma = ( wma + bn ) / ( 1024 + nCount*2 );   // new weighted MA, ~0.2% weight on last block (adj. 12~24h)
-
-        return wma.GetCompact();
-    }
-}
-
-
-// yacoin2015: ProofOfWork Simple Moving Average
-unsigned int GetProofOfWorkSMA(const CBlockIndex* pIndexLast)
-{
-    CBigNum sma(0);    // Simple Moving Average
-    unsigned int nCount = 0;
-
-    const CBlockIndex* pindex = GetLastBlockIndex( pIndexLast, false ); // ProofOfWork
-
-    while ( pindex && pindex->pprev && nCount < 14400 )    // ~10+ day window of PoW blocks
-    {
-        if ( pindex->IsProofOfWork() )
-        {
-            CBigNum bn;
-            sma += bn.SetCompact( pindex->nBits );
-            nCount++;
-        }
-
-        pindex = pindex->pprev;
-    }
-
-    if ( nCount == 0 )
-        return 0;
-    else
-    {
-        sma /= nCount;
-        return sma.GetCompact();
-    }
-}
-
-
 // select stake target limit according to hard-coded conditions
 CBigNum inline GetProofOfStakeLimit(int nHeight, unsigned int nTime)
 {
@@ -2477,119 +2390,7 @@ static unsigned int GetNextTargetRequired044(const CBlockIndex* pindexLast, bool
 // requires adjusted PoW-PoS ratio (GetSpacingThreshold), PoW target moving average (nBitsMA)
 unsigned int GetNextTargetRequired(const CBlockIndex* pindexLast, bool fProofOfStake)
 {
-    if( fUseOld044Rules )
-    {
-        return GetNextTargetRequired044( pindexLast, fProofOfStake );
-    }
-    CBigNum 
-        bnTargetLimit = fProofOfStake ? 
-                        bnProofOfStakeHardLimit: 
-                        bnProofOfWorkLimit; // PoS(~uint256(0) >> 30), PoW(~uint256(0) >> 20)
-
-    bool fCheckPreviousPoWBlockOverstep(false); // flag, used for check and ignore overstepped PoW block difficulty
-
-    if (
-        !fProofOfStake && 
-        !fUseOld044Rules     //((pindexLast->nTime >= YACOIN_NEW_LOGIC_SWITCH_TIME) || fTestNet)
-       )
-    {
-        if ( pindexLast->IsProofOfWork() )  // PoW after PoW
-        {
-            CBigNum bnOverstepNew;
-
-            const CBlockIndex
-                * ppos = GetLastBlockIndex( pindexLast->pprev, true ); // get last PoS block preceeding
-
-            if( ppos )  // we are NOT on genesis block
-            {
-                int 
-                    overstep = ( pindexLast->nHeight - ppos->nHeight ) - ppos->GetSpacingThreshold();    // distanceToPoS - AdjPowPosRatio
-
-                if ( overstep == 0 && ppos->nBitsMA > 0 )    // if true, we generate target for next (1st) overstepped block
-                {
-                    bnOverstepNew.SetCompact( ppos->nBitsMA );
-                    const CBlockIndex* pindex = pindexLast;
-
-                    while ( pindex->IsProofOfWork() )
-                    {
-                        CBigNum powTarget;
-                        powTarget.SetCompact( pindex->nBits );
-
-                        // if any recent PoW block target is lower than MA, we use that one to maximize difficulty
-                        if ( powTarget < bnOverstepNew )
-                            bnOverstepNew = powTarget;
-
-                        pindex = pindex->pprev;
-                    }
-
-                    bnOverstepNew = bnOverstepNew >> 1; // cut that target in half, consequently double difficulty
-                    return bnOverstepNew.GetCompact();  // now it should take twice the time ...
-                }
-                else if ( overstep > 0 )
-                {
-                    bnOverstepNew.SetCompact( pindexLast->nBits );
-                    bnOverstepNew = bnOverstepNew >> 1; // for each overstepped block, make difficulty double
-                    return bnOverstepNew.GetCompact();  // good luck ignoring PoS blocks for long ...
-                }
-                else {} // we let old rules down below do the work
-            }
-            else  // we are on genesis block, so what to do???, let 0.4.4 run????
-            {
-            }
-        }
-        else    // PoW after PoS
-            fCheckPreviousPoWBlockOverstep = true;
-    }
-
-    if (pindexLast == NULL)
-        return bnTargetLimit.GetCompact(); // genesis block
-
-    const CBlockIndex* pindexPrev = GetLastBlockIndex(pindexLast, fProofOfStake);
-
-    if (pindexPrev->pprev == NULL)
-        return bnProofOfWorkLimit.GetCompact(); // first block: CBigNum(~uint256(0) >> 20)
-
-
-    int nPoSBlocksBetween = pindexLast->nHeight - pindexPrev->nHeight;  // calc now, pindexPrev might later point elsewhere
-
-    if ( fCheckPreviousPoWBlockOverstep )  // if calculating target for PoW after PoS block, adjustment is needed when previous PoW in overstep
-    {
-        const CBlockIndex* ppos = GetLastBlockIndex( pindexPrev->pprev, true ); // get last PoS block preceeding last PoW block
-
-        if ( ppos->nBitsMA > 0 )
-        {
-            int overstep = ( pindexPrev->nHeight - ppos->nHeight ) - ppos->GetSpacingThreshold();
-
-            // overstepped blocks are expected to be produced with delay but next difficulty (after PoS block) shouldn't be too high because of that.
-            // if overstepped, we point pindexPrev to last non-overstepped PoW block and use it's nTime and nBits to derive bnNew
-            for ( int i = 0; i < overstep; i++ )
-                pindexPrev = pindexPrev->pprev;
-        }
-    }
-
-
-    const CBlockIndex* pindexPrevPrev = GetLastBlockIndex(pindexPrev->pprev, fProofOfStake);
-
-    if (pindexPrevPrev->pprev == NULL)
-        return bnProofOfWorkLimit.GetCompact(); // second block: CBigNum(~uint256(0) >> 20)
-
-    ::int64_t nActualSpacing = pindexPrev->GetBlockTime() - pindexPrevPrev->GetBlockTime();
-
-    // ppcoin: target change every block
-    // ppcoin: retarget with exponential moving toward target spacing
-    CBigNum bnNew;
-    bnNew.SetCompact(pindexPrev->nBits);
-
-    ::int64_t nTargetSpacing = fProofOfStake ? nStakeTargetSpacing : min(nTargetSpacingWorkMax, (::int64_t) nStakeTargetSpacing * (1 + nPoSBlocksBetween));
-    ::int64_t nInterval = nTargetTimespan / nTargetSpacing;
-
-    bnNew *= ((nInterval - 1) * nTargetSpacing + nActualSpacing + nActualSpacing);
-    bnNew /= ((nInterval + 1) * nTargetSpacing);
-
-    if (bnNew > bnTargetLimit)
-        bnNew = bnTargetLimit;
-
-    return bnNew.GetCompact();
+    return GetNextTargetRequired044( pindexLast, fProofOfStake );
 }
 
 bool CheckProofOfWork(uint256 hash, unsigned int nBits)
@@ -3859,7 +3660,7 @@ bool CBlock::AddToBlockIndex(CValidationState &state, unsigned int nFile, unsign
         return error("AddToBlockIndex() : %s already exists", hash.ToString().substr(0,20).c_str());
 
     // Construct new block index object
-    CBlockIndex* pindexNew = new CBlockIndex(nFile, nBlockPos, *this);
+    CBlockIndex* pindexNew = new CBlockIndex(nFile, nBlockPos, *(CBlockHeader*)this);
     {
          LOCK(cs_nBlockSequenceId);
          pindexNew->nSequenceId = nBlockSequenceId++;
@@ -3875,10 +3676,6 @@ bool CBlock::AddToBlockIndex(CValidationState &state, unsigned int nFile, unsign
     {
         pindexNew->pprev = (*miPrev).second;
         pindexNew->nHeight = pindexNew->pprev->nHeight + 1;
-        pindexNew->nPosBlockCount = pindexNew->pprev->nPosBlockCount + 
-                                    ( pindexNew->IsProofOfStake() ? 1 : 0 );
-        pindexNew->nBitsMA = pindexNew->IsProofOfStake()? 
-                             GetProofOfWorkMA(pindexNew->pprev): 0;
     }
 
     // ppcoin: compute chain trust score
@@ -3917,8 +3714,6 @@ bool CBlock::AddToBlockIndex(CValidationState &state, unsigned int nFile, unsign
     // Add to mapBlockIndex
     mapAlreadyAskedFor.erase(CInv(MSG_BLOCK, hash));
     map<uint256, CBlockIndex*>::iterator mi = mapBlockIndex.insert(make_pair(hash, pindexNew)).first;
-    if (pindexNew->IsProofOfStake())
-        setStakeSeen.insert(make_pair(pindexNew->prevoutStake, pindexNew->nStakeTime));
     pindexNew->phashBlock = &((*mi).first);
     pindexNew->nStatus = BLOCK_VALID_TRANSACTIONS | BLOCK_HAVE_DATA;
     setBlockIndexValid.insert(pindexNew);
@@ -4223,25 +4018,6 @@ bool CBlock::AcceptBlock(CValidationState &state)
     return true;
 }
 
-// yacoin2015: ProofOfWork/ProofOfStake block ratio
-double CBlockIndex::GetPoWPoSRatio() const
-{
-    Yassert ( nPosBlockCount > 0 );
-    return (double)( nHeight - nPosBlockCount ) / (double) nPosBlockCount;
-}
-
-// yacoin2015: ProofOfWork block spacing threshold
-::int32_t CBlockIndex::GetSpacingThreshold() const
-{
-    // always force lower spacing to encourage ProofOfStake block inclusion
-
-    ::int32_t 
-        spacing =  (0 < nPosBlockCount)?
-                   (::int32_t)( boost::math::round( GetPoWPoSRatio() - 0.75 ) ):
-                   0;
-    return std::max( spacing, 1 );
-}
-
 // yacoin2015 GetBlockTrust upgrade
 CBigNum CBlockIndex::GetBlockTrust() const
 {
@@ -4249,105 +4025,6 @@ CBigNum CBlockIndex::GetBlockTrust() const
     bnTarget.SetCompact(nBits);
     if (bnTarget <= 0)
         return CBigNum(0);
-
-    // is (nTime >= YACOIN_NEW_LOGIC_SWITCH_TIME) actually true for blocks before 12/13/2015
-    if (
-        (0 < nPosBlockCount) 
-        &&
-        ( 
-         (
-          fTestNet 
-          && 
-          pprev 
-         ) 
-         ||
-         !fUseOld044Rules         //(nTime >= YACOIN_NEW_LOGIC_SWITCH_TIME)
-        )
-       )
-    {
-        ::int32_t iratio =  (::int32_t)boost::math::round( GetPoWPoSRatio() );
-
-        if ( IsProofOfStake() )
-        {
-            if ( iratio < 2 )
-            // switch to ppcoin trust model occurs when real PoW:PoS ratio drops below 1.5
-            {
-                if ( (nHeight - GetLastBlockIndex(pprev,false)->nHeight) > 10 )
-                {
-                    // after 10 sequential PoS blocks, we drop trust so PoW block (with trust doubled) can get in
-                    bnTarget.SetCompact( nBitsMA );
-                }
-                else // real proof-of-stake difficulty
-                  return (CBigNum(1)<<256) / (bnTarget+1);
-            }
-            else // but until ratio drops enough, we derive ProofOfStake block trust from ProofOfWork target MA
-            {
-                if ( pprev->IsProofOfWork() )
-                {
-                    bnTarget.SetCompact( nBitsMA );
-                    bnTarget = ( bnTarget >> 1 ) + ( bnTarget >> 4 ); // target MA/2 + target MA/16 -> ~1.78x MA trust
-                }
-                else if ( iratio < 5 && pprev->IsProofOfStake() && pprev->pprev->IsProofOfWork() )
-                // Under limited conditions we award trust also to second subsequent ProofOfStake block.
-                // This happens when iratio is 3 or 4 and there is less than average PoS blocks in recent history.
-                // It also remains in force when round(PoW:PoS) ratio equals 2, so that PoS blocks can prevail one day.
-                {
-                    ::int32_t recentPoSBlockCount = 0;
-
-                    if ( iratio > 2 )
-                    {
-                        const CBlockIndex* pindex = pprev->pprev;
-                        for ( int i=0; i < ( iratio*iratio + iratio - 2); i++ )
-                        {
-                            pindex = pindex->pprev;
-                            if ( pindex->IsProofOfStake() )
-                                recentPoSBlockCount++;
-                        }
-                    }
-
-                    if ( iratio == 2 || recentPoSBlockCount < iratio )
-                    // now we need to beat double trust of ProofOfWork block
-                    {
-                        bnTarget.SetCompact( nBitsMA );
-                        bnTarget = ( bnTarget >> 2 ) + ( bnTarget >> 3 ); // target MA/4 + target MA/8 -> ~2.67x MA trust
-                    }
-                }
-                else
-                  // no trust for 3,4,5... subsequent ProofOfStake block
-                  // (not until iratio < 2 and ppcoin trust model takes over)
-                  return CBigNum(0);
-            }
-        }
-        else // ProofOfWork block
-        {
-            if ( pprev->IsProofOfStake() )
-                bnTarget = bnTarget >> 1; // double trust for PoW after PoS block
-
-            else // IsProofOfWork() && pprev->IsProofOfWork()
-            {
-                const CBlockIndex* ppos = GetLastBlockIndex( pprev->pprev, true ); // last ProofOfStake block preceding
-                if ( ppos->nBitsMA > 0 ) // this check is needed in case PoS block came before YACOIN_NEW_LOGIC_SWITCH_TIME
-
-                {
-                    int overstep = ( this->nHeight - ppos->nHeight ) - ppos->GetSpacingThreshold();
-                    if ( overstep > 0 )
-                    {
-                        // block difficulty already high for overstepped block due GetNextTargetRequired,
-                        // we don't want to use that low nBits, rather use PoW target moving average from nBitsMA
-                        bnTarget.SetCompact( ppos->nBitsMA );
-                        // cut trust in half (by doubling target) with each overstepped block:
-                        bnTarget = bnTarget << min( overstep, bnProofOfWorkLimit.bitSize() - bnTarget.bitSize() );
-                    }
-                }
-            }
-        }
-        if( 0 == bnTarget )
-        {
-            bnTarget = 1;
-        }
-        return bnProofOfWorkLimit / bnTarget;
-    }
-
 
     // saironiq: new trust rules (since CONSECUTIVE_STAKE_SWITCH_TIME on mainnet and always on testnet)
     if (
@@ -4409,21 +4086,6 @@ bool ProcessBlock(CValidationState &state, CNode* pfrom, CBlock* pblock)
         return state.Invalid(error("ProcessBlock () : already have block %d %s", mapBlockIndex[hash]->nHeight, hash.ToString().substr(0,20).c_str()));
     if (mapOrphanBlocks.count(hash))
         return state.Invalid(error("ProcessBlock () : already have block (orphan) %s", hash.ToString().substr(0,20).c_str()));
-
-    // ppcoin: check proof-of-stake
-    // Limited duplicity on stake: prevents block flood attack
-    // Duplicate stake allowed only when there is orphan child block
-    if (
-        pblock->IsProofOfStake() && 
-        setStakeSeen.count(pblock->GetProofOfStake()) && 
-        !mapOrphanBlocksByPrev.count(hash) && 
-        !Checkpoints::WantedByPendingSyncCheckpoint(hash)
-       )
-        return error("ProcessBlock () : duplicate proof-of-stake (%s, %d) for block %s", 
-                     pblock->GetProofOfStake().first.ToString().c_str(), 
-                     pblock->GetProofOfStake().second, 
-                     hash.ToString().c_str()
-                    );
 
     // Preliminary checks
     if (!pblock->CheckBlock(state, true, true,
@@ -4523,19 +4185,6 @@ bool ProcessBlock(CValidationState &state, CNode* pfrom, CBlock* pblock)
     {
         printf("ProcessBlock: ORPHAN BLOCK, prev=%s\n", pblock->hashPrevBlock.ToString().substr(0,20).c_str());
         CBlock* pblock2 = new CBlock(*pblock);
-        // ppcoin: check proof-of-stake
-        if (pblock2->IsProofOfStake())
-        {
-            // Limited duplicity on stake: prevents block flood attack
-            // Duplicate stake allowed only when there is orphan child block
-            if (setStakeSeenOrphan.count(pblock2->GetProofOfStake()) && 
-                !mapOrphanBlocksByPrev.count(hash) && 
-                !Checkpoints::WantedByPendingSyncCheckpoint(hash)
-               )
-                return error("ProcessBlock () : duplicate proof-of-stake (%s, %d) for orphan block %s", pblock2->GetProofOfStake().first.ToString().c_str(), pblock2->GetProofOfStake().second, hash.ToString().c_str());
-            else
-                setStakeSeenOrphan.insert(pblock2->GetProofOfStake());
-        }
         mapOrphanBlocks.insert(make_pair(hash, pblock2));
         mapOrphanBlocksByPrev.insert(make_pair(pblock2->hashPrevBlock, pblock2));
 
@@ -4574,7 +4223,6 @@ bool ProcessBlock(CValidationState &state, CNode* pfrom, CBlock* pblock)
             if (pblockOrphan->AcceptBlock(stateDummy))
                 vWorkQueue.push_back(pblockOrphan->GetHash());
             mapOrphanBlocks.erase(pblockOrphan->GetHash());
-            setStakeSeenOrphan.erase(pblockOrphan->GetProofOfStake());
             delete pblockOrphan;
         }
         mapOrphanBlocksByPrev.erase(hashPrev);
@@ -4896,7 +4544,6 @@ FILE* AppendBlockFile(unsigned int& nFileRet)
 void UnloadBlockIndex()
 {
     mapBlockIndex.clear();
-    setStakeSeen.clear();
     bnBestChainTrust = CBigNum(0);
     setBlockIndexValid.clear();
     pindexBestInvalid = NULL;

@@ -667,9 +667,6 @@ bool CTxDB::LoadBlockIndex()
         //    return error("LoadBlockIndex() : CheckIndex failed at %d", pindexNew->nHeight);
         //}
 
-        // NovaCoin: build setStakeSeen
-        if (pindexNew->IsProofOfStake())
-            setStakeSeen.insert(make_pair(pindexNew->prevoutStake, pindexNew->nStakeTime));
 #ifdef WIN32
         ++nCounter;
         // could "guess at the max nHeight & %age against the loop count
@@ -855,8 +852,6 @@ bool CTxDB::LoadBlockIndex()
         BOOST_FOREACH (const PAIRTYPE(int, CBlockIndex *) & item, vSortedByHeight)
         {
             CBlockIndex *pindex = item.second;
-            pindex->nPosBlockCount = (pindex->pprev ? pindex->pprev->nPosBlockCount : 0) + (pindex->IsProofOfStake() ? 1 : 0);
-            pindex->nBitsMA = pindex->IsProofOfStake() ? GetProofOfWorkMA(pindex->pprev) : 0;
             pindex->bnChainTrust = (pindex->pprev ? pindex->pprev->bnChainTrust : CBigNum(0)) + pindex->GetBlockTrust();
             // NovaCoin: calculate stake modifier checksum
             pindex->nStakeModifierChecksum = GetStakeModifierChecksum(pindex);
