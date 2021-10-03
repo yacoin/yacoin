@@ -3765,13 +3765,45 @@ bool CBlock::AddToBlockIndex(CValidationState &state, unsigned int nFile, unsign
     return true;
 }
 
+bool CBlockHeader::CheckBlockHeader(CValidationState& state, bool fCheckPOW) const
+{
+    bool fProofOfStake = IsProofOfStake();
 
+    if (fProofOfStake)
+    {
+        // Proof-of-STake related checkings. Note that we know here that 1st transactions is coinstake. We don't need
+        //   check the type of 1st transaction because it's performed earlier by IsProofOfStake()
 
+        // nNonce must be zero for proof-of-stake blocks
+        if (nNonce != 0)
+            return state.DoS(100, error("CheckBlock () : non-zero nonce in proof-of-stake block"));
+
+        // Check timestamp  06/04/2018 missing test in this 0.4.5-0.48 code.  Thanks Joe! ;>
+        if (GetBlockTime() > FutureDrift(GetAdjustedTime()))
+            return error("CheckBlock () : block timestamp too far in the future");
+    }
+    else    // is PoW block
+    {
+        // Check proof of work matches claimed amount
+        if (fCheckPOW && !CheckProofOfWork(GetHash(), nBits))
+            return state.DoS(50, error("CheckBlock () : proof of work failed"));
+
+        // Check timestamp
+        if (GetBlockTime() > FutureDrift(GetAdjustedTime())){
+            printf("Block timestamp in future: blocktime %d futuredrift %d",GetBlockTime(),FutureDrift(GetAdjustedTime()));
+            return error("CheckBlock () : block timestamp too far in the future");
+        }
+    }
+    return true;
+}
 
 bool CBlock::CheckBlock(CValidationState &state, bool fCheckPOW, bool fCheckMerkleRoot, bool fCheckSig) const
 {
     // These are checks that are independent of context
     // that can be verified before saving an orphan block.
+
+    if (!CheckBlockHeader(state, fCheckPOW))
+        return false;
 
     set<uint256> 
         uniqueTx; // tx hashes
@@ -3799,10 +3831,6 @@ bool CBlock::CheckBlock(CValidationState &state, bool fCheckPOW, bool fCheckMerk
         // Proof-of-STake related checkings. Note that we know here that 1st transactions is coinstake. We don't need 
         //   check the type of 1st transaction because it's performed earlier by IsProofOfStake()
 
-        // nNonce must be zero for proof-of-stake blocks
-        if (nNonce != 0)
-            return state.DoS(100, error("CheckBlock () : non-zero nonce in proof-of-stake block"));
-
         // Coinbase output should be empty if proof-of-stake block
         if (vtx[0].vout.size() != 1 || !vtx[0].vout[0].IsEmpty())
             return state.DoS(100, error("CheckBlock () : coinbase output not empty for proof-of-stake block"));
@@ -3810,10 +3838,6 @@ bool CBlock::CheckBlock(CValidationState &state, bool fCheckPOW, bool fCheckMerk
         // Check coinstake timestamp
         if (GetBlockTime() != (::int64_t)vtx[1].nTime)
             return state.DoS(50, error("CheckBlock () : coinstake timestamp violation nTimeBlock=%" PRId64 " nTimeTx=%ld", GetBlockTime(), vtx[1].nTime));
-
-        // Check timestamp  06/04/2018 missing test in this 0.4.5-0.48 code.  Thanks Joe! ;>
-        if (GetBlockTime() > FutureDrift(GetAdjustedTime()))
-            return error("CheckBlock () : block timestamp too far in the future");
 
         // NovaCoin: check proof-of-stake block signature
         if (fCheckSig && !CheckBlockSignature())
@@ -3836,23 +3860,7 @@ bool CBlock::CheckBlock(CValidationState &state, bool fCheckPOW, bool fCheckMerk
         nSigOps += vtx[1].GetLegacySigOpCount();
     }
     else    // is PoW block
-    {       // nNonce must be greater than zero for proof-of-work blocks, WHY????
-        if (
-            (!fUseOld044Rules) && 
-            (nNonce == 0)
-           )
-            return state.DoS(50, error("CheckBlock () : zero nonce in proof-of-work block"));
-
-        // Check proof of work matches claimed amount
-        if (fCheckPOW && !CheckProofOfWork(GetHash(), nBits))
-            return state.DoS(50, error("CheckBlock () : proof of work failed"));
-
-        // Check timestamp
-        if (GetBlockTime() > FutureDrift(GetAdjustedTime())){
-            printf("Block timestamp in future: blocktime %d futuredrift %d",GetBlockTime(),FutureDrift(GetAdjustedTime()));
-            return error("CheckBlock () : block timestamp too far in the future");
-        }
-
+    {
         // Check coinbase timestamp
         if (GetBlockTime() < PastDrift((::int64_t)vtx[0].nTime))
             return state.DoS(50, error("CheckBlock () : coinbase timestamp is too late"));

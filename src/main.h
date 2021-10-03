@@ -1430,6 +1430,7 @@ public:
     {
         return !IsProofOfStake();
     }
+    bool CheckBlockHeader(CValidationState& state, bool fCheckPOW = true) const;
 };
 
 class CBlock : public CBlockHeader
