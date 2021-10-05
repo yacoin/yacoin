@@ -3146,6 +3146,7 @@ bool CBlock::ConnectBlock(CValidationState &state, CTxDB& txdb, CBlockIndex* pin
             return error("ConnectBlock() : UpdateTxIndex failed");
     }
 
+    pindex->RaiseValidity(BLOCK_VALID_SCRIPTS);
     // Update block index on disk without changing it in memory.
     // The memory index structure will be changed after the db commits.
     if (pindex->pprev)
@@ -3426,10 +3427,11 @@ void static FindMostWorkChain() {
         CBlockIndex *pindexTest = pindexNew;
         bool fInvalidAncestor = false;
         while (pindexTest && !chainActive.Contains(pindexTest)) {
-            if (pindexTest->nStatus & BLOCK_FAILED_MASK) {
+            if (!pindexTest->IsValid(BLOCK_VALID_TRANSACTIONS) || !(pindexTest->nStatus & BLOCK_HAVE_DATA)) {
                 // Candidate has an invalid ancestor, remove entire chain from the set.
                 if (pindexBestInvalid == NULL || pindexNew->bnChainTrust > pindexBestInvalid->bnChainTrust)
-                    pindexBestInvalid = pindexNew;                CBlockIndex *pindexFailed = pindexNew;
+                    pindexBestInvalid = pindexNew;
+                CBlockIndex *pindexFailed = pindexNew;
                 while (pindexTest != pindexFailed) {
                     pindexFailed->nStatus |= BLOCK_FAILED_CHILD;
                     setBlockIndexValid.erase(pindexFailed);
@@ -3652,48 +3654,31 @@ bool CBlock::GetCoinAge(::uint64_t& nCoinAge) const
     return true;
 }
 
-bool CBlock::AddToBlockIndex(CValidationState &state, unsigned int nFile, unsigned int nBlockPos)
+// Mark a block as having its data received and checked (up to BLOCK_VALID_TRANSACTIONS).
+bool CBlock::ReceivedBlockTransactions(CValidationState &state, unsigned int nFile, unsigned int nBlockPos, CBlockIndex *pindexNew)
 {
-    // Check for duplicate
-    uint256 hash = GetHash();
-    if (mapBlockIndex.count(hash))
-        return error("AddToBlockIndex() : %s already exists", hash.ToString().substr(0,20).c_str());
-
-    // Construct new block index object
-    CBlockIndex* pindexNew = new CBlockIndex(nFile, nBlockPos, *(CBlockHeader*)this);
-    {
-         LOCK(cs_nBlockSequenceId);
-         pindexNew->nSequenceId = nBlockSequenceId++;
-    }
-    if (!pindexNew)
-        return error("AddToBlockIndex() : new CBlockIndex failed");
-    pindexNew->phashBlock = &hash;
-
-    map<uint256, CBlockIndex*>::iterator 
-        miPrev = mapBlockIndex.find(hashPrevBlock); // this bothers me when mapBlockIndex == NULL!?
-
-    if (miPrev != mapBlockIndex.end())
-    {
-        pindexNew->pprev = (*miPrev).second;
-        pindexNew->nHeight = pindexNew->pprev->nHeight + 1;
-    }
-
-    // ppcoin: compute chain trust score
-    pindexNew->bnChainTrust = (pindexNew->pprev ? 
-                                pindexNew->pprev->bnChainTrust : 
-                                CBigNum(0)
-                              ) + 
-                              pindexNew->GetBlockTrust();
-
-    // ppcoin: compute stake entropy bit for stake modifier
-    if (!pindexNew->SetStakeEntropyBit(GetStakeEntropyBit(pindexNew->nHeight)))
-        return error("AddToBlockIndex() : SetStakeEntropyBit() failed");
+    // pindexNew->nTx = vtx.size();
+    // if (pindexNew->pprev) {
+    //     // Not the genesis block.
+    //     if (pindexNew->pprev->nChainTx) {
+    //         // This parent's block's total number transactions is known, so compute outs.
+    //         pindexNew->nChainTx = pindexNew->pprev->nChainTx + pindexNew->nTx;
+    //     } else {
+    //         // The total number of transactions isn't known yet.
+    //         // We will compute it when the block is connected.
+    //         pindexNew->nChainTx = 0;
+    //     }
+    // } else {
+    //     // Genesis block.
+    //     pindexNew->nChainTx = pindexNew->nTx;
+    // }
 
     // ppcoin: record proof-of-stake hash value
+    uint256 hash = GetHash();
     if (pindexNew->IsProofOfStake())
     {
         if (!mapProofOfStake.count(hash))
-            return error("AddToBlockIndex() : hashProofOfStake not found in map");
+            return error("AcceptBlock() : hashProofOfStake not found in map");
         pindexNew->hashProofOfStake = mapProofOfStake[hash];
     }
 
@@ -3703,20 +3688,20 @@ bool CBlock::AddToBlockIndex(CValidationState &state, unsigned int nFile, unsign
         ::uint64_t nStakeModifier = 0;
         bool fGeneratedStakeModifier = false;
         if (!ComputeNextStakeModifier(pindexNew, nStakeModifier, fGeneratedStakeModifier))
-            return error("AddToBlockIndex() : ComputeNextStakeModifier() failed");
+            return error("AcceptBlock() : ComputeNextStakeModifier() failed");
         pindexNew->SetStakeModifier(nStakeModifier, fGeneratedStakeModifier);
 
         pindexNew->nStakeModifierChecksum = GetStakeModifierChecksum(pindexNew);
         if (!CheckStakeModifierCheckpoints(pindexNew->nHeight, pindexNew->nStakeModifierChecksum))
-            return error("AddToBlockIndex() : Rejected by stake modifier checkpoint height=%d, modifier=0x%016" PRIx64, pindexNew->nHeight, nStakeModifier);
+            return error("AcceptBlock() : Rejected by stake modifier checkpoint height=%d, modifier=0x%016" PRIx64, pindexNew->nHeight, nStakeModifier);
     }
 
-    // Add to mapBlockIndex
-    mapAlreadyAskedFor.erase(CInv(MSG_BLOCK, hash));
-    map<uint256, CBlockIndex*>::iterator mi = mapBlockIndex.insert(make_pair(hash, pindexNew)).first;
-    pindexNew->phashBlock = &((*mi).first);
-    pindexNew->nStatus = BLOCK_VALID_TRANSACTIONS | BLOCK_HAVE_DATA;
-    setBlockIndexValid.insert(pindexNew);
+    pindexNew->nFile = nFile;
+    pindexNew->nBlockPos = nBlockPos;
+    pindexNew->nStatus |= BLOCK_HAVE_DATA;
+
+    if (pindexNew->RaiseValidity(BLOCK_VALID_TRANSACTIONS))
+        setBlockIndexValid.insert(pindexNew);
 
     // Write to disk block index
     CTxDB txdb;
@@ -3765,6 +3750,211 @@ bool CBlock::AddToBlockIndex(CValidationState &state, unsigned int nFile, unsign
     return true;
 }
 
+bool CBlockHeader::AcceptBlockHeader(CValidationState &state,
+                                     CBlockIndex **ppindex)
+{
+    // Check for duplicate
+    uint256 hash = GetHash();
+    std::map<uint256, CBlockIndex *>::iterator miSelf = mapBlockIndex.find(hash);
+    CBlockIndex *pindex = NULL;
+    if (miSelf != mapBlockIndex.end())
+    {
+        pindex = miSelf->second;
+        if (pindex->nStatus & BLOCK_FAILED_MASK)
+            return state.Invalid(error("AcceptBlockHeader() : block is marked invalid"), 0,
+                                 "duplicate");
+    }
+
+    // Get prev block index
+    map<uint256, CBlockIndex *>::iterator mi = mapBlockIndex.find(hashPrevBlock);
+    if (mi == mapBlockIndex.end())
+        return state.DoS(10, error("AcceptBlockHeader () : prev block not found"));
+    CBlockIndex* pindexPrev = (*mi).second;
+    int nHeight = pindexPrev->nHeight+1;
+
+    // Check proof-of-work or proof-of-stake
+    if (nBits != GetNextTargetRequired(pindexPrev, IsProofOfStake()))
+        return state.DoS(
+            100, error("AcceptBlockHeader () : incorrect %s",
+                       IsProofOfWork() ? "proof-of-work" : "proof-of-stake"));
+
+    ::int64_t nMedianTimePast = pindexPrev->GetMedianTimePast();
+
+    // Check timestamp against prev
+    if (GetBlockTime() <= pindexPrev->GetMedianTimePast() ||
+        FutureDrift(GetBlockTime()) < pindexPrev->GetBlockTime())
+        return error("AcceptBlockHeader () : block's timestamp is too early");
+
+    // Check that the block chain matches the known block chain up to a checkpoint
+    if (!Checkpoints::CheckHardened(nHeight, hash))
+        return state.DoS(
+            100,
+            error("AcceptBlockHeader () : rejected by hardened checkpoint lock-in at %d",
+                  nHeight));
+
+    if (pindex == NULL)
+        pindex = AddToBlockIndex();
+
+    if (ppindex)
+        *ppindex = pindex;
+
+    return true;
+}
+
+CBlockIndex* CBlockHeader::AddToBlockIndex()
+{
+    // Check for duplicate
+    uint256 hash = GetHash();
+    std::map<uint256, CBlockIndex*>::iterator it = mapBlockIndex.find(hash);
+    if (it != mapBlockIndex.end())
+        return it->second;
+
+    // Construct new block index object
+    CBlockIndex* pindexNew = new CBlockIndex(*(CBlockHeader*)this);
+    {
+         LOCK(cs_nBlockSequenceId);
+         pindexNew->nSequenceId = nBlockSequenceId++;
+    }
+
+    // Add to mapBlockIndex
+    map<uint256, CBlockIndex*>::iterator mi = mapBlockIndex.insert(make_pair(hash, pindexNew)).first;
+    pindexNew->phashBlock = &((*mi).first);
+    map<uint256, CBlockIndex*>::iterator miPrev = mapBlockIndex.find(hashPrevBlock); // this bothers me when mapBlockIndex == NULL!?
+
+    if (miPrev != mapBlockIndex.end())
+    {
+        pindexNew->pprev = (*miPrev).second;
+        pindexNew->nHeight = pindexNew->pprev->nHeight + 1;
+    }
+
+    // ppcoin: compute chain trust score
+    pindexNew->bnChainTrust = (pindexNew->pprev ? 
+                                pindexNew->pprev->bnChainTrust : 
+                                CBigNum(0)
+                              ) + 
+                              pindexNew->GetBlockTrust();
+
+    // ppcoin: compute stake entropy bit for stake modifier
+    if (!pindexNew->SetStakeEntropyBit(GetStakeEntropyBit(pindexNew->nHeight)))
+        error("AddToBlockIndex() : SetStakeEntropyBit() failed");
+
+    pindexNew->RaiseValidity(BLOCK_VALID_TREE);
+
+    return pindexNew;
+}
+
+//bool CBlock::AddToBlockIndex(CValidationState &state, unsigned int nFile, unsigned int nBlockPos)
+//{
+//    // // Check for duplicate
+//    // uint256 hash = GetHash();
+//    // if (mapBlockIndex.count(hash))
+//    //     return error("AddToBlockIndex() : %s already exists", hash.ToString().substr(0,20).c_str());
+//
+//    // // Construct new block index object
+//    // CBlockIndex* pindexNew = new CBlockIndex(nFile, nBlockPos, *(CBlockHeader*)this);
+//    // {
+//    //      LOCK(cs_nBlockSequenceId);
+//    //      pindexNew->nSequenceId = nBlockSequenceId++;
+//    // }
+//    // if (!pindexNew)
+//    //     return error("AddToBlockIndex() : new CBlockIndex failed");
+//    // pindexNew->phashBlock = &hash;
+//
+//    // map<uint256, CBlockIndex*>::iterator
+//    //     miPrev = mapBlockIndex.find(hashPrevBlock); // this bothers me when mapBlockIndex == NULL!?
+//
+//    // if (miPrev != mapBlockIndex.end())
+//    // {
+//    //     pindexNew->pprev = (*miPrev).second;
+//    //     pindexNew->nHeight = pindexNew->pprev->nHeight + 1;
+//    // }
+//
+//    // // ppcoin: compute chain trust score
+//    // pindexNew->bnChainTrust = (pindexNew->pprev ?
+//    //                             pindexNew->pprev->bnChainTrust :
+//    //                             CBigNum(0)
+//    //                           ) +
+//    //                           pindexNew->GetBlockTrust();
+//
+//    // ppcoin: compute stake entropy bit for stake modifier
+//    // if (!pindexNew->SetStakeEntropyBit(GetStakeEntropyBit(pindexNew->nHeight)))
+//    //     return error("AddToBlockIndex() : SetStakeEntropyBit() failed");
+//
+//    // ppcoin: record proof-of-stake hash value
+//    // if (pindexNew->IsProofOfStake())
+//    // {
+//    //     if (!mapProofOfStake.count(hash))
+//    //         return error("AddToBlockIndex() : hashProofOfStake not found in map");
+//    //     pindexNew->hashProofOfStake = mapProofOfStake[hash];
+//    // }
+//
+//    // if (!chainActive.Tip() || (chainActive.Tip()->nHeight + 1) < nMainnetNewLogicBlockNumber)
+//    // {
+//    //     // ppcoin: compute stake modifier
+//    //     ::uint64_t nStakeModifier = 0;
+//    //     bool fGeneratedStakeModifier = false;
+//    //     if (!ComputeNextStakeModifier(pindexNew, nStakeModifier, fGeneratedStakeModifier))
+//    //         return error("AddToBlockIndex() : ComputeNextStakeModifier() failed");
+//    //     pindexNew->SetStakeModifier(nStakeModifier, fGeneratedStakeModifier);
+//
+//    //     pindexNew->nStakeModifierChecksum = GetStakeModifierChecksum(pindexNew);
+//    //     if (!CheckStakeModifierCheckpoints(pindexNew->nHeight, pindexNew->nStakeModifierChecksum))
+//    //         return error("AddToBlockIndex() : Rejected by stake modifier checkpoint height=%d, modifier=0x%016" PRIx64, pindexNew->nHeight, nStakeModifier);
+//    // }
+//
+//    // Add to mapBlockIndex
+//    // map<uint256, CBlockIndex*>::iterator mi = mapBlockIndex.insert(make_pair(hash, pindexNew)).first;
+//    // pindexNew->phashBlock = &((*mi).first);
+//    // pindexNew->nStatus = BLOCK_VALID_TRANSACTIONS | BLOCK_HAVE_DATA;
+//    // setBlockIndexValid.insert(pindexNew);
+//
+////     // Write to disk block index
+////     CTxDB txdb;
+////     if (!txdb.TxnBegin())
+////     {
+////         printf("AddToBlockIndex(): TxnBegin failed\n");
+////         return false;
+////     }
+////     txdb.WriteBlockIndex(CDiskBlockIndex(pindexNew));
+////     if (fStoreBlockHashToDb && !txdb.WriteBlockHash(CDiskBlockIndex(pindexNew)))
+////     {
+////         printf("AddToBlockIndex(): Can't WriteBlockHash\n");
+////     }
+////     if (!txdb.TxnCommit())
+////     {
+////         printf("AddToBlockIndex(): TxnCommit failed\n");
+////         return false;
+////     }
+//
+////     // New best
+////     if (!ActivateBestChain(state, txdb))
+////         return false;
+//
+////     if (pindexNew == chainActive.Tip())
+////     {
+////         // Notify UI to display prev block's coinbase if it was ours
+////         static uint256 hashPrevBestCoinBase;
+////         UpdatedTransaction(hashPrevBestCoinBase);
+////         hashPrevBestCoinBase = vtx[0].GetHash();
+////     }
+//
+//// #ifdef QT_GUI
+////     static ::int8_t counter = 0;
+////     if(
+////        ((++counter & 0x0F) == 0) ||     // every 16 blocks, why?
+////        !IsInitialBlockDownload()
+////       ) // repaint every 16 blocks if not in initial block download
+////     {
+////         //uiInterface.NotifyBlocksChanged();
+////     }
+////     else
+////     {
+////     //uiInterface.NotifyBlocksChanged();
+////     }
+//// #endif
+////     return true;
+//}
+
 bool CBlockHeader::CheckBlockHeader(CValidationState& state, bool fCheckPOW) const
 {
     bool fProofOfStake = IsProofOfStake();
@@ -3776,22 +3966,75 @@ bool CBlockHeader::CheckBlockHeader(CValidationState& state, bool fCheckPOW) con
 
         // nNonce must be zero for proof-of-stake blocks
         if (nNonce != 0)
-            return state.DoS(100, error("CheckBlock () : non-zero nonce in proof-of-stake block"));
+            return state.DoS(100, error("CheckBlockHeader () : non-zero nonce in proof-of-stake block"));
 
         // Check timestamp  06/04/2018 missing test in this 0.4.5-0.48 code.  Thanks Joe! ;>
         if (GetBlockTime() > FutureDrift(GetAdjustedTime()))
-            return error("CheckBlock () : block timestamp too far in the future");
+            return error("CheckBlockHeader () : block timestamp too far in the future");
     }
     else    // is PoW block
     {
         // Check proof of work matches claimed amount
         if (fCheckPOW && !CheckProofOfWork(GetHash(), nBits))
-            return state.DoS(50, error("CheckBlock () : proof of work failed"));
+            return state.DoS(50, error("CheckBlockHeader () : proof of work failed"));
 
         // Check timestamp
         if (GetBlockTime() > FutureDrift(GetAdjustedTime())){
             printf("Block timestamp in future: blocktime %d futuredrift %d",GetBlockTime(),FutureDrift(GetAdjustedTime()));
-            return error("CheckBlock () : block timestamp too far in the future");
+            return error("CheckBlockHeader () : block timestamp too far in the future");
+        }
+    }
+
+    CBlockIndex *pcheckpoint;
+    if (chainActive.Height() >= nMainnetNewLogicBlockNumber)
+    {
+        pcheckpoint = Checkpoints::GetLastSyncCheckpoint();
+    }
+    else
+    {
+        pcheckpoint = Checkpoints::GetLastCheckpoint(mapBlockIndex);
+    }
+
+    if (pcheckpoint && hashPrevBlock != hashBestChain &&
+        ((chainActive.Height() >= nMainnetNewLogicBlockNumber) ||
+         !Checkpoints::WantedByPendingSyncCheckpoint(GetHash())))
+    {
+        // Extra checks to prevent "fill up memory by spamming with bogus blocks"
+        ::int64_t deltaTime = GetBlockTime() - pcheckpoint->nTime;
+
+        CBigNum bnNewBlock;
+
+        bnNewBlock.SetCompact(nBits);
+
+        CBigNum bnRequired;
+
+        if (fUseOld044Rules
+            //(nTime < YACOIN_NEW_LOGIC_SWITCH_TIME)
+            //&& !fTestNet // new rules on Testnet
+            //|| fTestNet  // old rules on TestNet
+        )
+        {
+            bnRequired.SetCompact(ComputeMinWork(
+                GetLastBlockIndex(pcheckpoint, false)->nBits, deltaTime));
+        }
+        else
+        {
+            if (IsProofOfStake()) // <<<<<<<<<<<<<<<<<<<<<<<< this part is
+                                          // different
+                bnRequired.SetCompact(
+                    ComputeMinStake(GetLastBlockIndex(pcheckpoint, true)->nBits,
+                                    deltaTime, nTime));
+            else
+                bnRequired.SetCompact(ComputeMinWork(
+                    GetLastBlockIndex(pcheckpoint, false)->nBits, deltaTime));
+        }
+
+        if (bnNewBlock > bnRequired)
+        {
+            return state.DoS(100,
+                    error("CheckBlockHeader () : block with too little %s",
+                            IsProofOfStake() ?
+                                    "proof-of-stake" : "proof-of-work"));
         }
     }
     return true;
@@ -3911,84 +4154,84 @@ bool CBlock::CheckBlock(CValidationState &state, bool fCheckPOW, bool fCheckMerk
     return true;
 }
 
-bool CBlock::AcceptBlock(CValidationState &state)
+bool CBlock::AcceptBlock(CValidationState &state, CBlockIndex **ppindex)
 {
-    // Check for duplicate
+    // // Check for duplicate
+    // uint256 hash = GetHash();
+    // if (mapBlockIndex.count(hash))
+    //     return error("AcceptBlock () : block already in mapBlockIndex");
+
+    CBlockIndex *&pindex = *ppindex;
+
+    if (!AcceptBlockHeader(state, &pindex))
+        return false;
+
+    if (!CheckBlock(state))
+    {
+        if (state.Invalid() && !state.CorruptionPossible())
+        {
+            pindex->nStatus |= BLOCK_FAILED_VALID;
+        }
+        return false;
+    }
+
+    int nHeight = pindex->nHeight;
     uint256 hash = GetHash();
-    if (mapBlockIndex.count(hash))
-        return error("AcceptBlock () : block already in mapBlockIndex");
 
-    // Get prev block index
-    map<uint256, CBlockIndex*>::iterator mi = mapBlockIndex.find(hashPrevBlock);
-    if (mi == mapBlockIndex.end())
-        return state.DoS(10, error("AcceptBlock () : prev block not found"));
-    CBlockIndex* pindexPrev = (*mi).second;
-    int nHeight = pindexPrev->nHeight+1;
-
-    // Since hardfork block, new blocks don't accept transactions with version 1 anymore
+    // Since hardfork block, new blocks don't accept transactions with version 1
+    // anymore
     if (nHeight >= nMainnetNewLogicBlockNumber)
     {
         bool fProofOfStake = IsProofOfStake();
 
         if (vtx[0].nVersion == CTransaction::CURRENT_VERSION_of_Tx_for_yac_old)
-            return state.Invalid(error("AcceptBlock () : Not accept coinbase transaction with version 1"));
+        {
+            pindex->nStatus |= BLOCK_FAILED_VALID;
+            return state.Invalid(error(
+                "AcceptBlock () : Not accept coinbase transaction with version 1"));
+        }
 
-        if(fProofOfStake && vtx[1].nVersion == CTransaction::CURRENT_VERSION_of_Tx_for_yac_old)
-            return state.Invalid(error("AcceptBlock () : Not accept coinstake transaction with version 1"));
+        if (fProofOfStake &&
+            vtx[1].nVersion == CTransaction::CURRENT_VERSION_of_Tx_for_yac_old)
+        {
+            pindex->nStatus |= BLOCK_FAILED_VALID;
+            return state.Invalid(error(
+                "AcceptBlock () : Not accept coinstake transaction with version 1"));
+        }
 
         // Iterate all transactions starting from second for proof-of-stake block
         //    or first for proof-of-work block
         for (unsigned int i = (fProofOfStake ? 2 : 1); i < vtx.size(); ++i)
         {
             if (vtx[i].nVersion == CTransaction::CURRENT_VERSION_of_Tx_for_yac_old)
-                return state.Invalid(error("AcceptBlock () : Not accept transaction with version 1"));
+            {
+                pindex->nStatus |= BLOCK_FAILED_VALID;
+                return state.Invalid(
+                    error("AcceptBlock () : Not accept transaction with version 1"));
+            }
         }
     }
 
-    // Check proof-of-work or proof-of-stake
-    if (nBits != GetNextTargetRequired(pindexPrev, IsProofOfStake()))
-        return state.DoS(100, error("AcceptBlock () : incorrect %s", IsProofOfWork() ? "proof-of-work" : "proof-of-stake"));
-
-    ::int64_t 
-        nMedianTimePast = pindexPrev->GetMedianTimePast();
-//    int 
-//      //nMaxOffset = 12 * nSecondsPerHour; // 12 hours
-//        nMaxOffset = 7 * nSecondsPerDay; // One week (test)
-
-//    if (fTestNet)   // || pindexPrev->nTime < 1450569600)
-//        nMaxOffset = 7 * 7 * nSecondsPerDay; // 7 weeks on testNet
-
-// Check timestamp against prev
-    if (
-        GetBlockTime() <= pindexPrev->GetMedianTimePast()
-        ||
-        FutureDrift(GetBlockTime()) < pindexPrev->GetBlockTime()
-       )
-        return error("AcceptBlock () : block's timestamp is too early");
-/******* removed since it does't exist in <=0.4.4 code.  Thanks again, Joe ;>
-    if (
-        (pindexPrev->nHeight > 1) && 
-        ( (nMedianTimePast + nMaxOffset) < GetBlockTime() )
-       )
-        return error("AcceptBlock () : block's timestamp is too far in the future");
-*******/
     // Check that all transactions are finalized
-    BOOST_FOREACH(const CTransaction& tx, vtx)
+    BOOST_FOREACH (const CTransaction &tx, vtx)
         if (!tx.IsFinal(nHeight, GetBlockTime()))
-            return state.DoS(10, error("AcceptBlock () : contains a non-final transaction"));
-
-    // Check that the block chain matches the known block chain up to a checkpoint
-    if (!Checkpoints::CheckHardened(nHeight, hash))
-        return state.DoS(100, error("AcceptBlock () : rejected by hardened checkpoint lock-in at %d", nHeight));
+        {
+            pindex->nStatus |= BLOCK_FAILED_VALID;
+            return state.DoS(
+                10, error("AcceptBlock () : contains a non-final transaction"));
+        }
 
     // Enforce rule that the coinbase starts with serialized block height
     CScript expect = CScript() << nHeight;
-    if (
-        ( (!fUseOld044Rules) && ( vtx[0].vin[0].scriptSig.size() < expect.size() ) )
-        ||
-        !std::equal(expect.begin(), expect.end(), vtx[0].vin[0].scriptSig.begin())
-       )
-        return state.DoS(100, error("AcceptBlock () : block height mismatch in coinbase"));
+    if (((!fUseOld044Rules) &&
+         (vtx[0].vin[0].scriptSig.size() < expect.size())) ||
+        !std::equal(expect.begin(), expect.end(),
+                    vtx[0].vin[0].scriptSig.begin()))
+    {
+        pindex->nStatus |= BLOCK_FAILED_VALID;
+        return state.DoS(
+            100, error("AcceptBlock () : block height mismatch in coinbase"));
+    }
 
     // Write block to history file
     if (!CheckDiskSpace(::GetSerializeSize(*this, SER_DISK, CLIENT_VERSION)))
@@ -3997,25 +4240,27 @@ bool CBlock::AcceptBlock(CValidationState &state)
     unsigned int nBlockPos = 0;
     if (!WriteToDisk(nFile, nBlockPos))
         return error("AcceptBlock () : WriteToDisk failed");
-    if (!AddToBlockIndex(state, nFile, nBlockPos))
-        return error("AcceptBlock () : AddToBlockIndex failed");
+    if (!ReceivedBlockTransactions(state, nFile, nBlockPos, pindex))
+        return error("AcceptBlock () : ReceivedBlockTransactions failed");
 
     // here would be a good place to check for new logic
 
-    // Relay inventory, but don't relay old inventory during initial block download
+    // Relay inventory, but don't relay old inventory during initial block
+    // download
     int nBlockEstimate = Checkpoints::GetTotalBlocksEstimate();
     if (hashBestChain == hash)
-    {{
-        LOCK(cs_vNodes);
-        BOOST_FOREACH(CNode* pnode, vNodes)
-            if (
-                chainActive.Height() > (
-                (pnode->nStartingHeight != -1) ? 
-                pnode->nStartingHeight - 2000 : 
-                nBlockEstimate )
-               )                            // does 2000 blocks define IBD? 24 hours + a little
-                pnode->PushInventory(CInv(MSG_BLOCK, hash));
-    }}
+    {
+        {
+            LOCK(cs_vNodes);
+            BOOST_FOREACH (CNode *pnode, vNodes)
+                if (chainActive.Height() >
+                    ((pnode->nStartingHeight != -1)
+                         ? pnode->nStartingHeight - 2000
+                         : nBlockEstimate)) // does 2000 blocks define IBD? 24 hours + a
+                                            // little
+                    pnode->PushInventory(CInv(MSG_BLOCK, hash));
+        }
+    }
 
     // ppcoin: check pending sync-checkpoint
     if (chainActive.Height() < nMainnetNewLogicBlockNumber)
@@ -4121,75 +4366,13 @@ bool ProcessBlock(CValidationState &state, CNode* pfrom, CBlock* pblock)
             mapProofOfStake.insert(make_pair(hash, hashProofOfStake));
     }
 
-    CBlockIndex* pcheckpoint;
-    if (chainActive.Height() >= nMainnetNewLogicBlockNumber)
-    {
-        pcheckpoint = Checkpoints::GetLastSyncCheckpoint();
-    }
-    else
-    {
-        pcheckpoint = Checkpoints::GetLastCheckpoint(mapBlockIndex);
-    }
-
-    if (pcheckpoint && pblock->hashPrevBlock != hashBestChain
-            && ((chainActive.Height() >= nMainnetNewLogicBlockNumber)
-                    || !Checkpoints::WantedByPendingSyncCheckpoint(hash))) {
-        // Extra checks to prevent "fill up memory by spamming with bogus blocks"
-        ::int64_t 
-            deltaTime = pblock->GetBlockTime() - pcheckpoint->nTime;
-
-        CBigNum 
-            bnNewBlock;
-
-        bnNewBlock.SetCompact(pblock->nBits);
-
-        CBigNum 
-            bnRequired;
-
-        if(
-           fUseOld044Rules
-           //(pblock->nTime < YACOIN_NEW_LOGIC_SWITCH_TIME) 
-           //&& !fTestNet // new rules on Testnet
-           //|| fTestNet  // old rules on TestNet
-          )
-        {
-            bnRequired.SetCompact(
-                                  ComputeMinWork(GetLastBlockIndex(pcheckpoint, false)->nBits, 
-                                                 deltaTime
-                                                )
-                                 );
-        }
-        else
-        {
-            if (pblock->IsProofOfStake()) // <<<<<<<<<<<<<<<<<<<<<<<< this part is different
-                bnRequired.SetCompact(
-                                      ComputeMinStake(
-                                                      GetLastBlockIndex(pcheckpoint, true)->nBits, 
-                                                      deltaTime, 
-                                                      pblock->nTime                                                 
-                                                     )
-                                     );
-            else
-                bnRequired.SetCompact(
-                                      ComputeMinWork(GetLastBlockIndex(pcheckpoint, false)->nBits, 
-                                                     deltaTime
-                                                    )
-                                     );
-        }
-        if (bnNewBlock > bnRequired)
-        {
-            if (pfrom)
-                Misbehaving(pfrom->GetId(), 100);
-            return error("ProcessBlock () : block with too little %s", pblock->IsProofOfStake()? "proof-of-stake" : "proof-of-work");
-        }
-    }
-
     // ppcoin: ask for pending sync-checkpoint if any
     if (!IsInitialBlockDownload() && chainActive.Height() < nMainnetNewLogicBlockNumber)
         Checkpoints::AskForPendingSyncCheckpoint(pfrom);
 
-    // If don't already have its previous block, shunt it off to holding area until we get it
-    if (!mapBlockIndex.count(pblock->hashPrevBlock))
+    // If don't already have its previous block (with full data), shunt it off to holding area until we get it
+    std::map<uint256, CBlockIndex*>::iterator it = mapBlockIndex.find(pblock->hashPrevBlock);
+    if (pblock->hashPrevBlock != 0 && (it == mapBlockIndex.end() || !(it->second->nStatus & BLOCK_HAVE_DATA)))
     {
         printf("ProcessBlock: ORPHAN BLOCK, prev=%s\n", pblock->hashPrevBlock.ToString().substr(0,20).c_str());
         CBlock* pblock2 = new CBlock(*pblock);
@@ -4209,7 +4392,8 @@ bool ProcessBlock(CValidationState &state, CNode* pfrom, CBlock* pblock)
     }
 
     // Store to disk
-    if (!pblock->AcceptBlock(state))
+    CBlockIndex *pindex = NULL;
+    if (!pblock->AcceptBlock(state, &pindex))
         return error("ProcessBlock () : AcceptBlock FAILED");
 
     // Recursively process any orphan blocks that depended on this one
@@ -4228,7 +4412,8 @@ bool ProcessBlock(CValidationState &state, CNode* pfrom, CBlock* pblock)
                 * pblockOrphan = (*mi).second;
             Sleep( nOneMillisecond );  // let's try this arbitrary value? 
             CValidationState stateDummy;
-            if (pblockOrphan->AcceptBlock(stateDummy))
+            CBlockIndex *pindexChild = NULL;
+            if (pblockOrphan->AcceptBlock(stateDummy, &pindexChild))
                 vWorkQueue.push_back(pblockOrphan->GetHash());
             mapOrphanBlocks.erase(pblockOrphan->GetHash());
             delete pblockOrphan;
@@ -4742,7 +4927,8 @@ bool LoadBlockIndex(bool fAllowNew)
         unsigned int nBlockPos;
         if (!block.WriteToDisk(nFile, nBlockPos))
             return error("LoadBlockIndex() : writing genesis block to disk failed");
-        if (!block.AddToBlockIndex(stateDummy, nFile, nBlockPos))
+        CBlockIndex *pindex = block.AddToBlockIndex();
+        if (!block.ReceivedBlockTransactions(stateDummy, nFile, nBlockPos, pindex))
             return error("LoadBlockIndex() : genesis block not accepted");
 
         // initialize synchronized checkpoint

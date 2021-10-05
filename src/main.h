@@ -1430,7 +1430,26 @@ public:
     {
         return !IsProofOfStake();
     }
+
+    // ppcoin: entropy bit for stake modifier if chosen by modifier
+    unsigned int GetStakeEntropyBit(unsigned int nHeight) const
+    {
+
+            // Take last bit of block hash as entropy bit
+            unsigned int nEntropyBit = ((GetHash().Get64()) & 1ULL);
+            if (fDebug && GetBoolArg("-printstakemodifier"))
+                printf(
+                        "GetStakeEntropyBit: nTime=%" PRId64 " \nhashBlock=%s\nnEntropyBit=%u\n",
+                        nTime,
+                        GetHash().ToString().c_str(),
+                        nEntropyBit
+                      );
+            return nEntropyBit;
+
+    }
     bool CheckBlockHeader(CValidationState& state, bool fCheckPOW = true) const;
+    bool AcceptBlockHeader(CValidationState& state, CBlockIndex **ppindex= NULL);
+    CBlockIndex* AddToBlockIndex();
 };
 
 class CBlock : public CBlockHeader
@@ -1472,23 +1491,6 @@ public:
     }
 
     void UpdateTime(const CBlockIndex* pindexPrev);
-
-    // ppcoin: entropy bit for stake modifier if chosen by modifier
-    unsigned int GetStakeEntropyBit(unsigned int nHeight) const
-    {
-        
-            // Take last bit of block hash as entropy bit
-            unsigned int nEntropyBit = ((GetHash().Get64()) & 1ULL);
-            if (fDebug && GetBoolArg("-printstakemodifier"))
-                printf(
-                        "GetStakeEntropyBit: nTime=%" PRId64 " \nhashBlock=%s\nnEntropyBit=%u\n",
-                        nTime, 
-                        GetHash().ToString().c_str(), 
-                        nEntropyBit
-                      );
-   			return nEntropyBit;
- 
-    }
 
     std::pair<COutPoint, unsigned int> GetProofOfStake() const
     {
@@ -1621,9 +1623,9 @@ public:
     bool ReadFromDisk(const CBlockIndex* pindex, bool fReadTransactions=true, bool fCheckHeader = true);
     bool ReadFromDisk(unsigned int nFile, unsigned int nBlockPos,
             bool fReadTransactions = true, bool fCheckHeader = true);
-    bool AddToBlockIndex(CValidationState &state, unsigned int nFile, unsigned int nBlockPos);
+    bool ReceivedBlockTransactions(CValidationState &state, unsigned int nFile, unsigned int nBlockPos, CBlockIndex *pindexNew);
     bool CheckBlock(CValidationState& state, bool fCheckPOW=true, bool fCheckMerkleRoot=true, bool fCheckSig=true) const;
-    bool AcceptBlock(CValidationState &state);
+    bool AcceptBlock(CValidationState &state, CBlockIndex **ppindex);
     bool GetCoinAge(::uint64_t& nCoinAge) const; // ppcoin: calculate total coin age spent in block
     bool SignBlock044(const CKeyStore& keystore);
     bool SignBlock(CWallet& keystore);
@@ -1734,6 +1736,11 @@ public:
         blockHash      = 0;
         nStatus = 0;
         nSequenceId = 0;
+    }
+
+    CBlockIndex(CBlockHeader &blockHeader) :
+            CBlockIndex(0, 0, blockHeader) {
+
     }
 
     CBlockIndex(unsigned int nFileIn, unsigned int nBlockPosIn, CBlockHeader& blockHeader)
@@ -1882,6 +1889,29 @@ public:
     void print() const
     {
         printf("%s\n", ToString().c_str());
+    }
+
+    // Check whether this block index entry is valid up to the passed validity level.
+    bool IsValid(enum BlockStatus nUpTo = BLOCK_VALID_TRANSACTIONS) const
+    {
+        assert(!(nUpTo & ~BLOCK_VALID_MASK)); // Only validity flags allowed.
+        if (nStatus & BLOCK_FAILED_MASK)
+            return false;
+        return ((nStatus & BLOCK_VALID_MASK) >= nUpTo);
+    }
+
+    // Raise the validity level of this block index entry.
+    // Returns true if the validity was changed.
+    bool RaiseValidity(enum BlockStatus nUpTo)
+    {
+        assert(!(nUpTo & ~BLOCK_VALID_MASK)); // Only validity flags allowed.
+        if (nStatus & BLOCK_FAILED_MASK)
+            return false;
+        if ((nStatus & BLOCK_VALID_MASK) < nUpTo) {
+            nStatus = (nStatus & ~BLOCK_VALID_MASK) | nUpTo;
+            return true;
+        }
+        return false;
     }
 };
 
