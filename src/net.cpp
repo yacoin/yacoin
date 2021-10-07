@@ -967,7 +967,8 @@ void ThreadSocketHandler2(void *parg)
                 }
                 // Sleep( nOneMillisecond ); //Sleep( nOneHundredMilliseconds );
             }
-
+        }// end of LOCK(cs_vNodes)
+        {
             // Delete disconnected nodes
             list<CNode *> vNodesDisconnectedCopy = vNodesDisconnected;
             BOOST_FOREACH (CNode *pnode, vNodesDisconnectedCopy)
@@ -1002,7 +1003,7 @@ void ThreadSocketHandler2(void *parg)
                 // Sleep( nOneMillisecond ); //Sleep( nOneHundredMilliseconds );
             }
             updatePreviousNodecountIf(vNodes, nPrevNodeCount);
-        } // end of LOCK(cs_vNodes)
+        }
 
         //
         // Find which sockets have data to receive

@@ -2421,6 +2421,7 @@ int GetNumBlocksOfPeers()
 
 bool IsInitialBlockDownload()
 {
+    LOCK(cs_main);
     bool
         fIsIBD = true;      // presume still downloading blocks
 
@@ -3458,6 +3459,7 @@ void static FindMostWorkChain() {
 
 // Try to activate to the most-work chain (thereby connecting it).
 bool ActivateBestChain(CValidationState &state, CTxDB& txdb) {
+    LOCK(cs_main);
     CBlockIndex *pindexOldTip = chainActive.Tip();
     bool fComplete = false;
     while (!fComplete) {
@@ -3725,6 +3727,7 @@ bool CBlock::ReceivedBlockTransactions(CValidationState &state, unsigned int nFi
     if (!ActivateBestChain(state, txdb))
         return false;
 
+    LOCK(cs_main);
     if (pindexNew == chainActive.Tip())
     {
         // Notify UI to display prev block's coinbase if it was ours
@@ -5438,6 +5441,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
                 pfrom->addr.ToString().c_str()
               );
 
+        LOCK(cs_main);
         cPeerBlockCounts.input(pfrom->nStartingHeight);
 
         // ppcoin: ask for pending sync-checkpoint if any
@@ -5590,6 +5594,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
             return error("message inv size() = %" PRIszu " too big!", vInv.size());
         }
 
+        LOCK(cs_main);
         CTxDB txdb("r");
 
         for (unsigned int nInv = 0; nInv < vInv.size(); ++nInv)
@@ -5643,6 +5648,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
         printf("rx'd a getdata request (%" PRIszu " invsz) from %s\n",
                vInv.size(), pfrom->addr.ToString().c_str());
 
+      LOCK(cs_main);
       BOOST_FOREACH (const CInv &inv, vInv) {
         if (fShutdown)
           return true;
@@ -5729,6 +5735,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
 
         vRecv >> locator >> hashStop;
 
+        LOCK(cs_main);
         // Find the last block the caller has in the main chain
         CBlockIndex
             * pindex = locator.GetBlockIndex();
@@ -5812,6 +5819,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
         uint256 hashStop;
         vRecv >> locator >> hashStop;
 
+        LOCK(cs_main);
         CBlockIndex* pindex = NULL;
         if (locator.IsNull())
         {
@@ -5864,6 +5872,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
         CInv inv(MSG_TX, tx.GetHash());
         pfrom->AddInventoryKnown(inv);
 
+        LOCK(cs_main);
         bool 
             fMissingInputs = false;
         CValidationState state;
@@ -5956,6 +5965,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
 
         Sleep( nOneMillisecond );  // let's try this arbitrary value? 
 
+        LOCK(cs_main);
         // Remember who we got this block from.
         mapBlockSource[inv.hash] = pfrom->GetId();
         MarkBlockAsReceived(inv.hash, pfrom->GetId());
@@ -6258,7 +6268,6 @@ bool ProcessMessages(CNode* pfrom)
         try
         {
             {
-                LOCK(cs_main);
                 fRet = ProcessMessage(pfrom, strCommand, vMsg);
             }
             if (fShutdown)
@@ -6314,8 +6323,6 @@ bool ProcessMessages(CNode* pfrom)
 
 bool SendMessages(CNode *pto, bool fSendTrickle)
 {
-    TRY_LOCK(cs_main, lockMain);
-    if (lockMain)
     {
         // Don't send anything until we get their version message
         if (pto->nVersion == 0)
@@ -6337,6 +6344,9 @@ bool SendMessages(CNode *pto, bool fSendTrickle)
         // Resend wallet transactions that haven't gotten in a block yet
         ResendWalletTransactions();
 
+        TRY_LOCK(cs_main, lockMain); // Acquire cs_main for IsInitialBlockDownload() and CNodeState()
+        if (!lockMain)
+            return true;
         // Address refresh broadcast
         static ::int64_t nLastRebroadcast; // remember, statics are initialized to 0
         if (!IsInitialBlockDownload() &&
