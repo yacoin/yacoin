@@ -3551,7 +3551,7 @@ bool ActivateBestChain(CValidationState &state, CTxDB& txdb) {
         static ::int8_t counter = 0;
         if(
            ((++counter & 0x0F) == 0) ||     // every 16 blocks, why?
-           !fInitialDownload()
+           !fInitialDownload
           ) // repaint every 16 blocks if not in initial block download
         {
             //uiInterface.NotifyBlocksChanged();
