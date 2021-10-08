@@ -5276,7 +5276,10 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
         return true;
     }
 
-    State(pfrom->GetId())->nLastBlockProcess = GetTime();
+    {
+        LOCK(cs_main);
+        State(pfrom->GetId())->nLastBlockProcess = GetTime();
+    }
 /******************
     if (strCommand == "version")
     else if (strCommand == "verack")
