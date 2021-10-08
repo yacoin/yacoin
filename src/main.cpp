@@ -3441,58 +3441,54 @@ static CBlockIndex* FindMostWorkChain() {
     } while(true);
 }
 
-// Try to activate to the most-work chain (thereby connecting it).
-bool ActivateBestChain(CValidationState &state, CTxDB& txdb) {
-    LOCK(cs_main);
+// Try to make some progress towards making pindexMostWork the active block.
+static bool ActivateBestChainStep(CValidationState &state, CTxDB& txdb, CBlockIndex *pindexMostWork) {
     CBlockIndex *pindexOldTip = chainActive.Tip();
-    bool fComplete = false;
-    while (!fComplete) {
-        CBlockIndex *pindexMostWork = FindMostWorkChain();
-        CBlockIndex *pindexFork = chainActive.FindFork(pindexMostWork);
-        fComplete = true;
+    CBlockIndex *pindexFork = chainActive.FindFork(pindexMostWork);
 
-        // Check whether we have something to do.
-        if (pindexMostWork == NULL) break;
+    // Disconnect active blocks which are no longer in the best chain.
+    while (chainActive.Tip() && chainActive.Tip() != pindexFork) {
+        if (!txdb.TxnBegin()) {
+            return error("ActivateBestChain () : TxnBegin 1 failed");
+        }
+        if (!DisconnectTip(state, txdb)) // Disconnect the latest block on the chain
+        {
+            txdb.TxnAbort();
+            return false;
+        }
+    }
 
-        // Disconnect active blocks which are no longer in the best chain.
-        while (chainActive.Tip() && chainActive.Tip() != pindexFork) {
-            if (!txdb.TxnBegin()) {
-                return error("ActivateBestChain () : TxnBegin 1 failed");
-            }
-            if (!DisconnectTip(state, txdb)) // Disconnect the latest block on the chain
-            {
+    // Build list of new blocks to connect.
+    std::vector<CBlockIndex*> vpindexToConnect;
+    vpindexToConnect.reserve(pindexMostWork->nHeight - (pindexFork ? pindexFork->nHeight : -1));
+    while (pindexMostWork && pindexMostWork != pindexFork) {
+        vpindexToConnect.push_back(pindexMostWork);
+        pindexMostWork = pindexMostWork->pprev;
+    }
+
+    // Connect new blocks.
+    BOOST_REVERSE_FOREACH(CBlockIndex *pindexConnect, vpindexToConnect) {
+        if (!txdb.TxnBegin()) {
+            return error("ActivateBestChain () : TxnBegin 2 failed");
+        }
+        if (!ConnectTip(state, txdb, pindexConnect)) {
+            if (state.IsInvalid()) {
+                // The block violates a consensus rule.
+                if (!state.CorruptionPossible())
+                    InvalidChainFound(vpindexToConnect.back());
+                state = CValidationState();
+                txdb.TxnAbort();
+                break;
+            } else {
+                // A system error occurred (disk space, database error, ...).
                 txdb.TxnAbort();
                 return false;
             }
         }
-
-        // Build list of new blocks to connect.
-        std::vector<CBlockIndex*> vpindexToConnect;
-        vpindexToConnect.reserve(pindexMostWork->nHeight - (pindexFork ? pindexFork->nHeight : -1));
-        while (pindexMostWork && pindexMostWork != pindexFork) {
-            vpindexToConnect.push_back(pindexMostWork);
-            pindexMostWork = pindexMostWork->pprev;
-        }
-
-        // Connect new blocks.
-        BOOST_REVERSE_FOREACH(CBlockIndex *pindexConnect, vpindexToConnect) {
-            if (!txdb.TxnBegin()) {
-                return error("ActivateBestChain () : TxnBegin 2 failed");
-            }
-            if (!ConnectTip(state, txdb, pindexConnect)) {
-                if (state.IsInvalid()) {
-                    // The block violates a consensus rule.
-                    if (!state.CorruptionPossible())
-                        InvalidChainFound(vpindexToConnect.back());
-                    fComplete = false;
-                    state = CValidationState();
-                    txdb.TxnAbort();
-                    break;
-                } else {
-                    // A system error occurred (disk space, database error, ...).
-                    txdb.TxnAbort();
-                    return false;
-                }
+        else {
+            if (!pindexOldTip || chainActive.Tip()->bnChainTrust > pindexOldTip->bnChainTrust) {
+                // We're in a better position than we were. Return temporarily to release the lock.
+                break;
             }
         }
     }
@@ -3509,6 +3505,28 @@ bool ActivateBestChain(CValidationState &state, CTxDB& txdb) {
     return true;
 }
 
+bool ActivateBestChain(CValidationState &state, CTxDB& txdb) {
+    do {
+        boost::this_thread::interruption_point();
+
+        LOCK(cs_main);
+
+        // Check whether we're done (this could be avoided after the first run,
+        // but that's not worth optimizing.
+        CBlockIndex *pindexMostWork = FindMostWorkChain();
+        if (pindexMostWork == NULL || pindexMostWork == chainActive.Tip())
+            return true;
+
+        if (!ActivateBestChainStep(state, txdb, pindexMostWork))
+            return false;
+
+        // Check whether we're done now.
+        if (pindexMostWork == chainActive.Tip())
+            return true;
+    } while(true);
+
+    return true;
+}
 //////////////////////////////////////////////////////////////////////////////
 //
 // CChain implementation
