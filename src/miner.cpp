@@ -890,30 +890,29 @@ bool CheckWork(CBlock* pblock, CWallet& wallet, CReserveKey& reservekey)
         LOCK(cs_main);
         if (pblock->hashPrevBlock != hashBestChain)
             return error("CheckWork () : generated block is stale");
+    }
+    // Remove key from key pool
+    reservekey.KeepKey();
 
-        // Remove key from key pool
-        reservekey.KeepKey();
+    // Track how many getdata requests this block gets
+    {
+        LOCK(wallet.cs_wallet);
+        wallet.mapRequestCount[hashBlock] = 0;
+    }
 
-        // Track how many getdata requests this block gets
-        {
-            LOCK(wallet.cs_wallet);
-            wallet.mapRequestCount[hashBlock] = 0;
-        }
-
-        // Process this block the same as if we had received it from another node
-        MeasureTime processBlock;
-        CValidationState state;
-        if (!ProcessBlock(state, NULL, pblock))
-        {
-            processBlock.mEnd.stamp();
-            printf("CheckWork(), total time for ProcessBlock = %lu us\n",
-                    processBlock.getExecutionTime());
-            return error("CheckWork () : ProcessBlock, block not accepted");
-        }
+    // Process this block the same as if we had received it from another node
+    MeasureTime processBlock;
+    CValidationState state;
+    if (!ProcessBlock(state, NULL, pblock))
+    {
         processBlock.mEnd.stamp();
         printf("CheckWork(), total time for ProcessBlock = %lu us\n",
                 processBlock.getExecutionTime());
+        return error("CheckWork () : ProcessBlock, block not accepted");
     }
+    processBlock.mEnd.stamp();
+    printf("CheckWork(), total time for ProcessBlock = %lu us\n",
+            processBlock.getExecutionTime());
 
     return true;
 }

@@ -3777,8 +3777,7 @@ bool CBlock::ReceivedBlockTransactions(CValidationState &state, unsigned int nFi
         return false;
     }
 
-    // New best
-    return ActivateBestChain(state, txdb);
+    return true;
 }
 
 bool CBlockHeader::AcceptBlockHeader(CValidationState &state,
@@ -4207,7 +4206,6 @@ bool CBlock::AcceptBlock(CValidationState &state, CBlockIndex **ppindex)
     }
 
     int nHeight = pindex->nHeight;
-    uint256 hash = GetHash();
 
     // Since hardfork block, new blocks don't accept transactions with version 1
     // anymore
@@ -4349,94 +4347,100 @@ bool ProcessBlock(CValidationState &state, CNode* pfrom, CBlock* pblock)
 {
     // Check for duplicate
     uint256 hash = pblock->GetHash();
-    if (mapBlockIndex.count(hash))
-        return state.Invalid(error("ProcessBlock () : already have block %d %s", mapBlockIndex[hash]->nHeight, hash.ToString().substr(0,20).c_str()));
-    if (mapOrphanBlocks.count(hash))
-        return state.Invalid(error("ProcessBlock () : already have block (orphan) %s", hash.ToString().substr(0,20).c_str()));
-
-    // Preliminary checks
-    if (!pblock->CheckBlock(state, true, true,
-            (pblock->nTime > Checkpoints::GetLastCheckpointTime())))
     {
-        return error("ProcessBlock () : CheckBlock FAILED");
-    }
+        LOCK(cs_main);
+        if (mapBlockIndex.count(hash))
+            return state.Invalid(error("ProcessBlock () : already have block %d %s", mapBlockIndex[hash]->nHeight, hash.ToString().substr(0,20).c_str()));
+        if (mapOrphanBlocks.count(hash))
+            return state.Invalid(error("ProcessBlock () : already have block (orphan) %s", hash.ToString().substr(0,20).c_str()));
 
-    // ppcoin: verify hash target and signature of coinstake tx
-    if (pblock->IsProofOfStake())
-    {
-        uint256 hashProofOfStake = 0, targetProofOfStake = 0;
-        if (!CheckProofOfStake(state, pblock->vtx[1], pblock->nBits, hashProofOfStake, targetProofOfStake))
+        // Preliminary checks
+        if (!pblock->CheckBlock(state, true, true,
+                (pblock->nTime > Checkpoints::GetLastCheckpointTime())))
         {
-            printf("WARNING: ProcessBlock (): "
-                   "check proof-of-stake failed for block %s (%s)\n", 
-                    hash.ToString().c_str()
-                    , DateTimeStrFormat( " %Y-%m-%d %H:%M:%S",
-                                        pblock->nTime
-                                       ).c_str()
-                  );
-            return false; // do not error here as we expect this during initial block download
+            return error("ProcessBlock () : CheckBlock FAILED");
         }
-        if (!mapProofOfStake.count(hash)) // add to mapProofOfStake
-            mapProofOfStake.insert(make_pair(hash, hashProofOfStake));
-    }
 
-    // ppcoin: ask for pending sync-checkpoint if any
-    if (!IsInitialBlockDownload() && chainActive.Height() < nMainnetNewLogicBlockNumber)
-        Checkpoints::AskForPendingSyncCheckpoint(pfrom);
-
-    // If don't already have its previous block (with full data), shunt it off to holding area until we get it
-    std::map<uint256, CBlockIndex*>::iterator it = mapBlockIndex.find(pblock->hashPrevBlock);
-    if (pblock->hashPrevBlock != 0 && (it == mapBlockIndex.end() || !(it->second->nStatus & BLOCK_HAVE_DATA)))
-    {
-        printf("ProcessBlock: ORPHAN BLOCK, prev=%s\n", pblock->hashPrevBlock.ToString().substr(0,20).c_str());
-        CBlock* pblock2 = new CBlock(*pblock);
-        mapOrphanBlocks.insert(make_pair(hash, pblock2));
-        mapOrphanBlocksByPrev.insert(make_pair(pblock2->hashPrevBlock, pblock2));
-
-        // Ask this guy to fill in what we're missing
-        if (pfrom)
+        // ppcoin: verify hash target and signature of coinstake tx
+        if (pblock->IsProofOfStake())
         {
-            pfrom->PushGetBlocks(chainActive.Tip(), GetOrphanRoot(pblock2));
-            // ppcoin: getblocks may not obtain the ancestor block rejected
-            // earlier by duplicate-stake check so we ask for it again directly
-            if (!IsInitialBlockDownload())
-                pfrom->AskFor(CInv(MSG_BLOCK, WantedByOrphan(pblock2)));
+            uint256 hashProofOfStake = 0, targetProofOfStake = 0;
+            if (!CheckProofOfStake(state, pblock->vtx[1], pblock->nBits, hashProofOfStake, targetProofOfStake))
+            {
+                printf("WARNING: ProcessBlock (): "
+                       "check proof-of-stake failed for block %s (%s)\n",
+                        hash.ToString().c_str()
+                        , DateTimeStrFormat( " %Y-%m-%d %H:%M:%S",
+                                            pblock->nTime
+                                           ).c_str()
+                      );
+                return false; // do not error here as we expect this during initial block download
+            }
+            if (!mapProofOfStake.count(hash)) // add to mapProofOfStake
+                mapProofOfStake.insert(make_pair(hash, hashProofOfStake));
         }
-        return true;
-    }
 
-    // Store to disk
-    CBlockIndex *pindex = NULL;
-    if (!pblock->AcceptBlock(state, &pindex))
-        return error("ProcessBlock () : AcceptBlock FAILED");
+        // ppcoin: ask for pending sync-checkpoint if any
+        if (!IsInitialBlockDownload() && chainActive.Height() < nMainnetNewLogicBlockNumber)
+            Checkpoints::AskForPendingSyncCheckpoint(pfrom);
 
-    // Recursively process any orphan blocks that depended on this one
-    vector<uint256> 
-        vWorkQueue;
-    vWorkQueue.push_back(hash);
-    for (unsigned int i = 0; i < vWorkQueue.size(); ++i)
-    {
-        uint256 
-            hashPrev = vWorkQueue[i];
-        for (multimap<uint256, CBlock*>::iterator mi = mapOrphanBlocksByPrev.lower_bound(hashPrev);
-             mi != mapOrphanBlocksByPrev.upper_bound(hashPrev);
-             ++mi)
+        // If don't already have its previous block (with full data), shunt it off to holding area until we get it
+        std::map<uint256, CBlockIndex*>::iterator it = mapBlockIndex.find(pblock->hashPrevBlock);
+        if (pblock->hashPrevBlock != 0 && (it == mapBlockIndex.end() || !(it->second->nStatus & BLOCK_HAVE_DATA)))
         {
-            CBlock
-                * pblockOrphan = (*mi).second;
-            Sleep( nOneMillisecond );  // let's try this arbitrary value? 
-            CValidationState stateDummy;
-            CBlockIndex *pindexChild = NULL;
-            if (pblockOrphan->AcceptBlock(stateDummy, &pindexChild))
-                vWorkQueue.push_back(pblockOrphan->GetHash());
-            mapOrphanBlocks.erase(pblockOrphan->GetHash());
-            delete pblockOrphan;
+            printf("ProcessBlock: ORPHAN BLOCK, prev=%s\n", pblock->hashPrevBlock.ToString().substr(0,20).c_str());
+            CBlock* pblock2 = new CBlock(*pblock);
+            mapOrphanBlocks.insert(make_pair(hash, pblock2));
+            mapOrphanBlocksByPrev.insert(make_pair(pblock2->hashPrevBlock, pblock2));
+
+            // Ask this guy to fill in what we're missing
+            if (pfrom)
+            {
+                pfrom->PushGetBlocks(chainActive.Tip(), GetOrphanRoot(pblock2));
+                // ppcoin: getblocks may not obtain the ancestor block rejected
+                // earlier by duplicate-stake check so we ask for it again directly
+                if (!IsInitialBlockDownload())
+                    pfrom->AskFor(CInv(MSG_BLOCK, WantedByOrphan(pblock2)));
+            }
+            return true;
         }
-        mapOrphanBlocksByPrev.erase(hashPrev);
+
+        // Store to disk
+        CBlockIndex *pindex = NULL;
+        if (!pblock->AcceptBlock(state, &pindex))
+            return error("ProcessBlock () : AcceptBlock FAILED");
+
+        // Recursively process any orphan blocks that depended on this one
+        vector<uint256>
+            vWorkQueue;
+        vWorkQueue.push_back(hash);
+        for (unsigned int i = 0; i < vWorkQueue.size(); ++i)
+        {
+            uint256
+                hashPrev = vWorkQueue[i];
+            for (multimap<uint256, CBlock*>::iterator mi = mapOrphanBlocksByPrev.lower_bound(hashPrev);
+                 mi != mapOrphanBlocksByPrev.upper_bound(hashPrev);
+                 ++mi)
+            {
+                CBlock
+                    * pblockOrphan = (*mi).second;
+                Sleep( nOneMillisecond );  // let's try this arbitrary value?
+                CValidationState stateDummy;
+                CBlockIndex *pindexChild = NULL;
+                if (pblockOrphan->AcceptBlock(stateDummy, &pindexChild))
+                    vWorkQueue.push_back(pblockOrphan->GetHash());
+                mapOrphanBlocks.erase(pblockOrphan->GetHash());
+                delete pblockOrphan;
+            }
+            mapOrphanBlocksByPrev.erase(hashPrev);
+        }
     }
 
+    CTxDB txdb;
+    // New best
+    if (!ActivateBestChain(state, txdb))
+        return error("ProcessBlock() : ActivateBestChain failed");
     printf("ProcessBlock: ACCEPTED %s BLOCK\n", pblock->IsProofOfStake()?"POS":"POW");
-
     // ppcoin: if responsible for sync-checkpoint send it
     if (chainActive.Height() < nMainnetNewLogicBlockNumber && pfrom && !CSyncCheckpoint::strMasterPrivKey.empty())
         Checkpoints::SendSyncCheckpoint(Checkpoints::AutoSelectSyncCheckpoint());
@@ -4944,7 +4948,9 @@ bool LoadBlockIndex(bool fAllowNew)
         CBlockIndex *pindex = block.AddToBlockIndex();
         if (!block.ReceivedBlockTransactions(stateDummy, nFile, nBlockPos, pindex))
             return error("LoadBlockIndex() : genesis block not accepted");
-
+        CValidationState state;
+        if (!ActivateBestChain(state, txdb))
+            return error("LoadBlockIndex() : genesis block cannot be activated");
         // initialize synchronized checkpoint
         if (!Checkpoints::WriteSyncCheckpoint((!fTestNet ? hashGenesisBlock : hashGenesisBlockTestNet)))
             return error("LoadBlockIndex() : failed to init sync checkpoint");
@@ -5976,10 +5982,12 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
 
         Sleep( nOneMillisecond );  // let's try this arbitrary value? 
 
-        LOCK(cs_main);
-        // Remember who we got this block from.
-        mapBlockSource[inv.hash] = pfrom->GetId();
-        MarkBlockAsReceived(inv.hash, pfrom->GetId());
+        {
+            LOCK(cs_main);
+            // Remember who we got this block from.
+            mapBlockSource[inv.hash] = pfrom->GetId();
+            MarkBlockAsReceived(inv.hash, pfrom->GetId());
+        }
 
         MeasureTime processBlock;
         CValidationState state;
