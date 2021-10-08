@@ -3166,6 +3166,10 @@ bool CBlock::ConnectBlock(CValidationState &state, CTxDB& txdb, CBlockIndex* pin
     BOOST_FOREACH(CTransaction& tx, vtx)
         SyncWithWallets(tx, this, true);
 
+    // Notify UI to display prev block's coinbase if it was ours
+    static uint256 hashPrevBestCoinBase;
+    UpdatedTransaction(hashPrevBestCoinBase);
+    hashPrevBestCoinBase = vtx[0].GetHash();
 
     return true;
 }
@@ -3443,6 +3447,7 @@ static CBlockIndex* FindMostWorkChain() {
 
 // Try to make some progress towards making pindexMostWork the active block.
 static bool ActivateBestChainStep(CValidationState &state, CTxDB& txdb, CBlockIndex *pindexMostWork) {
+//    bool fInvalidFound = false;
     CBlockIndex *pindexOldTip = chainActive.Tip();
     CBlockIndex *pindexFork = chainActive.FindFork(pindexMostWork);
 
@@ -3477,6 +3482,7 @@ static bool ActivateBestChainStep(CValidationState &state, CTxDB& txdb, CBlockIn
                 if (!state.CorruptionPossible())
                     InvalidChainFound(vpindexToConnect.back());
                 state = CValidationState();
+//                fInvalidFound = true;
                 txdb.TxnAbort();
                 break;
             } else {
@@ -3493,37 +3499,69 @@ static bool ActivateBestChainStep(CValidationState &state, CTxDB& txdb, CBlockIn
         }
     }
 
-    if (chainActive.Tip() != pindexOldTip) {
-        std::string strCmd = GetArg("-blocknotify", "");
-        if (!IsInitialBlockDownload() && !strCmd.empty())
-        {
-            boost::replace_all(strCmd, "%s", chainActive.Tip()->GetBlockHash().GetHex());
-            boost::thread t(runCommand, strCmd); // thread runs free
-        }
-    }
+    // Callbacks/notifications for a new best chain.
+//    if (fInvalidFound)
+//        CheckForkWarningConditionsOnNewFork(vpindexToConnect.back());
+//    else
+//        CheckForkWarningConditions();
 
     return true;
 }
 
 bool ActivateBestChain(CValidationState &state, CTxDB& txdb) {
+    CBlockIndex *pindexNewTip = NULL;
+    CBlockIndex *pindexMostWork = NULL;
     do {
         boost::this_thread::interruption_point();
 
-        LOCK(cs_main);
+        bool fInitialDownload;
+        {
+            LOCK(cs_main);
+            pindexMostWork = FindMostWorkChain();
 
-        // Check whether we're done (this could be avoided after the first run,
-        // but that's not worth optimizing.
-        CBlockIndex *pindexMostWork = FindMostWorkChain();
-        if (pindexMostWork == NULL || pindexMostWork == chainActive.Tip())
-            return true;
+            // Whether we have anything to do at all.
+            if (pindexMostWork == NULL || pindexMostWork == chainActive.Tip())
+                return true;
 
-        if (!ActivateBestChainStep(state, txdb, pindexMostWork))
-            return false;
+            if (!ActivateBestChainStep(state, txdb, pindexMostWork))
+                return false;
 
-        // Check whether we're done now.
-        if (pindexMostWork == chainActive.Tip())
-            return true;
-    } while(true);
+            pindexNewTip = chainActive.Tip();
+            fInitialDownload = IsInitialBlockDownload();
+        }
+        // When we reach this point, we switched to a new tip (stored in pindexNewTip).
+
+        // Notifications/callbacks that can run without cs_main
+        if (!fInitialDownload) {
+            uint256 hashNewTip = pindexNewTip->GetBlockHash();
+            // Relay inventory, but don't relay old inventory during initial block download.
+            int nBlockEstimate = Checkpoints::GetTotalBlocksEstimate();
+            LOCK(cs_vNodes);
+            BOOST_FOREACH(CNode* pnode, vNodes)
+                if (chainActive.Height() > (pnode->nStartingHeight != -1 ? pnode->nStartingHeight - 2000 : nBlockEstimate))
+                    pnode->PushInventory(CInv(MSG_BLOCK, hashNewTip));
+
+            std::string strCmd = GetArg("-blocknotify", "");
+            if (!strCmd.empty()) {
+                boost::replace_all(strCmd, "%s", hashNewTip.GetHex());
+                boost::thread t(runCommand, strCmd); // thread runs free
+            }
+        }
+#ifdef QT_GUI
+        static ::int8_t counter = 0;
+        if(
+           ((++counter & 0x0F) == 0) ||     // every 16 blocks, why?
+           !fInitialDownload()
+          ) // repaint every 16 blocks if not in initial block download
+        {
+            //uiInterface.NotifyBlocksChanged();
+        }
+        else
+        {
+        //uiInterface.NotifyBlocksChanged();
+        }
+#endif
+    } while(pindexMostWork != chainActive.Tip());
 
     return true;
 }
@@ -3740,33 +3778,7 @@ bool CBlock::ReceivedBlockTransactions(CValidationState &state, unsigned int nFi
     }
 
     // New best
-    if (!ActivateBestChain(state, txdb))
-        return false;
-
-    LOCK(cs_main);
-    if (pindexNew == chainActive.Tip())
-    {
-        // Notify UI to display prev block's coinbase if it was ours
-        static uint256 hashPrevBestCoinBase;
-        UpdatedTransaction(hashPrevBestCoinBase);
-        hashPrevBestCoinBase = vtx[0].GetHash();
-    }
-
-#ifdef QT_GUI
-    static ::int8_t counter = 0;
-    if( 
-       ((++counter & 0x0F) == 0) ||     // every 16 blocks, why?
-       !IsInitialBlockDownload()
-      ) // repaint every 16 blocks if not in initial block download
-    {
-        //uiInterface.NotifyBlocksChanged();
-    }
-    else
-    {
-    //uiInterface.NotifyBlocksChanged();
-    }
-#endif
-    return true;
+    return ActivateBestChain(state, txdb);
 }
 
 bool CBlockHeader::AcceptBlockHeader(CValidationState &state,
@@ -4263,23 +4275,6 @@ bool CBlock::AcceptBlock(CValidationState &state, CBlockIndex **ppindex)
         return error("AcceptBlock () : ReceivedBlockTransactions failed");
 
     // here would be a good place to check for new logic
-
-    // Relay inventory, but don't relay old inventory during initial block
-    // download
-    int nBlockEstimate = Checkpoints::GetTotalBlocksEstimate();
-    if (hashBestChain == hash)
-    {
-        {
-            LOCK(cs_vNodes);
-            BOOST_FOREACH (CNode *pnode, vNodes)
-                if (chainActive.Height() >
-                    ((pnode->nStartingHeight != -1)
-                         ? pnode->nStartingHeight - 2000
-                         : nBlockEstimate)) // does 2000 blocks define IBD? 24 hours + a
-                                            // little
-                    pnode->PushInventory(CInv(MSG_BLOCK, hash));
-        }
-    }
 
     // ppcoin: check pending sync-checkpoint
     if (chainActive.Height() < nMainnetNewLogicBlockNumber)
