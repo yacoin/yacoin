@@ -2402,7 +2402,7 @@ bool OpenNetworkConnection(const CAddress &addrConnect,
 // most recently
 double static NodeSyncScore(const CNode *pnode)
 {
-    return -pnode->nLastRecv;
+    return pnode->nLastRecv;
 }
 
 void static StartSync(const vector<CNode *> &vNodes)

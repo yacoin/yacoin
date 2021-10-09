@@ -431,7 +431,7 @@ void MarkBlockAsReceived(const uint256 &hash, NodeId nodeFrom = -1) {
         state->vBlocksInFlight.erase(itInFlight->second.second);
         state->nBlocksInFlight--;
         if (itInFlight->second.first == nodeFrom)
-            state->nLastBlockReceive = GetTime();
+            state->nLastBlockReceive = GetTimeMicros();
         mapBlocksInFlight.erase(itInFlight);
     }
 
@@ -462,7 +462,7 @@ void MarkBlockAsInFlight(NodeId nodeid, const uint256 &hash) {
     // Make sure it's not listed somewhere already.
     MarkBlockAsReceived(hash);
 
-    QueuedBlock newentry = {hash, GetTime(), state->nBlocksInFlight};
+    QueuedBlock newentry = {hash, GetTimeMicros(), state->nBlocksInFlight};
     if (state->nBlocksInFlight == 0)
         state->nLastBlockReceive = newentry.nTime; // Reset when a first request is sent.
     list<QueuedBlock>::iterator it = state->vBlocksInFlight.insert(state->vBlocksInFlight.end(), newentry);
@@ -5370,7 +5370,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
 
     {
         LOCK(cs_main);
-        State(pfrom->GetId())->nLastBlockProcess = GetTime();
+        State(pfrom->GetId())->nLastBlockProcess = GetTimeMicros();
     }
 /******************
     if (strCommand == "version")
@@ -6596,14 +6596,15 @@ bool SendMessages(CNode *pto, bool fSendTrickle)
 
         // Detect stalled peers. Require that blocks are in flight, we haven't
         // received a (requested) block in one minute, and that all blocks are
-        // in flight for over 3 minutes, since we first had a chance to
+        // in flight for over 2 minutes, since we first had a chance to
         // process an incoming block.
-//        if (!pto->fDisconnect && state.nBlocksInFlight &&
-//            state.nLastBlockReceive < state.nLastBlockProcess - BLOCK_DOWNLOAD_TIMEOUT &&
-//            state.vBlocksInFlight.front().nTime < state.nLastBlockProcess - 3*BLOCK_DOWNLOAD_TIMEOUT) {
-//            printf("Peer %s is stalling block download, disconnecting\n", state.name.c_str());
-//            pto->fDisconnect = true;
-//        }
+        ::int64_t nNow = GetTimeMicros();
+        if (!pto->fDisconnect && state.nBlocksInFlight &&
+            state.nLastBlockReceive < state.nLastBlockProcess - BLOCK_DOWNLOAD_TIMEOUT*1000000 &&
+            state.vBlocksInFlight.front().nTime < state.nLastBlockProcess - 2*BLOCK_DOWNLOAD_TIMEOUT*1000000) {
+            printf("Peer %s is stalling block download, disconnecting\n", state.name.c_str());
+            pto->fDisconnect = true;
+        }
 
         // Update knowledge of peer's block availability.
         ProcessBlockAvailability(pto->GetId());
@@ -6627,9 +6628,6 @@ bool SendMessages(CNode *pto, bool fSendTrickle)
         //
         // Message: getdata
         //
-        ::int64_t nNow =
-            GetTime() * 1000000; //??? time now * 1,000,000 what is this about???
-
         CTxDB txdb("r");
 
         while (!pto->fDisconnect && !pto->mapAskFor.empty() && (*pto->mapAskFor.begin()).first <= nNow)
