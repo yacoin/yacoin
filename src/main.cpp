@@ -2227,7 +2227,7 @@ static unsigned int GetNextTargetRequired044(const CBlockIndex* pindexLast, bool
             }
             else // get block #0
             {
-                CBlockIndex* pbi = FindBlockByHeight(0);
+                CBlockIndex* pbi = chainActive.Genesis();
                 CBlock block;
 
                 block.ReadFromDisk(pbi);

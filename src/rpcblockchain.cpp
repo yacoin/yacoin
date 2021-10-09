@@ -540,7 +540,7 @@ Value getblockhash(const Array& params, bool fHelp)
     if (nHeight < 0 || nHeight > chainActive.Height())
         throw runtime_error("Block number out of range.");
 
-    CBlockIndex* pblockindex = FindBlockByHeight(nHeight);
+    CBlockIndex* pblockindex = chainActive[nHeight];
     return pblockindex->phashBlock->GetHex();
 }
 
