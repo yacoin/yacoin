@@ -3301,9 +3301,7 @@ void static UpdateTip(CBlockIndex *pindexNew) {
 
     if (!fIsInitialDownload)
     {
-        const CBlockLocator locator(pindexNew);
-
-        ::SetBestChain(locator);
+        ::SetBestChain(chainActive.GetLocator());
     }
 
    // New best block
@@ -5855,8 +5853,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
 
         LOCK(cs_main);
         // Find the last block the caller has in the main chain
-        CBlockIndex
-            * pindex = locator.GetBlockIndex();
+        CBlockIndex* pindex = chainActive.FindFork(locator);
 
         // Send the rest of the chain
         if (pindex)
@@ -5950,9 +5947,9 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
         else
         {
             // Find the last block the caller has in the main chain
-            pindex = locator.GetBlockIndex();
+            pindex = chainActive.FindFork(locator);
             if (pindex)
-                pindex = pindex->pnext;
+                pindex = chainActive.Next(pindex);
         }
 
         vector<CBlock> vHeaders;

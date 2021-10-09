@@ -130,7 +130,7 @@ void Shutdown(void* parg)
         {
             LOCK(cs_main);
             if (pwalletMain)
-                pwalletMain->SetBestChain(CBlockLocator(chainActive.Tip()));
+                pwalletMain->SetBestChain(chainActive.GetLocator());
         }
         bitdb.Flush(true);
 #if !defined(WIN32) && !defined(QT_GUI)
@@ -1337,7 +1337,9 @@ bool AppInit2()
         CWalletDB walletdb(strWalletFileName);
         CBlockLocator locator;
         if (walletdb.ReadBestBlock(locator))
-            pindexRescan = locator.GetBlockIndex();
+            pindexRescan = chainActive.FindFork(locator);
+        else
+            pindexRescan = chainActive.Genesis();
     }
     if (chainActive.Tip() != pindexRescan && chainActive.Tip() && pindexRescan && chainActive.Tip()->nHeight > pindexRescan->nHeight)
     {

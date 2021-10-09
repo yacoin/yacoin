@@ -213,7 +213,7 @@ void CNode::PushGetBlocks(CBlockIndex *pindexBegin, uint256 hashEnd)
     pindexLastGetBlocksBegin = pindexBegin;
     hashLastGetBlocksEnd = hashEnd;
 
-    PushMessage("getblocks", CBlockLocator(pindexBegin), hashEnd);
+    PushMessage("getblocks", chainActive.GetLocator(pindexBegin), hashEnd);
 }
 
 // find 'best' local address for a particular peer
