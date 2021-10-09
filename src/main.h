@@ -1674,6 +1674,8 @@ public:
     const uint256* phashBlock;
     CBlockIndex* pprev;
     CBlockIndex* pnext;
+    // pointer to the index of some further predecessor of this block
+    CBlockIndex* pskip;
     ::uint32_t nFile;
     ::uint32_t nBlockPos;
     CBigNum bnChainTrust; // ppcoin: trust score of block chain
@@ -1716,6 +1718,7 @@ public:
         phashBlock = NULL;
         pprev = NULL;
         pnext = NULL;
+        pskip = NULL;
         nFile = 0;
         nBlockPos = 0;
         nHeight = 0;
@@ -1749,6 +1752,7 @@ public:
         phashBlock = NULL;
         pprev = NULL;
         pnext = NULL;
+        pskip = NULL;
         nFile = nFileIn;
         nBlockPos = nBlockPosIn;
         nHeight = 0;
@@ -1914,6 +1918,12 @@ public:
         }
         return false;
     }
+    // Build the skiplist pointer for this entry.
+    void BuildSkip();
+
+    // Efficiently find an ancestor of this block.
+    CBlockIndex* GetAncestor(int height);
+    const CBlockIndex* GetAncestor(int height) const;
 };
 
 

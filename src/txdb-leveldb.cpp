@@ -861,6 +861,8 @@ bool CTxDB::LoadBlockIndex()
                 setBlockIndexValid.insert(pindex);
             if (pindex->nStatus & BLOCK_FAILED_MASK && (!pindexBestInvalid || pindex->bnChainTrust > pindexBestInvalid->bnChainTrust))
                 pindexBestInvalid = pindex;
+            if (pindex->pprev)
+                pindex->BuildSkip();
 #ifdef WIN32
             ++nCounter;
             if (0 == (nCounter % nUpdatePeriod))

@@ -3648,8 +3648,11 @@ CBlockLocator CChain::GetLocator(const CBlockIndex *pindex) const {
             break;
         // Exponentially larger steps back, plus the genesis block.
         int nHeight = std::max(pindex->nHeight - nStep, 0);
+        // Jump back quickly to the same height as the chain.
+        if (pindex->nHeight > nHeight)
+            pindex = pindex->GetAncestor(nHeight);
         // In case pindex is not in this chain, iterate pindex->pprev to find blocks.
-        while (pindex->nHeight > nHeight && !Contains(pindex))
+        while (!Contains(pindex))
             pindex = pindex->pprev;
         // If pindex is in this chain, use direct height-based access.
         if (pindex->nHeight > nHeight)
@@ -3676,6 +3679,8 @@ CBlockIndex *CChain::FindFork(const CBlockLocator &locator) const {
 }
 
 CBlockIndex *CChain::FindFork(CBlockIndex *pindex) const {
+    if (pindex->nHeight > Height())
+        pindex = pindex->GetAncestor(Height());
     while (pindex && !Contains(pindex))
         pindex = pindex->pprev;
     return pindex;
@@ -3894,6 +3899,7 @@ CBlockIndex* CBlockHeader::AddToBlockIndex()
     {
         pindexNew->pprev = (*miPrev).second;
         pindexNew->nHeight = pindexNew->pprev->nHeight + 1;
+        pindexNew->BuildSkip();
     }
 
     // ppcoin: compute chain trust score
@@ -4380,6 +4386,55 @@ bool CBlockIndex::IsSuperMajority(int minVersion, const CBlockIndex* pstart, uns
         pstart = pstart->pprev;
     }
     return (nFound >= nRequired);
+}
+
+/** Turn the lowest '1' bit in the binary representation of a number into a '0'. */
+int static inline InvertLowestOne(int n) { return n & (n - 1); }
+
+/** Compute what height to jump back to with the CBlockIndex::pskip pointer. */
+int static inline GetSkipHeight(int height) {
+    if (height < 2)
+        return 0;
+
+    // Determine which height to jump back to. Any number strictly lower than height is acceptable,
+    // but the following expression seems to perform well in simulations (max 110 steps to go back
+    // up to 2**18 blocks).
+    return (height & 1) ? InvertLowestOne(InvertLowestOne(height - 1)) + 1 : InvertLowestOne(height);
+}
+
+CBlockIndex* CBlockIndex::GetAncestor(int height)
+{
+    if (height > nHeight || height < 0)
+        return NULL;
+
+    CBlockIndex* pindexWalk = this;
+    int heightWalk = nHeight;
+    while (heightWalk > height) {
+        int heightSkip = GetSkipHeight(heightWalk);
+        int heightSkipPrev = GetSkipHeight(heightWalk - 1);
+        if (heightSkip == height ||
+            (heightSkip > height && !(heightSkipPrev < heightSkip - 2 &&
+                                      heightSkipPrev >= height))) {
+            // Only follow pskip if pprev->pskip isn't better than pskip->pprev.
+            pindexWalk = pindexWalk->pskip;
+            heightWalk = heightSkip;
+        } else {
+            pindexWalk = pindexWalk->pprev;
+            heightWalk--;
+        }
+    }
+    return pindexWalk;
+}
+
+const CBlockIndex* CBlockIndex::GetAncestor(int height) const
+{
+    return const_cast<CBlockIndex*>(this)->GetAncestor(height);
+}
+
+void CBlockIndex::BuildSkip()
+{
+    if (pprev)
+        pskip = pprev->GetAncestor(GetSkipHeight(nHeight));
 }
 
 bool ProcessBlock(CValidationState &state, CNode* pfrom, CBlock* pblock)
