@@ -339,6 +339,7 @@ bool ActivateBestChain(CValidationState &state, CTxDB& txdb);
 
 struct CNodeStateStats {
     int nMisbehavior;
+    int nSyncHeight;
 };
 
 /** Position on disk for a particular transaction. */
