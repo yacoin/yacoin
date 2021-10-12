@@ -154,6 +154,7 @@ extern ::int64_t nMinimumInputValue;
 extern bool fUseFastIndex;
 extern int nScriptCheckThreads;
 extern const uint256 entropyStore[38];
+extern bool fStoreBlockHashToDb;
 
 // Minimum disk space required - used in CheckDiskSpace()
 static const ::uint64_t nMinDiskSpace = 52428800;
@@ -1097,7 +1098,6 @@ public:
     // Store following info to avoid calculating hash many times
     mutable struct block_header previousBlockHeader;
     mutable uint256 blockHash;
-    mutable uint256 blockYacoinHash;
 
     // network and disk
     std::vector<CTransaction> vtx;
@@ -1148,6 +1148,12 @@ public:
             const_cast<CBlock*>(this)->vtx.clear();
             const_cast<CBlock*>(this)->vchBlockSig.clear();
         }
+        previousBlockHeader.version = this->nVersion;
+        previousBlockHeader.prev_block = hashPrevBlock;
+        previousBlockHeader.merkle_root = hashMerkleRoot;
+        previousBlockHeader.timestamp = nTime;
+        previousBlockHeader.bits = nBits;
+        previousBlockHeader.nonce = nNonce;
     )
 
     void SetNull()
@@ -1171,7 +1177,6 @@ public:
         vMerkleTree.clear();
         nDoS = 0;
         blockHash = 0;
-        blockYacoinHash = 0;
         memset(UVOIDBEGIN(previousBlockHeader), 0, sizeof(struct block_header));
     }
 
@@ -1344,75 +1349,6 @@ public:
         return blockHash;
     }
 
-    // yacoin2015
-    uint256 CalculateYacoinHash() const
-    {
-        uint256 
-            thash;
-        unsigned char nfactor;
-        if (nVersion >= VERSION_of_block_for_yac_05x_new) // 64-bit nTime
-        {
-            nfactor = GetNfactor(nTime, true);
-            struct block_header block_data;
-            block_data.version = nVersion;
-            block_data.prev_block = hashPrevBlock;
-            block_data.merkle_root = hashMerkleRoot;
-            block_data.timestamp = nTime;
-            block_data.bits = nBits;
-            block_data.nonce = nNonce;
-            if(
-               !scrypt_hash(
-                           CVOIDBEGIN(block_data),
-                           sizeof(struct block_header),
-                           UINTBEGIN(thash),
-                           nfactor
-                          )
-              )
-            {
-                thash = 0;  // perhaps? should error("lack of memory for scrypt hash?");
-            }
-        }
-        else // 32-bit nTime
-        {
-        	nfactor = GetNfactor(nTime, false);
-            old_block_header oldBlock;
-            oldBlock.version = nVersion;
-            oldBlock.prev_block = hashPrevBlock;
-            oldBlock.merkle_root = hashMerkleRoot;
-            oldBlock.timestamp = nTime;
-            oldBlock.bits = nBits;
-            oldBlock.nonce = nNonce;
-            if(
-               !scrypt_hash(
-                           CVOIDBEGIN(oldBlock),
-                           sizeof(old_block_header),
-                           UINTBEGIN(thash),
-                           nfactor
-                          )
-              )
-            {
-                thash = 0;  // perhaps? should error("lack of memory for scrypt hash?");
-            }
-        }
-
-        return thash;
-    }
-
-    uint256 GetYacoinHash(int blockHeight = 0) const
-    {
-        if(blockYacoinHash == 0 || IsHeaderDifferent())
-        {
-            blockYacoinHash = CalculateYacoinHash();
-            previousBlockHeader.version = nVersion;
-            previousBlockHeader.prev_block = hashPrevBlock;
-            previousBlockHeader.merkle_root = hashMerkleRoot;
-            previousBlockHeader.timestamp = nTime;
-            previousBlockHeader.bits = nBits;
-            previousBlockHeader.nonce = nNonce;
-        }
-        return blockYacoinHash;
-    }
-
     ::int64_t GetBlockTime() const
     {
         return (::int64_t)nTime;
@@ -1539,49 +1475,6 @@ public:
         return true;
     }
 
-    bool ReadFromDisk(
-                      unsigned int nFile, 
-                      unsigned int nBlockPos, 
-                      bool fReadTransactions = true,
-                      bool fCheckHeader = true
-                     )
-    {
-        SetNull();
-
-        // Open history file to read
-        CAutoFile filein = CAutoFile(OpenBlockFile(nFile, nBlockPos, "rb"), SER_DISK, CLIENT_VERSION);
-        if (!filein)
-            return error("CBlock::ReadFromDisk() : OpenBlockFile failed");
-        if (!fReadTransactions)
-            filein.nType |= SER_BLOCKHEADERONLY;
-
-        // Read block
-        try {
-            filein >> *this;
-        }
-        catch (std::exception &e) 
-        //catch (...) 
-        {
-            //(void)e;
-            return error("%s() : deserialize or I/O error", BOOST_CURRENT_FUNCTION);
-        }
-
-        // Check the header
-        if (
-            fReadTransactions && 
-            IsProofOfWork() && 
-            (
-             fCheckHeader &&           
-             !CheckProofOfWork(GetYacoinHash(), nBits)
-            )
-           )
-            return error("CBlock::ReadFromDisk() : errors in block header");
-
-        return true;
-    }
-
-
-
     void print() const
     {
         printf("CBlock(\n"
@@ -1620,6 +1513,8 @@ public:
     bool DisconnectBlock(CTxDB& txdb, CBlockIndex* pindex);
     bool ConnectBlock(CTxDB& txdb, CBlockIndex* pindex, bool fJustCheck=false);
     bool ReadFromDisk(const CBlockIndex* pindex, bool fReadTransactions=true, bool fCheckHeader = true);
+    bool ReadFromDisk(unsigned int nFile, unsigned int nBlockPos,
+            bool fReadTransactions = true, bool fCheckHeader = true);
     bool SetBestChain(CTxDB& txdb, CBlockIndex* pindexNew);
     bool AddToBlockIndex(unsigned int nFile, unsigned int nBlockPos);
     bool CheckBlock(bool fCheckPOW=true, bool fCheckMerkleRoot=true, bool fCheckSig=true) const;
@@ -1964,11 +1859,7 @@ public:
 
     uint256 GetBlockHash() const
     {
-        if (
-            fUseFastIndex &&
-            (nTime < GetAdjustedTime() - 24 * 60 * 60) &&   // block's time is ~< 1 day old
-            (blockHash != 0)
-           )
+        if (fUseFastIndex && (blockHash != 0))
             return blockHash;
 
         CBlock block;

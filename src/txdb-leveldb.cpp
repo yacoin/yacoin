@@ -281,6 +281,16 @@ bool CTxDB::WriteBlockIndex(const CDiskBlockIndex& blockindex)
     return Write(make_pair(string("blockindex"), blockindex.GetBlockHash()), blockindex);
 }
 
+bool CTxDB::WriteBlockHash(const CDiskBlockIndex& blockindex)
+{
+    return Write(make_pair(string("blockhash"), make_pair(blockindex.nFile, blockindex.nBlockPos)), blockindex.GetBlockHash());
+}
+
+bool CTxDB::ReadBlockHash(const unsigned int nFile, const unsigned int nBlockPos, uint256& blockhash)
+{
+    return Read(make_pair(string("blockhash"), make_pair(nFile, nBlockPos)), blockhash);
+}
+
 bool CTxDB::ReadHashBestChain(uint256& hashBestChain)
 {
     return Read(string("hashBestChain"), hashBestChain);
@@ -433,6 +443,8 @@ bool CTxDB::LoadBlockIndex()
     iterator->Seek(ssStartKey.str());
     ::int32_t bestEpochIntervalHeight = 0;
     uint256 bestEpochIntervalHash;
+    int newStoredBlock = 0;
+    int alreadyStoredBlock = 0;
     // Now read each entry.
     while (iterator->Valid())   //what is so slow in this loop of all PoW blocks?
     {                           // 5 minutes for 1400 blocks, ~300 blocks/min or ~5/sec
@@ -554,6 +566,17 @@ bool CTxDB::LoadBlockIndex()
         pindexNew->nTime          = diskindex.nTime;
         pindexNew->nBits          = diskindex.nBits;
         pindexNew->nNonce         = diskindex.nNonce;
+
+        uint256 tmpBlockhash;
+        if (fStoreBlockHashToDb && !ReadBlockHash(diskindex.nFile, diskindex.nBlockPos, tmpBlockhash))
+        {
+            newStoredBlock++;
+            WriteBlockHash(diskindex);
+        }
+        else
+        {
+            alreadyStoredBlock++;
+        }
 
         if (pindexNew->nHeight >= bestEpochIntervalHeight &&
             ((pindexNew->nHeight % nEpochInterval == 0) || (pindexNew->nHeight == nMainnetNewLogicBlockNumber)))
@@ -686,6 +709,12 @@ bool CTxDB::LoadBlockIndex()
     }
     delete iterator;
 
+    printf("CTxDB::LoadBlockIndex(), fStoreBlockHashToDb = %d, "
+            "newStoredBlock = %d, "
+            "alreadyStoredBlock = %d\n",
+            fStoreBlockHashToDb,
+            newStoredBlock,
+            alreadyStoredBlock);
     // Calculate current block reward
     map<uint256, CBlockIndex*>::iterator mi = mapBlockIndex.find(bestEpochIntervalHash);
     if (mi != mapBlockIndex.end())

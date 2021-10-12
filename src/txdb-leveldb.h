@@ -235,6 +235,8 @@ public:
     bool ReadDiskTx(COutPoint outpoint, CTransaction& tx, CTxIndex& txindex);
     bool ReadDiskTx(COutPoint outpoint, CTransaction& tx);
     bool WriteBlockIndex(const CDiskBlockIndex& blockindex);
+    bool WriteBlockHash(const CDiskBlockIndex& blockindex);
+    bool ReadBlockHash(const unsigned int nFile, const unsigned int nBlockPos, uint256& blockhash);
     bool ReadHashBestChain(uint256& hashBestChain);
     bool WriteHashBestChain(uint256 hashBestChain);
     bool ReadBestInvalidTrust(CBigNum& bnBestInvalidTrust);
