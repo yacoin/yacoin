@@ -130,7 +130,6 @@ static map<CNetAddr, LocalServiceInfo> mapLocalHost;
 static bool vfReachable[NET_MAX] = {};
 static bool vfLimited[NET_MAX] = {};
 static CNode *pnodeLocalHost = NULL;
-static CNode *pnodeSync = NULL;
 CAddress addrSeenByPeer(CService("0.0.0.0", 0), nLocalServices);
 ::uint64_t nLocalHostNonce = 0;
 boost::array<int, THREAD_MAX> vnThreadsRunning;
@@ -202,18 +201,6 @@ static int GetMaxOutboundConnections()
     // printf( "GetMaxOutboundConnections() = %d\n", count );
 
     return count;
-}
-
-void CNode::PushGetBlocks(CBlockIndex *pindexBegin, uint256 hashEnd)
-{
-    // Filter out duplicate requests
-    if (pindexBegin == pindexLastGetBlocksBegin &&
-        hashEnd == hashLastGetBlocksEnd)
-        return;
-    pindexLastGetBlocksBegin = pindexBegin;
-    hashLastGetBlocksEnd = hashEnd;
-
-    PushMessage("getblocks", chainActive.GetLocator(pindexBegin), hashEnd);
 }
 
 // find 'best' local address for a particular peer
@@ -709,10 +696,6 @@ void CNode::CloseSocketDisconnect()
     TRY_LOCK(cs_vRecv, lockRecv);
     if (lockRecv)
         vRecv.clear();
-
-    // if this was the sync node, we'll need a new one
-    if (this == pnodeSync)
-        pnodeSync = NULL;
 }
 
 void CNode::Cleanup() {}
@@ -817,7 +800,6 @@ void CNode::copyStats(CNodeStats &stats)
     X(nStartingHeight);
     X(nSendBytes);
     X(nRecvBytes);
-    stats.fSyncNode = (this == pnodeSync);
 }
 #undef X
 
@@ -2398,49 +2380,6 @@ bool OpenNetworkConnection(const CAddress &addrConnect,
     return true;
 }
 
-// for now, use a very simple selection metric: the node from which we received
-// most recently
-double static NodeSyncScore(const CNode *pnode)
-{
-    return pnode->nLastRecv;
-}
-
-void static StartSync(const vector<CNode *> &vNodes)
-{
-    CNode *pnodeNewSync = NULL;
-    double dBestScore = 0;
-
-    {
-        LOCK(cs_vNodes);
-        // Iterate over all nodes
-        BOOST_FOREACH (CNode *pnode, vNodes)
-        {
-            // check preconditions for allowing a sync
-            if (!pnode->fClient && !pnode->fOneShot && !pnode->fDisconnect &&
-                pnode->fSuccessfullyConnected &&
-                (pnode->nStartingHeight >
-                 (chainActive.Height() - (int)nOnedayOfAverageBlocks)) && // perhaps
-                ((pnode->nVersion < NOBLKS_VERSION_START) ||              // why <60002 || >= 60005
-                 (pnode->nVersion >= NOBLKS_VERSION_END)                  // why are 60002, 3, 4 taboo?
-                 ))
-            { // if ok, compare node's score with the best so far
-                double dScore = NodeSyncScore(pnode);
-                if (pnodeNewSync == NULL || (dScore > dBestScore))
-                {
-                    pnodeNewSync = pnode;
-                    dBestScore = dScore;
-                }
-            }
-        }
-        // if a new sync candidate was found, start sync!
-        if (pnodeNewSync)
-        {
-            pnodeNewSync->fStartSync = true;
-            pnodeSync = pnodeNewSync;
-        }
-    }
-}
-
 void ThreadMessageHandler(void *parg)
 {
     // Make this thread recognisable as the message handling thread
@@ -2477,7 +2416,6 @@ void ThreadMessageHandler2(void *parg)
             printf("ThreadMessageHandler2 is looping\n");
         }
         nLoopCounter++;
-        bool fHaveSyncNode = false;
         vector<CNode *> vNodesCopy;
         {
             LOCK(cs_vNodes);
@@ -2485,13 +2423,8 @@ void ThreadMessageHandler2(void *parg)
             BOOST_FOREACH (CNode *pnode, vNodesCopy)
             {
                 pnode->AddRef();
-                if (pnode == pnodeSync)
-                    fHaveSyncNode = true;
             }
         }
-
-        if (!fHaveSyncNode)
-            StartSync(vNodesCopy);
 
         // Poll the connected nodes for messages
         CNode *pnodeTrickle = NULL;

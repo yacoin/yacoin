@@ -857,12 +857,26 @@ bool CTxDB::LoadBlockIndex()
             pindex->nStakeModifierChecksum = GetStakeModifierChecksum(pindex);
             if (!CheckStakeModifierCheckpoints(pindex->nHeight, pindex->nStakeModifierChecksum))
                 return error("CTxDB::LoadBlockIndex() : Failed stake modifier checkpoint height=%d, modifier=0x%016" PRIx64, pindex->nHeight, pindex->nStakeModifier);
-            if (pindex->IsValid(BLOCK_VALID_TRANSACTIONS))
+            if (pindex->nStatus & BLOCK_HAVE_DATA) {
+                if (pindex->pprev) {
+                    if (pindex->pprev->validTx) {
+                        pindex->validTx = true;
+                    } else {
+                        pindex->validTx = false;
+                        mapBlocksUnlinked.insert(std::make_pair(pindex->pprev, pindex));
+                    }
+                } else {
+                    pindex->validTx = true;
+                }
+            }
+            if (pindex->IsValid(BLOCK_VALID_TRANSACTIONS) && (pindex->validTx || pindex->pprev == NULL))
                 setBlockIndexValid.insert(pindex);
             if (pindex->nStatus & BLOCK_FAILED_MASK && (!pindexBestInvalid || pindex->bnChainTrust > pindexBestInvalid->bnChainTrust))
                 pindexBestInvalid = pindex;
             if (pindex->pprev)
                 pindex->BuildSkip();
+            if (pindex->IsValid(BLOCK_VALID_TREE) && (pindexBestHeader == NULL || CBlockIndexWorkComparator()(pindexBestHeader, pindex)))
+                pindexBestHeader = pindex;
 #ifdef WIN32
             ++nCounter;
             if (0 == (nCounter % nUpdatePeriod))

@@ -256,7 +256,6 @@ public:
     ::int32_t nStartingHeight;
     ::uint64_t nSendBytes;
     ::uint64_t nRecvBytes;
-    bool fSyncNode;
 };
 
 /** Information about a peer */
@@ -351,10 +350,7 @@ public:
         nRefCount = 0;
         nReleaseTime = 0;
         hashContinue = 0;
-        pindexLastGetBlocksBegin = 0;
-        hashLastGetBlocksEnd = 0;
         nStartingHeight = -1;
-        fStartSync = false;
         fGetAddr = false;
         hashCheckpointKnown = 0;
         setInventoryKnown.max_size((size_t)SendBufferSize() / 1000);

@@ -95,8 +95,16 @@ inline bool MoneyRange(::int64_t nValue) { return (nValue >= 0 && nValue <= MAX_
 static const int MAX_SCRIPTCHECK_THREADS = 16;
 /** Number of blocks that can be requested at any given time from a single peer. */
 static const int MAX_BLOCKS_IN_TRANSIT_PER_PEER = 500;
-/** Timeout in seconds before considering a block download peer unresponsive. */
-static const unsigned int BLOCK_DOWNLOAD_TIMEOUT = 60;
+/** Timeout in seconds during which a peer must stall block download progress before being disconnected. */
+static const unsigned int BLOCK_STALLING_TIMEOUT = 2;
+/** Number of headers sent in one getheaders result. We rely on the assumption that if a peer sends
+ *  less than this number, we reached their tip. Changing this value is a protocol upgrade. */
+static const unsigned int MAX_HEADERS_RESULTS = 2000;
+/** Size of the "block download window": how far ahead of our current height do we fetch?
+ *  Larger windows tolerate larger download speed differences between peer, but increase the potential
+ *  degree of disordering of blocks on disk (which make reindexing and in the future perhaps pruning
+ *  harder). We'll probably want to make this a per-peer adaptive value at some point. */
+static const unsigned int BLOCK_DOWNLOAD_WINDOW = 2000;
     // hashGenesisBlock("0x0000060fc90618113cde415ead019a1052a9abc43afcccff38608ff8751353e5");
     // hashGenesisBlock("0x00000f3f5eac1539c4e9216e17c74ff387ac1629884d2f97a3144dc32bf67bda");
     // hashGenesisBlock("0x0ea17bb85e10d8c6ded6783a4ce8f79e75d49b439ff41f55d274e6b15612fff9");
@@ -113,7 +121,9 @@ extern const uint256
     hashGenesisBlockTestNet;
 extern int 
     nConsecutiveStakeSwitchHeight;  // see timesamps.h = 420000;
-
+// All pairs A->B, where A (or one if its ancestors) misses transactions, but B has transactions.
+extern std::multimap<CBlockIndex*, CBlockIndex*> mapBlocksUnlinked;
+extern CBlockIndex *pindexBestHeader;
 const ::int64_t 
     nMaxClockDrift = nTwoHoursInSeconds;
 
@@ -144,7 +154,6 @@ extern ::int64_t nTimeBestReceived;
 extern CCriticalSection cs_setpwalletRegistered;
 extern std::set<CWallet*> setpwalletRegistered;
 extern unsigned char pchMessageStart[4];
-extern std::map<uint256, CBlock*> mapOrphanBlocks;
 extern ::int64_t nBlockRewardPrev;
 extern const ::int64_t nSimulatedMOneySupplyAtFork;
 extern ::uint32_t nMinEase; // minimum ease corresponds to highest difficulty
@@ -169,21 +178,38 @@ enum GetMaxSize_mode
 };
 
 enum BlockStatus {
+    // Unused.
     BLOCK_VALID_UNKNOWN      =    0,
-    BLOCK_VALID_HEADER       =    1, // parsed, version ok, hash satisfies claimed PoW, 1 <= vtx count <= max, timestamp not in future
-    BLOCK_VALID_TREE         =    2, // parent found, difficulty matches, timestamp >= median previous, checkpoint
-    BLOCK_VALID_TRANSACTIONS =    3, // only first tx is coinbase, 2 <= coinbase input script length <= 100, transactions valid, no duplicate txids, sigops, size, merkle root
-    BLOCK_VALID_CHAIN        =    4, // outputs do not overspend inputs, no double spends, coinbase output ok, immature coinbase spends, BIP30
-    BLOCK_VALID_SCRIPTS      =    5, // scripts/signatures ok
-    BLOCK_VALID_MASK         =    7,
+
+    // Parsed, version ok, hash satisfies claimed PoW, 1 <= vtx count <= max, timestamp not in future
+    BLOCK_VALID_HEADER       =    1,
+
+    // All parent headers found, difficulty matches, timestamp >= median previous, checkpoint. Implies all parents
+    // are also at least TREE.
+    BLOCK_VALID_TREE         =    2,
+
+    // Only first tx is coinbase, 2 <= coinbase input script length <= 100, transactions valid, no duplicate txids,
+    // sigops, size, merkle root. Implies all parents are at least TREE but not necessarily TRANSACTIONS. When all
+    // parent blocks also have TRANSACTIONS, CBlockIndex::nChainTx will be set.
+    BLOCK_VALID_TRANSACTIONS =    3,
+
+    // Outputs do not overspend inputs, no double spends, coinbase output ok, immature coinbase spends, BIP30.
+    // Implies all parents are also at least CHAIN.
+    BLOCK_VALID_CHAIN        =    4,
+
+    // Scripts & signatures ok. Implies all parents are also at least SCRIPTS.
+    BLOCK_VALID_SCRIPTS      =    5,
+
+    // All validity bits.
+    BLOCK_VALID_MASK         =   BLOCK_VALID_HEADER | BLOCK_VALID_TREE | BLOCK_VALID_TRANSACTIONS |
+                                 BLOCK_VALID_CHAIN | BLOCK_VALID_SCRIPTS,
 
     BLOCK_HAVE_DATA          =    8, // full block available in blk*.dat
     BLOCK_HAVE_UNDO          =   16, // undo data available in rev*.dat
-    BLOCK_HAVE_MASK          =   24,
-
+    BLOCK_HAVE_MASK          =   BLOCK_HAVE_DATA | BLOCK_HAVE_UNDO,
     BLOCK_FAILED_VALID       =   32, // stage after last reached validness failed
     BLOCK_FAILED_CHILD       =   64, // descends from failed block
-    BLOCK_FAILED_MASK        =   96
+    BLOCK_FAILED_MASK = BLOCK_FAILED_VALID | BLOCK_FAILED_CHILD,
 };
 
 class CReserveKey;
@@ -289,7 +315,6 @@ int GetNumBlocksOfPeers();
 bool IsInitialBlockDownload();
 std::string GetWarnings(std::string strFor);
 bool GetTransaction(const uint256 &hash, CTransaction &tx, uint256 &hashBlock);
-uint256 WantedByOrphan(const CBlock* pblockOrphan);
 const CBlockIndex* GetLastBlockIndex(const CBlockIndex* pindex, bool fProofOfStake);
 
 void StakeMinter(CWallet *pwallet);
@@ -1471,16 +1496,25 @@ public:
     }
 
     CBlock(const CBlockHeader &blockHeader)
-        : CBlockHeader(blockHeader)
     {
         SetNull();
+        *((CBlockHeader*)this) = blockHeader;
     }
 
     IMPLEMENT_SERIALIZE
     (
         READWRITE(*(CBlockHeader*)this);
-        READWRITE(vtx);
-        READWRITE(vchBlockSig);
+        // ConnectBlock depends on vtx following header to generate CDiskTxPos
+        if (!(nType & (SER_GETHASH|SER_BLOCKHEADERONLY)))
+        {
+            READWRITE(vtx);
+            READWRITE(vchBlockSig);
+        }
+        else if (fRead)
+        {
+            const_cast<CBlock*>(this)->vtx.clear();
+            const_cast<CBlock*>(this)->vchBlockSig.clear();
+        }
     )
 
     void SetNull()
@@ -1712,6 +1746,9 @@ public:
     unsigned int nStatus;
     // (memory only) Sequencial id assigned to distinguish order in which blocks are received.
     uint32_t nSequenceId;
+    // (memory only) This value will be set to true only if and only if transactions for this block and all its parents are available.
+    bool validTx;
+
 public:
     CBlockIndex()
     {
@@ -1740,6 +1777,7 @@ public:
         blockHash      = 0;
         nStatus = 0;
         nSequenceId = 0;
+        validTx = false;
     }
 
     CBlockIndex(CBlockHeader &blockHeader) :
@@ -1765,6 +1803,7 @@ public:
         hashProofOfStake = 0;
         nStatus = 0;
         nSequenceId = 0;
+        validTx = false;
         if (blockHeader.IsProofOfStake())
         {
             SetProofOfStake();
@@ -1790,6 +1829,19 @@ public:
         blockHeader.nTime          = nTime;
         blockHeader.nBits          = nBits;
         blockHeader.nNonce         = nNonce;
+        printf ("TACA ===> GetBlockHeader,"
+                "blockHeader.nVersion = %d, "
+                "blockHeader.hashPrevBlock.GetHex().c_str() = %s, "
+                "blockHeader.hashMerkleRoot.GetHex().c_str() = %s, "
+                "blockHeader.nTime = %d, "
+                "blockHeader.nBits = %d, "
+                "blockHeader.nNonce = %d\n",
+                blockHeader.nVersion,
+                blockHeader.hashPrevBlock.GetHex().c_str(),
+                blockHeader.hashMerkleRoot.GetHex().c_str(),
+                blockHeader.nTime,
+                blockHeader.nBits,
+                blockHeader.nNonce);
         return blockHeader;
     }
 
