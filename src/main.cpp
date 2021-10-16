@@ -3867,20 +3867,6 @@ bool CBlock::ReceivedBlockTransactions(CValidationState &state, unsigned int nFi
         pindexNew->hashProofOfStake = mapProofOfStake[hash];
     }
 
-    if (!chainActive.Tip() || (chainActive.Tip()->nHeight + 1) < nMainnetNewLogicBlockNumber)
-    {
-        // ppcoin: compute stake modifier
-        ::uint64_t nStakeModifier = 0;
-        bool fGeneratedStakeModifier = false;
-        if (!ComputeNextStakeModifier(pindexNew, nStakeModifier, fGeneratedStakeModifier))
-            return error("AcceptBlock() : ComputeNextStakeModifier() failed");
-        pindexNew->SetStakeModifier(nStakeModifier, fGeneratedStakeModifier);
-
-        pindexNew->nStakeModifierChecksum = GetStakeModifierChecksum(pindexNew);
-        if (!CheckStakeModifierCheckpoints(pindexNew->nHeight, pindexNew->nStakeModifierChecksum))
-            return error("AcceptBlock() : Rejected by stake modifier checkpoint height=%d, modifier=0x%016" PRIx64, pindexNew->nHeight, nStakeModifier);
-    }
-
     pindexNew->nFile = nFile;
     pindexNew->nBlockPos = nBlockPos;
     pindexNew->validTx = false;
@@ -3918,6 +3904,21 @@ bool CBlock::ReceivedBlockTransactions(CValidationState &state, unsigned int nFi
                 mapBlocksUnlinked.erase(it);
             }
             txdb.WriteBlockIndex(CDiskBlockIndex(pindexNew));
+
+            if (!chainActive.Tip() || (chainActive.Tip()->nHeight + 1) < nMainnetNewLogicBlockNumber)
+            {
+                // ppcoin: compute stake modifier
+                ::uint64_t nStakeModifier = 0;
+                bool fGeneratedStakeModifier = false;
+                if (!ComputeNextStakeModifier(pindexNew, nStakeModifier, fGeneratedStakeModifier))
+                    return error("AcceptBlock() : ComputeNextStakeModifier() failed");
+                pindexNew->SetStakeModifier(nStakeModifier, fGeneratedStakeModifier);
+
+                pindexNew->nStakeModifierChecksum = GetStakeModifierChecksum(pindexNew);
+                if (!CheckStakeModifierCheckpoints(pindexNew->nHeight, pindexNew->nStakeModifierChecksum))
+                    return printf("AcceptBlock() : Rejected by stake modifier checkpoint height=%d, modifier=0x%016" PRIx64, pindexNew->nHeight, nStakeModifier);
+            }
+
             if (fStoreBlockHashToDb && !txdb.WriteBlockHash(CDiskBlockIndex(pindexNew)))
             {
                 printf("AddToBlockIndex(): Can't WriteBlockHash\n");
