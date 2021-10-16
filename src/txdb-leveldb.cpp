@@ -720,7 +720,7 @@ bool CTxDB::LoadBlockIndex()
         {
             CBlockIndex* pindexCurrent = (*it).second;
             WriteBlockIndex(CDiskBlockIndex(pindexCurrent));
-            mapHash.insert(make_pair(pindexCurrent->GetSHA256Hash(), (*it).first)).first;
+            mapHash.insert(make_pair(pindexCurrent->GetSHA256Hash(), (*it).first));
             numberOfReindexBlock++;
         }
         printf("CTxDB::LoadBlockIndex(), fReindex = %d, "

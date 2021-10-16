@@ -1445,13 +1445,13 @@ public:
     {
         if(blockSHA256Hash == 0 || IsHeaderDifferent())
         {
-            blockSHA256Hash = Hash(BEGIN(nVersion), END(nNonce));
             previousBlockHeader.version = nVersion;
             previousBlockHeader.prev_block = hashPrevBlock;
             previousBlockHeader.merkle_root = hashMerkleRoot;
             previousBlockHeader.timestamp = nTime;
             previousBlockHeader.bits = nBits;
             previousBlockHeader.nonce = nNonce;
+            blockSHA256Hash = Hash(BEGIN(previousBlockHeader.version), END(previousBlockHeader.nonce));
         }
         return blockSHA256Hash;
     }

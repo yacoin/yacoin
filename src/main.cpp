@@ -4020,9 +4020,6 @@ CBlockIndex* CBlockHeader::AddToBlockIndex()
     pindexNew->phashBlock = &((*mi).first);
     map<uint256, CBlockIndex*>::iterator miPrev = mapBlockIndex.find(hashPrevBlock); // this bothers me when mapBlockIndex == NULL!?
 
-    // Add to mapHash
-    mapHash.insert(make_pair(GetSHA256Hash(), hash)).first;
-
     if (miPrev != mapBlockIndex.end())
     {
         pindexNew->pprev = (*miPrev).second;
@@ -6116,19 +6113,22 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
         CBlockIndex *pindexLast = NULL;
         BOOST_FOREACH(CBlock& header, headers) {
             // SHA256 doesn't cost much cpu usage to calculate
-            map<uint256, uint256>::iterator mi = mapHash.find(header.GetSHA256Hash());
+            uint256 blockHash;
+            uint256 blockSHA256Hash = header.GetSHA256Hash();
+            map<uint256, uint256>::iterator mi = mapHash.find(blockSHA256Hash);
             if (mi != mapHash.end())
             {
                 uint256 blockHash = (*mi).second;
-                printf("Already have header %s\n", blockHash.ToString().c_str());
+                printf("Already have header %s (sha256: %s)\n", blockHash.ToString().c_str(), blockSHA256Hash.ToString().c_str());
                 std::map<uint256, CBlockIndex *>::iterator miBlockIndex = mapBlockIndex.find(blockHash);
                 pindexLast = miBlockIndex->second;
                 continue;
             }
             else
             {
-                uint256 blockHash = header.GetHash();
-                printf("Received header %s from node %s\n", blockHash.ToString().c_str(), pfrom->addrName.c_str());
+                blockHash = header.GetHash();
+                printf("Received header %s (sha256: %s) from node %s\n", blockHash.ToString().c_str(), blockSHA256Hash.ToString().c_str(), pfrom->addrName.c_str());
+                mapHash.insert(make_pair(blockSHA256Hash, blockHash));
             }
 
             CValidationState state;
@@ -6168,15 +6168,24 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
 
         vRecv >> block;
         // SHA256 doesn't cost much cpu usage to calculate
-        map<uint256, uint256>::iterator mi = mapHash.find(block.GetSHA256Hash());
+        uint256 hashBlock;
+        uint256 sha256HashBlock = block.GetSHA256Hash();
+        map<uint256, uint256>::iterator mi = mapHash.find(sha256HashBlock);
         if (mi != mapHash.end())
-            block.blockHash = (*mi).second;
-        uint256 hashBlock = block.GetHash();
+        {
+            hashBlock = (*mi).second;
+        }
+        else
+        {
+            hashBlock = block.GetHash();
+            mapHash.insert(make_pair(sha256HashBlock, hashBlock));
+        }
 
         printf(
-            "received block %s (%s) from %s\n", 
+            "received block %s (sha256: %s) (%s) from %s\n",
               //hashBlock.ToString().substr(0,20).c_str()
-                hashBlock.ToString().c_str()
+                hashBlock.ToString().c_str(),
+                sha256HashBlock.ToString().c_str()
                 , DateTimeStrFormat( "%Y-%m-%d %H:%M:%S", block.GetBlockTime() ).c_str()
                 , pfrom->addr.ToString().c_str()
               );
