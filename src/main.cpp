@@ -3903,23 +3903,23 @@ bool CBlock::ReceivedBlockTransactions(CValidationState &state, unsigned int nFi
                 range.first++;
                 mapBlocksUnlinked.erase(it);
             }
-            txdb.WriteBlockIndex(CDiskBlockIndex(pindexNew));
+            txdb.WriteBlockIndex(CDiskBlockIndex(pindex));
 
             if (!chainActive.Tip() || (chainActive.Tip()->nHeight + 1) < nMainnetNewLogicBlockNumber)
             {
                 // ppcoin: compute stake modifier
                 ::uint64_t nStakeModifier = 0;
                 bool fGeneratedStakeModifier = false;
-                if (!ComputeNextStakeModifier(pindexNew, nStakeModifier, fGeneratedStakeModifier))
+                if (!ComputeNextStakeModifier(pindex, nStakeModifier, fGeneratedStakeModifier))
                     return error("AcceptBlock() : ComputeNextStakeModifier() failed");
-                pindexNew->SetStakeModifier(nStakeModifier, fGeneratedStakeModifier);
+                pindex->SetStakeModifier(nStakeModifier, fGeneratedStakeModifier);
 
-                pindexNew->nStakeModifierChecksum = GetStakeModifierChecksum(pindexNew);
-                if (!CheckStakeModifierCheckpoints(pindexNew->nHeight, pindexNew->nStakeModifierChecksum))
-                    return printf("AcceptBlock() : Rejected by stake modifier checkpoint height=%d, modifier=0x%016" PRIx64, pindexNew->nHeight, nStakeModifier);
+                pindex->nStakeModifierChecksum = GetStakeModifierChecksum(pindex);
+                if (!CheckStakeModifierCheckpoints(pindex->nHeight, pindex->nStakeModifierChecksum))
+                    return printf("AcceptBlock() : Rejected by stake modifier checkpoint height=%d, modifier=0x%016" PRIx64, pindex->nHeight, nStakeModifier);
             }
 
-            if (fStoreBlockHashToDb && !txdb.WriteBlockHash(CDiskBlockIndex(pindexNew)))
+            if (fStoreBlockHashToDb && !txdb.WriteBlockHash(CDiskBlockIndex(pindex)))
             {
                 printf("AddToBlockIndex(): Can't WriteBlockHash\n");
             }
