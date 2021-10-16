@@ -5772,7 +5772,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
             // TODO: improve the logic to detect stalling initial-headers-sync peer
             if (inv.type == MSG_BLOCK) {
                 UpdateBlockAvailability(pfrom->GetId(), inv.hash);
-                if (!fAlreadyHave && !mapBlocksInFlight.count(inv.hash)) {
+                if (!fAlreadyHave && !mapBlocksInFlight.count(inv.hash) && !IsInitialBlockDownload()) {
                     // First request the headers preceeding the announced block. In the normal fully-synced
                     // case where a new block is announced that succeeds the current tip (no reorganization),
                     // there are no such headers.
@@ -6125,6 +6125,11 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
                 pindexLast = miBlockIndex->second;
                 continue;
             }
+            else
+            {
+                uint256 blockHash = header.GetHash();
+                printf("Received header %s from node %s\n", blockHash.ToString().c_str(), pfrom->addrName.c_str());
+            }
 
             CValidationState state;
             if (pindexLast != NULL && header.hashPrevBlock != pindexLast->GetBlockHash()) {
@@ -6171,7 +6176,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
         printf(
             "received block %s (%s) from %s\n", 
               //hashBlock.ToString().substr(0,20).c_str()
-                hashBlock.ToString().substr(0,16).c_str()
+                hashBlock.ToString().c_str()
                 , DateTimeStrFormat( "%Y-%m-%d %H:%M:%S", block.GetBlockTime() ).c_str()
                 , pfrom->addr.ToString().c_str()
               );
