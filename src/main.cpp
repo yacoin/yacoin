@@ -4185,57 +4185,6 @@ bool CBlockHeader::CheckBlockHeader(CValidationState& state, bool fCheckPOW) con
         }
     }
 
-    CBlockIndex *pcheckpoint;
-    if (chainActive.Height() >= nMainnetNewLogicBlockNumber)
-    {
-        pcheckpoint = Checkpoints::GetLastSyncCheckpoint();
-    }
-    else
-    {
-        pcheckpoint = Checkpoints::GetLastCheckpoint(mapBlockIndex);
-    }
-
-    if (pcheckpoint && hashPrevBlock != hashBestChain &&
-        (chainActive.Height() >= nMainnetNewLogicBlockNumber))
-    {
-        // Extra checks to prevent "fill up memory by spamming with bogus blocks"
-        ::int64_t deltaTime = GetBlockTime() - pcheckpoint->nTime;
-
-        CBigNum bnNewBlock;
-
-        bnNewBlock.SetCompact(nBits);
-
-        CBigNum bnRequired;
-
-        if (fUseOld044Rules
-            //(nTime < YACOIN_NEW_LOGIC_SWITCH_TIME)
-            //&& !fTestNet // new rules on Testnet
-            //|| fTestNet  // old rules on TestNet
-        )
-        {
-            bnRequired.SetCompact(ComputeMinWork(
-                GetLastBlockIndex(pcheckpoint, false)->nBits, deltaTime));
-        }
-        else
-        {
-            if (IsProofOfStake()) // <<<<<<<<<<<<<<<<<<<<<<<< this part is
-                                          // different
-                bnRequired.SetCompact(
-                    ComputeMinStake(GetLastBlockIndex(pcheckpoint, true)->nBits,
-                                    deltaTime, nTime));
-            else
-                bnRequired.SetCompact(ComputeMinWork(
-                    GetLastBlockIndex(pcheckpoint, false)->nBits, deltaTime));
-        }
-
-        if (bnNewBlock > bnRequired)
-        {
-            return state.DoS(100,
-                    error("CheckBlockHeader () : block with too little %s",
-                            IsProofOfStake() ?
-                                    "proof-of-stake" : "proof-of-work"));
-        }
-    }
     return true;
 }
 
