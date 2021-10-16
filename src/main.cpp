@@ -3718,7 +3718,6 @@ CBlockLocator CChain::GetLocator(const CBlockIndex *pindex) const {
     int nStep = 1;
     std::vector<uint256> vHave;
     vHave.reserve(32);
-
     if (!pindex)
         pindex = Tip();
     while (pindex) {
@@ -3728,19 +3727,16 @@ CBlockLocator CChain::GetLocator(const CBlockIndex *pindex) const {
             break;
         // Exponentially larger steps back, plus the genesis block.
         int nHeight = std::max(pindex->nHeight - nStep, 0);
-        // Jump back quickly to the same height as the chain.
-        if (pindex->nHeight > nHeight)
-            pindex = pindex->GetAncestor(nHeight);
-        // In case pindex is not in this chain, iterate pindex->pprev to find blocks.
-        while (!Contains(pindex))
-            pindex = pindex->pprev;
-        // If pindex is in this chain, use direct height-based access.
-        if (pindex->nHeight > nHeight)
+        if (Contains(pindex)) {
+            // Use O(1) CChain index if possible.
             pindex = (*this)[nHeight];
+        } else {
+            // Otherwise, use O(log n) skiplist.
+            pindex = pindex->GetAncestor(nHeight);
+        }
         if (vHave.size() > 10)
             nStep *= 2;
     }
-
     return CBlockLocator(vHave);
 }
 
