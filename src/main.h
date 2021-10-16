@@ -123,6 +123,7 @@ extern int
     nConsecutiveStakeSwitchHeight;  // see timesamps.h = 420000;
 // All pairs A->B, where A (or one if its ancestors) misses transactions, but B has transactions.
 extern std::multimap<CBlockIndex*, CBlockIndex*> mapBlocksUnlinked;
+// Best header we've seen so far (used for getheaders queries' starting points).
 extern CBlockIndex *pindexBestHeader;
 const ::int64_t 
     nMaxClockDrift = nTwoHoursInSeconds;
@@ -365,6 +366,8 @@ bool ActivateBestChain(CValidationState &state, CTxDB& txdb);
 struct CNodeStateStats {
     int nMisbehavior;
     int nSyncHeight;
+    int nCommonHeight;
+    std::vector<int> vHeightInFlight;
 };
 
 /** Position on disk for a particular transaction. */
