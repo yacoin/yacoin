@@ -6174,6 +6174,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
         if (mi != mapHash.end())
         {
             hashBlock = (*mi).second;
+            block.blockHash = hashBlock;
         }
         else
         {
