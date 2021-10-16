@@ -710,6 +710,7 @@ bool CTxDB::LoadBlockIndex()
     }
     delete iterator;
 
+
     if (fReindex)
     {
         fReindex = false;
@@ -719,6 +720,7 @@ bool CTxDB::LoadBlockIndex()
         {
             CBlockIndex* pindexCurrent = (*it).second;
             WriteBlockIndex(CDiskBlockIndex(pindexCurrent));
+            mapHash.insert(make_pair(pindexCurrent->GetSHA256Hash(), (*it).first)).first;
             numberOfReindexBlock++;
         }
         printf("CTxDB::LoadBlockIndex(), fReindex = %d, "
@@ -726,6 +728,16 @@ bool CTxDB::LoadBlockIndex()
                fReindex,
                numberOfReindexBlock);
     }
+    else
+    {
+        map<uint256, CBlockIndex *>::iterator it;
+        for (it = mapBlockIndex.begin(); it != mapBlockIndex.end(); it++)
+        {
+            CBlockIndex* pindexCurrent = (*it).second;
+            mapHash.insert(make_pair(pindexCurrent->GetSHA256Hash(), (*it).first)).first;
+        }
+    }
+
     printf("CTxDB::LoadBlockIndex(), fStoreBlockHashToDb = %d, "
            "newStoredBlock = %d, "
            "alreadyStoredBlock = %d\n",

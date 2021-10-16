@@ -133,6 +133,7 @@ CTxMemPool mempool;
 unsigned int nTransactionsUpdated = 0;
 
 map<uint256, CBlockIndex*> mapBlockIndex;
+map<uint256, uint256> mapHash;
 // are all of these undocumented numbers a function of Nfactor?  Cpu power? Other???
 #ifndef LOW_DIFFICULTY_FOR_DEVELOPMENT
 CBigNum bnProofOfWorkLimit(~uint256(0) >> 20);
@@ -4014,6 +4015,9 @@ CBlockIndex* CBlockHeader::AddToBlockIndex()
     pindexNew->phashBlock = &((*mi).first);
     map<uint256, CBlockIndex*>::iterator miPrev = mapBlockIndex.find(hashPrevBlock); // this bothers me when mapBlockIndex == NULL!?
 
+    // Add to mapHash
+    mapHash.insert(make_pair(GetSHA256Hash(), hash)).first;
+
     if (miPrev != mapBlockIndex.end())
     {
         pindexNew->pprev = (*miPrev).second;
@@ -6120,6 +6124,17 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
                     header.nTime,
                     header.nBits,
                     header.nNonce);
+            // SHA256 doesn't cost much cpu usage to calculate
+            map<uint256, uint256>::iterator mi = mapHash.find(header.GetSHA256Hash());
+            if (mi != mapHash.end())
+            {
+                uint256 blockHash = (*mi).second;
+                printf("Already have header %s\n", blockHash.ToString().c_str());
+                std::map<uint256, CBlockIndex *>::iterator miBlockIndex = mapBlockIndex.find(blockHash);
+                pindexLast = miBlockIndex->second;
+                continue;
+            }
+
             CValidationState state;
             if (pindexLast != NULL && header.hashPrevBlock != pindexLast->GetBlockHash()) {
                 Misbehaving(pfrom->GetId(), 20);
@@ -6156,6 +6171,10 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
             block;
 
         vRecv >> block;
+        // SHA256 doesn't cost much cpu usage to calculate
+        map<uint256, uint256>::iterator mi = mapHash.find(block.GetSHA256Hash());
+        if (mi != mapHash.end())
+            block.blockHash = (*mi).second;
         uint256 hashBlock = block.GetHash();
 
         printf(

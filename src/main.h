@@ -139,6 +139,7 @@ extern const ::int64_t
 extern CScript COINBASE_FLAGS;
 extern CCriticalSection cs_main;
 extern std::map<uint256, CBlockIndex*> mapBlockIndex;
+extern std::map<uint256, uint256> mapHash; // map of (SHA256-hash, chacha-hash)
 extern std::set<CBlockIndex*, CBlockIndexWorkComparator> setBlockIndexCandidates;
 extern unsigned int nNodeLifespan;
 //extern unsigned int nStakeMinAge;
@@ -1215,6 +1216,9 @@ public:
     mutable struct block_header previousBlockHeader;
     mutable uint256 blockHash;
 
+    // (memory-only) Store to avoid calculating hash many times at initial-block-sync
+    mutable uint256 blockSHA256Hash;
+
     CBlockHeader()
     {
         SetNull();
@@ -1264,6 +1268,7 @@ public:
         nBits = 0;
         nNonce = 0;
         blockHash = 0;
+        blockSHA256Hash = 0;
         memset(UVOIDBEGIN(previousBlockHeader), 0, sizeof(struct block_header));
     }
 
@@ -1434,6 +1439,21 @@ public:
             previousBlockHeader.nonce = nNonce;
         }
         return blockHash;
+    }
+
+    uint256 GetSHA256Hash() const
+    {
+        if(blockSHA256Hash == 0 || IsHeaderDifferent())
+        {
+            blockSHA256Hash = Hash(BEGIN(nVersion), END(nNonce));
+            previousBlockHeader.version = nVersion;
+            previousBlockHeader.prev_block = hashPrevBlock;
+            previousBlockHeader.merkle_root = hashMerkleRoot;
+            previousBlockHeader.timestamp = nTime;
+            previousBlockHeader.bits = nBits;
+            previousBlockHeader.nonce = nNonce;
+        }
+        return blockSHA256Hash;
     }
 
     int64_t GetBlockTime() const
@@ -1851,6 +1871,12 @@ public:
     uint256 GetBlockHash() const
     {
         return *phashBlock;
+    }
+
+    uint256 GetSHA256Hash() const
+    {
+        CBlockHeader blockHeader = GetBlockHeader();
+        return blockHeader.GetSHA256Hash();
     }
 
     ::int64_t GetBlockTime() const
