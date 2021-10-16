@@ -868,7 +868,7 @@ bool CTxDB::LoadBlockIndex()
             // NovaCoin: calculate stake modifier checksum
             pindex->nStakeModifierChecksum = GetStakeModifierChecksum(pindex);
             if (!CheckStakeModifierCheckpoints(pindex->nHeight, pindex->nStakeModifierChecksum))
-                printf("CTxDB::LoadBlockIndex() : Failed stake modifier checkpoint height=%d, modifier=0x%016" PRIx64, pindex->nHeight, pindex->nStakeModifier);
+                printf("CTxDB::LoadBlockIndex() : Failed stake modifier checkpoint height=%d, modifier=0x%016\n" PRIx64, pindex->nHeight, pindex->nStakeModifier);
             if (pindex->nStatus & BLOCK_HAVE_DATA) {
                 if (pindex->pprev) {
                     if (pindex->pprev->validTx) {

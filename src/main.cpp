@@ -3916,7 +3916,7 @@ bool CBlock::ReceivedBlockTransactions(CValidationState &state, unsigned int nFi
 
                 pindex->nStakeModifierChecksum = GetStakeModifierChecksum(pindex);
                 if (!CheckStakeModifierCheckpoints(pindex->nHeight, pindex->nStakeModifierChecksum))
-                    return printf("AcceptBlock() : Rejected by stake modifier checkpoint height=%d, modifier=0x%016" PRIx64, pindex->nHeight, nStakeModifier);
+                    printf("AcceptBlock() : Rejected by stake modifier checkpoint height=%d, modifier=0x%016\n" PRIx64, pindex->nHeight, nStakeModifier);
             }
 
             if (fStoreBlockHashToDb && !txdb.WriteBlockHash(CDiskBlockIndex(pindex)))
