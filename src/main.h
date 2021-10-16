@@ -1852,19 +1852,6 @@ public:
         blockHeader.nTime          = nTime;
         blockHeader.nBits          = nBits;
         blockHeader.nNonce         = nNonce;
-        printf ("TACA ===> GetBlockHeader,"
-                "blockHeader.nVersion = %d, "
-                "blockHeader.hashPrevBlock.GetHex().c_str() = %s, "
-                "blockHeader.hashMerkleRoot.GetHex().c_str() = %s, "
-                "blockHeader.nTime = %d, "
-                "blockHeader.nBits = %d, "
-                "blockHeader.nNonce = %d\n",
-                blockHeader.nVersion,
-                blockHeader.hashPrevBlock.GetHex().c_str(),
-                blockHeader.hashMerkleRoot.GetHex().c_str(),
-                blockHeader.nTime,
-                blockHeader.nBits,
-                blockHeader.nNonce);
         return blockHeader;
     }
 

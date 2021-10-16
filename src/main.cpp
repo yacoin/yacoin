@@ -3958,7 +3958,6 @@ bool CBlockHeader::AcceptBlockHeader(CValidationState &state,
         return true;
     }
 
-    printf("TACA ==> CBlockHeader::AcceptBlockHeader, hash = %s, hashPrevBlock.GetHex() = %s\n", hash.GetHex().c_str(), hashPrevBlock.GetHex().c_str());
     // Get prev block index
     map<uint256, CBlockIndex *>::iterator mi = mapBlockIndex.find(hashPrevBlock);
     if (mi == mapBlockIndex.end())
@@ -6090,7 +6089,6 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
 
         // Bypass the normal CBlock deserialization, as we don't want to risk deserializing 2000 full blocks.
         unsigned int nCount = ReadCompactSize(vRecv);
-        printf ("TACA ===> ProcessMessage, headers, nCount = %d\n", nCount);
         if (nCount > MAX_HEADERS_RESULTS) {
             Misbehaving(pfrom->GetId(), 20);
             return error("headers message size = %u", nCount);
@@ -6111,19 +6109,6 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
 
         CBlockIndex *pindexLast = NULL;
         BOOST_FOREACH(CBlock& header, headers) {
-            printf ("TACA ===> ProcessMessage,"
-                    "header.nVersion = %d, "
-                    "header.hashPrevBlock.GetHex().c_str() = %s, "
-                    "header.hashMerkleRoot.GetHex().c_str() = %s, "
-                    "header.nTime = %d, "
-                    "header.nBits = %d, "
-                    "header.nNonce = %d\n",
-                    header.nVersion,
-                    header.hashPrevBlock.GetHex().c_str(),
-                    header.hashMerkleRoot.GetHex().c_str(),
-                    header.nTime,
-                    header.nBits,
-                    header.nNonce);
             // SHA256 doesn't cost much cpu usage to calculate
             map<uint256, uint256>::iterator mi = mapHash.find(header.GetSHA256Hash());
             if (mi != mapHash.end())
