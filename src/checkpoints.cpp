@@ -213,7 +213,7 @@ namespace Checkpoints
                 if (!block.ReadFromDisk(pindexCheckpoint))
                     return error("AcceptPendingSyncCheckpoint: ReadFromDisk failed for sync checkpoint %s", hashPendingCheckpoint.ToString().c_str());
                 CValidationState state;
-                setBlockIndexValid.insert(pindexCheckpoint);
+                setBlockIndexCandidates.insert(pindexCheckpoint);
                 if (!ActivateBestChain(state, txdb))
                 {
                     hashInvalidCheckpoint = hashPendingCheckpoint;
@@ -293,7 +293,7 @@ namespace Checkpoints
             if (!block.ReadFromDisk(mapBlockIndex[hash]))
                 return error("ResetSyncCheckpoint: ReadFromDisk failed for hardened checkpoint %s", hash.ToString().c_str());
             CValidationState state;
-            setBlockIndexValid.insert(mapBlockIndex[hash]);
+            setBlockIndexCandidates.insert(mapBlockIndex[hash]);
             if (!ActivateBestChain(state, txdb))
             {
                 return error("ResetSyncCheckpoint: SetBestChain failed for hardened checkpoint %s", hash.ToString().c_str());

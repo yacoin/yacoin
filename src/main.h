@@ -139,7 +139,7 @@ extern const ::int64_t
 extern CScript COINBASE_FLAGS;
 extern CCriticalSection cs_main;
 extern std::map<uint256, CBlockIndex*> mapBlockIndex;
-extern std::set<CBlockIndex*, CBlockIndexWorkComparator> setBlockIndexValid;
+extern std::set<CBlockIndex*, CBlockIndexWorkComparator> setBlockIndexCandidates;
 extern unsigned int nNodeLifespan;
 //extern unsigned int nStakeMinAge;
 extern int nCoinbaseMaturity;

@@ -870,7 +870,7 @@ bool CTxDB::LoadBlockIndex()
                 }
             }
             if (pindex->IsValid(BLOCK_VALID_TRANSACTIONS) && (pindex->validTx || pindex->pprev == NULL))
-                setBlockIndexValid.insert(pindex);
+                setBlockIndexCandidates.insert(pindex);
             if (pindex->nStatus & BLOCK_FAILED_MASK && (!pindexBestInvalid || pindex->bnChainTrust > pindexBestInvalid->bnChainTrust))
                 pindexBestInvalid = pindex;
             if (pindex->pprev)
@@ -1100,7 +1100,7 @@ bool CTxDB::LoadBlockIndex()
         CBlock block;
         if (!block.ReadFromDisk(pindexFork))
             return error("LoadBlockIndex() : block.ReadFromDisk failed");
-        setBlockIndexValid.insert(pindexFork);
+        setBlockIndexCandidates.insert(pindexFork);
         CTxDB txdb;
         CValidationState state;
         ActivateBestChain(state, txdb);

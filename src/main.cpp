@@ -189,7 +189,7 @@ CBlockIndex *pindexBestInvalid;
 uint256 hashBestChain = 0;
 // The set of all CBlockIndex entries with BLOCK_VALID_TRANSACTIONS or better that are at least
 // as good as our current tip. Entries may be failed, though.
-set<CBlockIndex*, CBlockIndexWorkComparator> setBlockIndexValid; // may contain all CBlockIndex*'s that have validness >=BLOCK_VALID_TRANSACTIONS, and must contain those who aren't failed
+set<CBlockIndex*, CBlockIndexWorkComparator> setBlockIndexCandidates; // may contain all CBlockIndex*'s that have validness >=BLOCK_VALID_TRANSACTIONS, and must contain those who aren't failed
 // Best header we've seen so far (used for getheaders queries' starting points).
 CBlockIndex *pindexBestHeader = NULL;
 // Number of nodes with fSyncStarted.
@@ -3345,7 +3345,7 @@ void static InvalidBlockFound(const CValidationState &state, CTxDB& txdb, CBlock
         if (!txdb.TxnCommit()) {
             printf("InvalidBlockFound(): TxnCommit failed\n");
         }
-        setBlockIndexValid.erase(pindex);
+        setBlockIndexCandidates.erase(pindex);
     }
 }
 
@@ -3517,8 +3517,8 @@ static CBlockIndex* FindMostWorkChain() {
 
         // Find the best candidate header.
         {
-            std::set<CBlockIndex*, CBlockIndexWorkComparator>::reverse_iterator it = setBlockIndexValid.rbegin();
-            if (it == setBlockIndexValid.rend())
+            std::set<CBlockIndex*, CBlockIndexWorkComparator>::reverse_iterator it = setBlockIndexCandidates.rbegin();
+            if (it == setBlockIndexCandidates.rend())
                 return NULL;
             pindexNew = *it;
         }
@@ -3537,10 +3537,10 @@ static CBlockIndex* FindMostWorkChain() {
                 CBlockIndex *pindexFailed = pindexNew;
                 while (pindexTest != pindexFailed) {
                     pindexFailed->nStatus |= BLOCK_FAILED_CHILD;
-                    setBlockIndexValid.erase(pindexFailed);
+                    setBlockIndexCandidates.erase(pindexFailed);
                     pindexFailed = pindexFailed->pprev;
                 }
-                setBlockIndexValid.erase(pindexTest);
+                setBlockIndexCandidates.erase(pindexTest);
                 fInvalidAncestor = true;
                 break;
             }
@@ -3891,7 +3891,7 @@ bool CBlock::ReceivedBlockTransactions(CValidationState &state, unsigned int nFi
             CBlockIndex *pindex = queue.front();
             queue.pop_front();
             pindex->validTx = (pindex->pprev ? pindex->pprev->validTx : true);
-            setBlockIndexValid.insert(pindex);
+            setBlockIndexCandidates.insert(pindex);
             std::pair<std::multimap<CBlockIndex*, CBlockIndex*>::iterator, std::multimap<CBlockIndex*, CBlockIndex*>::iterator> range = mapBlocksUnlinked.equal_range(pindex);
             while (range.first != range.second) {
                 std::multimap<CBlockIndex*, CBlockIndex*>::iterator it = range.first;
@@ -4106,7 +4106,7 @@ CBlockIndex* CBlockHeader::AddToBlockIndex()
 //    // map<uint256, CBlockIndex*>::iterator mi = mapBlockIndex.insert(make_pair(hash, pindexNew)).first;
 //    // pindexNew->phashBlock = &((*mi).first);
 //    // pindexNew->nStatus = BLOCK_VALID_TRANSACTIONS | BLOCK_HAVE_DATA;
-//    // setBlockIndexValid.insert(pindexNew);
+//    // setBlockIndexCandidates.insert(pindexNew);
 //
 ////     // Write to disk block index
 ////     CTxDB txdb;
@@ -4877,7 +4877,7 @@ void UnloadBlockIndex()
 {
     mapBlockIndex.clear();
     bnBestChainTrust = CBigNum(0);
-    setBlockIndexValid.clear();
+    setBlockIndexCandidates.clear();
     pindexBestInvalid = NULL;
     hashBestChain = 0;
     chainActive.SetTip(NULL);
@@ -5767,6 +5767,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
                         // later (within the same cs_main lock, though).
                         MarkBlockAsInFlight(pfrom->GetId(), inv.hash);
                     }
+                    printf("getheaders (%d) %s to peer=%s\n", pindexBestHeader->nHeight, inv.hash.ToString().c_str(), pfrom->addrName.c_str());
                 }
             }
 
@@ -6126,7 +6127,10 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
             UpdateBlockAvailability(pfrom->GetId(), pindexLast->GetBlockHash());
 
         if (nCount == MAX_HEADERS_RESULTS && pindexLast) {
+            // Headers message had its maximum size; the peer may have more headers.
+            // TODO: optimize: if pindexLast is an ancestor of chainActive.Tip or pindexBestHeader, continue
             // from there instead.
+            printf("more getheaders (%d) to end to peer=%s (startheight:%d)\n", pindexLast->nHeight, pfrom->addrName.c_str(), pfrom->nStartingHeight);
             pfrom->PushMessage("getheaders", chainActive.GetLocator(pindexLast), uint256(0));
         }
     }
@@ -6604,6 +6608,7 @@ bool SendMessages(CNode *pto, bool fSendTrickle)
                 state.fSyncStarted = true;
                 nSyncStarted++;
                 CBlockIndex *pindexStart = pindexBestHeader->pprev ? pindexBestHeader->pprev : pindexBestHeader;
+                printf("initial getheaders (%d) to peer=%s (startheight:%d)\n", pindexStart->nHeight, pto->addrName.c_str(), pto->nStartingHeight);
                 pto->PushMessage("getheaders", chainActive.GetLocator(pindexStart), uint256(0));
             }
         }
@@ -6691,11 +6696,14 @@ bool SendMessages(CNode *pto, bool fSendTrickle)
             BOOST_FOREACH(CBlockIndex *pindex, vToDownload) {
                 vGetData.push_back(CInv(MSG_BLOCK, pindex->GetBlockHash()));
                 MarkBlockAsInFlight(pto->GetId(), pindex->GetBlockHash(), pindex);
-                printf("Requesting block %s peer=%s\n", pindex->GetBlockHash().ToString().c_str(), pto->addrName.c_str());
+                printf("Requesting block %s (height = %d) peer=%s\n", pindex->GetBlockHash().ToString().c_str(), pindex->nHeight, pto->addrName.c_str());
             }
             if (state.nBlocksInFlight == 0 && staller != -1) {
                 if (State(staller)->nStallingSince == 0)
+                {
                     State(staller)->nStallingSince = nNow;
+                    printf("Stall started peer=%d\n", staller);
+                }
             }
         }
 
