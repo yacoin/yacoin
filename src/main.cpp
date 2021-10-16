@@ -3519,7 +3519,7 @@ static CBlockIndex* FindMostWorkChain() {
 
         // Find the best candidate header.
         {
-            std::set<CBlockIndex*, CBlockIndexWorkComparator>::reverse_iterator it = setBlockIndexCandidates.rbegin();
+            set<CBlockIndex*, CBlockIndexWorkComparator>::reverse_iterator it = setBlockIndexCandidates.rbegin();
             if (it == setBlockIndexCandidates.rend())
                 return NULL;
             pindexNew = *it;
@@ -3610,6 +3610,15 @@ static bool ActivateBestChainStep(CValidationState &state, CTxDB& txdb, CBlockIn
                 }
             }
             else {
+                // Delete all entries in setBlockIndexValid that are worse than our new current block.
+                // Note that we can't delete the current block itself, as we may need to return to it later in case a
+                // reorganization to a better block fails.
+                set<CBlockIndex*, CBlockIndexWorkComparator>::iterator it = setBlockIndexCandidates.begin();
+                while (setBlockIndexCandidates.value_comp()(*it, chainActive.Tip())) {
+                    setBlockIndexCandidates.erase(it++);
+                }
+                // Either the current tip or a successor of it we're working towards is left in setBlockIndexValid.
+                assert(!setBlockIndexCandidates.empty());
                 if (!pindexOldTip || chainActive.Tip()->bnChainTrust > pindexOldTip->bnChainTrust) {
                     // We're in a better position than we were. Return temporarily to release the lock.
                     fContinue = false;
