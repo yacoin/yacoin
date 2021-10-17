@@ -372,7 +372,7 @@ struct CNodeState {
     // String name of this peer (debugging/logging purposes).
     std::string name;
     // The best known block we know this peer has announced.
-    CBlockIndex *pindexBestKnownBlock;
+    CBlockIndex *pindexBestKnownHeader;
     // The hash of the last unknown block this peer has announced.
     uint256 hashLastUnknownBlock;
     // The last full block we both have.
@@ -387,7 +387,7 @@ struct CNodeState {
     CNodeState() {
         nMisbehavior = 0;
         fShouldBan = false;
-        pindexBestKnownBlock = NULL;
+        pindexBestKnownHeader = NULL;
         hashLastUnknownBlock = uint256(0);
         pindexLastCommonBlock = NULL;
         fSyncStarted = false;
@@ -460,8 +460,8 @@ void ProcessBlockAvailability(NodeId nodeid) {
     if (state->hashLastUnknownBlock != 0) {
         map<uint256, CBlockIndex*>::iterator itOld = mapBlockIndex.find(state->hashLastUnknownBlock);
         if (itOld != mapBlockIndex.end() && itOld->second->bnChainTrust > 0) {
-            if (state->pindexBestKnownBlock == NULL || itOld->second->bnChainTrust >= state->pindexBestKnownBlock->bnChainTrust)
-                state->pindexBestKnownBlock = itOld->second;
+            if (state->pindexBestKnownHeader == NULL || itOld->second->bnChainTrust >= state->pindexBestKnownHeader->bnChainTrust)
+                state->pindexBestKnownHeader = itOld->second;
             state->hashLastUnknownBlock = uint256(0);
         }
     }
@@ -477,8 +477,8 @@ void UpdateBlockAvailability(NodeId nodeid, const uint256 &hash) {
     map<uint256, CBlockIndex*>::iterator it = mapBlockIndex.find(hash);
     if (it != mapBlockIndex.end() && it->second->bnChainTrust > 0) {
         // An actually better block was announced.
-        if (state->pindexBestKnownBlock == NULL || it->second->bnChainTrust >= state->pindexBestKnownBlock->bnChainTrust)
-            state->pindexBestKnownBlock = it->second;
+        if (state->pindexBestKnownHeader == NULL || it->second->bnChainTrust >= state->pindexBestKnownHeader->bnChainTrust)
+            state->pindexBestKnownHeader = it->second;
     } else {
         // An unknown block was announced; just assume that the latest one is the best one.
         state->hashLastUnknownBlock = hash;
@@ -514,10 +514,10 @@ void FindNextBlocksToDownload(NodeId nodeid, unsigned int count, std::vector<CBl
     CNodeState *state = State(nodeid);
     assert(state != NULL);
 
-    // Make sure pindexBestKnownBlock is up to date, we'll need it.
+    // Make sure pindexBestKnownHeader is up to date, we'll need it.
     ProcessBlockAvailability(nodeid);
 
-    if (state->pindexBestKnownBlock == NULL || state->pindexBestKnownBlock->bnChainTrust < chainActive.Tip()->bnChainTrust) {
+    if (state->pindexBestKnownHeader == NULL || state->pindexBestKnownHeader->bnChainTrust < chainActive.Tip()->bnChainTrust) {
         // This peer has nothing interesting.
         return;
     }
@@ -525,13 +525,13 @@ void FindNextBlocksToDownload(NodeId nodeid, unsigned int count, std::vector<CBl
     if (state->pindexLastCommonBlock == NULL) {
         // Bootstrap quickly by guessing a parent of our best tip is the forking point.
         // Guessing wrong in either direction is not a problem.
-        state->pindexLastCommonBlock = chainActive[std::min(state->pindexBestKnownBlock->nHeight, chainActive.Height())];
+        state->pindexLastCommonBlock = chainActive[std::min(state->pindexBestKnownHeader->nHeight, chainActive.Height())];
     }
 
     // If the peer reorganized, our previous pindexLastCommonBlock may not be an ancestor
     // of their current tip anymore. Go back enough to fix that.
-    state->pindexLastCommonBlock = LastCommonAncestor(state->pindexLastCommonBlock, state->pindexBestKnownBlock);
-    if (state->pindexLastCommonBlock == state->pindexBestKnownBlock)
+    state->pindexLastCommonBlock = LastCommonAncestor(state->pindexLastCommonBlock, state->pindexBestKnownHeader);
+    if (state->pindexLastCommonBlock == state->pindexBestKnownHeader)
         return;
 
     std::vector<CBlockIndex*> vToFetch;
@@ -540,15 +540,15 @@ void FindNextBlocksToDownload(NodeId nodeid, unsigned int count, std::vector<CBl
     // linked block we have in common with this peer. The +1 is so we can detect stalling, namely if we would be able to
     // download that next block if the window were 1 larger.
     int nWindowEnd = state->pindexLastCommonBlock->nHeight + BLOCK_DOWNLOAD_WINDOW;
-    int nMaxHeight = std::min<int>(state->pindexBestKnownBlock->nHeight, nWindowEnd + 1);
+    int nMaxHeight = std::min<int>(state->pindexBestKnownHeader->nHeight, nWindowEnd + 1);
     NodeId waitingfor = -1;
     while (pindexWalk->nHeight < nMaxHeight) {
-        // Read up to 1000 (or more, if more blocks than that are needed) successors of pindexWalk (towards
-        // pindexBestKnownBlock) into vToFetch. We fetch 128, because CBlockIndex::GetAncestor may be as expensive
+        // Read up to 4000 (or more, if more blocks than that are needed) successors of pindexWalk (towards
+        // pindexBestKnownHeader) into vToFetch. We fetch 4000, because CBlockIndex::GetAncestor may be as expensive
         // as iterating over ~100 CBlockIndex* entries anyway.
-        int nToFetch = std::min(nMaxHeight - pindexWalk->nHeight, std::max<int>(count - vBlocks.size(), 1000));
+        int nToFetch = std::min(nMaxHeight - pindexWalk->nHeight, std::max<int>(count - vBlocks.size(), FETCH_BLOCK_DOWNLOAD));
         vToFetch.resize(nToFetch);
-        pindexWalk = state->pindexBestKnownBlock->GetAncestor(pindexWalk->nHeight + nToFetch);
+        pindexWalk = state->pindexBestKnownHeader->GetAncestor(pindexWalk->nHeight + nToFetch);
         vToFetch[nToFetch - 1] = pindexWalk;
         for (unsigned int i = nToFetch - 1; i > 0; i--) {
             vToFetch[i - 1] = vToFetch[i]->pprev;
@@ -590,7 +590,7 @@ bool GetNodeStateStats(NodeId nodeid, CNodeStateStats &stats) {
     if (state == NULL)
         return false;
     stats.nMisbehavior = state->nMisbehavior;
-    stats.nSyncHeight = state->pindexBestKnownBlock ? state->pindexBestKnownBlock->nHeight : -1;
+    stats.nSyncHeight = state->pindexBestKnownHeader ? state->pindexBestKnownHeader->nHeight : -1;
     stats.nCommonHeight = state->pindexLastCommonBlock ? state->pindexLastCommonBlock->nHeight : -1;
     BOOST_FOREACH(const QueuedBlock& queue, state->vBlocksInFlight) {
         if (queue.pindex)
@@ -3562,7 +3562,7 @@ static bool ActivateBestChainStep(CValidationState &state, CTxDB& txdb, CBlockIn
     // Disconnect active blocks which are no longer in the best chain.
     while (chainActive.Tip() && chainActive.Tip() != pindexFork) {
         if (!txdb.TxnBegin()) {
-            return error("ActivateBestChain () : TxnBegin 1 failed");
+            return error("ActivateBestChainStep () : TxnBegin 1 failed");
         }
         if (!DisconnectTip(state, txdb)) // Disconnect the latest block on the chain
         {
@@ -3591,7 +3591,7 @@ static bool ActivateBestChainStep(CValidationState &state, CTxDB& txdb, CBlockIn
         // Connect new blocks.
         BOOST_REVERSE_FOREACH(CBlockIndex *pindexConnect, vpindexToConnect) {
             if (!txdb.TxnBegin()) {
-                return error("ActivateBestChain () : TxnBegin 2 failed");
+                return error("ActivateBestChainStep () : TxnBegin 2 failed");
             }
             if (!ConnectTip(state, txdb, pindexConnect)) {
                 if (state.IsInvalid()) {
@@ -5769,7 +5769,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
             // TODO: improve the logic to detect stalling initial-headers-sync peer
             if (inv.type == MSG_BLOCK) {
                 UpdateBlockAvailability(pfrom->GetId(), inv.hash);
-                if (!fAlreadyHave && !mapBlocksInFlight.count(inv.hash) && !IsInitialBlockDownload()) {
+                if (!fAlreadyHave && !mapBlocksInFlight.count(inv.hash) && pindexBestHeader->GetBlockTime() > GetAdjustedTime() - 24 * 60 * 60) {
                     // First request the headers preceeding the announced block. In the normal fully-synced
                     // case where a new block is announced that succeeds the current tip (no reorganization),
                     // there are no such headers.
@@ -5779,7 +5779,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
                     // doing this will result in the received block being rejected as an orphan in case it is
                     // not a direct successor.
                     pfrom->PushMessage("getheaders", chainActive.GetLocator(pindexBestHeader), inv.hash);
-                    if (chainActive.Tip()->GetBlockTime() > GetAdjustedTime() - 60 * 20) {
+                    if (chainActive.Tip()->GetBlockTime() > GetAdjustedTime() - 24 * 60 * 60) {
                         vToFetch.push_back(inv);
                         // Mark block as in flight already, even though the actual "getdata" message only goes out
                         // later (within the same cs_main lock, though).
@@ -6638,7 +6638,9 @@ bool SendMessages(CNode *pto, bool fSendTrickle)
         // Start block sync
         if (pindexBestHeader == NULL)
             pindexBestHeader = chainActive.Tip();
-        bool fFetch = !pto->fInbound || (pindexBestHeader && (state.pindexLastCommonBlock ? state.pindexLastCommonBlock->nHeight : 0) + 1440 > pindexBestHeader->nHeight);
+        // Allow to fetch for both inbound and outbound connection
+//        bool fFetch = !pto->fInbound || (pindexBestHeader && (state.pindexLastCommonBlock ? state.pindexLastCommonBlock->nHeight : 0) + 1440 > pindexBestHeader->nHeight);
+        bool fFetch = true;
         if (!state.fSyncStarted && !pto->fClient && fFetch) {
             // Only actively request headers from a single peer, unless we're close to today.
             if (nSyncStarted == 0 || pindexBestHeader->GetBlockTime() > GetAdjustedTime() - 24 * 60 * 60) {
