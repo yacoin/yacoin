@@ -6767,7 +6767,8 @@ bool SendMessages(CNode *pto, bool fSendTrickle)
         // Message: getdata (blocks)
         //
         vector<CInv> vGetData;
-        if (!pto->fDisconnect && !pto->fClient && fFetch && state.nBlocksInFlight < MAX_BLOCKS_IN_TRANSIT_PER_PEER) {
+        if (!pto->fDisconnect && !pto->fClient && fFetch && state.nBlocksInFlight < MAX_BLOCKS_IN_TRANSIT_PER_PEER
+                && (!state.fSyncStarted || (pindexBestHeader->GetBlockTime() > GetAdjustedTime() - 24 * 60 * 60) || vNodes.size() == 1)) { // Not download block from initial-header-sync node, unless best header close to today or there is only 1 connected node
             vector<CBlockIndex*> vToDownload;
             NodeId staller = -1;
             FindNextBlocksToDownload(pto->GetId(), MAX_BLOCKS_IN_TRANSIT_PER_PEER - state.nBlocksInFlight, vToDownload, staller);
