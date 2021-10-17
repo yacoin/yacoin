@@ -6777,12 +6777,32 @@ bool SendMessages(CNode *pto, bool fSendTrickle)
                 MarkBlockAsInFlight(pto->GetId(), pindex->GetBlockHash(), pindex);
                 printf("Requesting block %s (height = %d) peer=%s\n", pindex->GetBlockHash().ToString().c_str(), pindex->nHeight, pto->addrName.c_str());
             }
-            if (state.nBlocksInFlight == 0 && staller != -1) {
-                if (State(staller)->nStallingSince == 0)
+            if (state.nBlocksInFlight == 0) {
+                // Stalling due to other peer
+                if (staller != -1)
                 {
-                    State(staller)->nStallingSince = nNow;
-                    printf("Stall started peer=%d\n", staller);
+                    if (State(staller)->nStallingSince == 0)
+                    {
+                        State(staller)->nStallingSince = nNow;
+                        printf("Stall started peer=%d\n", staller);
+                    }
                 }
+                else
+                {
+                    int bestHeaderHeight = pindexBestHeader ? pindexBestHeader->nHeight : -1;
+                    int bestBlockHeight = chainActive.Height();
+                    int nSyncHeight = state.pindexBestKnownHeader ? state.pindexBestKnownHeader->nHeight : -1;
+                    /* Trigger sending "getblocks" from other peers when
+                     * 1) bestHeaderHeight > bestBlockHeight + HEADER_BLOCK_DIFFERENCES_TRIGGER_GETDATA (default = 400000)
+                     * 2) synced_headers < bestHeaderHeight
+                     */
+                    if ((bestHeaderHeight > bestBlockHeight + HEADER_BLOCK_DIFFERENCES_TRIGGER_GETBLOCKS) &&
+                            (nSyncHeight < bestHeaderHeight))
+                    {
+                        pto->PushMessage("getblocks", chainActive.GetLocator(pindexBestHeader), pindexBestHeader->pprev->GetBlockHash());
+                    }
+                }
+
             }
         }
 

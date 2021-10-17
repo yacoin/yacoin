@@ -106,6 +106,8 @@ static const unsigned int MAX_HEADERS_RESULTS = 2000;
  *  harder). We'll probably want to make this a per-peer adaptive value at some point. */
 static const unsigned int BLOCK_DOWNLOAD_WINDOW = MAX_BLOCKS_IN_TRANSIT_PER_PEER * 64; //32000
 static const unsigned int FETCH_BLOCK_DOWNLOAD = MAX_BLOCKS_IN_TRANSIT_PER_PEER * 8; //4000
+// Trigger sending getblocks from other peers when header > block + HEADER_BLOCK_DIFFERENCES_TRIGGER_GETDATA
+static const unsigned int HEADER_BLOCK_DIFFERENCES_TRIGGER_GETBLOCKS = 400000; //4000
 /** Headers download timeout expressed in microseconds
  *  Timeout = base + per_header * (expected number of headers) */
 static const int64_t HEADERS_DOWNLOAD_TIMEOUT_BASE = 10 * 60 * 1000000; // 15 minutes
