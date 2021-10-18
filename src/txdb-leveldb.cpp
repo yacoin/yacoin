@@ -578,6 +578,19 @@ bool CTxDB::LoadBlockIndex()
         pindexNew->nStatus = diskindex.nStatus;
         pindexNew->blockHash = blockHash;
 
+        if (fReindex)
+        {
+            if ((pindexNew->nHeight == 0) || (pindexNew->nFile != 0 && pindexNew->nBlockPos != 0))
+            {
+                pindexNew->nStatus |= BLOCK_HAVE_DATA;
+                pindexNew->RaiseValidity(BLOCK_VALID_TRANSACTIONS);
+            }
+            else
+            {
+                printf("block height = %d has no block data, nFile = %u, nBlockPost = %u\n", pindexNew->nHeight, pindexNew->nFile, pindexNew->nBlockPos);
+            }
+        }
+
         uint256 tmpBlockhash;
         if (fStoreBlockHashToDb && !ReadBlockHash(diskindex.nFile, diskindex.nBlockPos, tmpBlockhash))
         {
@@ -710,10 +723,27 @@ bool CTxDB::LoadBlockIndex()
     }
     delete iterator;
 
+    // Load hashBestChain pointer to end of best chain
+    if (!ReadHashBestChain(hashBestChain))
+    {
+        if (chainActive.Genesis() == NULL)
+            return true;
+        return error("CTxDB::LoadBlockIndex() : hashBestChain not loaded");
+    }
+    if (!mapBlockIndex.count(hashBestChain))
+        return error("CTxDB::LoadBlockIndex() : hashBestChain not found in the block index");
+    chainActive.SetTip(mapBlockIndex[hashBestChain]);
 
     if (fReindex)
     {
         fReindex = false;
+        CBlockIndex* chainTip = chainActive.Tip();
+        while (chainTip != NULL)
+        {
+            chainTip->RaiseValidity(BLOCK_VALID_SCRIPTS);
+            chainTip = chainTip->pprev;
+        }
+
         map<uint256, CBlockIndex *>::iterator it;
         int numberOfReindexBlock = 0;
         for (it = mapBlockIndex.begin(); it != mapBlockIndex.end(); it++)
@@ -723,10 +753,11 @@ bool CTxDB::LoadBlockIndex()
             mapHash.insert(make_pair(pindexCurrent->GetSHA256Hash(), (*it).first));
             numberOfReindexBlock++;
         }
-        printf("CTxDB::LoadBlockIndex(), fReindex = %d, "
+        printf("CTxDB::LoadBlockIndex(), fReindex = 1, "
                "numberOfReindexBlock = %d\n",
                fReindex,
                numberOfReindexBlock);
+
     }
     else
     {
@@ -914,16 +945,6 @@ bool CTxDB::LoadBlockIndex()
 #endif
 #endif
 
-    // Load hashBestChain pointer to end of best chain
-    if (!ReadHashBestChain(hashBestChain))
-    {
-        if (chainActive.Genesis() == NULL)
-            return true;
-        return error("CTxDB::LoadBlockIndex() : hashBestChain not loaded");
-    }
-    if (!mapBlockIndex.count(hashBestChain))
-        return error("CTxDB::LoadBlockIndex() : hashBestChain not found in the block index");
-    chainActive.SetTip(mapBlockIndex[hashBestChain]);
     bnBestChainTrust = chainActive.Tip()->bnChainTrust;
 
     printf("LoadBlockIndex(): hashBestChain=%s  height=%d  trust=%s  date=%s\n",
