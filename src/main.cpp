@@ -2241,7 +2241,7 @@ static unsigned int GetNextTargetRequired044(const CBlockIndex* pindexLast, bool
         nRelativeTargetDelta = (nTarget >> 3);  // i.e. 1/8 of the current target
 
     // Yacoind version 1.0.0
-    if ((chainActive.Tip()->nHeight + 1) >= nMainnetNewLogicBlockNumber)
+    if ((pindexLast->nHeight + 1) >= nMainnetNewLogicBlockNumber)
     {
         // COMMENT THIS BLOCK CODE OUT , WE MAY USE IT IN CASE OF AN EMERGENCY HARDFORK
 //        const ::int64_t
@@ -5772,7 +5772,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
             // TODO: improve the logic to detect stalling initial-headers-sync peer
             if (inv.type == MSG_BLOCK) {
                 UpdateBlockAvailability(pfrom->GetId(), inv.hash);
-                if (!fAlreadyHave && !mapBlocksInFlight.count(inv.hash) && pindexBestHeader->GetBlockTime() > GetAdjustedTime() - 24 * 60 * 60) {
+                if (!fAlreadyHave && !mapBlocksInFlight.count(inv.hash) && ((pindexBestHeader->GetBlockTime() > GetAdjustedTime() - 24 * 60 * 60) || (pindexBestHeader->nHeight == 0))) {
                     // First request the headers preceeding the announced block. In the normal fully-synced
                     // case where a new block is announced that succeeds the current tip (no reorganization),
                     // there are no such headers.
