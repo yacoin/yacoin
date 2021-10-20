@@ -419,6 +419,7 @@ void InitializeNode(NodeId nodeid, const CNode *pnode) {
 void FinalizeNode(NodeId nodeid) {
     LOCK(cs_main);
     CNodeState *state = State(nodeid);
+    printf("FinalizeNode for peer=%s\n", state->name.c_str());
 
     if (state->fSyncStarted)
         nSyncStarted--;
