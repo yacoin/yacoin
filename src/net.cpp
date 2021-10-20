@@ -936,12 +936,6 @@ void ThreadSocketHandler2(void *parg)
                     pnode->Cleanup();
 
                     // hold in disconnected pool until all refs are released
-                    pnode->nReleaseTime =
-                        max(pnode->nReleaseTime,
-                            GetTime() + (15 * nOneMinuteInSeconds) // Is it 15 minutes???
-                                                                   // If so, WHY?????????
-                        );
-
                     if ( // what is this testing for, and WHY????
                         pnode->fNetworkNode || pnode->fInbound)
                         pnode->Release();
