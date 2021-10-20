@@ -739,6 +739,17 @@ bool CTxDB::LoadBlockIndex()
         }
         tmpBlockIndex = tmpBlockIndex->pnext;
     }
+    // Calculate maximum target of all blocks, it corresponds to 1/3 highest difficulty (or 3 minimum ease)
+    uint256 bnMaximum = CBigNum().SetCompact(nMinEase).getuint256();
+    CBigNum bnMaximumTarget;
+    bnMaximumTarget.setuint256(bnMaximum);
+    bnMaximumTarget *= 3;
+
+    (void)printf(
+                 "Minimum difficulty target %s\n"
+                 ""
+                 , CBigNum( bnMaximumTarget ).getuint256().ToString().substr(0,16).c_str()
+                );
 
     if (fReindex)
     {
