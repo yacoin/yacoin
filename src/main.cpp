@@ -3820,9 +3820,11 @@ bool CBlockHeader::AcceptBlockHeader(CValidationState &state,
     int nHeight = pindexPrev->nHeight+1;
 
     // Check proof-of-work or proof-of-stake
+    // In case there is a block reorg between two nodes, the mininum difficulty (minEase) can affect the return value of GetNextTargetRequired
+    // In order the node which have weaker-chain can sync blocks of stronger-chain, we lower the DoS score from 100 to 10, so that we don't ban the node which have weaker-chain
     if (nBits != GetNextTargetRequired(pindexPrev, IsProofOfStake()))
         return state.DoS(
-            100, error("AcceptBlockHeader () : incorrect %s",
+            10, error("AcceptBlockHeader () : incorrect %s",
                        IsProofOfWork() ? "proof-of-work" : "proof-of-stake"));
 
     ::int64_t nMedianTimePast = pindexPrev->GetMedianTimePast();
