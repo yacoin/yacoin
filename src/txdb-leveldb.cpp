@@ -602,19 +602,6 @@ bool CTxDB::LoadBlockIndex()
             alreadyStoredBlock++;
         }
 
-        if (pindexNew->nHeight >= bestEpochIntervalHeight &&
-            ((pindexNew->nHeight % nEpochInterval == 0) || (pindexNew->nHeight == nMainnetNewLogicBlockNumber)))
-        {
-            bestEpochIntervalHeight = pindexNew->nHeight;
-            bestEpochIntervalHash = blockHash;
-        }
-        // Find the minimum ease (highest difficulty) when starting node
-        // It will be used to calculate min difficulty (maximum ease)
-        if ((pindexNew->nHeight >= nMainnetNewLogicBlockNumber) && (nMinEase > pindexNew->nBits))
-        {
-            nMinEase = pindexNew->nBits;
-        }
-
 #ifdef WIN32
         n64timeStart11 = GetTimeMillis();
         nDelta11 += (n64timeStart11 - n64timeStart10);
@@ -733,6 +720,25 @@ bool CTxDB::LoadBlockIndex()
     if (!mapBlockIndex.count(hashBestChain))
         return error("CTxDB::LoadBlockIndex() : hashBestChain not found in the block index");
     chainActive.SetTip(mapBlockIndex[hashBestChain]);
+
+    // Recalculate block reward and minimum ease (highest difficulty) when starting node
+    CBlockIndex* tmpBlockIndex = chainActive[nMainnetNewLogicBlockNumber];
+    while (tmpBlockIndex != NULL)
+    {
+        if (tmpBlockIndex->nHeight >= bestEpochIntervalHeight &&
+            ((tmpBlockIndex->nHeight % nEpochInterval == 0) || (tmpBlockIndex->nHeight == nMainnetNewLogicBlockNumber)))
+        {
+            bestEpochIntervalHeight = tmpBlockIndex->nHeight;
+            bestEpochIntervalHash = tmpBlockIndex->blockHash;
+        }
+        // Find the minimum ease (highest difficulty) when starting node
+        // It will be used to calculate min difficulty (maximum ease)
+        if ((tmpBlockIndex->nHeight >= nMainnetNewLogicBlockNumber) && (nMinEase > tmpBlockIndex->nBits))
+        {
+            nMinEase = tmpBlockIndex->nBits;
+        }
+        tmpBlockIndex = tmpBlockIndex->pnext;
+    }
 
     if (fReindex)
     {
