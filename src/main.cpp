@@ -396,6 +396,8 @@ struct CNodeState {
     bool fSyncStarted;
     //! When to potentially disconnect peer for stalling headers download
     int64_t nHeadersSyncTimeout;
+    //! When to potentially send the next getblocks
+    int64_t nLastTimeSendingGetBlocks;
     // Since when we're stalling block download progress (in microseconds), or 0.
     int64_t nStallingSince;
     list<QueuedBlock> vBlocksInFlight;
@@ -411,6 +413,7 @@ struct CNodeState {
         nHeadersSyncTimeout = 0;
         nStallingSince = 0;
         nBlocksInFlight = 0;
+        nLastTimeSendingGetBlocks = 0;
     }
 };
 
@@ -6667,9 +6670,11 @@ bool SendMessages(CNode *pto, bool fSendTrickle)
                      * 2) synced_headers < bestHeaderHeight
                      */
                     if ((bestHeaderHeight > bestBlockHeight + HEADER_BLOCK_DIFFERENCES_TRIGGER_GETBLOCKS) &&
-                            (nSyncHeight < bestHeaderHeight))
+                            (nSyncHeight < bestHeaderHeight) &&
+                            state.nLastTimeSendingGetBlocks < nNow - 60 * 1000000) // avoid spamming getblocks, just send every 1 minute
                     {
                         pto->PushMessage("getblocks", chainActive.GetLocator(pindexBestHeader), pindexBestHeader->pprev->GetBlockHash());
+                        state.nLastTimeSendingGetBlocks = GetTimeMicros();
                     }
                 }
 
