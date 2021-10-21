@@ -5620,7 +5620,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
             // TODO: improve the logic to detect stalling initial-headers-sync peer
             if (inv.type == MSG_BLOCK) {
                 UpdateBlockAvailability(pfrom->GetId(), inv.hash);
-                if (!fAlreadyHave && !mapBlocksInFlight.count(inv.hash) && ((pindexBestHeader->GetBlockTime() > GetAdjustedTime() - 24 * 60 * 60) || (pindexBestHeader->nHeight == 0))) {
+                if (!fAlreadyHave && !mapBlocksInFlight.count(inv.hash) && ((pindexBestHeader->GetBlockTime() > GetAdjustedTime() - 24 * 60 * 60) || (pindexBestHeader->nHeight == 0 && nSyncStarted == 0))) {
                     // First request the headers preceeding the announced block. In the normal fully-synced
                     // case where a new block is announced that succeeds the current tip (no reorganization),
                     // there are no such headers.
@@ -6611,6 +6611,13 @@ bool SendMessages(CNode *pto, bool fSendTrickle)
                 state.nHeadersSyncTimeout = std::numeric_limits<int64_t>::max();
             }
         }
+
+        // Check for block sync timeouts
+        if (!pto->fDisconnect && state.vBlocksInFlight.size() > 0 && (state.vBlocksInFlight.front().nTime + BLOCK_DOWNLOAD_TIMEOUT_BASE) < nNow && pto->vRecv.empty()) {
+            printf("Timeout downloading block %s from peer=%d, disconnecting\n", state.vBlocksInFlight.front().hash.ToString().c_str(), pto->addrName.c_str());
+            pto->fDisconnect = true;
+        }
+
         //
         // Message: getdata (blocks)
         //
