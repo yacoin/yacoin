@@ -3831,6 +3831,9 @@ bool CBlockHeader::AcceptBlockHeader(CValidationState &state,
         return true;
     }
 
+    if (!CheckBlockHeader(state, true))
+        return false;
+
     // Get prev block index
     map<uint256, CBlockIndex *>::iterator mi = mapBlockIndex.find(hashPrevBlock);
     if (mi == mapBlockIndex.end())
