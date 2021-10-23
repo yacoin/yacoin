@@ -6625,11 +6625,11 @@ bool SendMessages(CNode *pto, bool fSendTrickle)
                     // disconnect our sync peer for stalling; we have bigger
                     // problems if we can't get any outbound peers.
                     if (pto->fInbound) {
-                        printf("Timeout downloading headers from inbound peer=%d, disconnecting\n", pto->addrName.c_str());
+                        printf("Timeout downloading headers from inbound peer=%s, disconnecting\n", pto->addrName.c_str());
                         pto->fDisconnect = true;
                         return true;
                     } else {
-                        printf("Timeout downloading headers from outbound peer=%d, not disconnecting\n", pto->addrName.c_str());
+                        printf("Timeout downloading headers from outbound peer=%s, not disconnecting\n", pto->addrName.c_str());
                         // Reset the headers sync state so that we have a
                         // chance to try downloading from a different peer.
                         // Note: this will also result in at least one more
