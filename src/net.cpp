@@ -981,6 +981,25 @@ void ThreadSocketHandler2(void *parg)
             updatePreviousNodecountIf(vNodes, nPrevNodeCount);
         }
 
+        // Update median starting height of all connected peers
+        {
+            // Disconnect unused nodes
+            vector<CNode *> vNodesCopy = vNodes;
+
+            if (vNodesCopy.size() > 0)
+            {
+                ::int32_t startingHeight[vNodesCopy.size()];
+                ::int32_t nodeCounter = 0;
+
+                BOOST_FOREACH (CNode *pnode, vNodesCopy)
+                {
+                    startingHeight[nodeCounter] = pnode->nStartingHeight;
+                    nodeCounter++;
+                }
+                std::sort(startingHeight, startingHeight + nodeCounter);
+                nMedianStartingHeight = startingHeight[nodeCounter/2];
+            }
+        }
         //
         // Find which sockets have data to receive
         //

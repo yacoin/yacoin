@@ -195,6 +195,8 @@ set<CBlockIndex*, CBlockIndexWorkComparator> setBlockIndexCandidates; // may con
 CBlockIndex *pindexBestHeader = NULL;
 // Number of nodes with fSyncStarted.
 int nSyncStarted = 0;
+// Median starting height of all connected peers.
+int nMedianStartingHeight = 0;
 // All pairs A->B, where A (or one if its ancestors) misses transactions, but B has transactions.
 multimap<CBlockIndex*, CBlockIndex*> mapBlocksUnlinked;
 ::int64_t nTimeBestReceived = 0;
@@ -5641,7 +5643,12 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
             // TODO: improve the logic to detect stalling initial-headers-sync peer
             if (inv.type == MSG_BLOCK) {
                 UpdateBlockAvailability(pfrom->GetId(), inv.hash);
-                if (!fAlreadyHave && !mapBlocksInFlight.count(inv.hash) && ((pindexBestHeader->GetBlockTime() > GetAdjustedTime() - 24 * 60 * 60) || (pindexBestHeader->nHeight == 0 && nSyncStarted == 0))) {
+                // When receiving "inv" message, we only send "getheaders" to get new block headers and "getdata" to get new block data if
+                // 1) The node isn't in initial-block sync. It means that the best header must be closed to today, within 48 hours.
+                //    I choose 48 hours here to avoid any problem happens (connection timeout, ...) at the time the node transits from "initial-block sync" to "nearly synced completely"
+                //    If there is any problems which make the node can't sync latest headers/blocks from other peers, the node can continue to sync headers/blocks when it receives "inv" messages from other peers
+                // 2) The node is at the beginning of initial-block-sync (pindexBestHeader->nHeight == 0 && nSyncStarted == 0)
+                if (!fAlreadyHave && !mapBlocksInFlight.count(inv.hash) && ((pindexBestHeader->GetBlockTime() > GetAdjustedTime() - 48 * 60 * 60) || (pindexBestHeader->nHeight == 0 && nSyncStarted == 0))) {
                     // First request the headers preceeding the announced block. In the normal fully-synced
                     // case where a new block is announced that succeeds the current tip (no reorganization),
                     // there are no such headers.
@@ -5651,7 +5658,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
                     // doing this will result in the received block being rejected as an orphan in case it is
                     // not a direct successor.
                     pfrom->PushMessage("getheaders", chainActive.GetLocator(pindexBestHeader), inv.hash);
-                    if (chainActive.Tip()->GetBlockTime() > GetAdjustedTime() - 24 * 60 * 60) {
+                    if (chainActive.Tip()->GetBlockTime() > GetAdjustedTime() - 48 * 60 * 60) {
                         vToFetch.push_back(inv);
                         // Mark block as in flight already, even though the actual "getdata" message only goes out
                         // later (within the same cs_main lock, though).
@@ -6024,7 +6031,14 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
         if (pindexLast)
             UpdateBlockAvailability(pfrom->GetId(), pindexLast->GetBlockHash());
 
-        if (nCount == MAX_HEADERS_RESULTS && pindexLast) {
+        // During initial block sync, if this node has starting height < nMedianStartingHeight, we should stop syncing headers from it.
+        if ((pindexBestHeader->GetBlockTime() < GetAdjustedTime() - 24 * 60 * 60) && (pfrom->nStartingHeight < nMedianStartingHeight))
+        {
+            state.fSyncStarted = false;
+            nSyncStarted--;
+            state.nHeadersSyncTimeout = 0;
+        }
+        else if (nCount == MAX_HEADERS_RESULTS && pindexLast) {
             // Headers message had its maximum size; the peer may have more headers.
             // TODO: optimize: if pindexLast is an ancestor of chainActive.Tip or pindexBestHeader, continue
             // from there instead.
@@ -6520,7 +6534,7 @@ bool SendMessages(CNode *pto, bool fSendTrickle)
         bool fFetch = true;
         if (!state.fSyncStarted && !pto->fClient && fFetch) {
             // Only actively request headers from a single peer, unless we're close to today.
-            if (nSyncStarted == 0 || pindexBestHeader->GetBlockTime() > GetAdjustedTime() - 24 * 60 * 60) {
+            if ((nSyncStarted == 0 && pto->nStartingHeight >= nMedianStartingHeight) || pindexBestHeader->GetBlockTime() > GetAdjustedTime() - 24 * 60 * 60) {
                 state.fSyncStarted = true;
                 state.nHeadersSyncTimeout = GetTimeMicros() + HEADERS_DOWNLOAD_TIMEOUT_BASE;
                 nSyncStarted++;

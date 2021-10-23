@@ -354,7 +354,6 @@ public:
         fGetAddr = false;
         hashCheckpointKnown = 0;
         setInventoryKnown.max_size((size_t)SendBufferSize() / 1000);
-
         {
             LOCK(cs_nLastNodeId);
             id = nLastNodeId++;
