@@ -596,5 +596,23 @@ inline ::uint64_t ByteReverse_64bit(::uint64_t value)
 	value = (value & 0x00FF00FF00FF00FF) << 8  | (value & 0xFF00FF00FF00FF00) >> 8;
 	return value;
 }
+
+struct Timestamp
+{
+    Timestamp() {mValue = 0;};
+    void stamp();
+    uint64_t getValue() const;
+private:
+    uint64_t mValue;
+};
+
+struct MeasureTime
+{
+    MeasureTime();
+    Timestamp mStart;
+    Timestamp mEnd;
+
+    uint64_t getExecutionTime() const;
+};
 #endif
 

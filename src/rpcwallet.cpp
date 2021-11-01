@@ -82,8 +82,8 @@ void LockTimeRedeemScriptToJSON(const CScript& redeemScript, txnouttype type, Ob
     bool isTimeBasedLock = false;
     std::string redeemScriptFormat = redeemScript.ToString();
 
-    out.push_back(Pair("RedeemScript hex", HexStr(redeemScript.begin(), redeemScript.end())));
-    out.push_back(Pair("RedeemScript format", redeemScriptFormat));
+    out.push_back(Pair("RedeemScriptHex", HexStr(redeemScript.begin(), redeemScript.end())));
+    out.push_back(Pair("RedeemScriptFormat", redeemScriptFormat));
 
     // Get locktime and public key
     std::string delimiter = " ";
@@ -100,13 +100,13 @@ void LockTimeRedeemScriptToJSON(const CScript& redeemScript, txnouttype type, Ob
         }
         redeemScriptFormat.erase(0, pos + delimiter.length());
     }
-    out.push_back(Pair("Public key", data));
+    out.push_back(Pair("PublicKey", data));
 
     // Convert to address
     CScriptID redeemScriptID = redeemScript.GetID();
     if (type == TX_CLTV)
     {
-        addressType += "cltv address";
+        addressType += "CltvAddress";
         if (nLockTime < LOCKTIME_THRESHOLD)
         {
             std::stringstream ss;
@@ -122,7 +122,7 @@ void LockTimeRedeemScriptToJSON(const CScript& redeemScript, txnouttype type, Ob
     }
     else // TX_CSV
     {
-        addressType += "csv address";
+        addressType += "CsvAddress";
         if (nLockTime & CTxIn::SEQUENCE_LOCKTIME_TYPE_FLAG)
         {
             std::stringstream ss;
@@ -138,7 +138,7 @@ void LockTimeRedeemScriptToJSON(const CScript& redeemScript, txnouttype type, Ob
             isTimeBasedLock = false;
         }
     }
-    out.push_back(Pair("Lock type", isTimeBasedLock ? "Time-based lock" : "Block-based lock"));
+    out.push_back(Pair("LockType", isTimeBasedLock ? "Time-based lock" : "Block-based lock"));
     out.push_back(Pair(addressType, CBitcoinAddress(redeemScriptID).ToString()));
     out.push_back(Pair("Description", "This is a redeemscript of " + addressType + "."
                                     + " Any coins sent to this " + addressType + " will be " + lockCondition + "."

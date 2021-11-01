@@ -121,6 +121,7 @@ bool scrypt_hash(
                  unsigned char Nfactor
                 )
 {
+    MeasureTime scryptHash;
     if(
        0 != scrypt(
                    (const unsigned char *)input,
@@ -134,7 +135,15 @@ bool scrypt_hash(
                    32
                   )
       )
+    {
+        scryptHash.mEnd.stamp();
+        printf("scrypt_hash(): Total time = %lu (us), Nfactor = %d\n",
+                scryptHash.getExecutionTime(), Nfactor);
         return true;
+    }
+    scryptHash.mEnd.stamp();
+    printf("scrypt_hash(): Total time = %lu (us), Nfactor = %d\n",
+            scryptHash.getExecutionTime(), Nfactor);
     return false;
 }
 
@@ -281,7 +290,7 @@ const ::uint32_t
         {            
             return 0;
         }
-        ++hash_count;
+         ++hash_count;
         // Hash target can't be smaller than bnProofOfWorkLimit which is 00000fffff000000
         if (            
             ( 0 == ( hashc[31]))

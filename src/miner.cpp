@@ -899,8 +899,17 @@ bool CheckWork(CBlock* pblock, CWallet& wallet, CReserveKey& reservekey)
         }
 
         // Process this block the same as if we had received it from another node
+        MeasureTime processBlock;
         if (!ProcessBlock(NULL, pblock))
+        {
+            processBlock.mEnd.stamp();
+            printf("CheckWork(), total time for ProcessBlock = %lu us\n",
+                    processBlock.getExecutionTime());
             return error("CheckWork () : ProcessBlock, block not accepted");
+        }
+        processBlock.mEnd.stamp();
+        printf("CheckWork(), total time for ProcessBlock = %lu us\n",
+                processBlock.getExecutionTime());
     }
 
     return true;
@@ -954,8 +963,17 @@ bool CheckStake(CBlock* pblock, CWallet& wallet)
         }
 
         // Process this block the same as if we had received it from another node
+        MeasureTime processBlock;
         if (!ProcessBlock(NULL, pblock))
+        {
+            processBlock.mEnd.stamp();
+            printf("CheckStake(), total time for ProcessBlock = %lu us\n",
+                    processBlock.getExecutionTime());
             return error("CheckStake() : ProcessBlock, block not accepted");
+        }
+        processBlock.mEnd.stamp();
+        printf("CheckStake(), total time for ProcessBlock = %lu us\n",
+                processBlock.getExecutionTime());
     }
 
     return true;
