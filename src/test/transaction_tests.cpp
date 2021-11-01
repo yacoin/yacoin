@@ -66,8 +66,8 @@ BOOST_AUTO_TEST_CASE(tx_valid)
             CDataStream stream(ParseHex(transaction), SER_NETWORK, PROTOCOL_VERSION);
             CTransaction tx;
             stream >> tx;
-
-                BOOST_CHECK_MESSAGE(tx.CheckTransaction(), strTest);
+            CValidationState state;
+                BOOST_CHECK_MESSAGE(tx.CheckTransaction(state), strTest);
 
             for (unsigned int i = 0; i < tx.vin.size(); i++)
             {
@@ -135,8 +135,8 @@ BOOST_AUTO_TEST_CASE(tx_invalid)
             CDataStream stream(ParseHex(transaction), SER_NETWORK, PROTOCOL_VERSION);
             CTransaction tx;
             stream >> tx;
-
-            fValid = tx.CheckTransaction();
+            CValidationState state;
+            fValid = tx.CheckTransaction(state);
 
             for (unsigned int i = 0; i < tx.vin.size() && fValid; i++)
             {
@@ -162,7 +162,8 @@ BOOST_AUTO_TEST_CASE(basic_transaction_tests)
     CDataStream stream(vch, SER_DISK, CLIENT_VERSION);
     CTransaction tx;
     stream >> tx;
-    BOOST_CHECK_MESSAGE(tx.CheckTransaction(), "Simple deserialized transaction should be valid.");
+    CValidationState state;
+    BOOST_CHECK_MESSAGE(tx.CheckTransaction(state), "Simple deserialized transaction should be valid.");
 
     // Check that duplicate txins fail
     tx.vin.push_back(tx.vin[0]);

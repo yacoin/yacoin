@@ -153,6 +153,8 @@ Value getpeerinfo(const Array& params, bool fHelp)
     BOOST_FOREACH(const CNodeStats& stats, vstats) {
         Object obj;
 
+        CNodeStateStats statestats;
+        bool fStateStats = GetNodeStateStats(stats.nodeid, statestats);
         obj.push_back(Pair("addr", stats.addrName));
         obj.push_back(Pair("services", strprintf("%08" PRIx64, stats.nServices)));
       //obj.push_back(Pair("lastsend", (boost::int64_t)stats.nLastSend));
@@ -168,9 +170,16 @@ Value getpeerinfo(const Array& params, bool fHelp)
         obj.push_back(Pair("inbound", stats.fInbound));
         obj.push_back(Pair("releasetime", (boost::int64_t)stats.nReleaseTime));
         obj.push_back(Pair("startingheight", stats.nStartingHeight));
-        obj.push_back(Pair("banscore", stats.nMisbehavior));
-        if (stats.fSyncNode)
-            obj.push_back(Pair("syncnode", true));
+        if (fStateStats) {
+            obj.push_back(Pair("banscore", statestats.nMisbehavior));
+            obj.push_back(Pair("synced_headers", statestats.nSyncHeight));
+            obj.push_back(Pair("synced_blocks", statestats.nCommonHeight));
+            Array heights;
+            BOOST_FOREACH(int height, statestats.vHeightInFlight) {
+                heights.push_back(height);
+            }
+            obj.push_back(Pair("inflight", heights));
+        }
         ret.push_back(obj);
     }
     Object 

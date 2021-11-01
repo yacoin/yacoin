@@ -45,6 +45,12 @@ static const int PROTOCOL_VERSION = 60009;
 // earlier versions not supported as of Feb 2012, and are disconnected
 static const int MIN_PROTO_VERSION = 209;
 
+// In this version, 'getheaders' was introduced.
+static const int GETHEADERS_VERSION = 31800;
+
+// disconnect from peers older than this proto version
+static const int MIN_PEER_PROTO_VERSION = GETHEADERS_VERSION;
+
 // disconnect buggy clients
 static const int MIN_PEER_BUGGY_VERSION = 60006;
 

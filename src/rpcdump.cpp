@@ -72,7 +72,7 @@ Value importprivkey(const Array& params, bool fHelp)
         if (!pwalletMain->AddKey(key))
             throw JSONRPCError(RPC_WALLET_ERROR, "Error adding key to wallet");
 
-        pwalletMain->ScanForWalletTransactions(pindexGenesisBlock, true);
+        pwalletMain->ScanForWalletTransactions(chainActive.Genesis(), true);
         pwalletMain->ReacceptWalletTransactions();
     }
 
@@ -125,7 +125,7 @@ Value importaddress(const Array& params, bool fHelp)
 
         if (fRescan)
         {
-            pwalletMain->ScanForWalletTransactions(pindexGenesisBlock, true);
+            pwalletMain->ScanForWalletTransactions(chainActive.Genesis(), true);
             pwalletMain->ReacceptWalletTransactions();
         }
     }

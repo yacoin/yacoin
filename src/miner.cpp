@@ -144,10 +144,10 @@ public:
     {
         if(
             false 
-            //((pindexBest->nTime < YACOIN_NEW_LOGIC_SWITCH_TIME) && !fTestNet )
+            //((chainActive.Tip()->nTime < YACOIN_NEW_LOGIC_SWITCH_TIME) && !fTestNet )
           )
         {
-            SetMockTime( (int64_t)(pindexBest->nTime + nOneMinuteInSeconds) );
+            SetMockTime( (int64_t)(chainActive.Tip()->nTime + nOneMinuteInSeconds) );
         }
     }
 
@@ -155,7 +155,7 @@ public:
     {
         if(
             false 
-            //((pindexBest->nTime < YACOIN_NEW_LOGIC_SWITCH_TIME) && !fTestNet )
+            //((chainActive.Tip()->nTime < YACOIN_NEW_LOGIC_SWITCH_TIME) && !fTestNet )
           )
         {
             SetMockTime( 0 );   // restores time to now
@@ -179,7 +179,7 @@ CBlock* CreateNewBlock(CWallet* pwallet, bool fProofOfStake)
     {
       //pblock->nVersion = CBlock::VERSION_of_block_for_yac_044_old;
     	// TODO: Need update for mainet
-    	if (pindexGenesisBlock && (nBestHeight + 1) >= nMainnetNewLogicBlockNumber)
+    	if (chainActive.Genesis() && (chainActive.Height() + 1) >= nMainnetNewLogicBlockNumber)
     	{
             pblock->nVersion = VERSION_of_block_for_yac_05x_new;
     	}
@@ -221,12 +221,12 @@ CBlock* CreateNewBlock(CWallet* pwallet, bool fProofOfStake)
         nMinTxFee = MIN_TX_FEE;
 
     CBlockIndex
-        * pindexPrev = pindexBest;
+        * pindexPrev = chainActive.Tip();
 /*********************/
     // ppcoin: if coinstake available add coinstake tx
     static ::int64_t 
         nLastCoinStakeSearchTime = GetAdjustedTime();  // only initialized at startup
-    //CBlockIndex* pindexPrev = pindexBest;
+    //CBlockIndex* pindexPrev = chainActive.Tip();
 
     if (fProofOfStake)  // attempt to find a coinstake
     {
@@ -300,7 +300,7 @@ CBlock* CreateNewBlock(CWallet* pwallet, bool fProofOfStake)
         {
             LOCK2(cs_main, mempool.cs);
             CBlockIndex
-                * pindexPrev = pindexBest;
+                * pindexPrev = chainActive.Tip();
             const int nHeight = pindexPrev->nHeight + 1;
             CTxDB 
                 txdb("r");
@@ -463,7 +463,8 @@ CBlock* CreateNewBlock(CWallet* pwallet, bool fProofOfStake)
                     mapInputs;
                 bool 
                     fInvalid;
-                if (!tx.FetchInputs(txdb, mapTestPoolTmp, false, true, mapInputs, fInvalid))
+                CValidationState state;
+                if (!tx.FetchInputs(state, txdb, mapTestPoolTmp, false, true, mapInputs, fInvalid))
                     continue;
 
                 ::int64_t 
@@ -473,7 +474,7 @@ CBlock* CreateNewBlock(CWallet* pwallet, bool fProofOfStake)
                 if ((nBlockSigOps + nTxSigOps) >= GetMaxSize(MAX_BLOCK_SIGOPS))
                     continue;
 
-                if (!tx.ConnectInputs(txdb, mapInputs, mapTestPoolTmp, CDiskTxPos(1,1,1), pindexPrev, false, true))
+                if (!tx.ConnectInputs(state, txdb, mapInputs, mapTestPoolTmp, CDiskTxPos(1,1,1), pindexPrev, false, true))
                     continue;
                 mapTestPoolTmp[tx.GetHash()] = CTxIndex(CDiskTxPos(1,1,1), tx.vout.size());
                 swap(mapTestPool, mapTestPoolTmp);
@@ -544,7 +545,7 @@ CBlock* CreateNewBlock(CWallet* pwallet, bool fProofOfStake)
     {
         LOCK2(cs_main, mempool.cs);
         CBlockIndex
-            * pindexPrev = pindexBest;
+            * pindexPrev = chainActive.Tip();
         const int nHeight = pindexPrev->nHeight + 1;
         CTxDB 
             txdb("r");
@@ -676,7 +677,8 @@ CBlock* CreateNewBlock(CWallet* pwallet, bool fProofOfStake)
             map<uint256, CTxIndex> mapTestPoolTmp(mapTestPool);
             MapPrevTx mapInputs;
             bool fInvalid;
-            if (!tx.FetchInputs(txdb, mapTestPoolTmp, false, true, mapInputs, fInvalid))
+            CValidationState state;
+            if (!tx.FetchInputs(state, txdb, mapTestPoolTmp, false, true, mapInputs, fInvalid))
                 continue;
 
             int64_t nTxFees = tx.GetValueIn(mapInputs)-tx.GetValueOut();
@@ -685,7 +687,7 @@ CBlock* CreateNewBlock(CWallet* pwallet, bool fProofOfStake)
             if (nBlockSigOps + nTxSigOps >= GetMaxSize(MAX_BLOCK_SIGOPS))
                 continue;
 
-            if (!tx.ConnectInputs(txdb, mapInputs, mapTestPoolTmp, CDiskTxPos(1,1,1), pindexPrev, false, true, true, MANDATORY_SCRIPT_VERIFY_FLAGS))
+            if (!tx.ConnectInputs(state, txdb, mapInputs, mapTestPoolTmp, CDiskTxPos(1,1,1), pindexPrev, false, true, true, MANDATORY_SCRIPT_VERIFY_FLAGS))
                 continue;
             mapTestPoolTmp[tx.GetHash()] = CTxIndex(CDiskTxPos(1,1,1), tx.vout.size());
             swap(mapTestPool, mapTestPoolTmp);
@@ -888,34 +890,34 @@ bool CheckWork(CBlock* pblock, CWallet& wallet, CReserveKey& reservekey)
         LOCK(cs_main);
         if (pblock->hashPrevBlock != hashBestChain)
             return error("CheckWork () : generated block is stale");
+    }
+    // Remove key from key pool
+    reservekey.KeepKey();
 
-        // Remove key from key pool
-        reservekey.KeepKey();
+    // Track how many getdata requests this block gets
+    {
+        LOCK(wallet.cs_wallet);
+        wallet.mapRequestCount[hashBlock] = 0;
+    }
 
-        // Track how many getdata requests this block gets
-        {
-            LOCK(wallet.cs_wallet);
-            wallet.mapRequestCount[hashBlock] = 0;
-        }
-
-        // Process this block the same as if we had received it from another node
-        MeasureTime processBlock;
-        if (!ProcessBlock(NULL, pblock))
-        {
-            processBlock.mEnd.stamp();
-            printf("CheckWork(), total time for ProcessBlock = %lu us\n",
-                    processBlock.getExecutionTime());
-            return error("CheckWork () : ProcessBlock, block not accepted");
-        }
+    // Process this block the same as if we had received it from another node
+    MeasureTime processBlock;
+    CValidationState state;
+    if (!ProcessBlock(state, NULL, pblock))
+    {
         processBlock.mEnd.stamp();
         printf("CheckWork(), total time for ProcessBlock = %lu us\n",
                 processBlock.getExecutionTime());
+        return error("CheckWork () : ProcessBlock, block not accepted");
     }
+    processBlock.mEnd.stamp();
+    printf("CheckWork(), total time for ProcessBlock = %lu us\n",
+            processBlock.getExecutionTime());
 
     return true;
 }
 
-bool CheckStake(CBlock* pblock, CWallet& wallet)
+bool CheckStake(CValidationState& state, CBlock* pblock, CWallet& wallet)
 {
     uint256 
         proofHash = 0, 
@@ -936,7 +938,7 @@ bool CheckStake(CBlock* pblock, CWallet& wallet)
     }
 
     // verify hash target and signature of coinstake tx
-    if (!CheckProofOfStake(pblock->vtx[1], pblock->nBits, proofHash, hashTarget))
+    if (!CheckProofOfStake(state, pblock->vtx[1], pblock->nBits, proofHash, hashTarget))
         return error("CheckStake() : proof-of-stake checking failed");
 
     //// debug print
@@ -964,7 +966,7 @@ bool CheckStake(CBlock* pblock, CWallet& wallet)
 
         // Process this block the same as if we had received it from another node
         MeasureTime processBlock;
-        if (!ProcessBlock(NULL, pblock))
+        if (!ProcessBlock(state, NULL, pblock))
         {
             processBlock.mEnd.stamp();
             printf("CheckStake(), total time for ProcessBlock = %lu us\n",
@@ -991,7 +993,7 @@ void StakeMinter(CWallet *pwallet)
 
     while (true)
     {
-        if (fShutdown || (pindexBest && pindexBest->nHeight + 1 >= nMainnetNewLogicBlockNumber))
+        if (fShutdown || (chainActive.Tip() && chainActive.Tip()->nHeight + 1 >= nMainnetNewLogicBlockNumber))
             return;
 
         while (pwallet->IsLocked())
@@ -1007,7 +1009,7 @@ void StakeMinter(CWallet *pwallet)
                 vNodes.empty() 
                 //&& !fTestNet      //TestNet can mint stand alone!
                )
-               //|| (fTestNet && (pindexBest->nHeight < nCoinbaseMaturity))
+               //|| (fTestNet && (chainActive.Tip()->nHeight < nCoinbaseMaturity))
               )
         {
             Sleep(1000);
@@ -1018,7 +1020,7 @@ void StakeMinter(CWallet *pwallet)
         // to temporarily stop mining
         //continue;
         CBlockIndex
-            * pindexPrev = pindexBest;
+            * pindexPrev = chainActive.Tip();
 
         if ( fUseOld044Rules )
         {                                                   // behave as previously
@@ -1051,8 +1053,9 @@ void StakeMinter(CWallet *pwallet)
         // Trying to sign a block
             if (pblock->SignBlock(*pwallet))
             {
+                CValidationState state;
                 SetThreadPriority(THREAD_PRIORITY_NORMAL);
-                if( CheckStake(pblock.get(), *pwallet) )
+                if( CheckStake(state, pblock.get(), *pwallet) )
                 {
                     printf(
                            "\nCPUMinter : proof-of-stake block found "
@@ -1087,7 +1090,7 @@ bool
     check_for_stop_mining( CBlockIndex *pindexPrev )
 {
     if (
-        (pindexPrev != pindexBest) ||
+        (pindexPrev != chainActive.Tip()) ||
         !fGenerateBitcoins ||
         fShutdown
        )
@@ -1160,7 +1163,7 @@ static void YacoinMiner(CWallet *pwallet)  // here fProofOfStake is always false
             nTransactionsUpdatedLast = nTransactionsUpdated;
 
         CBlockIndex
-            * pindexPrev = pindexBest;
+            * pindexPrev = chainActive.Tip();
 
         auto_ptr<CBlock> 
             pblock(CreateNewBlock(pwallet, false));

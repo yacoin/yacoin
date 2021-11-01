@@ -214,8 +214,7 @@ Value getinfo(const Array& params, bool fHelp)
     obj.push_back(Pair("unspendable",   ValueFromAmount(pwalletMain->GetWatchOnlyBalance())));
     obj.push_back(Pair("newmint",       ValueFromAmount(pwalletMain->GetNewMint())));
     obj.push_back(Pair("stake",         ValueFromAmount(pwalletMain->GetStake())));
-    obj.push_back(Pair("blocks",        (int)nBestHeight));
-    obj.push_back(Pair("posblocks",     (int)pindexBest->nPosBlockCount));
+    obj.push_back(Pair("blocks",        (int)chainActive.Height()));
     obj.push_back(Pair("timeoffset",    (boost::int64_t)GetTimeOffset()));
 
     ::int64_t
@@ -226,13 +225,13 @@ Value getinfo(const Array& params, bool fHelp)
 
     obj.push_back(Pair("up-time",       sUpTime));
 
-    obj.push_back(Pair("moneysupply",   ValueFromAmount(pindexBest->nMoneySupply)));
+    obj.push_back(Pair("moneysupply",   ValueFromAmount(chainActive.Tip()->nMoneySupply)));
     obj.push_back(Pair("connections",   (int)vNodes.size()));
     obj.push_back(Pair("proxy",         (proxy.first.IsValid() ? proxy.first.ToStringIPPort() : string())));
     obj.push_back(Pair("ip",            addrSeenByPeer.ToStringIP()));
 
     diff.push_back(Pair("proof-of-work",  GetDifficulty()));
-    diff.push_back(Pair("proof-of-stake", GetDifficulty(GetLastBlockIndex(pindexBest, true))));
+    diff.push_back(Pair("proof-of-stake", GetDifficulty(GetLastBlockIndex(chainActive.Tip(), true))));
     obj.push_back(Pair("difficulty",    diff));
 
     obj.push_back(Pair("testnet",       fTestNet));
@@ -1768,7 +1767,9 @@ Value listsinceblock(const Array& params, bool fHelp)
             blockId = 0;
 
         blockId.SetHex(params[0].get_str());
-        pindex = CBlockLocator(blockId).GetBlockIndex();
+        std::map<uint256, CBlockIndex*>::iterator it = mapBlockIndex.find(blockId);
+        if (it != mapBlockIndex.end())
+            pindex = it->second;
     }
 
     if (params.size() > 1)
@@ -1784,7 +1785,7 @@ Value listsinceblock(const Array& params, bool fHelp)
             filter = filter | MINE_WATCH_ONLY;
 
     int 
-        depth = pindex ? (1 + nBestHeight - pindex->nHeight) : -1;
+        depth = pindex ? (1 + chainActive.Height() - pindex->nHeight) : -1;
 
     Array 
         transactions;
@@ -1815,11 +1816,11 @@ Value listsinceblock(const Array& params, bool fHelp)
     else
     {
         int 
-            target_height = pindexBest->nHeight + 1 - target_confirms;
+            target_height = chainActive.Tip()->nHeight + 1 - target_confirms;
 
         CBlockIndex 
             *block;
-        for (block = pindexBest;
+        for (block = chainActive.Tip();
              block && block->nHeight > target_height;
              block = block->pprev
             )  
@@ -1897,7 +1898,7 @@ Value gettransaction(const Array& params, bool fHelp)
                 {
                     CBlockIndex* pindex = (*mi).second;
                     if (pindex->IsInMainChain())
-                        entry.push_back(Pair("confirmations", 1 + nBestHeight - pindex->nHeight));
+                        entry.push_back(Pair("confirmations", 1 + chainActive.Height() - pindex->nHeight));
                     else
                         entry.push_back(Pair("confirmations", 0));
                 }

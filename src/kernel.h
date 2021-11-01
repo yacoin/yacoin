@@ -76,7 +76,7 @@ bool ScanForStakeKernelHash(MetaMap &mapMeta, ::uint32_t nBits, ::uint32_t nTime
 
 // Check kernel hash target and coinstake signature
 // Sets hashProofOfStake on success return
-bool CheckProofOfStake(const CTransaction& tx, unsigned int nBits, uint256& hashProofOfStake, uint256& targetProofOfStake);
+bool CheckProofOfStake(CValidationState &state, const CTransaction& tx, unsigned int nBits, uint256& hashProofOfStake, uint256& targetProofOfStake);
 
 // Get stake modifier checksum
 ::uint32_t GetStakeModifierChecksum(const CBlockIndex* pindex);
