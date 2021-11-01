@@ -1212,7 +1212,7 @@ static const CRPCCommand vRPCCommands[] =
     { "help",                   &help,                   true,   false },
     { "stop",                   &stop,                   true,   true  },
     { "getbestblockhash",       &getbestblockhash,       true,   false },
-    { "getblockchaininfo",      &getblockchaininfo,       true,   false },
+    { "gettimechaininfo",       &gettimechaininfo,       true,   false },
     { "getblockcount",          &getblockcount,          true,   false },
     { "getwalletinfo",          &getwalletinfo,          true,   false },
     { "getrpcinfo",             &getrpcinfo,             true,   false },

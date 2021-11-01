@@ -170,11 +170,11 @@ Value getbestblockhash(const Array& params, bool fHelp)
     return hashBestChain.GetHex();
 }
 
-Value getblockchaininfo(const Array& params, bool fHelp)
+Value gettimechaininfo(const Array& params, bool fHelp)
 {
     if (fHelp || params.size() != 0)
         throw runtime_error(
-            "getblockchaininfo\n"
+            "gettimechaininfo\n"
             "Returns an object containing various state info regarding block chain processing.\n"
             "\nResult:\n"
             "{\n"
