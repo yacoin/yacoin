@@ -5992,25 +5992,33 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
             return true;
         }
 
-        CBlockIndex *pindexLast = NULL;
+        // Calculate header hash
         BOOST_FOREACH(CBlock& header, headers) {
             // SHA256 doesn't cost much cpu usage to calculate
-            uint256 blockHash;
             uint256 blockSHA256Hash = header.GetSHA256Hash();
+
             map<uint256, uint256>::iterator mi = mapHash.find(blockSHA256Hash);
             if (mi != mapHash.end())
             {
-                uint256 blockHash = (*mi).second;
-                printf("Already have header %s (sha256: %s)\n", blockHash.ToString().c_str(), blockSHA256Hash.ToString().c_str());
-                std::map<uint256, CBlockIndex *>::iterator miBlockIndex = mapBlockIndex.find(blockHash);
-                pindexLast = miBlockIndex->second;
-                continue;
+                header.blockHash = (*mi).second;
+                printf("Already have header %s (sha256: %s)\n", header.blockHash.ToString().c_str(), blockSHA256Hash.ToString().c_str());
             }
-            else
+
+            if (header.blockHash == 0)
             {
-                blockHash = header.GetHash();
+                uint256 blockHash = header.GetHash();
                 printf("Received header %s (sha256: %s) from node %s\n", blockHash.ToString().c_str(), blockSHA256Hash.ToString().c_str(), pfrom->addrName.c_str());
                 mapHash.insert(make_pair(blockSHA256Hash, blockHash));
+            }
+        }
+
+        CBlockIndex *pindexLast = NULL;
+        BOOST_FOREACH(CBlock& header, headers) {
+            std::map<uint256, CBlockIndex *>::iterator miBlockIndex = mapBlockIndex.find(header.GetHash());
+            if (miBlockIndex != mapBlockIndex.end())
+            {
+                pindexLast = miBlockIndex->second;
+                continue;
             }
 
             CValidationState state;
