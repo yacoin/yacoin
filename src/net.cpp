@@ -2816,6 +2816,7 @@ bool StopNode()
     {
         LOCK(cs_main);
         ThreadScriptCheckQuit();
+        ThreadHashCalculationQuit();
     }
     if (semOutbound)
     {
@@ -2873,9 +2874,13 @@ bool StopNode()
     if (vnThreadsRunning[THREAD_SCRIPTCHECK] > 0)
         printf("ThreadScriptCheck still running\n");
 
+    if (vnThreadsRunning[THREAD_HASHCALCULATION] > 0)
+        printf("ThreadHashCalculation still running\n");
+
     while ((vnThreadsRunning[THREAD_MESSAGEHANDLER] > 0) ||
            (vnThreadsRunning[THREAD_RPCHANDLER] > 0) ||
            (vnThreadsRunning[THREAD_SCRIPTCHECK] > 0) ||
+           (vnThreadsRunning[THREAD_HASHCALCULATION] > 0) ||
            (vnThreadsRunning[THREAD_ADDEDCONNECTIONS] > 0))
         // Sleep(20);      // again, related to above?  Or not? Or ...???
         Sleep(2 * nTenMilliseconds); // again, related to above?  Or not? Or ...???

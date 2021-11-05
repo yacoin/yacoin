@@ -313,10 +313,12 @@ bool LoadExternalBlockFile(FILE* fileIn);
 
 // Run an instance of the script checking thread
 void ThreadScriptCheck(void* parg);
-// Run an instance of the hash calculation thread
-void ThreadHashCalculation(void* parg);
 // Stop the script checking threads
 void ThreadScriptCheckQuit();
+// Run an instance of the hash calculation thread
+void ThreadHashCalculation(void* parg);
+// Stop the hash calculation threads
+void ThreadHashCalculationQuit();
 
 bool CheckProofOfWork(uint256 hash, unsigned int nBits);
 unsigned int GetNextTargetRequired(const CBlockIndex* pindexLast, bool fProofOfStake);
