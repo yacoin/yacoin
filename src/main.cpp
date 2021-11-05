@@ -133,6 +133,7 @@ CTxMemPool mempool;
 unsigned int nTransactionsUpdated = 0;
 
 map<uint256, CBlockIndex*> mapBlockIndex;
+boost::mutex mapHashmutex;
 map<uint256, uint256> mapHash;
 // are all of these undocumented numbers a function of Nfactor?  Cpu power? Other???
 #ifndef LOW_DIFFICULTY_FOR_DEVELOPMENT
@@ -201,6 +202,7 @@ int nMedianStartingHeight = 0;
 multimap<CBlockIndex*, CBlockIndex*> mapBlocksUnlinked;
 ::int64_t nTimeBestReceived = 0;
 int nScriptCheckThreads = 0;
+int nHashCalcThreads = 0;
 
 CMedianFilter<int> cPeerBlockCounts(5, 0); // Amount of blocks that other nodes claim to have
 
@@ -2638,6 +2640,31 @@ bool CScriptCheck::operator()() const
     return true;
 }
 
+bool CHashCalculation::operator()()
+{
+    uint256 blockSHA256Hash = pBlock->GetSHA256Hash();
+
+    {
+        boost::mutex::scoped_lock lock(mapHashmutex);
+        map<uint256, uint256>::iterator mi = mapHash.find(blockSHA256Hash);
+        if (mi != mapHash.end())
+        {
+            pBlock->blockHash = (*mi).second;
+            printf("Already have header %s (sha256: %s)\n", pBlock->blockHash.ToString().c_str(), blockSHA256Hash.ToString().c_str());
+        }
+    }
+
+    if (pBlock->blockHash == 0)
+    {
+        uint256 blockHash = pBlock->GetHash();
+        printf("Received header %s (sha256: %s) from node %s\n", blockHash.ToString().c_str(), blockSHA256Hash.ToString().c_str(), pNode->addrName.c_str());
+        boost::mutex::scoped_lock lock(mapHashmutex);
+        mapHash.insert(make_pair(blockSHA256Hash, blockHash));
+    }
+
+    return true;
+}
+
 bool VerifySignature(
                      const CTransaction& txFrom, 
                      const CTransaction& txTo, 
@@ -2922,6 +2949,7 @@ bool CBlock::DisconnectBlock(CValidationState &state, CTxDB& txdb, CBlockIndex* 
 }
 
 static CCheckQueue<CScriptCheck> scriptcheckqueue(128);
+static CCheckQueue<CHashCalculation> hashCalculationQueue(200);
 
 void ThreadScriptCheck(void*) 
 {
@@ -2934,6 +2962,19 @@ void ThreadScriptCheck(void*)
 void ThreadScriptCheckQuit() 
 {
     scriptcheckqueue.Quit();
+}
+
+void ThreadHashCalculation(void*)
+{
+    ++vnThreadsRunning[THREAD_HASHCALCULATION];
+    RenameThread("yacoin-hashcalc");
+    hashCalculationQueue.Thread();
+    --vnThreadsRunning[THREAD_HASHCALCULATION];
+}
+
+void ThreadHashCalculationQuit()
+{
+    hashCalculationQueue.Quit();
 }
 
 bool CBlock::ConnectBlock(CValidationState &state, CTxDB& txdb, CBlockIndex* pindex, bool fJustCheck)
@@ -5992,25 +6033,48 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
             return true;
         }
 
+
+
         // Calculate header hash
-        BOOST_FOREACH(CBlock& header, headers) {
-            // SHA256 doesn't cost much cpu usage to calculate
-            uint256 blockSHA256Hash = header.GetSHA256Hash();
+        printf("Start calculating hash for %d block headers", nCount);
+        if (nHashCalcThreads > 1)
+        {
+            CCheckQueueControl<CHashCalculation> control(&hashCalculationQueue);
+            std::vector<CHashCalculation> vHashCalc;
+            vHashCalc.reserve(nCount);
 
-            map<uint256, uint256>::iterator mi = mapHash.find(blockSHA256Hash);
-            if (mi != mapHash.end())
-            {
-                header.blockHash = (*mi).second;
-                printf("Already have header %s (sha256: %s)\n", header.blockHash.ToString().c_str(), blockSHA256Hash.ToString().c_str());
+            int index = 0;
+            BOOST_FOREACH(CBlock& header, headers) {
+                CHashCalculation hashCalc(&header, pfrom);
+                vHashCalc.push_back(CHashCalculation());
+                hashCalc.swap(vHashCalc.back());
+                index++;
             }
+            control.Add(vHashCalc);
+            control.Wait();
+        }
+        else
+        {
+            BOOST_FOREACH(CBlock& header, headers) {
+                // SHA256 doesn't cost much cpu usage to calculate
+                uint256 blockSHA256Hash = header.GetSHA256Hash();
 
-            if (header.blockHash == 0)
-            {
-                uint256 blockHash = header.GetHash();
-                printf("Received header %s (sha256: %s) from node %s\n", blockHash.ToString().c_str(), blockSHA256Hash.ToString().c_str(), pfrom->addrName.c_str());
-                mapHash.insert(make_pair(blockSHA256Hash, blockHash));
+                map<uint256, uint256>::iterator mi = mapHash.find(blockSHA256Hash);
+                if (mi != mapHash.end())
+                {
+                    header.blockHash = (*mi).second;
+                    printf("Already have header %s (sha256: %s)\n", header.blockHash.ToString().c_str(), blockSHA256Hash.ToString().c_str());
+                }
+
+                if (header.blockHash == 0)
+                {
+                    uint256 blockHash = header.GetHash();
+                    printf("Received header %s (sha256: %s) from node %s\n", blockHash.ToString().c_str(), blockSHA256Hash.ToString().c_str(), pfrom->addrName.c_str());
+                    mapHash.insert(make_pair(blockSHA256Hash, blockHash));
+                }
             }
         }
+        printf("Finish calculating hash for %d block headers", nCount);
 
         CBlockIndex *pindexLast = NULL;
         BOOST_FOREACH(CBlock& header, headers) {

@@ -147,6 +147,7 @@ extern const ::int64_t
 extern CScript COINBASE_FLAGS;
 extern CCriticalSection cs_main;
 extern std::map<uint256, CBlockIndex*> mapBlockIndex;
+extern boost::mutex mapHashmutex;
 extern std::map<uint256, uint256> mapHash; // map of (SHA256-hash, chacha-hash)
 extern std::set<CBlockIndex*, CBlockIndexWorkComparator> setBlockIndexCandidates;
 extern unsigned int nNodeLifespan;
@@ -174,6 +175,7 @@ extern ::int64_t nMinimumInputValue;
 extern bool fUseFastIndex;
 extern bool fReindex;
 extern int nScriptCheckThreads;
+extern int nHashCalcThreads;
 extern const uint256 entropyStore[38];
 extern bool fStoreBlockHashToDb;
 
@@ -311,6 +313,8 @@ bool LoadExternalBlockFile(FILE* fileIn);
 
 // Run an instance of the script checking thread
 void ThreadScriptCheck(void* parg);
+// Run an instance of the hash calculation thread
+void ThreadHashCalculation(void* parg);
 // Stop the script checking threads
 void ThreadScriptCheckQuit();
 
@@ -1092,7 +1096,25 @@ public:
     }
 };
 
+/** Closure representing one block hash calculation
+ *  Note that this stores pointer to the block*/
+class CHashCalculation
+{
+private:
+    CBlock *pBlock;
+    CNode* pNode;
 
+public:
+    CHashCalculation() {}
+    CHashCalculation(CBlock* pBlock, CNode* pNode) :
+        pBlock(pBlock), pNode(pNode) { }
+
+    bool operator()();
+    void swap(CHashCalculation &check) {
+        std::swap(pBlock, check.pBlock);
+        std::swap(pNode, check.pNode);
+    }
+};
 
 
 /** A transaction with a merkle branch linking it to the block chain. */

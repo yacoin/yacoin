@@ -481,6 +481,7 @@ std::string HelpMessage()
         "  -checkblocks=<n>       " + _("How many blocks to check at startup (default: 750, 0 = all)") + "\n" +
         "  -checklevel=<n>        " + _("How thorough the block verification is (0-6, default: 1)") + "\n" +
         "  -par=N                 " + _("Set the number of script verification threads (1-16, 0=auto, default: 0)") + "\n" +
+        "  -hashcalcthreads=N     " + _("Set the number of threads which calculate hash (maximum threads = number of cpu cores, default: 1)") + "\n" +
         "  -loadblock=<file>      " + _("Imports blocks from external blk000?.dat file") + "\n" +
                                         "\n" + _("SSL options: (see the Bitcoin Wiki for SSL setup instructions)") + "\n" +
         "  -rpcssl                                  " + _("Use OpenSSL (https) for JSON-RPC connections") + "\n" +
@@ -570,6 +571,13 @@ bool AppInit2()
     MAX_BLOCKS_IN_TRANSIT_PER_PEER = GetArg("-initSyncMaximumBlocksInDownloadPerPeer", 500);
     BLOCK_DOWNLOAD_WINDOW = GetArg("-initSyncBlockDownloadWindow", MAX_BLOCKS_IN_TRANSIT_PER_PEER * 64);
     HEADER_BLOCK_DIFFERENCES_TRIGGER_GETBLOCKS = GetArg("-initSyncTriggerGetBlocks", 100000);
+
+    int maximumHashCalcThread = boost::thread::hardware_concurrency();
+    nHashCalcThreads = (int)(GetArg("-hashcalcthreads", 1));
+    if (nHashCalcThreads <= 0)
+        nHashCalcThreads = 1;
+    else if (nHashCalcThreads > maximumHashCalcThread)
+        nHashCalcThreads = maximumHashCalcThread;
 
     // Ping and address broadcast intervals
     nPingInterval = max< ::int64_t>(10 * 60, GetArg("-keepalive", 30 * 60));
@@ -917,6 +925,13 @@ bool AppInit2()
     {
         printf("Using %u threads for script verification\n", nScriptCheckThreads);
         for (int i=0; i<nScriptCheckThreads-1; ++i)
+            NewThread(ThreadScriptCheck, NULL);
+    }
+
+    if (nHashCalcThreads)
+    {
+        printf("Using %u threads for hash calculation\n", nHashCalcThreads);
+        for (int i=0; i<nHashCalcThreads-1; ++i)
             NewThread(ThreadScriptCheck, NULL);
     }
 
