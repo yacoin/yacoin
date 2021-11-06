@@ -932,7 +932,7 @@ bool AppInit2()
     {
         printf("Using %u threads for hash calculation\n", nHashCalcThreads);
         for (int i=0; i<nHashCalcThreads-1; ++i)
-            NewThread(ThreadScriptCheck, NULL);
+            NewThread(ThreadHashCalculation, NULL);
     }
 
     ::int64_t nStart;

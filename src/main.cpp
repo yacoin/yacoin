@@ -2642,6 +2642,7 @@ bool CScriptCheck::operator()() const
 
 bool CHashCalculation::operator()()
 {
+    unsigned long threadId = getThreadId();
     uint256 blockSHA256Hash = pBlock->GetSHA256Hash();
 
     {
@@ -2650,14 +2651,14 @@ bool CHashCalculation::operator()()
         if (mi != mapHash.end())
         {
             pBlock->blockHash = (*mi).second;
-            printf("Already have header %s (sha256: %s)\n", pBlock->blockHash.ToString().c_str(), blockSHA256Hash.ToString().c_str());
+            printf("[HashCalcThread:%ld] Already have header %s (sha256: %s)\n", threadId, pBlock->blockHash.ToString().c_str(), blockSHA256Hash.ToString().c_str());
         }
     }
 
     if (pBlock->blockHash == 0)
     {
         uint256 blockHash = pBlock->GetHash();
-        printf("Received header %s (sha256: %s) from node %s\n", blockHash.ToString().c_str(), blockSHA256Hash.ToString().c_str(), pNode->addrName.c_str());
+        printf("[HashCalcThread:%ld] Received header %s (sha256: %s) from node %s\n", threadId, blockHash.ToString().c_str(), blockSHA256Hash.ToString().c_str(), pNode->addrName.c_str());
         boost::mutex::scoped_lock lock(mapHashmutex);
         mapHash.insert(make_pair(blockSHA256Hash, blockHash));
     }
@@ -6036,7 +6037,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
 
 
         // Calculate header hash
-        printf("Start calculating hash for %d block headers", nCount);
+        printf("Start calculating hash for %d block headers\n", nCount);
         if (nHashCalcThreads > 1)
         {
             CCheckQueueControl<CHashCalculation> control(&hashCalculationQueue);
@@ -6074,7 +6075,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
                 }
             }
         }
-        printf("Finish calculating hash for %d block headers", nCount);
+        printf("Finish calculating hash for %d block headers\n", nCount);
 
         CBlockIndex *pindexLast = NULL;
         BOOST_FOREACH(CBlock& header, headers) {
