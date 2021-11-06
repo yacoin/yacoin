@@ -107,7 +107,7 @@ extern int MAX_BLOCKS_IN_TRANSIT_PER_PEER;
 extern unsigned int BLOCK_DOWNLOAD_WINDOW; //32000
 extern unsigned int FETCH_BLOCK_DOWNLOAD; //4000
 // Trigger sending getblocks from other peers when header > block + HEADER_BLOCK_DIFFERENCES_TRIGGER_GETDATA
-extern unsigned int HEADER_BLOCK_DIFFERENCES_TRIGGER_GETBLOCKS; //4000
+extern unsigned int HEADER_BLOCK_DIFFERENCES_TRIGGER_GETBLOCKS; //default = 10000
 /** Headers download timeout expressed in microseconds
  *  Timeout = base + per_header * (expected number of headers) */
 extern int64_t HEADERS_DOWNLOAD_TIMEOUT_BASE; // 10 minutes

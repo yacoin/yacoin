@@ -418,7 +418,7 @@ std::string HelpMessage()
         "  -initSyncDownloadTimeout=<n>     " + _("Headers/block download timeout in seconds (default: 600)") + "\n" +
         "  -initSyncMaximumBlocksInDownloadPerPeer=<n>     " + _("Maximum number of blocks being downloaded at a time from one peer (default: 500)") + "\n" +
         "  -initSyncBlockDownloadWindow=<n>     " + _("Block download windows (default: initSyncMaximumBlocksInDownloadPerPeer * 64)") + "\n" +
-        "  -initSyncTriggerGetBlocks=<n>     " + _("When number of synced headers - number of synced blocks, send getblocks message to all peers to download block (default: 100000)") + "\n" +
+        "  -initSyncTriggerGetBlocks=<n>     " + _("When number of synced headers - number of synced blocks, send getblocks message to all peers to download block (default: 10000)") + "\n" +
 #ifdef USE_UPNP
 #if USE_UPNP
         "  -upnp                  " + _("Use UPnP to map the listening port (default: 1 when listening)") + "\n" +
@@ -570,7 +570,7 @@ bool AppInit2()
     BLOCK_DOWNLOAD_TIMEOUT_BASE = HEADERS_DOWNLOAD_TIMEOUT_BASE;
     MAX_BLOCKS_IN_TRANSIT_PER_PEER = GetArg("-initSyncMaximumBlocksInDownloadPerPeer", 500);
     BLOCK_DOWNLOAD_WINDOW = GetArg("-initSyncBlockDownloadWindow", MAX_BLOCKS_IN_TRANSIT_PER_PEER * 64);
-    HEADER_BLOCK_DIFFERENCES_TRIGGER_GETBLOCKS = GetArg("-initSyncTriggerGetBlocks", 100000);
+    HEADER_BLOCK_DIFFERENCES_TRIGGER_GETBLOCKS = GetArg("-initSyncTriggerGetBlocks", 10000);
 
     int maximumHashCalcThread = boost::thread::hardware_concurrency();
     nHashCalcThreads = (int)(GetArg("-hashcalcthreads", 1));
