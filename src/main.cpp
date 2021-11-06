@@ -6110,6 +6110,10 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
             state.fSyncStarted = false;
             nSyncStarted--;
             state.nHeadersSyncTimeout = 0;
+            printf(
+                    "Stop syncing headers from peer=%s, it may not have latest blockchain (startheight=%d < nMedianStartingHeight=%d)\n",
+                    pfrom->addrName.c_str(), pfrom->nStartingHeight,
+                    nMedianStartingHeight);
         }
         else if (nCount == MAX_HEADERS_RESULTS && pindexLast) {
             // Headers message had its maximum size; the peer may have more headers.
@@ -6119,6 +6123,17 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
             state.nHeadersSyncTimeout = GetTimeMicros() + HEADERS_DOWNLOAD_TIMEOUT_BASE;
             printf("more getheaders (%d) to end to peer=%s (startheight:%d)\n", pindexLast->nHeight, pfrom->addrName.c_str(), pfrom->nStartingHeight);
             pfrom->PushMessage("getheaders", chainActive.GetLocator(pindexLast), uint256(0));
+        }
+        else if (nCount < MAX_HEADERS_RESULTS && pindexBestHeader->nHeight < nMedianStartingHeight)
+        {
+            // This node doesn't have latest blockchain or there is an error with this node which make it not send full 2000 headers
+            state.fSyncStarted = false;
+            nSyncStarted--;
+            state.nHeadersSyncTimeout = 0;
+            printf(
+                    "Stop syncing headers from peer=%s, this node doesn't have latest blockchain or there is an error with this node which make it only send %d headers, (startheight=%d, nMedianStartingHeight=%d)\n",
+                    pfrom->addrName.c_str(), nCount, pfrom->nStartingHeight,
+                    nMedianStartingHeight);
         }
     }
 
