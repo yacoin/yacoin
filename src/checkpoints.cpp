@@ -217,54 +217,6 @@ namespace Checkpoints
         return true;
     }
 
-    bool AcceptPendingSyncCheckpoint()
-    {
-        LOCK(cs_hashSyncCheckpoint);
-        if (hashPendingCheckpoint != 0 && mapBlockIndex.count(hashPendingCheckpoint))
-        {
-            if (!ValidateSyncCheckpoint(hashPendingCheckpoint))
-            {
-                hashPendingCheckpoint = 0;
-                checkpointMessagePending.SetNull();
-                return false;
-            }
-
-            CTxDB txdb;
-            CBlockIndex* pindexCheckpoint = mapBlockIndex[hashPendingCheckpoint];
-            if (!pindexCheckpoint->IsInMainChain())
-            {
-                CBlock block;
-                if (!block.ReadFromDisk(pindexCheckpoint))
-                    return error("AcceptPendingSyncCheckpoint: ReadFromDisk failed for sync checkpoint %s", hashPendingCheckpoint.ToString().c_str());
-                CValidationState state;
-                setBlockIndexCandidates.insert(pindexCheckpoint);
-                if (!ActivateBestChain(state, txdb))
-                {
-                    hashInvalidCheckpoint = hashPendingCheckpoint;
-                    return error("AcceptPendingSyncCheckpoint: SetBestChain failed for sync checkpoint %s", hashPendingCheckpoint.ToString().c_str());
-                }
-            }
-
-#ifndef USE_LEVELDB
-            txdb.Close();
-#endif
-            if (!WriteSyncCheckpoint(hashPendingCheckpoint))
-                return error("AcceptPendingSyncCheckpoint(): failed to write sync checkpoint %s", hashPendingCheckpoint.ToString().c_str());
-            hashPendingCheckpoint = 0;
-            checkpointMessage = checkpointMessagePending;
-            checkpointMessagePending.SetNull();
-            printf("AcceptPendingSyncCheckpoint : sync-checkpoint at %s\n", hashSyncCheckpoint.ToString().c_str());
-            // relay the checkpoint
-            if (!checkpointMessage.IsNull())
-            {
-                BOOST_FOREACH(CNode* pnode, vNodes)
-                    checkpointMessage.RelayTo(pnode);
-            }
-            return true;
-        }
-        return false;
-    }
-
     // Automatically select a suitable sync-checkpoint
     uint256 AutoSelectSyncCheckpoint()
     {
@@ -301,54 +253,6 @@ namespace Checkpoints
         if (nHeight < pindexSync->nHeight && !mapBlockIndex.count(hashBlock))
             return false; // lower height than sync-checkpoint
         return true;
-    }
-
-    // ppcoin: reset synchronized checkpoint to last hardened checkpoint
-    bool ResetSyncCheckpoint()
-    {
-        LOCK(cs_hashSyncCheckpoint);
-        const uint256& hash = mapCheckpoints.rbegin()->second.first;
-        if (mapBlockIndex.count(hash) && !mapBlockIndex[hash]->IsInMainChain())
-        {
-            // checkpoint block accepted but not yet in main chain
-            printf("ResetSyncCheckpoint: SetBestChain to hardened checkpoint %s\n", hash.ToString().c_str());
-            CTxDB txdb;
-            CBlock block;
-            if (!block.ReadFromDisk(mapBlockIndex[hash]))
-                return error("ResetSyncCheckpoint: ReadFromDisk failed for hardened checkpoint %s", hash.ToString().c_str());
-            CValidationState state;
-            setBlockIndexCandidates.insert(mapBlockIndex[hash]);
-            if (!ActivateBestChain(state, txdb))
-            {
-                return error("ResetSyncCheckpoint: SetBestChain failed for hardened checkpoint %s", hash.ToString().c_str());
-            }
-
-#ifndef USE_LEVELDB
-            txdb.Close();
-#endif
-
-        }
-        else if(!mapBlockIndex.count(hash))
-        {
-            // checkpoint block not yet accepted
-            hashPendingCheckpoint = hash;
-            checkpointMessagePending.SetNull();
-            printf("ResetSyncCheckpoint: pending for sync-checkpoint %s\n", hashPendingCheckpoint.ToString().c_str());
-        }
-
-        BOOST_REVERSE_FOREACH(const MapCheckpoints::value_type& i, mapCheckpoints)
-        {
-            const uint256& hash = i.second.first;
-            if (mapBlockIndex.count(hash) && mapBlockIndex[hash]->IsInMainChain())
-            {
-                if (!WriteSyncCheckpoint(hash))
-                    return error("ResetSyncCheckpoint: failed to write sync checkpoint %s", hash.ToString().c_str());
-                printf("ResetSyncCheckpoint: sync-checkpoint reset to %s\n", hashSyncCheckpoint.ToString().c_str());
-                return true;
-            }
-        }
-
-        return false;
     }
 
     bool SetCheckpointPrivKey(std::string strPrivKey)

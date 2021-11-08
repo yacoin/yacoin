@@ -4335,12 +4335,6 @@ bool CBlock::AcceptBlock(CValidationState &state, CBlockIndex **ppindex)
 
     // here would be a good place to check for new logic
 
-    // ppcoin: check pending sync-checkpoint
-    if (chainActive.Height() < nMainnetNewLogicBlockNumber)
-    {
-        Checkpoints::AcceptPendingSyncCheckpoint();
-    }
-
     return true;
 }
 
@@ -5020,18 +5014,6 @@ bool LoadBlockIndex(bool fAllowNew)
 
     {
         CTxDB txdb("r+");
-        string strPubKey = "";
-        if (!txdb.ReadCheckpointPubKey(strPubKey) || strPubKey != CSyncCheckpoint::strMasterPubKey)
-        {
-            // write checkpoint master key to db
-            txdb.TxnBegin();
-            if (!txdb.WriteCheckpointPubKey(CSyncCheckpoint::strMasterPubKey))
-                return error("LoadBlockIndex() : failed to write new checkpoint master key to db");
-            if (!txdb.TxnCommit())
-                return error("LoadBlockIndex() : failed to commit new checkpoint master key to db");
-            if ((!fTestNet) && !Checkpoints::ResetSyncCheckpoint())
-                return error("LoadBlockIndex() : failed to reset sync-checkpoint");
-        }
 
         // upgrade time set to zero if blocktreedb initialized
         if (txdb.ReadModifierUpgradeTime(nModifierUpgradeTime))
