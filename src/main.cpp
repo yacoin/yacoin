@@ -6760,7 +6760,7 @@ bool SendMessages(CNode *pto, bool fSendTrickle)
                             (nSyncHeight < bestHeaderHeight) &&
                             state.nLastTimeSendingGetBlocks < nNow - 60 * 1000000) // avoid spamming getblocks, just send every 1 minute
                     {
-                        pto->PushMessage("getblocks", chainActive.GetLocator(pindexBestHeader), pindexBestHeader->pprev->GetBlockHash());
+                        pto->PushMessage("getblocks", chainActive.GetLocator(pindexBestHeader->pprev->pprev), pindexBestHeader->GetBlockHash());
                         state.nLastTimeSendingGetBlocks = GetTimeMicros();
                     }
                 }
