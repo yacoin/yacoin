@@ -6604,7 +6604,7 @@ bool SendMessages(CNode *pto, bool fSendTrickle)
         bool fFetch = true;
         if (!state.fSyncStarted && !pto->fClient && fFetch) {
             // Only actively request headers from a single peer, unless we're close to today.
-            if ((nSyncStarted == 0 && pto->nStartingHeight >= nMedianStartingHeight) || pindexBestHeader->GetBlockTime() > GetAdjustedTime() - 24 * 60 * 60) {
+            if ((nSyncStarted == 0 || pindexBestHeader->GetBlockTime() > GetAdjustedTime() - 24 * 60 * 60) && pto->nStartingHeight >= nMedianStartingHeight ) {
                 state.fSyncStarted = true;
                 state.nHeadersSyncTimeout = GetTimeMicros() + HEADERS_DOWNLOAD_TIMEOUT_BASE;
                 nSyncStarted++;
