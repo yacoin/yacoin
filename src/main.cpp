@@ -6093,9 +6093,9 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
             nSyncStarted--;
             state.nHeadersSyncTimeout = 0;
             printf(
-                    "Stop syncing headers from peer=%s, it may not have latest blockchain (startheight=%d < nMedianStartingHeight=%d)\n",
+                    "Stop syncing headers from peer=%s, it may not have latest blockchain (startheight=%d < nMedianStartingHeight=%d), current best header has height = %d\n",
                     pfrom->addrName.c_str(), pfrom->nStartingHeight,
-                    nMedianStartingHeight);
+                    nMedianStartingHeight, pindexBestHeader->nHeight);
         }
         else if (nCount == MAX_HEADERS_RESULTS && pindexLast) {
             // Headers message had its maximum size; the peer may have more headers.
@@ -6103,8 +6103,8 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
             // from there instead.
             // Set the timeout to trigger disconnect logic
             state.nHeadersSyncTimeout = GetTimeMicros() + HEADERS_DOWNLOAD_TIMEOUT_BASE;
-            printf("more getheaders (%d) to end to peer=%s (startheight:%d)\n", pindexLast->nHeight, pfrom->addrName.c_str(), pfrom->nStartingHeight);
-            pfrom->PushMessage("getheaders", chainActive.GetLocator(pindexLast), uint256(0));
+            printf("more getheaders (%d) to end to peer=%s (startheight:%d), current best header has height = %d\n", pindexLast->nHeight, pfrom->addrName.c_str(), pfrom->nStartingHeight);
+            pfrom->PushMessage("getheaders", chainActive.GetLocator(pindexLast), uint256(0), pindexBestHeader->nHeight);
         }
         else if (nCount < MAX_HEADERS_RESULTS && pindexBestHeader->nHeight < nMedianStartingHeight)
         {
@@ -6113,9 +6113,10 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
             nSyncStarted--;
             state.nHeadersSyncTimeout = 0;
             printf(
-                    "Stop syncing headers from peer=%s, this node doesn't have latest blockchain or there is an error with this node which make it only send %d headers, (startheight=%d, nMedianStartingHeight=%d)\n",
+                    "Stop syncing headers from peer=%s, this node doesn't have latest blockchain or there is an error with this node which make it only send %d headers"
+                    "(startheight=%d, nMedianStartingHeight=%d), current best header has height = %d\n",
                     pfrom->addrName.c_str(), nCount, pfrom->nStartingHeight,
-                    nMedianStartingHeight);
+                    nMedianStartingHeight, pindexBestHeader->nHeight);
         }
     }
 
