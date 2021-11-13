@@ -6009,14 +6009,10 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
             //ReadCompactSize(vRecv); // ignore vchBlockSig; assume it is 0.
         }
 
-        LOCK(cs_main);
-
         if (nCount == 0) {
             // Nothing interesting. Stop asking this peers for more headers.
             return true;
         }
-
-
 
         // Calculate header hash
         printf("Start calculating hash for %d block headers\n", nCount);
@@ -6058,6 +6054,8 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
             }
         }
         printf("Finish calculating hash for %d block headers\n", nCount);
+
+        LOCK(cs_main);
 
         CBlockIndex *pindexLast = NULL;
         BOOST_FOREACH(CBlock& header, headers) {
