@@ -95,7 +95,7 @@ Value getsubsidy(const Array& params, bool fHelp)
     }
     else
     {
-        nBits = GetNextTargetRequired(pindexBest, false);
+        nBits = GetNextTargetRequired(chainActive.Tip(), false);
     }
 
     return (Value_type)GetProofOfWorkReward(nBits);
@@ -149,16 +149,16 @@ Value getmininginfo(const Array& params, bool fHelp)
     pwalletMain->GetStakeStats(nKernelsRate, nCoinDaysRate);
 
     Object obj, diff, weight;
-    obj.push_back(Pair("blocks",        (int)nBestHeight));
+    obj.push_back(Pair("blocks",        (int)chainActive.Height()));
     obj.push_back(Pair("currentblocksize",(Value_type)nLastBlockSize));
     obj.push_back(Pair("currentblocktx",(Value_type)nLastBlockTx));
 
     diff.push_back(Pair("proof-of-work",        GetDifficulty()));
-    diff.push_back(Pair("proof-of-stake",       GetDifficulty(GetLastBlockIndex(pindexBest, true))));
+    diff.push_back(Pair("proof-of-stake",       GetDifficulty(GetLastBlockIndex(chainActive.Tip(), true))));
     diff.push_back(Pair("search-interval",      (Value_type)nLastCoinStakeSearchInterval));
     obj.push_back(Pair("difficulty",    diff));
 
-    uint64_t blockvalue=(uint64_t)GetProofOfWorkReward(GetLastBlockIndex(pindexBest, false)->nBits, 0, nBestHeight);
+    uint64_t blockvalue=(uint64_t)GetProofOfWorkReward(GetLastBlockIndex(chainActive.Tip(), false)->nBits, 0, chainActive.Height());
     obj.push_back(Pair("blockvalue", blockvalue)); // for testing purposes, easier to compare than float
     obj.push_back(Pair("powreward", (Value_type)blockvalue / 1000000.0));
     obj.push_back(Pair("netmhashps",     GetPoWMHashPS()));
@@ -173,13 +173,13 @@ Value getmininginfo(const Array& params, bool fHelp)
     weight.push_back(Pair("cdaysrate",   nCoinDaysRate));
     obj.push_back(Pair("stakestats", weight));
 
-    obj.push_back(Pair("stakeinterest %",(Value_type)GetProofOfStakeReward(0, GetLastBlockIndex(pindexBest, true)->nBits,
-                                                                 GetLastBlockIndex(pindexBest, true)->nTime, true) / 10000));
+    obj.push_back(Pair("stakeinterest %",(Value_type)GetProofOfStakeReward(0, GetLastBlockIndex(chainActive.Tip(), true)->nBits,
+                                                                 GetLastBlockIndex(chainActive.Tip(), true)->nTime, true) / 10000));
     obj.push_back(Pair("testnet",       fTestNet));
 
     // WM - Tweaks to report current Nfactor and N.
     unsigned char 
-        Nfactor = GetNfactor(pindexBest->GetBlockTime(), nBestHeight >= nMainnetNewLogicBlockNumber? true : false);
+        Nfactor = GetNfactor(chainActive.Tip()->GetBlockTime(), chainActive.Height() >= nMainnetNewLogicBlockNumber? true : false);
 
     uint64_t 
         N;
@@ -222,11 +222,11 @@ Value getworkex(const Array& params, bool fHelp)
         static CBlockIndex* pindexPrev;
         static int64_t nStart;
         static CBlock* pblock;
-        if (pindexPrev != pindexBest ||
+        if (pindexPrev != chainActive.Tip() ||
             (nTransactionsUpdated != nTransactionsUpdatedLast && GetTime() - nStart > 60)
             || (GetTime() - nStart > nMaxClockDrift*0.75))
         {
-            if (pindexPrev != pindexBest)
+            if (pindexPrev != chainActive.Tip())
             {
                 // Deallocate old blocks since they're obsolete now
                 mapNewBlock.clear();
@@ -235,7 +235,7 @@ Value getworkex(const Array& params, bool fHelp)
                 vNewBlock.clear();
             }
             nTransactionsUpdatedLast = nTransactionsUpdated;
-            pindexPrev = pindexBest;
+            pindexPrev = chainActive.Tip();
             nStart = GetTime();
 
             // Create new block
@@ -358,12 +358,12 @@ Value getwork(const Array& params, bool fHelp)
         static CBlockIndex* pindexPrev;
         static int64_t nStart;
         static CBlock* pblock;
-        if ((pindexPrev != pindexBest)
+        if ((pindexPrev != chainActive.Tip())
             || (nTransactionsUpdated != nTransactionsUpdatedLast && GetTime() - nStart > 60)
             || (GetTime() - nStart > nMaxClockDrift*0.75)
             )
         {
-            if (pindexPrev != pindexBest)
+            if (pindexPrev != chainActive.Tip())
             {
                 // Deallocate old blocks since they're obsolete now
                 mapNewBlock.clear();
@@ -375,9 +375,9 @@ Value getwork(const Array& params, bool fHelp)
             // Clear pindexPrev so future getworks make a new block, despite any failures from here on
             pindexPrev = NULL;
 
-            // Store the pindexBest used before CreateNewBlock, to avoid races
+            // Store the chainActive.Tip() used before CreateNewBlock, to avoid races
             nTransactionsUpdatedLast = nTransactionsUpdated;
-            CBlockIndex* pindexPrevNew = pindexBest;
+            CBlockIndex* pindexPrevNew = chainActive.Tip();
             nStart = GetTime();
 
             // Create new block
@@ -554,15 +554,15 @@ Value getblocktemplate(const Array& params, bool fHelp)
     static CBlockIndex* pindexPrev;
     static int64_t nStart;
     static CBlock* pblock;
-    if (pindexPrev != pindexBest ||
+    if (pindexPrev != chainActive.Tip() ||
         (nTransactionsUpdated != nTransactionsUpdatedLast && GetTime() - nStart > 5))
     {
         // Clear pindexPrev so future calls make a new block, despite any failures from here on
         pindexPrev = NULL;
 
-        // Store the pindexBest used before CreateNewBlock, to avoid races
+        // Store the chainActive.Tip() used before CreateNewBlock, to avoid races
         nTransactionsUpdatedLast = nTransactionsUpdated;
-        CBlockIndex* pindexPrevNew = pindexBest;
+        CBlockIndex* pindexPrevNew = chainActive.Tip();
         nStart = GetTime();
 
         // Create new block
@@ -606,7 +606,8 @@ Value getblocktemplate(const Array& params, bool fHelp)
         MapPrevTx mapInputs;
         map<uint256, CTxIndex> mapUnused;
         bool fInvalid = false;
-        if (tx.FetchInputs(txdb, mapUnused, false, false, mapInputs, fInvalid))
+        CValidationState state;
+        if (tx.FetchInputs(state, txdb, mapUnused, false, false, mapInputs, fInvalid))
         {
             entry.push_back(Pair("fee", (Value_type)(tx.GetValueIn(mapInputs) - tx.GetValueOut())));
 
@@ -687,7 +688,8 @@ Value submitblock(const Array& params, bool fHelp)
     if (!block.SignBlock(*pwalletMain))
         throw JSONRPCError(-100, "Unable to sign block, wallet locked?");
 
-    bool fAccepted = ProcessBlock(NULL, &block);
+    CValidationState state;
+    bool fAccepted = ProcessBlock(state, NULL, &block);
     if (!fAccepted)
         return "rejected";
 

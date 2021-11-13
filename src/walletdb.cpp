@@ -249,7 +249,8 @@ ReadKeyValue(CWallet* pwallet, CDataStream& ssKey, CDataStream& ssValue,
             ssKey >> hash;
             CWalletTx& wtx = pwallet->mapWallet[hash];
             ssValue >> wtx;
-            if (wtx.CheckTransaction() && (wtx.GetHash() == hash))
+            CValidationState state;
+            if (wtx.CheckTransaction(state) && (wtx.GetHash() == hash))
                 wtx.BindWallet(pwallet);
             else
             {
@@ -730,8 +731,8 @@ bool DumpWallet(CWallet* pwallet, const string& strDest)
       // produce output
       file << strprintf("# Wallet dump created by Yacoin %s (%s)\n", CLIENT_BUILD.c_str(), CLIENT_DATE.c_str());
       file << strprintf("# * Created on %s\n", EncodeDumpTime(GetTime()).c_str());
-      file << strprintf("# * Best block at time of backup was %i (%s),\n", nBestHeight, hashBestChain.ToString().c_str());
-      file << strprintf("#   mined on %s\n", EncodeDumpTime(pindexBest->nTime).c_str());
+      file << strprintf("# * Best block at time of backup was %i (%s),\n", chainActive.Height(), hashBestChain.ToString().c_str());
+      file << strprintf("#   mined on %s\n", EncodeDumpTime(chainActive.Tip()->nTime).c_str());
       file << "\n";
       for (std::vector<std::pair< ::int64_t, CKeyID> >::const_iterator it = vKeyBirth.begin(); it != vKeyBirth.end(); it++) {
           const CKeyID &keyid = it->second;
@@ -785,7 +786,7 @@ bool ImportWallet(CWallet *pwallet, const string& strLocation)
       if (!file.is_open())
           return false;
 
-      ::int64_t nTimeBegin = pindexBest->nTime;
+      ::int64_t nTimeBegin = chainActive.Tip()->nTime;
 
       bool fGood = true;
 
@@ -842,11 +843,11 @@ bool ImportWallet(CWallet *pwallet, const string& strLocation)
       file.close();
 
       // rescan block chain looking for coins from new keys
-      CBlockIndex *pindex = pindexBest;
+      CBlockIndex *pindex = chainActive.Tip();
       while (pindex && pindex->pprev && pindex->nTime > nTimeBegin - 7200)
           pindex = pindex->pprev;
 
-      printf("Rescanning last %i blocks\n", pindexBest->nHeight - pindex->nHeight + 1);
+      printf("Rescanning last %i blocks\n", chainActive.Tip()->nHeight - pindex->nHeight + 1);
       pwallet->ScanForWalletTransactions(pindex);
       pwallet->ReacceptWalletTransactions();
       pwallet->MarkDirty();

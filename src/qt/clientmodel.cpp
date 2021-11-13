@@ -43,9 +43,9 @@ double ClientModel::getPoSKernelPS()
 double ClientModel::getDifficulty(bool fProofofStake)
 {
     if (fProofofStake)
-       return GetDifficulty(GetLastBlockIndex(pindexBest,true));
+       return GetDifficulty(GetLastBlockIndex(chainActive.Tip(),true));
     else
-       return GetDifficulty(GetLastBlockIndex(pindexBest,false));
+       return GetDifficulty(GetLastBlockIndex(chainActive.Tip(),false));
 }
 
 int ClientModel::getNumConnections(uint8_t flags) const
@@ -64,7 +64,7 @@ int ClientModel::getNumConnections(uint8_t flags) const
 
 int ClientModel::getNumBlocks() const
 {
-    return nBestHeight;
+    return chainActive.Height();
 }
 
 int ClientModel::getNumBlocksAtStartup()
@@ -85,8 +85,8 @@ quint64 ClientModel::getTotalBytesSent() const
 
 QDateTime ClientModel::getLastBlockDate() const
 {
-    if (pindexBest)
-        return QDateTime::fromTime_t(pindexBest->GetBlockTime());
+    if (chainActive.Tip())
+        return QDateTime::fromTime_t(chainActive.Tip()->GetBlockTime());
     else
         return QDateTime::fromTime_t(1367991220); // Genesis block's time
 }
@@ -150,7 +150,7 @@ int ClientModel::getNumBlocksOfPeers() const
 
 int ClientModel::getNFactor() const
 {
-    return GetNfactor(pindexBest->GetBlockTime(), nBestHeight >= nMainnetNewLogicBlockNumber? true : false);
+    return GetNfactor(chainActive.Tip()->GetBlockTime(), chainActive.Height() >= nMainnetNewLogicBlockNumber? true : false);
 }
 
 QString ClientModel::getStatusBarWarnings() const

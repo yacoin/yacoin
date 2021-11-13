@@ -56,6 +56,7 @@ unsigned int nNodeLifespan;
 unsigned int nMinerSleep;
 bool fUseFastIndex;
 bool fStoreBlockHashToDb;
+bool fReindex;
 bool fUseFastStakeMiner;
 bool fUseMemoryLog;
 enum Checkpoints::CPMode CheckpointsMode;
@@ -125,10 +126,11 @@ void Shutdown(void* parg)
 //        CTxDB().Close();
         bitdb.Flush(false);
         StopNode();
+        UnregisterNodeSignals(GetNodeSignals());
         {
             LOCK(cs_main);
             if (pwalletMain)
-                pwalletMain->SetBestChain(CBlockLocator(pindexBest));
+                pwalletMain->SetBestChain(chainActive.GetLocator());
         }
         bitdb.Flush(true);
 #if !defined(WIN32) && !defined(QT_GUI)
@@ -412,6 +414,11 @@ std::string HelpMessage()
         "  -bantime=<n>           " + _("Number of seconds to keep misbehaving peers from reconnecting (default: 86400)") + "\n" +
         "  -maxreceivebuffer=<n>  " + _("Maximum per-connection receive buffer, <n>*1000 bytes (default: 5000)") + "\n" +
         "  -maxsendbuffer=<n>     " + _("Maximum per-connection send buffer, <n>*1000 bytes (default: 1000)") + "\n" +
+        "  -reindex               " + _("Reindex the old database before the header-sync version") + "\n" +
+        "  -initSyncDownloadTimeout=<n>     " + _("Headers/block download timeout in seconds (default: 600)") + "\n" +
+        "  -initSyncMaximumBlocksInDownloadPerPeer=<n>     " + _("Maximum number of blocks being downloaded at a time from one peer (default: 500)") + "\n" +
+        "  -initSyncBlockDownloadWindow=<n>     " + _("Block download windows (default: initSyncMaximumBlocksInDownloadPerPeer * 64)") + "\n" +
+        "  -initSyncTriggerGetBlocks=<n>     " + _("When number of synced headers - number of synced blocks, send getblocks message to all peers to download block (default: 100000)") + "\n" +
 #ifdef USE_UPNP
 #if USE_UPNP
         "  -upnp                  " + _("Use UPnP to map the listening port (default: 1 when listening)") + "\n" +
@@ -554,8 +561,15 @@ bool AppInit2()
     nNodeLifespan = (unsigned int)(GetArg("-addrlifespan", 7));
     fUseFastIndex = GetBoolArg("-fastindex", true);
     fStoreBlockHashToDb = GetBoolArg("-storeblockhash", true);
+    fReindex = GetBoolArg("-reindex", false);
     fUseMemoryLog = GetBoolArg("-memorylog", true);
     nMinerSleep = (unsigned int)(GetArg("-minersleep", nOneHundredMilliseconds));
+
+    HEADERS_DOWNLOAD_TIMEOUT_BASE = GetArg("-initSyncDownloadTimeout", 10 * 60) * 1000000;
+    BLOCK_DOWNLOAD_TIMEOUT_BASE = HEADERS_DOWNLOAD_TIMEOUT_BASE;
+    MAX_BLOCKS_IN_TRANSIT_PER_PEER = GetArg("-initSyncMaximumBlocksInDownloadPerPeer", 500);
+    BLOCK_DOWNLOAD_WINDOW = GetArg("-initSyncBlockDownloadWindow", MAX_BLOCKS_IN_TRANSIT_PER_PEER * 64);
+    HEADER_BLOCK_DIFFERENCES_TRIGGER_GETBLOCKS = GetArg("-initSyncTriggerGetBlocks", 100000);
 
     // Ping and address broadcast intervals
     nPingInterval = max< ::int64_t>(10 * 60, GetArg("-keepalive", 30 * 60));
@@ -943,7 +957,7 @@ bool AppInit2()
     }
 
     // ********************************************************* Step 6: network initialization
-
+    RegisterNodeSignals(GetNodeSignals());
     int nSocksVersion = (int)(GetArg("-socks", 5));
 
 #ifdef WIN32
@@ -1326,20 +1340,22 @@ bool AppInit2()
 
     RegisterWallet(pwalletMain);
 
-    CBlockIndex *pindexRescan = pindexBest;
+    CBlockIndex *pindexRescan = chainActive.Tip();
     if (GetBoolArg("-rescan"))
-        pindexRescan = pindexGenesisBlock;
+        pindexRescan = chainActive.Genesis();
     else
     {
         CWalletDB walletdb(strWalletFileName);
         CBlockLocator locator;
         if (walletdb.ReadBestBlock(locator))
-            pindexRescan = locator.GetBlockIndex();
+            pindexRescan = chainActive.FindFork(locator);
+        else
+            pindexRescan = chainActive.Genesis();
     }
-    if (pindexBest != pindexRescan && pindexBest && pindexRescan && pindexBest->nHeight > pindexRescan->nHeight)
+    if (chainActive.Tip() != pindexRescan && chainActive.Tip() && pindexRescan && chainActive.Tip()->nHeight > pindexRescan->nHeight)
     {
         uiInterface.InitMessage(_("<b>Please wait, rescanning blocks...</b>"));
-        printf("Rescanning last %i blocks (from block %i)...\n", pindexBest->nHeight - pindexRescan->nHeight, pindexRescan->nHeight);
+        printf("Rescanning last %i blocks (from block %i)...\n", chainActive.Tip()->nHeight - pindexRescan->nHeight, pindexRescan->nHeight);
         nStart = GetTimeMillis();
 #ifdef WIN32
         int
@@ -1348,7 +1364,7 @@ bool AppInit2()
         nNumberOfTxs = pwalletMain->ScanForWalletTransactions(
                                         pindexRescan, 
                                         true,   // will modify Tx's in wallet
-                                        pindexBest->nHeight - pindexRescan->nHeight
+                                        chainActive.Tip()->nHeight - pindexRescan->nHeight
                                                              );
 #else
         pwalletMain->ScanForWalletTransactions(pindexRescan, true);
@@ -1418,7 +1434,7 @@ bool AppInit2()
 
     //// debug print
     printf("mapBlockIndex.size() = %" PRIszu "\n",   mapBlockIndex.size());
-    printf("nBestHeight = %d\n",                     nBestHeight);
+    printf("chainActive.Height() = %d\n",                     chainActive.Height());
     printf("setKeyPool.size() = %" PRIszu "\n",      pwalletMain->setKeyPool.size());
     printf("mapWallet.size() = %" PRIszu " transactions\n",       pwalletMain->mapWallet.size());
     printf("mapAddressBook.size() = %" PRIszu "\n",  pwalletMain->mapAddressBook.size());

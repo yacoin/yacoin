@@ -304,7 +304,7 @@ void ExplorerPage::showBlockLineDetails( )
     {
         if ( 
             ( 0 <= nNewBlockNumber ) &&
-            ( nNewBlockNumber <= nBestHeight )
+            ( nNewBlockNumber <= chainActive.Height() )
            )
         {
             if ( nNewBlockNumber != nLastBestHeight )
@@ -883,7 +883,7 @@ std::string BuildTxDetailsFrom(
             {
                 sStandardItemModelElement = strprintf( 
                                                     "%d"
-                                                    , 1 + nBestHeight - pindex->nHeight 
+                                                    , 1 + chainActive.Height() - pindex->nHeight 
                                                      );
                 sTemp += sStandardItemModelElement + "<br />\n";
                 pQSIMtxinfo->setData( 
@@ -1186,7 +1186,7 @@ void ExplorerPage::setNumBlocks( int currentHeight )
             nSECONDsPerHOUR = nSECONDsPerMINUTE * nMINUTEsPerHOUR;
             
         // really should get the block determined from height parameter currentHeight
-        // but nBestHeight & hashBestChain refer to the best block, I think!?
+        // but chainActive.Height() & hashBestChain refer to the best block, I think!?
 
         int
             nHeight = currentHeight;

@@ -63,10 +63,10 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity)
     for (unsigned int i = 0; i < sizeof(blockinfo)/sizeof(*blockinfo); ++i)
     {
         pblock->nVersion = 1;
-        pblock->nTime = pindexBest->GetMedianTimePast()+1;
+        pblock->nTime = chainActive.Tip()->GetMedianTimePast()+1;
         pblock->vtx[0].vin[0].scriptSig = CScript();
         pblock->vtx[0].vin[0].scriptSig.push_back(blockinfo[i].extranonce);
-        pblock->vtx[0].vin[0].scriptSig.push_back(pindexBest->nHeight);
+        pblock->vtx[0].vin[0].scriptSig.push_back(chainActive.Tip()->nHeight);
         pblock->vtx[0].vout[0].scriptPubKey = CScript();
         if (txFirst.size() < 2)
             txFirst.push_back(new CTransaction(pblock->vtx[0]));
@@ -188,14 +188,14 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity)
     mempool.clear();
 
     // subsidy changing
-    int nHeight = pindexBest->nHeight;
-    pindexBest->nHeight = 209999;
+    int nHeight = chainActive.Tip()->nHeight;
+    chainActive.Tip()->nHeight = 209999;
     BOOST_CHECK(pblock = CreateNewBlock(reservekey));
     delete pblock;
-    pindexBest->nHeight = 210000;
+    chainActive.Tip()->nHeight = 210000;
     BOOST_CHECK(pblock = CreateNewBlock(reservekey));
     delete pblock;
-    pindexBest->nHeight = nHeight;
+    chainActive.Tip()->nHeight = nHeight;
 }
 
 BOOST_AUTO_TEST_CASE(sha256transform_equality)

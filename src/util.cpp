@@ -94,6 +94,7 @@ bool fTestNetNewLogic = false;
 ::int32_t nMainnetNewLogicBlockNumber;
 unsigned char MAXIMUM_YAC1DOT0_N_FACTOR;
 ::int32_t nYac20BlockNumberTime = 0;
+::int64_t nYac10HardforkTime = 1619048730;
 // Epoch interval is a difficulty period. Right now on testnet, it is 21,000 blocks
 ::uint32_t nEpochInterval = 21000;
 ::uint32_t nDifficultyInterval = nEpochInterval;

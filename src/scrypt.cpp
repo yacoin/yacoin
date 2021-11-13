@@ -319,7 +319,7 @@ const ::uint32_t
     #endif
 #endif
             if (
-                (pindexPrev != pindexBest) ||
+                (pindexPrev != chainActive.Tip()) ||
                 fShutdown
                )
                 break;
