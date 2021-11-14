@@ -2642,6 +2642,11 @@ bool CScriptCheck::operator()() const
 
 bool CHashCalculation::operator()()
 {
+    // Hash calculation takes much time to finish. So checking fShutdown node regularly to quickly shut down node during hash calculation
+    if (fShutdown) {
+        return true;
+    }
+
     unsigned long threadId = getThreadId();
     uint256 blockSHA256Hash = pBlock->GetSHA256Hash();
 
@@ -6031,6 +6036,11 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
             }
             control.Add(vHashCalc);
             control.Wait();
+
+            // Hash calculation takes much time to finish. So checking fShutdown node regularly to quickly shut down node during hash calculation
+            if (fShutdown) {
+                return true;
+            }
         }
         else
         {
@@ -6050,6 +6060,11 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
                     uint256 blockHash = header.GetHash();
                     printf("Received header %s (sha256: %s) from node %s\n", blockHash.ToString().c_str(), blockSHA256Hash.ToString().c_str(), pfrom->addrName.c_str());
                     mapHash.insert(make_pair(blockSHA256Hash, blockHash));
+                }
+
+                // Hash calculation takes much time to finish. So checking fShutdown node regularly to quickly shut down node during hash calculation
+                if (fShutdown) {
+                    return true;
                 }
             }
         }

@@ -12,6 +12,7 @@
 #include <boost/thread/condition_variable.hpp>
 #include <boost/thread/locks.hpp>
 #include <boost/thread/mutex.hpp>
+#include <boost/atomic.hpp>
 
 template<typename T> class CCheckQueueControl;
 
@@ -46,7 +47,7 @@ private:
     int nIdle;
 
     // The total number of workers (including the master).
-    int nTotal;
+    boost::atomic<int> nTotal;
 
     // The temporary evaluation result.
     bool fAllOk;
@@ -54,7 +55,7 @@ private:
     // Number of verifications that haven't completed yet.
     // This includes elements that are not anymore in queue, but still in
     // worker's own batches.
-    unsigned int nTodo;
+    boost::atomic<unsigned int> nTodo;
 
     // Whether we're shutting down.
     bool fQuit;
@@ -187,7 +188,10 @@ public:
         condWorker.notify_all(); 
 
         while (nTotal > 0)
-            condQuit.wait(lock);
+        {
+            condQuit.timed_wait(lock, boost::posix_time::milliseconds(1000));
+            condWorker.notify_all();
+        }
     }
 
     ~CCheckQueue() {
