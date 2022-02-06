@@ -110,12 +110,12 @@ BitcoinGUI::BitcoinGUI(QWidget *parent):
 
     if(isTest == 1 && fTestNet)
     {
-      setWindowTitle(tr("Yacoin TESTING on TESTNET ") + tr("Wallet ") + "v" + (titVersion));
+      setWindowTitle(tr("Yacoin on TESTNET ") + tr("Wallet ") + "v" + (titVersion));
     }
 
     else if(isTest == 1)
     {
-      setWindowTitle(tr("Yacoin TESTING ") + tr("Wallet ") + "v" + (titVersion));
+      setWindowTitle(tr("Yacoin ") + tr("Wallet ") + "v" + (titVersion));
     }    
        
     else if(fTestNet)

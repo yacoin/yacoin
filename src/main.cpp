@@ -133,6 +133,7 @@ CTxMemPool mempool;
 unsigned int nTransactionsUpdated = 0;
 
 map<uint256, CBlockIndex*> mapBlockIndex;
+boost::mutex mapHashmutex;
 map<uint256, uint256> mapHash;
 // are all of these undocumented numbers a function of Nfactor?  Cpu power? Other???
 #ifndef LOW_DIFFICULTY_FOR_DEVELOPMENT
@@ -201,6 +202,7 @@ int nMedianStartingHeight = 0;
 multimap<CBlockIndex*, CBlockIndex*> mapBlocksUnlinked;
 ::int64_t nTimeBestReceived = 0;
 int nScriptCheckThreads = 0;
+int nHashCalcThreads = 0;
 
 CMedianFilter<int> cPeerBlockCounts(5, 0); // Amount of blocks that other nodes claim to have
 
@@ -260,7 +262,7 @@ int MAX_BLOCKS_IN_TRANSIT_PER_PEER = 500;
 unsigned int BLOCK_DOWNLOAD_WINDOW = MAX_BLOCKS_IN_TRANSIT_PER_PEER * 64; //32000
 unsigned int FETCH_BLOCK_DOWNLOAD = MAX_BLOCKS_IN_TRANSIT_PER_PEER * 8; //4000
 // Trigger sending getblocks from other peers when header > block + HEADER_BLOCK_DIFFERENCES_TRIGGER_GETDATA
-unsigned int HEADER_BLOCK_DIFFERENCES_TRIGGER_GETBLOCKS = 100000; //4000
+unsigned int HEADER_BLOCK_DIFFERENCES_TRIGGER_GETBLOCKS = 10000;
 /** Headers download timeout expressed in microseconds
  *  Timeout = base + per_header * (expected number of headers) */
 int64_t HEADERS_DOWNLOAD_TIMEOUT_BASE = 10 * 60 * 1000000; // 10 minutes
@@ -2638,6 +2640,37 @@ bool CScriptCheck::operator()() const
     return true;
 }
 
+bool CHashCalculation::operator()()
+{
+    // Hash calculation takes much time to finish. So checking fShutdown node regularly to quickly shut down node during hash calculation
+    if (fShutdown) {
+        return true;
+    }
+
+    unsigned long threadId = getThreadId();
+    uint256 blockSHA256Hash = pBlock->GetSHA256Hash();
+
+    {
+        boost::mutex::scoped_lock lock(mapHashmutex);
+        map<uint256, uint256>::iterator mi = mapHash.find(blockSHA256Hash);
+        if (mi != mapHash.end())
+        {
+            pBlock->blockHash = (*mi).second;
+            printf("[HashCalcThread:%ld] Already have header %s (sha256: %s)\n", threadId, pBlock->blockHash.ToString().c_str(), blockSHA256Hash.ToString().c_str());
+        }
+    }
+
+    if (pBlock->blockHash == 0)
+    {
+        uint256 blockHash = pBlock->GetHash();
+        printf("[HashCalcThread:%ld] Received header %s (sha256: %s) from node %s\n", threadId, blockHash.ToString().c_str(), blockSHA256Hash.ToString().c_str(), pNode->addrName.c_str());
+        boost::mutex::scoped_lock lock(mapHashmutex);
+        mapHash.insert(make_pair(blockSHA256Hash, blockHash));
+    }
+
+    return true;
+}
+
 bool VerifySignature(
                      const CTransaction& txFrom, 
                      const CTransaction& txTo, 
@@ -2922,6 +2955,7 @@ bool CBlock::DisconnectBlock(CValidationState &state, CTxDB& txdb, CBlockIndex* 
 }
 
 static CCheckQueue<CScriptCheck> scriptcheckqueue(128);
+static CCheckQueue<CHashCalculation> hashCalculationQueue(200);
 
 void ThreadScriptCheck(void*) 
 {
@@ -2934,6 +2968,19 @@ void ThreadScriptCheck(void*)
 void ThreadScriptCheckQuit() 
 {
     scriptcheckqueue.Quit();
+}
+
+void ThreadHashCalculation(void*)
+{
+    ++vnThreadsRunning[THREAD_HASHCALCULATION];
+    RenameThread("yacoin-hashcalc");
+    hashCalculationQueue.Thread();
+    --vnThreadsRunning[THREAD_HASHCALCULATION];
+}
+
+void ThreadHashCalculationQuit()
+{
+    hashCalculationQueue.Quit();
 }
 
 bool CBlock::ConnectBlock(CValidationState &state, CTxDB& txdb, CBlockIndex* pindex, bool fJustCheck)
@@ -4293,12 +4340,6 @@ bool CBlock::AcceptBlock(CValidationState &state, CBlockIndex **ppindex)
 
     // here would be a good place to check for new logic
 
-    // ppcoin: check pending sync-checkpoint
-    if (chainActive.Height() < nMainnetNewLogicBlockNumber)
-    {
-        Checkpoints::AcceptPendingSyncCheckpoint();
-    }
-
     return true;
 }
 
@@ -4978,18 +5019,6 @@ bool LoadBlockIndex(bool fAllowNew)
 
     {
         CTxDB txdb("r+");
-        string strPubKey = "";
-        if (!txdb.ReadCheckpointPubKey(strPubKey) || strPubKey != CSyncCheckpoint::strMasterPubKey)
-        {
-            // write checkpoint master key to db
-            txdb.TxnBegin();
-            if (!txdb.WriteCheckpointPubKey(CSyncCheckpoint::strMasterPubKey))
-                return error("LoadBlockIndex() : failed to write new checkpoint master key to db");
-            if (!txdb.TxnCommit())
-                return error("LoadBlockIndex() : failed to commit new checkpoint master key to db");
-            if ((!fTestNet) && !Checkpoints::ResetSyncCheckpoint())
-                return error("LoadBlockIndex() : failed to reset sync-checkpoint");
-        }
 
         // upgrade time set to zero if blocktreedb initialized
         if (txdb.ReadModifierUpgradeTime(nModifierUpgradeTime))
@@ -5985,32 +6014,71 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
             //ReadCompactSize(vRecv); // ignore vchBlockSig; assume it is 0.
         }
 
-        LOCK(cs_main);
-
         if (nCount == 0) {
             // Nothing interesting. Stop asking this peers for more headers.
             return true;
         }
 
+        // Calculate header hash
+        printf("Start calculating hash for %d block headers\n", nCount);
+        if (nHashCalcThreads > 1)
+        {
+            CCheckQueueControl<CHashCalculation> control(&hashCalculationQueue);
+            std::vector<CHashCalculation> vHashCalc;
+            vHashCalc.reserve(nCount);
+
+            int index = 0;
+            BOOST_FOREACH(CBlock& header, headers) {
+                CHashCalculation hashCalc(&header, pfrom);
+                vHashCalc.push_back(CHashCalculation());
+                hashCalc.swap(vHashCalc.back());
+                index++;
+            }
+            control.Add(vHashCalc);
+            control.Wait();
+
+            // Hash calculation takes much time to finish. So checking fShutdown node regularly to quickly shut down node during hash calculation
+            if (fShutdown) {
+                return true;
+            }
+        }
+        else
+        {
+            BOOST_FOREACH(CBlock& header, headers) {
+                // SHA256 doesn't cost much cpu usage to calculate
+                uint256 blockSHA256Hash = header.GetSHA256Hash();
+
+                map<uint256, uint256>::iterator mi = mapHash.find(blockSHA256Hash);
+                if (mi != mapHash.end())
+                {
+                    header.blockHash = (*mi).second;
+                    printf("Already have header %s (sha256: %s)\n", header.blockHash.ToString().c_str(), blockSHA256Hash.ToString().c_str());
+                }
+
+                if (header.blockHash == 0)
+                {
+                    uint256 blockHash = header.GetHash();
+                    printf("Received header %s (sha256: %s) from node %s\n", blockHash.ToString().c_str(), blockSHA256Hash.ToString().c_str(), pfrom->addrName.c_str());
+                    mapHash.insert(make_pair(blockSHA256Hash, blockHash));
+                }
+
+                // Hash calculation takes much time to finish. So checking fShutdown node regularly to quickly shut down node during hash calculation
+                if (fShutdown) {
+                    return true;
+                }
+            }
+        }
+        printf("Finish calculating hash for %d block headers\n", nCount);
+
+        LOCK(cs_main);
+
         CBlockIndex *pindexLast = NULL;
         BOOST_FOREACH(CBlock& header, headers) {
-            // SHA256 doesn't cost much cpu usage to calculate
-            uint256 blockHash;
-            uint256 blockSHA256Hash = header.GetSHA256Hash();
-            map<uint256, uint256>::iterator mi = mapHash.find(blockSHA256Hash);
-            if (mi != mapHash.end())
+            std::map<uint256, CBlockIndex *>::iterator miBlockIndex = mapBlockIndex.find(header.GetHash());
+            if (miBlockIndex != mapBlockIndex.end())
             {
-                uint256 blockHash = (*mi).second;
-                printf("Already have header %s (sha256: %s)\n", blockHash.ToString().c_str(), blockSHA256Hash.ToString().c_str());
-                std::map<uint256, CBlockIndex *>::iterator miBlockIndex = mapBlockIndex.find(blockHash);
                 pindexLast = miBlockIndex->second;
                 continue;
-            }
-            else
-            {
-                blockHash = header.GetHash();
-                printf("Received header %s (sha256: %s) from node %s\n", blockHash.ToString().c_str(), blockSHA256Hash.ToString().c_str(), pfrom->addrName.c_str());
-                mapHash.insert(make_pair(blockSHA256Hash, blockHash));
             }
 
             CValidationState state;
@@ -6037,6 +6105,10 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
             state.fSyncStarted = false;
             nSyncStarted--;
             state.nHeadersSyncTimeout = 0;
+            printf(
+                    "Stop syncing headers from peer=%s, it may not have latest blockchain (startheight=%d < nMedianStartingHeight=%d), current best header has height = %d\n",
+                    pfrom->addrName.c_str(), pfrom->nStartingHeight,
+                    nMedianStartingHeight, pindexBestHeader->nHeight);
         }
         else if (nCount == MAX_HEADERS_RESULTS && pindexLast) {
             // Headers message had its maximum size; the peer may have more headers.
@@ -6044,8 +6116,20 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
             // from there instead.
             // Set the timeout to trigger disconnect logic
             state.nHeadersSyncTimeout = GetTimeMicros() + HEADERS_DOWNLOAD_TIMEOUT_BASE;
-            printf("more getheaders (%d) to end to peer=%s (startheight:%d)\n", pindexLast->nHeight, pfrom->addrName.c_str(), pfrom->nStartingHeight);
-            pfrom->PushMessage("getheaders", chainActive.GetLocator(pindexLast), uint256(0));
+            printf("more getheaders (%d) to end to peer=%s (startheight:%d), current best header has height = %d\n", pindexLast->nHeight, pfrom->addrName.c_str(), pfrom->nStartingHeight);
+            pfrom->PushMessage("getheaders", chainActive.GetLocator(pindexLast), uint256(0), pindexBestHeader->nHeight);
+        }
+        else if (nCount < MAX_HEADERS_RESULTS && pindexBestHeader->nHeight < nMedianStartingHeight)
+        {
+            // This node doesn't have latest blockchain or there is an error with this node which make it not send full 2000 headers
+            state.fSyncStarted = false;
+            nSyncStarted--;
+            state.nHeadersSyncTimeout = 0;
+            printf(
+                    "Stop syncing headers from peer=%s, this node doesn't have latest blockchain or there is an error with this node which make it only send %d headers"
+                    "(startheight=%d, nMedianStartingHeight=%d), current best header has height = %d\n",
+                    pfrom->addrName.c_str(), nCount, pfrom->nStartingHeight,
+                    nMedianStartingHeight, pindexBestHeader->nHeight);
         }
     }
 
@@ -6534,7 +6618,7 @@ bool SendMessages(CNode *pto, bool fSendTrickle)
         bool fFetch = true;
         if (!state.fSyncStarted && !pto->fClient && fFetch) {
             // Only actively request headers from a single peer, unless we're close to today.
-            if ((nSyncStarted == 0 && pto->nStartingHeight >= nMedianStartingHeight) || pindexBestHeader->GetBlockTime() > GetAdjustedTime() - 24 * 60 * 60) {
+            if ((nSyncStarted == 0 || pindexBestHeader->GetBlockTime() > GetAdjustedTime() - 24 * 60 * 60) && pto->nStartingHeight >= nMedianStartingHeight ) {
                 state.fSyncStarted = true;
                 state.nHeadersSyncTimeout = GetTimeMicros() + HEADERS_DOWNLOAD_TIMEOUT_BASE;
                 nSyncStarted++;
@@ -6690,7 +6774,7 @@ bool SendMessages(CNode *pto, bool fSendTrickle)
                             (nSyncHeight < bestHeaderHeight) &&
                             state.nLastTimeSendingGetBlocks < nNow - 60 * 1000000) // avoid spamming getblocks, just send every 1 minute
                     {
-                        pto->PushMessage("getblocks", chainActive.GetLocator(pindexBestHeader), pindexBestHeader->pprev->GetBlockHash());
+                        pto->PushMessage("getblocks", chainActive.GetLocator(pindexBestHeader->pprev->pprev), pindexBestHeader->GetBlockHash());
                         state.nLastTimeSendingGetBlocks = GetTimeMicros();
                     }
                 }

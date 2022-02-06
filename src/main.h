@@ -107,7 +107,7 @@ extern int MAX_BLOCKS_IN_TRANSIT_PER_PEER;
 extern unsigned int BLOCK_DOWNLOAD_WINDOW; //32000
 extern unsigned int FETCH_BLOCK_DOWNLOAD; //4000
 // Trigger sending getblocks from other peers when header > block + HEADER_BLOCK_DIFFERENCES_TRIGGER_GETDATA
-extern unsigned int HEADER_BLOCK_DIFFERENCES_TRIGGER_GETBLOCKS; //4000
+extern unsigned int HEADER_BLOCK_DIFFERENCES_TRIGGER_GETBLOCKS; //default = 10000
 /** Headers download timeout expressed in microseconds
  *  Timeout = base + per_header * (expected number of headers) */
 extern int64_t HEADERS_DOWNLOAD_TIMEOUT_BASE; // 10 minutes
@@ -147,6 +147,7 @@ extern const ::int64_t
 extern CScript COINBASE_FLAGS;
 extern CCriticalSection cs_main;
 extern std::map<uint256, CBlockIndex*> mapBlockIndex;
+extern boost::mutex mapHashmutex;
 extern std::map<uint256, uint256> mapHash; // map of (SHA256-hash, chacha-hash)
 extern std::set<CBlockIndex*, CBlockIndexWorkComparator> setBlockIndexCandidates;
 extern unsigned int nNodeLifespan;
@@ -174,6 +175,7 @@ extern ::int64_t nMinimumInputValue;
 extern bool fUseFastIndex;
 extern bool fReindex;
 extern int nScriptCheckThreads;
+extern int nHashCalcThreads;
 extern const uint256 entropyStore[38];
 extern bool fStoreBlockHashToDb;
 
@@ -313,6 +315,10 @@ bool LoadExternalBlockFile(FILE* fileIn);
 void ThreadScriptCheck(void* parg);
 // Stop the script checking threads
 void ThreadScriptCheckQuit();
+// Run an instance of the hash calculation thread
+void ThreadHashCalculation(void* parg);
+// Stop the hash calculation threads
+void ThreadHashCalculationQuit();
 
 bool CheckProofOfWork(uint256 hash, unsigned int nBits);
 unsigned int GetNextTargetRequired(const CBlockIndex* pindexLast, bool fProofOfStake);
@@ -1092,7 +1098,25 @@ public:
     }
 };
 
+/** Closure representing one block hash calculation
+ *  Note that this stores pointer to the block*/
+class CHashCalculation
+{
+private:
+    CBlock *pBlock;
+    CNode* pNode;
 
+public:
+    CHashCalculation() {}
+    CHashCalculation(CBlock* pBlock, CNode* pNode) :
+        pBlock(pBlock), pNode(pNode) { }
+
+    bool operator()();
+    void swap(CHashCalculation &check) {
+        std::swap(pBlock, check.pBlock);
+        std::swap(pNode, check.pNode);
+    }
+};
 
 
 /** A transaction with a merkle branch linking it to the block chain. */

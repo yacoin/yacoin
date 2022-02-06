@@ -1564,6 +1564,13 @@ bool NewThread(void(*pfn)(void*), void* parg)
     return true;
 }
 
+unsigned long getThreadId(){
+    std::string threadId = boost::lexical_cast<std::string>(boost::this_thread::get_id());
+    unsigned long threadNumber = 0;
+    sscanf(threadId.c_str(), "%lx", &threadNumber);
+    return threadNumber;
+}
+
 void Timestamp::stamp()
 {
     struct timeval tv;
