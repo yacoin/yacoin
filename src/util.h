@@ -586,6 +586,7 @@ inline void ExitThread(size_t nExitCode)
 #endif
 
 void RenameThread(const char* name);
+unsigned long getThreadId();
 
 // interestingly, here, 32 bits is explicitly mentioned!!
 inline ::uint32_t ByteReverse(::uint32_t value)

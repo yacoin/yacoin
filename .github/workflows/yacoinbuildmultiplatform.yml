@@ -57,7 +57,7 @@ jobs:
           name: yacoin-qt-ubuntu-18.04
           path: /home/runner/work/yacoin/yacoin/release/yacoin-qt
   build-windows:
-    runs-on: windows-latest  
+    runs-on: windows-2019  
     steps:
       - uses: actions/checkout@v2
       - name: build
