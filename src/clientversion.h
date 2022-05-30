@@ -6,7 +6,7 @@
 //
 
 // These need to be macros, as version.cpp's and yacoin-qt.rc's voodoo requires it
-#define CLIENT_ _MAJOR       1
+#define CLIENT_VERSION_MAJOR       1
 #define CLIENT_VERSION_MINOR       1
 #define CLIENT_VERSION_REVISION    0
 #define CLIENT_VERSION_BUILD       0
