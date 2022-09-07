@@ -3144,19 +3144,17 @@ bool CBlock::ConnectBlock(CValidationState &state, CTxDB& txdb, CBlockIndex* pin
         return state.DoS(100, false);     // a direct ban
     }
 
-    if (IsProofOfWork())
-    {
-        ::int64_t nBlockReward = GetProofOfWorkReward(nBits, nFees);
+	if (IsProofOfWork()) {
+		::int64_t nBlockReward = GetProofOfWorkReward(nBits, nFees);
 
-        // Check coinbase reward
-        if (vtx[0].GetValueOut() > nBlockReward)
-            return error(
-                        "CheckBlock () : coinbase reward exceeded "
-                        "(actual=%" PRId64 " vs calculated=%" PRId64 ")",
-                        vtx[0].GetValueOut(),
-                        nBlockReward
-                        );
-    }
+		// Check coinbase reward
+		if (vtx[0].GetValueOut() > nBlockReward) {
+			return state.DoS(100,
+					error("CheckBlock () : coinbase reward exceeded "
+							"(actual=%" PRId64 " vs calculated=%" PRId64 ")",
+							vtx[0].GetValueOut(), nBlockReward));
+		}
+	}
 //_____________________ 
 
     // track money supply and mint amount info
