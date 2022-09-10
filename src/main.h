@@ -63,6 +63,8 @@ extern int
 static const unsigned int MAX_GENESIS_BLOCK_SIZE = 1000000;
 static const unsigned int MAX_ORPHAN_TRANSACTIONS = 10000;
 static const unsigned int MAX_INV_SZ = 50000;
+/** Maxiumum number of signature check operations in an IsStandard() P2SH script */
+static const unsigned int MAX_P2SH_SIGOPS = 21;
 
 static const ::int64_t MIN_TX_FEE = CENT;
 static const ::int64_t MIN_RELAY_TX_FEE = MIN_TX_FEE;
