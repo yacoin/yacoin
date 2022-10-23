@@ -5514,6 +5514,29 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
 
         pfrom->fSuccessfullyConnected = true;
 
+        // Send hash of transactions in mempool to the connected node
+        {
+            std::vector<uint256>
+                vtxid;
+
+            mempool.queryHashes(vtxid);
+
+            vector<CInv>
+                vInv;
+
+            for (unsigned int i = 0; i < vtxid.size(); ++i)
+            {
+                CInv
+                    inv(MSG_TX, vtxid[i]);
+
+                vInv.push_back(inv);
+                if (i == (MAX_INV_SZ - 1))
+                        break;
+            }
+            if (vInv.size() > 0)
+                pfrom->PushMessage("inv", vInv);
+        }
+
         printf("receive version message: version %d, blocks=%d, us=%s, them=%s, peer=%s\n", 
                 pfrom->nVersion, 
                 pfrom->nStartingHeight, 
