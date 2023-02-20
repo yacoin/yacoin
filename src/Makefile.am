@@ -61,6 +61,7 @@ yacoind-scrypt-jane.o: scrypt-jane/scrypt-jane.c
 	gcc -c $(xCXXFLAGS_SCRYPT_JANE) -MMD -o $@ $<
 
 libyacoin_common_a_SOURCES= \
+    dbwrapper.cpp \
     txdb-leveldb.cpp \
     alert.cpp \
     version.cpp \

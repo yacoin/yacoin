@@ -236,6 +236,7 @@ BITCOIN_QT_CPP = \
   qt/optionsmodel.cpp \
   qt/qrcodedialog.cpp \
   init.cpp \
+  dbwrapper.cpp \
   txdb-leveldb.cpp \
   alert.cpp \
   version.cpp \

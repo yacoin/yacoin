@@ -248,6 +248,7 @@ obj/scrypt-jane.o \
 obj/stun.o \
 obj/sync.o \
 obj/txdb-bdb.o \
+obj/dbwrapper.o \
 obj/txdb-leveldb.o \
 obj/util.o \
 obj/version.o \
@@ -282,6 +283,9 @@ endif
 ######################
 #.genjane:
 #	touch .genjane; gcc -c -O3 -DSCRYPT_CHACHA -DSCRYPT_KECCAK512 -DSCRYPT_CHOOSE_COMPILETIME -o obj/scrypt-jane.o scrypt-jane/scrypt-jane.c
+
+obj/dbwrapper.o: dbwrapper.cpp
+	$(CXX) -c -frandom-seed=$@ $(CFLAGS) $(INCLUDEPATHS) -MMD -o $@ $<
 
 obj/scrypt-jane.o: scrypt-jane/scrypt-jane.c
 	$(CXX) -c -frandom-seed=$@ $(CFLAGS) $(INCLUDEPATHS) -MMD -o $@ $<
