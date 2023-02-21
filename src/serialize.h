@@ -56,6 +56,15 @@ inline T& REF(const T& val)
     return const_cast<T&>(val);
 }
 
+/**
+ * Used to acquire a non-const pointer "this" to generate bodies
+ * of const serialization operations from a template
+ */
+template<typename T>
+inline T* NCONST_PTR(const T* val)
+{
+    return const_cast<T*>(val);
+}
 /////////////////////////////////////////////////////////////////
 //
 // Templates for serializing to anything that looks like a stream,
@@ -74,6 +83,22 @@ enum
 	 SER_BLOCKHEADERONLY = (1 << 17),
 
 };
+
+/**
+ * Implement three methods for serializable objects. These are actually wrappers over
+ * "SerializationOp" template, which implements the body of each class' serialization
+ * code. Adding "ADD_SERIALIZE_METHODS" in the body of the class causes these wrappers to be
+ * added as members.
+ */
+#define ADD_SERIALIZE_METHODS                                         \
+    template<typename Stream>                                         \
+    void Serialize(Stream& s, int nType, int nVersion) const {        \
+        NCONST_PTR(this)->SerializationOp(s, CSerActionSerialize(), int nType, int nVersion);  \
+    }                                                                 \
+    template<typename Stream>                                         \
+    void Unserialize(Stream& s, int nType, int nVersion) {            \
+        SerializationOp(s, CSerActionUnserialize(), int nType, int nVersion);                  \
+    }
 
 #ifdef _MSC_VER
 #define IMPLEMENT_SERIALIZE(statements)    \
