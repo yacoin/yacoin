@@ -31,6 +31,7 @@
  #include "scrypt.h"
 #endif
 
+#include "amount.h"
 #include <list>
 #include <map>
 
@@ -69,7 +70,6 @@ static const unsigned int MAX_P2SH_SIGOPS = 21;
 static const ::int64_t MIN_TX_FEE = CENT;
 static const ::int64_t MIN_RELAY_TX_FEE = MIN_TX_FEE;
 
-static const ::int64_t MAX_MONEY = 2000000000 * COIN;
 static const ::int64_t MAX_MINT_PROOF_OF_WORK = 100 * COIN;
 static const ::int64_t MAX_MINT_PROOF_OF_STAKE = 1 * COIN;
 static const ::int64_t MIN_TXOUT_AMOUNT = CENT/100;
@@ -92,7 +92,6 @@ static const int
 //static const int
 //    CURRENT_VERSION_previous = VERSION_of_block_for_yac_044_old;
 
-inline bool MoneyRange(::int64_t nValue) { return (nValue >= 0 && nValue <= MAX_MONEY); }
 // Maximum number of script-checking threads allowed
 static const int MAX_SCRIPTCHECK_THREADS = 16;
 /** Timeout in seconds during which a peer must stall block download progress before being disconnected. */
