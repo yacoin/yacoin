@@ -24,7 +24,7 @@
 #endif
 
 #ifndef H_BITCOIN_SCRIPT
- #include "script.h"
+ #include "script/script.h"
 #endif
 
 #ifndef SCRYPT_H

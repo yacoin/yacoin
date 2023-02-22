@@ -12,7 +12,7 @@
 #include <boost/tuple/tuple.hpp>
 
 #ifndef H_BITCOIN_SCRIPT
- #include "script.h"
+ #include "script/script.h"
 #endif
 
 #ifndef BITCOIN_MAIN_H

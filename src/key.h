@@ -67,7 +67,7 @@ public:
     CKeyID(const uint160 &in) : uint160(in) { }
 };
 
-/** A reference to a CScript: the Hash160 of its serialization (see script.h) */
+/** A reference to a CScript: the Hash160 of its serialization (see script/script.h) */
 class CScriptID : public uint160
 {
 public:

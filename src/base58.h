@@ -27,7 +27,7 @@
 #endif
 
 #ifndef H_BITCOIN_SCRIPT
- #include "script.h"
+ #include "script/script.h"
 #endif
 
 static const char* pszBase58 = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";

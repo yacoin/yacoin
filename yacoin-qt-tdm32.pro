@@ -175,7 +175,7 @@ HEADERS += \
     src/db.h \
     src/txdb.h \
     src/walletdb.h \
-    src/script.h \
+    src/script/script.h \
     src/init.h \
     src/irc.h \
     src/mruset.h \
@@ -253,7 +253,7 @@ SOURCES += src/qt/bitcoin.cpp src/qt/bitcoingui.cpp \
     src/util.cpp \
     src/netbase.cpp \
     src/key.cpp \
-    src/script.cpp \
+    src/script/script.cpp \
     src/main.cpp \
     src/miner.cpp \
     src/init.cpp \

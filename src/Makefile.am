@@ -88,7 +88,7 @@ libyacoin_common_a_SOURCES= \
     rpcwallet.cpp \
     rpcblockchain.cpp \
     rpcrawtransaction.cpp \
-    script.cpp \
+    script/script.cpp \
     sync.cpp \
     util.cpp \
     wallet.cpp \
