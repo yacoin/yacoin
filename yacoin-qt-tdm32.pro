@@ -266,6 +266,7 @@ SOURCES += src/qt/bitcoin.cpp src/qt/bitcoingui.cpp \
     src/addrman.cpp \
     src/db.cpp \
     src/walletdb.cpp \
+    src/assets/assettypes.cpp \
     src/primitives/transaction.cpp \
     src/primitives/block.cpp \
     src/qt/clientmodel.cpp \

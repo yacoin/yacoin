@@ -93,11 +93,11 @@ enum
 #define ADD_SERIALIZE_METHODS                                         \
     template<typename Stream>                                         \
     void Serialize(Stream& s, int nType, int nVersion) const {        \
-        NCONST_PTR(this)->SerializationOp(s, CSerActionSerialize(), int nType, int nVersion);  \
+        NCONST_PTR(this)->SerializationOp(s, CSerActionSerialize(), nType, nVersion);  \
     }                                                                 \
     template<typename Stream>                                         \
     void Unserialize(Stream& s, int nType, int nVersion) {            \
-        SerializationOp(s, CSerActionUnserialize(), int nType, int nVersion);                  \
+        SerializationOp(s, CSerActionUnserialize(), nType, nVersion);                  \
     }
 
 #ifdef _MSC_VER
