@@ -173,6 +173,7 @@ HEADERS += \
     src/ministun.h \
     src/key.h \
     src/db.h \
+    src/dbwrapper.h \
     src/txdb.h \
     src/walletdb.h \
     src/script/script.h \
@@ -265,6 +266,7 @@ SOURCES += src/qt/bitcoin.cpp src/qt/bitcoingui.cpp \
     src/checkpoints.cpp \
     src/addrman.cpp \
     src/db.cpp \
+    src/dbwrapper.cpp \
     src/walletdb.cpp \
     src/assets/assettypes.cpp \
     src/primitives/transaction.cpp \
