@@ -141,6 +141,11 @@ CDBWrapper::CDBWrapper(DatabaseType dbType, const char *pszMode)
     printf("Opened LevelDB successfully\n");
 }
 
+CDBIterator* CDBWrapper::NewIterator()
+{
+    return new CDBIterator(*this, pdb->NewIterator(leveldb::ReadOptions()));
+}
+
 void CDBWrapper::Close()
 {
     delete txdb[mDbType];
@@ -224,6 +229,11 @@ bool CDBWrapper::ScanBatch(const CDataStream &key, string *value, bool *deleted)
     }
     return scanner.foundEntry;
 }
+
+CDBIterator::~CDBIterator() { delete piter; }
+bool CDBIterator::Valid() const { return piter->Valid(); }
+void CDBIterator::SeekToFirst() { piter->SeekToFirst(); }
+void CDBIterator::Next() { piter->Next(); }
 
 #ifdef _MSC_VER
 #include "msvc_warnings.pop.h"

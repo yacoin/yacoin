@@ -33,6 +33,9 @@
 
 #include "primitives/transaction.h"
 #include "primitives/block.h"
+#include "assets/assettypes.h"
+#include "assets/assetdb.h"
+#include "assets/assets.h"
 #include "amount.h"
 #include <list>
 #include <map>
@@ -49,6 +52,34 @@ class CInv;
 class CRequestTracker;
 class CNode;
 class CBlockIndexWorkComparator;
+
+//
+// GLOBAL VARIABLES USED FOR ASSET MANAGEMENT SYSTEM
+//
+/** Global variable that point to the active assets database (protected by cs_main) */
+extern CAssetsDB *passetsdb;
+
+/** Global variable that point to the active assets (protected by cs_main) */
+extern CAssetsCache *passets;
+
+/** Global variable that point to the assets metadata LRU Cache (protected by cs_main) */
+extern CLRUCache<std::string, CDatabasedAssetData> *passetsCache;
+extern bool fAssetIndex;
+//
+// END OF GLOBAL VARIABLES USED FOR ASSET MANAGEMENT SYSTEM
+//
+
+//
+// FUNCTIONS USED FOR ASSET MANAGEMENT SYSTEM
+//
+/** Flush all state, indexes and buffers to disk. */
+void FlushAssetToDisk();
+bool AreAssetsDeployed();
+CAssetsCache* GetCurrentAssetCache();
+//
+// END OF FUNCTIONS USED FOR ASSET MANAGEMENT SYSTEM
+//
+
 
 //
 // Global state
@@ -141,8 +172,8 @@ extern ::uint64_t nLastBlockSize;
 extern ::uint32_t nLastCoinStakeSearchInterval;
 extern const std::string strMessageMagic;
 extern ::int64_t nTimeBestReceived;
-extern CCriticalSection cs_setpwalletRegistered;
-extern std::set<CWallet*> setpwalletRegistered;
+extern CCriticalSection cs_vpwalletRegistered;
+extern std::vector<CWallet*> vpwalletRegistered;
 extern unsigned char pchMessageStart[4];
 extern ::int64_t nBlockRewardPrev;
 extern const ::int64_t nSimulatedMOneySupplyAtFork;
@@ -271,7 +302,7 @@ public:
 extern CChain chainActive;
 
 void RegisterWallet(CWallet* pwalletIn);
-void UnregisterWallet(CWallet* pwalletIn);
+void CloseWallets();
 void SyncWithWallets(const CTransaction& tx, const CBlock* pblock = NULL, bool fUpdate = false, bool fConnect = true);
 /** Register with a network node to receive its signals */
 void RegisterNodeSignals(CNodeSignals& nodeSignals);
@@ -1089,6 +1120,8 @@ public:
     mutable CCriticalSection cs;
     std::map<uint256, CTransaction> mapTx;
     std::map<COutPoint, CInPoint> mapNextTx;
+    std::map<std::string, uint256> mapAssetToHash;
+    std::map<uint256, std::string> mapHashToAsset;
 
     bool accept(CValidationState &state, CTxDB& txdb, CTransaction &tx,
                 bool fCheckInputs, bool* pfMissingInputs);

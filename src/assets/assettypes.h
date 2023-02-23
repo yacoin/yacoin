@@ -24,15 +24,10 @@ enum class AssetType
     ROOT = 0,
     SUB = 1,
     UNIQUE = 2,
-    MSGCHANNEL = 3,
-    QUALIFIER = 4,
-    SUB_QUALIFIER = 5,
-    RESTRICTED = 6,
-    VOTE = 7,
-    REISSUE = 8,
-    OWNER = 9,
-    NULL_ADD_QUALIFIER = 10,
-    INVALID = 11
+    OWNER = 3,
+    VOTE = 4,
+    REISSUE = 5,
+    INVALID = 6
 };
 
 int IntFromAssetType(AssetType type);
@@ -183,6 +178,7 @@ public:
     {
         SetNull();
     }
+    CAssetTransfer(const std::string& strAssetName, const CAmount& nAmount);
 
     void SetNull()
     {
@@ -199,8 +195,6 @@ public:
         READWRITE(strName);
         READWRITE(nAmount);
     }
-
-    CAssetTransfer(const std::string& strAssetName, const CAmount& nAmount);
     bool IsValid(std::string& strError) const;
     void ConstructTransaction(CScript& script) const;
 };

@@ -184,10 +184,11 @@ extern bool
     fNoListen,
     fLogTimestamps,
     fReopenDebugLog;
-extern ::int32_t 
+extern ::int32_t
     nTestNetNewLogicBlockNumber,
 	nMainnetNewLogicBlockNumber,
     nYac20BlockNumberTime;
+extern ::int32_t nAssetSupportBlockNumber;
 extern ::uint32_t
     nDifficultyInterval,
     nEpochInterval;
@@ -364,7 +365,8 @@ std::string HexStr(const T itbegin, const T itend, bool fSpaces=false)
     return rv;
 }
 
-inline std::string HexStr(const std::vector<unsigned char>& vch, bool fSpaces=false)
+template<typename T>
+inline std::string HexStr(const T& vch, bool fSpaces=false)
 {
     return HexStr(vch.begin(), vch.end(), fSpaces);
 }

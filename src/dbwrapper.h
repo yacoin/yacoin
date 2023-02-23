@@ -1,10 +1,13 @@
 // Copyright (c) 2009-2012 The Bitcoin Developers.
+// Copyright (c) 2023 The Yacoin Developers.
 // Authored by Google, Inc.
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
-#ifndef BITCOIN_MAIN_H
- #include "main.h"
-#endif
+//#ifndef BITCOIN_MAIN_H
+// #include "main.h"
+//#endif
+#ifndef YACOIN_DBWRAPPER_H
+#define YACOIN_DBWRAPPER_H
 
 #include <map>
 #include <string>
@@ -12,6 +15,11 @@
 
 #include <leveldb/db.h>
 #include <leveldb/write_batch.h>
+
+static const size_t DBWRAPPER_PREALLOC_KEY_SIZE = 64;
+static const size_t DBWRAPPER_PREALLOC_VALUE_SIZE = 1024;
+
+class CDBIterator;
 
 enum DatabaseType
 {
@@ -72,6 +80,8 @@ protected:
     // or leaves value alone and sets deleted = true if activeBatch contains a
     // delete for it.
     bool ScanBatch(const CDataStream &key, std::string *value, bool *deleted) const;
+
+    CDBIterator *NewIterator();
 
     template<typename K, typename T>
     bool Read(const K& key, T& value)
@@ -227,3 +237,63 @@ protected:
         return Write(std::string("version"), nVersion);
     }
 };
+
+class CDBIterator
+{
+private:
+    const CDBWrapper &parent;
+    leveldb::Iterator *piter;
+
+public:
+
+    /**
+     * @param[in] _parent          Parent CDBWrapper instance.
+     * @param[in] _piter           The original leveldb iterator.
+     */
+    CDBIterator(const CDBWrapper &_parent, leveldb::Iterator *_piter) :
+        parent(_parent), piter(_piter) { };
+    ~CDBIterator();
+
+    bool Valid() const;
+
+    void SeekToFirst();
+
+    template<typename K> void Seek(const K& key) {
+        CDataStream ssKey(SER_DISK, CLIENT_VERSION);
+        ssKey.reserve(DBWRAPPER_PREALLOC_KEY_SIZE);
+        ssKey << key;
+        leveldb::Slice slKey(ssKey.data(), ssKey.size());
+        piter->Seek(slKey);
+    }
+
+    void Next();
+
+    template<typename K> bool GetKey(K& key) {
+        leveldb::Slice slKey = piter->key();
+        try {
+            CDataStream ssKey(slKey.data(), slKey.data() + slKey.size(), SER_DISK, CLIENT_VERSION);
+            ssKey >> key;
+        } catch (const std::exception&) {
+            return false;
+        }
+        return true;
+    }
+
+    template<typename V> bool GetValue(V& value) {
+        leveldb::Slice slValue = piter->value();
+        try {
+            CDataStream ssValue(slValue.data(), slValue.data() + slValue.size(), SER_DISK, CLIENT_VERSION);
+            ssValue >> value;
+        } catch (const std::exception&) {
+            return false;
+        }
+        return true;
+    }
+
+    unsigned int GetValueSize() {
+        return piter->value().size();
+    }
+
+};
+
+#endif // YACOIN_DBWRAPPER_H

@@ -57,6 +57,7 @@ bool DecodeBase58Check(const std::string& str, std::vector<unsigned char>& vchRe
 
 std::string EncodeDestination(const CTxDestination& dest);
 CTxDestination DecodeDestination(const std::string& str);
+bool IsValidDestinationString(const std::string& str);
 
 /** Base class for all base58-encoded data */
 class CBase58Data

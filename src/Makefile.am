@@ -62,6 +62,8 @@ yacoind-scrypt-jane.o: scrypt-jane/scrypt-jane.c
 
 libyacoin_common_a_SOURCES= \
     assets/assettypes.cpp \
+    assets/assetdb.cpp \
+    assets/assets.cpp \
     primitives/transaction.cpp \
     primitives/block.cpp \
     dbwrapper.cpp \

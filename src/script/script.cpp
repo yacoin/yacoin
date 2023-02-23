@@ -19,6 +19,8 @@
  #include "main.h"
 #endif
 
+#include "assets/assets.h"
+
 using namespace boost;
 
 using std::vector;
@@ -2029,9 +2031,49 @@ bool ExtractDestination(const CScript& scriptPubKey, CTxDestination& addressRet)
     {
         addressRet = CScriptID(uint160(vSolutions[0]));
         return true;
+    /** YAC_ASSET START */
+    } else if (whichType == TX_NEW_ASSET || whichType == TX_REISSUE_ASSET || whichType == TX_TRANSFER_ASSET) {
+        addressRet = CKeyID(uint160(vSolutions[0]));
+        return true;
     }
+     /** YAC_ASSET END */
     // Multisig txns have more than one address...
     return false;
+}
+
+bool ExtractDestinations(const CScript& scriptPubKey, txnouttype& typeRet, vector<CTxDestination>& addressRet, int& nRequiredRet)
+{
+    addressRet.clear();
+    typeRet = TX_NONSTANDARD;
+    vector<valtype> vSolutions;
+    if (!Solver(scriptPubKey, typeRet, vSolutions))
+        return false;
+    if (typeRet == TX_NULL_DATA)
+        return true;
+
+    if (typeRet == TX_MULTISIG)
+    {
+        nRequiredRet = vSolutions.front()[0];
+        for (unsigned int i = 1; i < vSolutions.size()-1; i++)
+        {
+            CTxDestination address = CPubKey(vSolutions[i]).GetID();
+            addressRet.push_back(address);
+        }
+    }
+    else
+    {
+        nRequiredRet = 1;
+        CTxDestination address;
+        if (!ExtractDestination(scriptPubKey, address))
+           return false;
+        addressRet.push_back(address);
+    }
+
+    return true;
+}
+
+bool IsValidDestination(const CTxDestination& dest) {
+    return dest.which() != 0;
 }
 
 class CAffectedKeysVisitor : public boost::static_visitor<void> {
@@ -2069,37 +2111,6 @@ public:
 
 void ExtractAffectedKeys(const CKeyStore &keystore, const CScript& scriptPubKey, std::vector<CKeyID> &vKeys) {
     CAffectedKeysVisitor(keystore, vKeys).Process(scriptPubKey);
-}
-
-bool ExtractDestinations(const CScript& scriptPubKey, txnouttype& typeRet, vector<CTxDestination>& addressRet, int& nRequiredRet)
-{
-    addressRet.clear();
-    typeRet = TX_NONSTANDARD;
-    vector<valtype> vSolutions;
-    if (!Solver(scriptPubKey, typeRet, vSolutions))
-        return false;
-    if (typeRet == TX_NULL_DATA)
-        return true;
-
-    if (typeRet == TX_MULTISIG)
-    {
-        nRequiredRet = vSolutions.front()[0];
-        for (unsigned int i = 1; i < vSolutions.size()-1; i++)
-        {
-            CTxDestination address = CPubKey(vSolutions[i]).GetID();
-            addressRet.push_back(address);
-        }
-    }
-    else
-    {
-        nRequiredRet = 1;
-        CTxDestination address;
-        if (!ExtractDestination(scriptPubKey, address))
-           return false;
-        addressRet.push_back(address);
-    }
-
-    return true;
 }
 
 bool VerifyScript(const CScript& scriptSig, const CScript& scriptPubKey, const CTransaction& txTo, unsigned int nIn,
@@ -2161,6 +2172,8 @@ bool SignSignature(const CKeyStore &keystore, const CScript& fromPubKey, CTransa
         // Solver returns the subscript that need to be evaluated;
         // the final scriptSig is the signatures from that
         // and then the serialized subscript:
+        // Important note: Until this step, we only have the redeemscript stored in txin.scriptSig. We still need signature for the public key
+        // specified in the redeemscript. Below steps do that for us.
         CScript subscript = txin.scriptSig;
 
         // Recompute txn hash using subscript in place of scriptPubKey:
@@ -2374,6 +2387,103 @@ bool CScript::IsPayToScriptHash() const
             this->at(22) == OP_EQUAL);
 }
 
+/** YAC_ASSET START */
+bool CScript::IsAssetScript() const
+{
+    int nType = 0;
+    bool isOwner = false;
+    int start = 0;
+    return IsAssetScript(nType, isOwner, start);
+}
+
+bool CScript::IsAssetScript(int& nType, bool& isOwner) const
+{
+    int start = 0;
+    return IsAssetScript(nType, isOwner, start);
+}
+
+bool CScript::IsAssetScript(int& nType, bool& fIsOwner, int& nStartingIndex) const
+{
+    if (this->size() > 31) {
+        if ((*this)[25] == OP_YAC_ASSET) { // OP_YAC_ASSET is always in the 25 index of the script if it exists
+            int index = -1;
+            if ((*this)[27] == YAC_Y) { // Check to see if YAC starts at 27 ( this->size() < 105)
+                if ((*this)[28] == YAC_A)
+                    if ((*this)[29] == YAC_C)
+                        index = 30;
+            } else {
+                if ((*this)[28] == YAC_Y) // Check to see if YAC starts at 28 ( this->size() >= 105)
+                    if ((*this)[29] == YAC_A)
+                        if ((*this)[30] == YAC_C)
+                            index = 31;
+            }
+
+            if (index > 0) {
+                nStartingIndex = index + 1; // Set the index where the asset data begins. Use to serialize the asset data into asset objects
+                if ((*this)[index] == YAC_T) { // Transfer first anticipating more transfers than other assets operations
+                    nType = TX_TRANSFER_ASSET;
+                    return true;
+                } else if ((*this)[index] == YAC_Q && this->size() > 39) {
+                    nType = TX_NEW_ASSET;
+                    fIsOwner = false;
+                    return true;
+                } else if ((*this)[index] == YAC_O) {
+                    nType = TX_NEW_ASSET;
+                    fIsOwner = true;
+                    return true;
+                } else if ((*this)[index] == YAC_R) {
+                    nType = TX_REISSUE_ASSET;
+                    return true;
+                }
+            }
+        }
+    }
+    return false;
+}
+
+
+bool CScript::IsNewAsset() const
+{
+
+    int nType = 0;
+    bool fIsOwner = false;
+    if (IsAssetScript(nType, fIsOwner))
+        return !fIsOwner && nType == TX_NEW_ASSET;
+
+    return false;
+}
+
+bool CScript::IsOwnerAsset() const
+{
+    int nType = 0;
+    bool fIsOwner = false;
+    if (IsAssetScript(nType, fIsOwner))
+        return fIsOwner && nType == TX_NEW_ASSET;
+
+    return false;
+}
+
+bool CScript::IsReissueAsset() const
+{
+    int nType = 0;
+    bool fIsOwner = false;
+    if (IsAssetScript(nType, fIsOwner))
+        return nType == TX_REISSUE_ASSET;
+
+    return false;
+}
+
+bool CScript::IsTransferAsset() const
+{
+    int nType = 0;
+    bool fIsOwner = false;
+    if (IsAssetScript(nType, fIsOwner))
+        return nType == TX_TRANSFER_ASSET;
+
+    return false;
+}
+/** YAC_ASSET END */
+
 bool CScript::HasCanonicalPushes() const
 {
     const_iterator pc = begin();
@@ -2458,6 +2568,15 @@ void CScript::SetCsv(::uint32_t nSequence, const CPubKey& pubKey)
     *this << OP_CHECKSEQUENCEVERIFY << OP_DROP;
     *this << pubKey << OP_CHECKSIG;
 }
+
+CScript GetScriptForDestination(const CTxDestination& dest)
+{
+    CScript script;
+
+    boost::apply_visitor(CScriptVisitor(&script), dest);
+    return script;
+}
+
 #ifdef _MSC_VER
     #include "msvc_warnings.pop.h"
 #endif

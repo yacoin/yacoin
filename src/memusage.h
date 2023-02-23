@@ -8,6 +8,7 @@
 #define YACOIN_MEMUSAGE_H
 
 #include "indirectmap.h"
+#include "prevector.h"
 
 #include <stdlib.h>
 

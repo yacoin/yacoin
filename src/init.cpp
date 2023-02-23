@@ -139,7 +139,7 @@ void Shutdown(void* parg)
         boost::filesystem::remove(GetPidFile());
     }
 #endif
-        UnregisterWallet(pwalletMain);
+        CloseWallets();
         if (fDebug)
             if (fPrintToConsole)
                 printf("wallet unregistered\n");
@@ -400,6 +400,7 @@ std::string HelpMessage()
         "  -dns                   " + _("Allow DNS lookups for -addnode, -seednode and -connect") + "\n" +
         "  -maxconnections=<n>    " + _("Maintain at most <n> connections to peers (default: 125)") + "\n" +
         "  -addnode=<ip>          " + _("Add a node to connect to and attempt to keep the connection open") + "\n" +
+        "  -assetindex            " + _("Keep an index of assets. Requires a -reindex.") + "\n" +
         "  -connect=<ip>          " + _("Connect only to the specified node(s)") + "\n" +
         "  -seednode=<ip>         " + _("Connect to a node to retrieve peer addresses, and disconnect") + "\n" +
         "  -externalip=<ip>       " + _("Specify your own public address") + "\n" +
@@ -564,6 +565,9 @@ bool AppInit2()
     fStoreBlockHashToDb = GetBoolArg("-storeblockhash", true);
     fReindex = GetBoolArg("-reindex", false);
     fUseMemoryLog = GetBoolArg("-memorylog", true);
+    // YAC_ASSET START
+    fAssetIndex = GetBoolArg("-assetindex", false);
+    // YAC_ASSET END
     nMinerSleep = (unsigned int)(GetArg("-minersleep", nOneHundredMilliseconds));
 
     HEADERS_DOWNLOAD_TIMEOUT_BASE = GetArg("-initSyncDownloadTimeout", 10 * 60) * 1000000;
@@ -1238,6 +1242,7 @@ bool AppInit2()
 
     nMainnetNewLogicBlockNumber = GetArg("-testnetNewLogicBlockNumber", 1890000);
     nTestNetNewLogicBlockNumber = GetArg("-testnetNewLogicBlockNumber", 0);
+    nAssetSupportBlockNumber = GetArg("-assetSupportBlockNumber", 1920000);
     printf("Param nMainnetNewLogicBlockNumber = %d\n",nMainnetNewLogicBlockNumber);
     printf("Param testnetNewLogicBlockNumber = %d\n",nTestNetNewLogicBlockNumber);
 

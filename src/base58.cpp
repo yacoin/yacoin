@@ -160,6 +160,11 @@ CTxDestination DecodeDestination(const std::string& str)
     return CBitcoinAddress(str).Get();
 }
 
+bool IsValidDestinationString(const std::string& str)
+{
+    return CBitcoinAddress(str).IsValid();
+}
+
 /** Base class for all base58-encoded data */
 CBase58Data::CBase58Data()
 {

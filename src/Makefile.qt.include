@@ -236,6 +236,8 @@ BITCOIN_QT_CPP = \
   qt/optionsmodel.cpp \
   qt/qrcodedialog.cpp \
   assets/assettypes.cpp \
+  assets/assetdb.cpp \
+  assets/assets.cpp \
   primitives/transaction.cpp \
   primitives/block.cpp \
   init.cpp \

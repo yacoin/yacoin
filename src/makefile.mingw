@@ -135,10 +135,6 @@ CFLAGS= \
 $(DEBUGFLAGS) \
 $(DEFS)
 
-CFLAGS_11= \
-$(CFLAGS) \
--std=c++11
-
 #$(INCLUDEPATHS)
 
 LDFLAGS= \
@@ -221,6 +217,8 @@ OBJS= \
 obj/alert.o \
 obj/addrman.o \
 obj/assettypes.o \
+obj/assetdb.o \
+obj/assets.o \
 obj/base58.o \
 obj/bitcoinrpc.o \
 obj/block.o \
@@ -297,9 +295,6 @@ endif
 #.genjane:
 #	touch .genjane; gcc -c -O3 -DSCRYPT_CHACHA -DSCRYPT_KECCAK512 -DSCRYPT_CHOOSE_COMPILETIME -o obj/scrypt-jane.o scrypt-jane/scrypt-jane.c
 
-obj/dbwrapper.o: dbwrapper.cpp
-	$(CXX) -c -frandom-seed=$@ $(CFLAGS) $(INCLUDEPATHS) -o $@ $<
-
 obj/script.o: script/script.cpp
 	$(CXX) -c -frandom-seed=$@ $(CFLAGS) $(INCLUDEPATHS) -o $@ $<
 
@@ -309,15 +304,14 @@ obj/block.o: primitives/block.cpp
 obj/transaction.o: primitives/transaction.cpp
 	$(CXX) -c -frandom-seed=$@ $(CFLAGS) $(INCLUDEPATHS) -o $@ $<
 
-obj/wallet.o: wallet.cpp
-	$(CXX) -c -frandom-seed=$@ $(CFLAGS_11) $(INCLUDEPATHS) -o $@ $<
-
 obj/assettypes.o: assets/assettypes.cpp
-	$(CXX) -c -frandom-seed=$@ $(CFLAGS_11) $(INCLUDEPATHS) -o $@ $<
+	$(CXX) -c -frandom-seed=$@ $(CFLAGS) $(INCLUDEPATHS) -o $@ $<
 
-obj/LibBoolEE.o: LibBoolEE.cpp
-	$(CXX) -c -frandom-seed=$@ $(CFLAGS_11) $(INCLUDEPATHS) -o $@ $<
+obj/assetdb.o: assets/assetdb.cpp
+	$(CXX) -c -frandom-seed=$@ $(CFLAGS) $(INCLUDEPATHS) -o $@ $<
 
+obj/assets.o: assets/assets.cpp
+	$(CXX) -c -frandom-seed=$@ $(CFLAGS) $(INCLUDEPATHS) -o $@ $<
 
 obj/scrypt-jane.o: scrypt-jane/scrypt-jane.c
 	$(CXX) -c -frandom-seed=$@ $(CFLAGS) $(INCLUDEPATHS) -MMD -o $@ $<

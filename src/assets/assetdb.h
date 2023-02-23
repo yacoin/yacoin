@@ -6,14 +6,11 @@
 #ifndef YACOIN_ASSETDB_H
 #define YACOIN_ASSETDB_H
 
-#include "fs.h"
 #include "serialize.h"
+#include "dbwrapper.h"
 
 #include <string>
 #include <map>
-#include <dbwrapper.h>
-
-const int8_t ASSET_UNDO_INCLUDES_VERIFIER_STRING = -1;
 
 class CNewAsset;
 class uint256;
@@ -26,34 +23,16 @@ struct CBlockAssetUndo
     bool fChangedUnits;
     std::string strIPFS;
     int32_t nUnits;
-    int8_t version;
-    bool fChangedVerifierString;
-    std::string verifierString;
 
     ADD_SERIALIZE_METHODS;
 
     template <typename Stream, typename Operation>
-    inline void SerializationOp(Stream& s, Operation ser_action) {
+    inline void SerializationOp(Stream& s, Operation ser_action, int nType, int nVersion) {
+        unsigned int nSerSize = 0;
         READWRITE(fChangedUnits);
         READWRITE(fChangedIPFS);
         READWRITE(strIPFS);
         READWRITE(nUnits);
-        if (ser_action.ForRead()) {
-            if (!s.empty() and s.size() >= 1) {
-                int8_t nVersionCheck;
-                ::Unserialize(s, nVersionCheck);
-
-                if (nVersionCheck == ASSET_UNDO_INCLUDES_VERIFIER_STRING) {
-                    ::Unserialize(s, fChangedVerifierString);
-                    ::Unserialize(s, verifierString);
-                }
-                version = nVersionCheck;
-            }
-        } else {
-            ::Serialize(s, ASSET_UNDO_INCLUDES_VERIFIER_STRING);
-            ::Serialize(s, fChangedVerifierString);
-            ::Serialize(s, verifierString);
-        }
     }
 };
 
@@ -61,7 +40,7 @@ struct CBlockAssetUndo
 class CAssetsDB : public CDBWrapper
 {
 public:
-    explicit CAssetsDB(size_t nCacheSize, bool fMemory = false, bool fWipe = false);
+    explicit CAssetsDB(const char* pszMode="r+");
 
     CAssetsDB(const CAssetsDB&) = delete;
     CAssetsDB& operator=(const CAssetsDB&) = delete;
@@ -82,7 +61,6 @@ public:
 
     // Erase from database functions
     bool EraseAssetData(const std::string& assetName);
-    bool EraseMyAssetData(const std::string& assetName);
     bool EraseAssetAddressQuantity(const std::string &assetName, const std::string &address);
     bool EraseAddressAssetQuantity(const std::string &address, const std::string &assetName);
 

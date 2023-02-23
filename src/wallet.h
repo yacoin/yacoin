@@ -197,6 +197,46 @@ public:
             const int nMaxDepth = 9999999) const;
 
     /**
+     * Helper function that calls AvailableCoinsAll, used for transfering assets
+     */
+    void AvailableAssets(
+        std::map<std::string, std::vector<COutput> >& mapAssetCoins,
+        bool fOnlySafe = true, const CCoinControl* coinControl = nullptr,
+        const CAmount& nMinimumAmount = 1,
+        const CAmount& nMaximumAmount = MAX_MONEY,
+        const CAmount& nMinimumSumAmount = MAX_MONEY,
+        const uint64_t& nMaximumCount = 0, const int& nMinDepth = 0,
+        const int& nMaxDepth = 9999999) const;
+
+    /**
+     * Helper function that calls AvailableCoinsAll, used to receive all coins,
+     * Assets and RVN
+     */
+    void AvailableCoinsWithAssets(
+        std::vector<COutput>& vCoins,
+        std::map<std::string, std::vector<COutput> >& mapAssetCoins,
+        bool fOnlySafe = true, const CCoinControl* coinControl = nullptr,
+        const CAmount& nMinimumAmount = 1,
+        const CAmount& nMaximumAmount = MAX_MONEY,
+        const CAmount& nMinimumSumAmount = MAX_MONEY,
+        const uint64_t& nMaximumCount = 0, const int& nMinDepth = 0,
+        const int& nMaxDepth = 9999999) const;
+
+    /**
+     * populate vCoins with vector of available COutputs, and populates vAssetCoins in fWithAssets is set to true.
+     */
+    void AvailableCoinsAll(std::vector<COutput> &vCoins,
+            std::map<std::string, std::vector<COutput> > &mapAssetCoins,
+            bool fGetRVN = true, bool fOnlyAssets = false,
+            bool fOnlySafe = true, const CCoinControl *coinControl = nullptr,
+            const CScript *fromScriptPubKey = NULL,
+            bool fCountCltvOrCsv = false, const CAmount &nMinimumAmount = 1,
+            const CAmount &nMaximumAmount = MAX_MONEY,
+            const CAmount &nMinimumSumAmount = MAX_MONEY,
+            const uint64_t &nMaximumCount = 0, const int &nMinDepth = 0,
+            const int &nMaxDepth = 9999999) const;
+
+    /**
      * Shuffle and select coins until nTargetValue is reached while avoiding
      * small change; This method is stochastic for some inputs and upon
      * completion the coin set and corresponding actual target value is
@@ -277,16 +317,59 @@ public:
     ::int64_t GetNewMint() const;
     ::int64_t GetWatchOnlyStake() const;
     ::int64_t GetWatchOnlyNewMint() const;
-    bool CreateTransaction(const std::vector<CRecipient> &vecSend,
-            CWalletTx &wtxNew, CReserveKey &reservekey, CAmount &nFeeRet,
-            int &nChangePosInOut, std::string &strFailReason,
-            const CCoinControl &coinControl,
-            const CScript *fromScriptPubKey = NULL);
     bool CreateTransaction(CScript scriptPubKey, ::int64_t nValue,
             CWalletTx &wtxNew, CReserveKey &reservekey, CAmount &nFeeRet,
             int &nChangePosInOut, std::string &strFailReason,
             const CCoinControl &coinControl,
             const CScript *fromScriptPubKey = NULL);
+
+    bool CreateTransaction(const std::vector<CRecipient> &vecSend,
+            CWalletTx &wtxNew, CReserveKey &reservekey, CAmount &nFeeRet,
+            int &nChangePosInOut, std::string &strFailReason,
+            const CCoinControl &coinControl,
+            const CScript *fromScriptPubKey = NULL);
+
+    bool CreateTransactionAll(
+        const std::vector<CRecipient>& vecSend, CWalletTx& wtxNew,
+        CReserveKey& reservekey, CAmount& nFeeRet, int& nChangePosInOut,
+        std::string& strFailReason, const CCoinControl& coinControl,
+        const CScript* fromScriptPubKey, bool fNewAsset,
+        const CNewAsset& asset, const CTxDestination destination,
+        bool fTransferAsset, bool fReissueAsset,
+        const CReissueAsset& reissueAsset, const AssetType& assetType);
+
+    bool CreateTransactionAll(
+        const std::vector<CRecipient>& vecSend, CWalletTx& wtxNew,
+        CReserveKey& reservekey, CAmount& nFeeRet, int& nChangePosInOut,
+        std::string& strFailReason, const CCoinControl& coinControl,
+        const CScript* fromScriptPubKey, bool fNewAsset,
+        const std::vector<CNewAsset> assets, const CTxDestination destination,
+        bool fTransferAsset, bool fReissueAsset,
+        const CReissueAsset& reissueAsset, const AssetType& assetType);
+
+    /** YAC_ASSET START */
+    bool CreateTransactionWithAssets(
+        const std::vector<CRecipient>& vecSend, CWalletTx& wtxNew,
+        CReserveKey& reservekey, CAmount& nFeeRet, int& nChangePosInOut,
+        std::string& strFailReason, const CCoinControl& coinControl,
+        const std::vector<CNewAsset> assets, const CTxDestination destination,
+        const AssetType& assetType);
+
+    bool CreateTransactionWithTransferAsset(
+        const std::vector<CRecipient>& vecSend, CWalletTx& wtxNew,
+        CReserveKey& reservekey, CAmount& nFeeRet, int& nChangePosInOut,
+        std::string& strFailReason, const CCoinControl& coinControl);
+
+    bool CreateTransactionWithReissueAsset(
+        const std::vector<CRecipient>& vecSend, CWalletTx& wtxNew,
+        CReserveKey& reservekey, CAmount& nFeeRet, int& nChangePosInOut,
+        std::string& strFailReason, const CCoinControl& coinControl,
+        const CReissueAsset& reissueAsset, const CTxDestination destination);
+
+    bool CreateNewChangeAddress(CReserveKey& reservekey, CKeyID& keyID,
+                                std::string& strFailReason);
+    /** YAC_ASSET END */
+
     bool CommitTransaction(CWalletTx& wtxNew, CReserveKey& reservekey);
 
     void GetStakeStats(float &nKernelsRate, float &nCoinDaysRate);
@@ -484,6 +567,18 @@ static void WriteOrderPos(const ::int64_t& nOrderPos, mapValue_t& mapValue)
     mapValue["n"] = i64tostr(nOrderPos);
 }
 
+/** YAC_ASSET START */
+struct CAssetOutputEntry
+{
+    txnouttype type;
+    std::string assetName;
+    CTxDestination destination;
+    CAmount nAmount = 0;
+    std::string message;
+    int64_t expireTime;
+    int vout;
+};
+/** YAC_ASSET END */
 
 /** A transaction with a bunch of additional info that only the owner cares about.
  * It includes any unrecorded transactions needed to link it back to the block chain.

@@ -33,7 +33,7 @@ uint32_t nBlockSequenceId = 1;
 // notify wallets about an updated transaction
 void static UpdatedTransaction(const uint256& hashTx)
 {
-    BOOST_FOREACH(CWallet* pwallet, setpwalletRegistered)
+    BOOST_FOREACH(CWallet* pwallet, vpwalletRegistered)
         pwallet->UpdatedTransaction(hashTx);
 }
 

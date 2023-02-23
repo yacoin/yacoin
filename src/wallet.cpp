@@ -1488,137 +1488,199 @@ int64_t CWallet::GetImmatureWatchOnlyBalance() const
 }
 
 // populate vCoins with vector of available COutputs
-void CWallet::AvailableCoins(std::vector<COutput> &vCoins, bool fOnlySafe,
-        const CCoinControl *coinControl,
-        const CScript *fromScriptPubKey,
-        bool fCountCltvOrCsv, const CAmount &nMinimumAmount,
-        const CAmount &nMaximumAmount,
-        const CAmount &nMinimumSumAmount,
-        const uint64_t nMaximumCount, const int nMinDepth,
-        const int nMaxDepth) const
+void CWallet::AvailableCoins(std::vector<COutput>& vCoins, bool fOnlySafe,
+                             const CCoinControl* coinControl,
+                             const CScript* fromScriptPubKey,
+                             bool fCountCltvOrCsv,
+                             const CAmount& nMinimumAmount,
+                             const CAmount& nMaximumAmount,
+                             const CAmount& nMinimumSumAmount,
+                             const uint64_t nMaximumCount, const int nMinDepth,
+                             const int nMaxDepth) const
 {
-    vCoins.clear();
+  std::map<std::string, std::vector<COutput> > mapAssetCoins;
+  AvailableCoinsAll(vCoins, mapAssetCoins, true, false, fOnlySafe, coinControl,
+                    fromScriptPubKey, fCountCltvOrCsv, nMinimumAmount,
+                    nMaximumAmount, nMinimumSumAmount, nMaximumCount, nMinDepth,
+                    nMaxDepth);
+}
 
-    {
-        LOCK2(cs_main, cs_wallet);
+void CWallet::AvailableAssets(
+    std::map<std::string, std::vector<COutput> >& mapAssetCoins, bool fOnlySafe,
+    const CCoinControl* coinControl, const CAmount& nMinimumAmount,
+    const CAmount& nMaximumAmount, const CAmount& nMinimumSumAmount,
+    const uint64_t& nMaximumCount, const int& nMinDepth,
+    const int& nMaxDepth) const
+{
+  if (!AreAssetsDeployed()) return;
 
-        CAmount nTotal = 0;
+  std::vector<COutput> vCoins;
 
-        for (const auto& entry : mapWallet)
-        {
-            const uint256& wtxid = entry.first;
-            const CWalletTx* pcoin = &entry.second;
+  AvailableCoinsAll(vCoins, mapAssetCoins, false, true, fOnlySafe, coinControl,
+                    NULL, false, nMinimumAmount, nMaximumAmount,
+                    nMinimumSumAmount, nMaximumCount, nMinDepth, nMaxDepth);
+}
 
-            if (!pcoin->IsFinal())
-                continue;
+void CWallet::AvailableCoinsWithAssets(
+    std::vector<COutput>& vCoins,
+    std::map<std::string, std::vector<COutput> >& mapAssetCoins, bool fOnlySafe,
+    const CCoinControl* coinControl, const CAmount& nMinimumAmount,
+    const CAmount& nMaximumAmount, const CAmount& nMinimumSumAmount,
+    const uint64_t& nMaximumCount, const int& nMinDepth,
+    const int& nMaxDepth) const
+{
+  AvailableCoinsAll(vCoins, mapAssetCoins, true, AreAssetsDeployed(), fOnlySafe,
+                    coinControl, NULL, false, nMinimumAmount, nMaximumAmount,
+                    nMinimumSumAmount, nMaximumCount, nMinDepth, nMaxDepth);
+}
 
-            if (pcoin->IsCoinBase() && (pcoin->GetBlocksToMaturity() > 0))
-                continue;
+void CWallet::AvailableCoinsAll(
+    std::vector<COutput>& vCoins,
+    std::map<std::string, std::vector<COutput> >& mapAssetCoins, bool fGetRVN,
+    bool fOnlyAssets, bool fOnlySafe, const CCoinControl* coinControl,
+    const CScript* fromScriptPubKey, bool fCountCltvOrCsv,
+    const CAmount& nMinimumAmount, const CAmount& nMaximumAmount,
+    const CAmount& nMinimumSumAmount, const uint64_t& nMaximumCount,
+    const int& nMinDepth, const int& nMaxDepth) const
+{
+  vCoins.clear();
 
-            if (pcoin->IsCoinStake() && (pcoin->GetBlocksToMaturity() > 0))
-                continue;
+  {
+    LOCK2(cs_main, cs_wallet);
 
-            int nDepth = pcoin->GetDepthInMainChain();
-            if (nDepth < 0)
-                continue;
+    CAmount nTotal = 0;
 
-            bool safeTx = pcoin->IsTrusted();
-            if (fOnlySafe && !safeTx)
-                continue;
-//
-//            bool safeTx = pcoin->IsTrusted();
-//
-//            // We should not consider coins from transactions that are replacing
-//            // other transactions.
-//            //
-//            // Example: There is a transaction A which is replaced by bumpfee
-//            // transaction B. In this case, we want to prevent creation of
-//            // a transaction B' which spends an output of B.
-//            //
-//            // Reason: If transaction A were initially confirmed, transactions B
-//            // and B' would no longer be valid, so the user would have to create
-//            // a new transaction C to replace B'. However, in the case of a
-//            // one-block reorg, transactions B' and C might BOTH be accepted,
-//            // when the user only wanted one of them. Specifically, there could
-//            // be a 1-block reorg away from the chain where transactions A and C
-//            // were accepted to another chain where B, B', and C were all
-//            // accepted.
-//            if (nDepth == 0 && pcoin->mapValue.count("replaces_txid")) {
-//                safeTx = false;
-//            }
-//
-//            // Similarly, we should not consider coins from transactions that
-//            // have been replaced. In the example above, we would want to prevent
-//            // creation of a transaction A' spending an output of A, because if
-//            // transaction B were initially confirmed, conflicting with A and
-//            // A', we wouldn't want to the user to create a transaction D
-//            // intending to replace A', but potentially resulting in a scenario
-//            // where A, A', and D could all be accepted (instead of just B and
-//            // D, or just A and A' like the user would want).
-//            if (nDepth == 0 && pcoin->mapValue.count("replaced_by_txid")) {
-//                safeTx = false;
-//            }
-//
-//            if (fOnlySafe && !safeTx) {
-//                continue;
-//            }
+    for (const auto& entry : mapWallet) {
+      const uint256& wtxid = entry.first;
+      const CWalletTx* pcoin = &entry.second;
 
-            if (nDepth < nMinDepth || nDepth > nMaxDepth)
-                continue;
+      if (!pcoin->IsFinal()) continue;
 
-            for (unsigned int i = 0; i < pcoin->vout.size(); i++) {
-                if (pcoin->vout[i].nValue < nMinimumAmount || pcoin->vout[i].nValue > nMaximumAmount)
-                    continue;
+      if (pcoin->IsCoinBase() && (pcoin->GetBlocksToMaturity() > 0)) continue;
 
-                // If there is coin control, only select coins from selected set
-                if (coinControl && coinControl->HasSelected() && !coinControl->fAllowOtherInputs && !coinControl->IsSelected(entry.first, i))
-                    continue;
+      if (pcoin->IsCoinStake() && (pcoin->GetBlocksToMaturity() > 0)) continue;
 
-                // Ignore spent coins
-                if (pcoin->IsSpent(i))
-                    continue;
+      int nDepth = pcoin->GetDepthInMainChain();
+      if (nDepth < 0) continue;
 
-                // Ignore coins which isn't mine
-                isminetype mine = IsMine(pcoin->vout[i]);
+      bool safeTx = pcoin->IsTrusted();
+      if (fOnlySafe && !safeTx) continue;
+      //
+      //            bool safeTx = pcoin->IsTrusted();
+      //
+      //            // We should not consider coins from transactions that are
+      //            replacing
+      //            // other transactions.
+      //            //
+      //            // Example: There is a transaction A which is replaced by
+      //            bumpfee
+      //            // transaction B. In this case, we want to prevent creation
+      //            of
+      //            // a transaction B' which spends an output of B.
+      //            //
+      //            // Reason: If transaction A were initially confirmed,
+      //            transactions B
+      //            // and B' would no longer be valid, so the user would have
+      //            to create
+      //            // a new transaction C to replace B'. However, in the case
+      //            of a
+      //            // one-block reorg, transactions B' and C might BOTH be
+      //            accepted,
+      //            // when the user only wanted one of them. Specifically,
+      //            there could
+      //            // be a 1-block reorg away from the chain where transactions
+      //            A and C
+      //            // were accepted to another chain where B, B', and C were
+      //            all
+      //            // accepted.
+      //            if (nDepth == 0 && pcoin->mapValue.count("replaces_txid")) {
+      //                safeTx = false;
+      //            }
+      //
+      //            // Similarly, we should not consider coins from transactions
+      //            that
+      //            // have been replaced. In the example above, we would want
+      //            to prevent
+      //            // creation of a transaction A' spending an output of A,
+      //            because if
+      //            // transaction B were initially confirmed, conflicting with
+      //            A and
+      //            // A', we wouldn't want to the user to create a transaction
+      //            D
+      //            // intending to replace A', but potentially resulting in a
+      //            scenario
+      //            // where A, A', and D could all be accepted (instead of just
+      //            B and
+      //            // D, or just A and A' like the user would want).
+      //            if (nDepth == 0 &&
+      //            pcoin->mapValue.count("replaced_by_txid")) {
+      //                safeTx = false;
+      //            }
+      //
+      //            if (fOnlySafe && !safeTx) {
+      //                continue;
+      //            }
 
-                if (mine == MINE_NO) {
-                    continue;
-                }
+      if (nDepth < nMinDepth || nDepth > nMaxDepth) continue;
 
-                // Check if the UTXO is locked by OP_CHECKLOCKTIMEVERIFY or OP_CHECKSEQUENCEVERIFY
-                // fCountCltvOrCsv = true => need to count all locked UTXO
-                // fromScriptPubKey = NULL => Don't select locked coin
-                // fromScriptPubKey != NULL => only choose coin from this script
-                bool isSpendableCltvOrCsv = IsSpendableCltvUTXO(pcoin->vout[i]) | IsSpendableCsvUTXO(pcoin->vout[i]);
-                if (isSpendableCltvOrCsv && !fCountCltvOrCsv && (!fromScriptPubKey || (fromScriptPubKey && pcoin->vout[i].scriptPubKey != *fromScriptPubKey)))
-                {
-                    continue;
-                }
-                if (!isSpendableCltvOrCsv && fromScriptPubKey && pcoin->vout[i].scriptPubKey != *fromScriptPubKey)
-                {
-                    continue;
-                }
+      for (unsigned int i = 0; i < pcoin->vout.size(); i++) {
+        if (pcoin->vout[i].nValue < nMinimumAmount ||
+            pcoin->vout[i].nValue > nMaximumAmount)
+          continue;
 
-                bool fSpendableIn = ((mine & MINE_SPENDABLE) != MINE_NO);
+        // If there is coin control, only select coins from selected set
+        if (coinControl && coinControl->HasSelected() &&
+            !coinControl->fAllowOtherInputs &&
+            !coinControl->IsSelected(entry.first, i))
+          continue;
 
-                vCoins.push_back(COutput(pcoin, i, nDepth, fSpendableIn, safeTx));
+        // Ignore spent coins
+        if (pcoin->IsSpent(i)) continue;
 
-                // Checks the sum amount of all UTXO's.
-                if (nMinimumSumAmount != MAX_MONEY) {
-                    nTotal += pcoin->vout[i].nValue;
+        // Ignore coins which isn't mine
+        isminetype mine = IsMine(pcoin->vout[i]);
 
-                    if (nTotal >= nMinimumSumAmount) {
-                        return;
-                    }
-                }
-
-                // Checks the maximum number of UTXO's.
-                if (nMaximumCount > 0 && vCoins.size() >= nMaximumCount) {
-                    return;
-                }
-            }
+        if (mine == MINE_NO) {
+          continue;
         }
+
+        // Check if the UTXO is locked by OP_CHECKLOCKTIMEVERIFY or
+        // OP_CHECKSEQUENCEVERIFY fCountCltvOrCsv = true => need to count all
+        // locked UTXO fromScriptPubKey = NULL => Don't select locked coin
+        // fromScriptPubKey != NULL => only choose coin from this script
+        bool isSpendableCltvOrCsv = IsSpendableCltvUTXO(pcoin->vout[i]) |
+                                    IsSpendableCsvUTXO(pcoin->vout[i]);
+        if (isSpendableCltvOrCsv && !fCountCltvOrCsv &&
+            (!fromScriptPubKey ||
+             (fromScriptPubKey &&
+              pcoin->vout[i].scriptPubKey != *fromScriptPubKey))) {
+          continue;
+        }
+        if (!isSpendableCltvOrCsv && fromScriptPubKey &&
+            pcoin->vout[i].scriptPubKey != *fromScriptPubKey) {
+          continue;
+        }
+
+        bool fSpendableIn = ((mine & MINE_SPENDABLE) != MINE_NO);
+
+        vCoins.push_back(COutput(pcoin, i, nDepth, fSpendableIn, safeTx));
+
+        // Checks the sum amount of all UTXO's.
+        if (nMinimumSumAmount != MAX_MONEY) {
+          nTotal += pcoin->vout[i].nValue;
+
+          if (nTotal >= nMinimumSumAmount) {
+            return;
+          }
+        }
+
+        // Checks the maximum number of UTXO's.
+        if (nMaximumCount > 0 && vCoins.size() >= nMaximumCount) {
+          return;
+        }
+      }
     }
+  }
 }
 
 void CWallet::AvailableCoinsMinConf(vector<COutput>& vCoins, int nConf, int64_t nMinValue, int64_t nMaxValue) const
@@ -1979,11 +2041,118 @@ bool CWallet::SelectCoinsSimple(int64_t nTargetValue, int64_t nMinValue, int64_t
     return true;
 }
 
+/** YAC_ASSET START */
+bool CWallet::CreateTransactionWithAssets(
+    const std::vector<CRecipient>& vecSend, CWalletTx& wtxNew,
+    CReserveKey& reservekey, CAmount& nFeeRet, int& nChangePosInOut,
+    std::string& strFailReason, const CCoinControl& coinControl,
+    const std::vector<CNewAsset> assets, const CTxDestination destination,
+    const AssetType& type)
+{
+  CReissueAsset reissueAsset;
+  return CreateTransactionAll(vecSend, wtxNew, reservekey, nFeeRet,
+                              nChangePosInOut, strFailReason, coinControl,
+                              NULL, true, assets, destination, false, false,
+                              reissueAsset, type);
+}
+
+bool CWallet::CreateTransactionWithTransferAsset(
+    const std::vector<CRecipient>& vecSend, CWalletTx& wtxNew,
+    CReserveKey& reservekey, CAmount& nFeeRet, int& nChangePosInOut,
+    std::string& strFailReason, const CCoinControl& coinControl)
+{
+  CNewAsset asset;
+  CReissueAsset reissueAsset;
+  CTxDestination destination;
+  AssetType assetType = AssetType::INVALID;
+  return CreateTransactionAll(vecSend, wtxNew, reservekey, nFeeRet,
+                              nChangePosInOut, strFailReason, coinControl,
+                              NULL, false, asset, destination, true, false,
+                              reissueAsset, assetType);
+}
+
+bool CWallet::CreateTransactionWithReissueAsset(
+    const std::vector<CRecipient>& vecSend, CWalletTx& wtxNew,
+    CReserveKey& reservekey, CAmount& nFeeRet, int& nChangePosInOut,
+    std::string& strFailReason, const CCoinControl& coinControl,
+    const CReissueAsset& reissueAsset, const CTxDestination destination)
+{
+  CNewAsset asset;
+  AssetType assetType = AssetType::REISSUE;
+  return CreateTransactionAll(vecSend, wtxNew, reservekey, nFeeRet,
+                              nChangePosInOut, strFailReason, coinControl,
+                              NULL, false, asset, destination, false, true,
+                              reissueAsset, assetType);
+}
+
+bool CWallet::CreateNewChangeAddress(CReserveKey& reservekey, CKeyID& keyID, std::string& strFailReason)
+{
+    // Called with coin control doesn't have a change_address
+    // no coin control: send change to newly generated address
+    // Note: We use a new key here to keep it from being obvious which side is the change.
+    //  The drawback is that by not reusing a previous key, the change may be lost if a
+    //  backup is restored, if the backup doesn't have the new private key for the change.
+    //  If we reused the old key, it would be possible to add code to look for and
+    //  rediscover unknown transactions that were written with keys of ours to recover
+    //  post-backup change.
+
+    // Reserve a new key pair from key pool
+    CPubKey vchPubKey = reservekey.GetReservedKey();
+    keyID = vchPubKey.GetID();
+    return true;
+}
+/** YAC_ASSET END */
+
+bool CWallet::CreateTransaction(CScript scriptPubKey, ::int64_t nValue,
+        CWalletTx &wtxNew, CReserveKey &reservekey, CAmount &nFeeRet,
+        int &nChangePosInOut, std::string &strFailReason,
+        const CCoinControl &coinControl,
+        const CScript *fromScriptPubKey)
+{
+    vector<CRecipient> vecSend;
+    CRecipient recipient = {scriptPubKey, nValue, false};
+    vecSend.push_back(recipient);
+    return CreateTransaction(vecSend, wtxNew, reservekey, nFeeRet, nChangePosInOut, strFailReason, coinControl, fromScriptPubKey);
+}
+
 bool CWallet::CreateTransaction(const std::vector<CRecipient> &vecSend,
         CWalletTx &wtxNew, CReserveKey &reservekey, CAmount &nFeeRet,
         int &nChangePosInOut, std::string &strFailReason,
         const CCoinControl &coinControl,
         const CScript *fromScriptPubKey)
+{
+    CNewAsset asset;
+    CReissueAsset reissueAsset;
+    CTxDestination destination;
+    AssetType assetType = AssetType::INVALID;
+    return CreateTransactionAll(vecSend, wtxNew, reservekey, nFeeRet, nChangePosInOut, strFailReason, coinControl, fromScriptPubKey, false,  asset, destination, false, false, reissueAsset, assetType);
+}
+
+bool CWallet::CreateTransactionAll(
+    const std::vector<CRecipient>& vecSend, CWalletTx& wtxNew,
+    CReserveKey& reservekey, CAmount& nFeeRet, int& nChangePosInOut,
+    std::string& strFailReason, const CCoinControl& coinControl,
+    const CScript* fromScriptPubKey, bool fNewAsset,
+    const CNewAsset& asset, const CTxDestination destination,
+    bool fTransferAsset, bool fReissueAsset,
+    const CReissueAsset& reissueAsset, const AssetType& assetType)
+{
+    std::vector<CNewAsset> assets;
+    assets.push_back(asset);
+    return CreateTransactionAll(
+        vecSend, wtxNew, reservekey, nFeeRet, nChangePosInOut, strFailReason,
+        coinControl, fromScriptPubKey, fNewAsset, assets, destination,
+        fTransferAsset, fReissueAsset, reissueAsset, assetType);
+}
+
+bool CWallet::CreateTransactionAll(
+    const std::vector<CRecipient>& vecSend, CWalletTx& wtxNew,
+    CReserveKey& reservekey, CAmount& nFeeRet, int& nChangePosInOut,
+    std::string& strFailReason, const CCoinControl& coinControl,
+    const CScript* fromScriptPubKey, bool fNewAsset,
+    const std::vector<CNewAsset> assets, const CTxDestination destination,
+    bool fTransferAsset, bool fReissueAsset,
+    const CReissueAsset& reissueAsset, const AssetType& assetType)
 {
     CAmount nValue = 0;
     int nChangePosRequest = nChangePosInOut;
@@ -2193,18 +2362,6 @@ bool CWallet::CreateTransaction(const std::vector<CRecipient> &vecSend,
         }
     }
     return true;
-}
-
-bool CWallet::CreateTransaction(CScript scriptPubKey, ::int64_t nValue,
-        CWalletTx &wtxNew, CReserveKey &reservekey, CAmount &nFeeRet,
-        int &nChangePosInOut, std::string &strFailReason,
-        const CCoinControl &coinControl,
-        const CScript *fromScriptPubKey)
-{
-    vector<CRecipient> vecSend;
-    CRecipient recipient = {scriptPubKey, nValue, false};
-    vecSend.push_back(recipient);
-    return CreateTransaction(vecSend, wtxNew, reservekey, nFeeRet, nChangePosInOut, strFailReason, coinControl, fromScriptPubKey);
 }
 
 void CWallet::GetStakeWeightFromValue(const int64_t& nTime, const int64_t& nValue, uint64_t& nWeight)

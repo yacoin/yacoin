@@ -156,6 +156,7 @@ HEADERS += \
     src/checkpoints.h \
     src/compat.h \
     src/coincontrol.h \
+    src/coins.h \
     src/indirectmap.h \
     src/LibBoolEE.h \
     src/sync.h \
@@ -166,6 +167,7 @@ HEADERS += \
     src/kernel.h \
     src/scrypt.h \
     src/pbkdf2.h \
+    src/prevector.h \
     src/serialize.h \
     src/strlcpy.h \
     src/main.h \
@@ -274,6 +276,8 @@ SOURCES += src/qt/bitcoin.cpp src/qt/bitcoingui.cpp \
     src/dbwrapper.cpp \
     src/walletdb.cpp \
     src/assets/assettypes.cpp \
+    src/assets/assetdb.cpp \
+    src/assets/assets.cpp \
     src/primitives/transaction.cpp \
     src/primitives/block.cpp \
     src/qt/clientmodel.cpp \

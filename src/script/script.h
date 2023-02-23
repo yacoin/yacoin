@@ -268,6 +268,11 @@ enum txnouttype
 	TX_CLTV,
 	TX_CSV,
     TX_NULL_DATA,
+    /** YAC_ASSET START */
+    TX_NEW_ASSET,
+    TX_REISSUE_ASSET,
+    TX_TRANSFER_ASSET,
+    /** YAC_ASSET END */
 };
 
 const char* GetTxnOutputType(txnouttype t);
@@ -402,6 +407,7 @@ enum opcodetype
     OP_NOP3 = 0xb2,
     OP_CHECKSEQUENCEVERIFY = OP_NOP3,
     OP_NOP4 = 0xb3,
+    OP_YAC_ASSET = OP_NOP4,
     OP_NOP5 = 0xb4,
     OP_NOP6 = 0xb5,
     OP_NOP7 = 0xb6,
@@ -441,6 +447,12 @@ inline std::string StackString(const std::vector<std::vector<unsigned char> >& v
         str += ValueString(vch);
     }
     return str;
+}
+
+template <typename T>
+std::vector<unsigned char> ToByteVector(const T& in)
+{
+    return std::vector<unsigned char>(in.begin(), in.end());
 }
 
 /** Serialized script, used inside transaction inputs and outputs */
@@ -726,6 +738,17 @@ public:
 
     bool IsPayToScriptHash() const;
 
+    /** YAC_ASSET START */
+    bool IsAssetScript(int& nType, bool& fIsOwner, int& nStartingIndex) const;
+    bool IsAssetScript(int& nType, bool& fIsOwner) const;
+    bool IsAssetScript() const;
+    bool IsNewAsset() const;
+    bool IsOwnerAsset() const;
+    bool IsReissueAsset() const;
+    bool IsTransferAsset() const;
+    bool IsAsset() const;
+    /** YAC_ASSET END */
+
     // Called by CTransaction::IsStandard and P2SH VerifyScript (which makes it consensus-critical).
     bool IsPushOnly() const
     {
@@ -803,13 +826,15 @@ bool IsSpendableCsvUTXO(const CKeyStore &keystore, const CScript& scriptPubKey);
 void ExtractAffectedKeys(const CKeyStore &keystore, const CScript& scriptPubKey, std::vector<CKeyID> &vKeys);
 bool ExtractDestination(const CScript& scriptPubKey, CTxDestination& addressRet);
 bool ExtractDestinations(const CScript& scriptPubKey, txnouttype& typeRet, std::vector<CTxDestination>& addressRet, int& nRequiredRet);
+/** Check whether a CTxDestination is a CNoDestination. */
+bool IsValidDestination(const CTxDestination& dest);
 bool SignSignature(const CKeyStore& keystore, const CScript& fromPubKey, CTransaction& txTo, unsigned int nIn, int nHashType=SIGHASH_ALL);
 bool SignSignature(const CKeyStore& keystore, const CTransaction& txFrom, CTransaction& txTo, unsigned int nIn, int nHashType=SIGHASH_ALL);
 bool SignSignature(const CKeyStore &keystore, const CTxOut& txOutFrom, CTransaction& txTo, unsigned int nIn, int nHashType=SIGHASH_ALL);
 bool VerifyScript(const CScript& scriptSig, const CScript& scriptPubKey, const CTransaction& txTo, unsigned int nIn, unsigned int flags, int nHashType);
+CScript GetScriptForDestination(const CTxDestination& dest);
 
 // Given two sets of signatures for scriptPubKey, possibly with OP_0 placeholders,
 // combine them intelligently and return the result.
 CScript CombineSignatures(CScript scriptPubKey, const CTransaction& txTo, unsigned int nIn, const CScript& scriptSig1, const CScript& scriptSig2);
-
 #endif

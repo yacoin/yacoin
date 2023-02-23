@@ -64,6 +64,55 @@ using std::min;
 using std::multimap;
 using std::deque;
 
+//
+// GLOBAL VARIABLES USED FOR ASSET MANAGEMENT SYSTEM
+//
+CAssetsDB *passetsdb = nullptr;
+CAssetsCache *passets = nullptr;
+CLRUCache<std::string, CDatabasedAssetData> *passetsCache = nullptr;
+bool fAssetIndex = false;
+//
+// END OF GLOBAL VARIABLES USED FOR ASSET MANAGEMENT SYSTEM
+//
+
+//
+// FUNCTIONS USED FOR ASSET MANAGEMENT SYSTEM
+//
+/** Flush all state, indexes and buffers to disk. */
+void FlushAssetToDisk()
+{
+    // Flush the assetstate
+    if (AreAssetsDeployed()) {
+        // Flush the assetstate
+        auto currentActiveAssetCache = GetCurrentAssetCache();
+        if (currentActiveAssetCache) {
+            if (!currentActiveAssetCache->DumpCacheToDatabase())
+                AbortNode("Failed to write to asset database");
+        }
+    }
+
+    // Write the reissue mempool data to database
+    if (passetsdb)
+        passetsdb->WriteReissuedMempoolState();
+}
+
+bool AreAssetsDeployed()
+{
+    if (chainActive.Height() != -1 && chainActive.Genesis() && chainActive.Height() >= nAssetSupportBlockNumber)
+    {
+        return true;
+    }
+    return false;
+}
+
+CAssetsCache* GetCurrentAssetCache()
+{
+    return passets;
+}
+//
+// END OF FUNCTIONS USED FOR ASSET MANAGEMENT SYSTEM
+//
+
 const ::int64_t 
     nSimulatedMOneySupplyAtFork = 124460820773591;  //124,460,820.773591 YAC
 
@@ -120,8 +169,8 @@ int
     nStatisticsNumberOfBlocks,  // = nBigLinearTrailingAverageLength,    
     nConsecutiveStakeSwitchHeight = 420000;  // see timesamps.h
 
-CCriticalSection cs_setpwalletRegistered;
-set<CWallet*> setpwalletRegistered;
+CCriticalSection cs_vpwalletRegistered;
+vector<CWallet*> vpwalletRegistered;
 
 CCriticalSection cs_main;
 
@@ -267,23 +316,25 @@ int64_t BLOCK_DOWNLOAD_TIMEOUT_BASE = HEADERS_DOWNLOAD_TIMEOUT_BASE; // 10 minut
 void RegisterWallet(CWallet* pwalletIn)
 {
     {
-        LOCK(cs_setpwalletRegistered);
-        setpwalletRegistered.insert(pwalletIn);
+        LOCK(cs_vpwalletRegistered);
+        vpwalletRegistered.push_back(pwalletIn);
     }
 }
 
-void UnregisterWallet(CWallet* pwalletIn)
+void CloseWallets()
 {
     {
-        LOCK(cs_setpwalletRegistered);
-        setpwalletRegistered.erase(pwalletIn);
+        LOCK(cs_vpwalletRegistered);
+        BOOST_FOREACH(CWallet* pwallet, vpwalletRegistered)
+            delete pwallet;
+        vpwalletRegistered.clear();
     }
 }
 
 // check whether the passed transaction is from us
 bool static IsFromMe(CTransaction& tx)
 {
-    BOOST_FOREACH(CWallet* pwallet, setpwalletRegistered)
+    BOOST_FOREACH(CWallet* pwallet, vpwalletRegistered)
         if (pwallet->IsFromMe(tx))
             return true;
     return false;
@@ -292,7 +343,7 @@ bool static IsFromMe(CTransaction& tx)
 // get the wallet transaction with the given hash (if it exists)
 bool static GetTransaction(const uint256& hashTx, CWalletTx& wtx)
 {
-    BOOST_FOREACH(CWallet* pwallet, setpwalletRegistered)
+    BOOST_FOREACH(CWallet* pwallet, vpwalletRegistered)
         if (pwallet->GetTransaction(hashTx,wtx))
             return true;
     return false;
@@ -301,7 +352,7 @@ bool static GetTransaction(const uint256& hashTx, CWalletTx& wtx)
 // erases transaction with the given hash from all wallets
 void static EraseFromWallets(uint256 hash)
 {
-    BOOST_FOREACH(CWallet* pwallet, setpwalletRegistered)
+    BOOST_FOREACH(CWallet* pwallet, vpwalletRegistered)
         pwallet->EraseFromWallet(hash);
 }
 
@@ -313,14 +364,14 @@ void SyncWithWallets(const CTransaction& tx, const CBlock* pblock, bool fUpdate,
         // ppcoin: wallets need to refund inputs when disconnecting coinstake
         if (tx.IsCoinStake())
         {
-            BOOST_FOREACH(CWallet* pwallet, setpwalletRegistered)
+            BOOST_FOREACH(CWallet* pwallet, vpwalletRegistered)
                 if (pwallet->IsFromMe(tx))
                     pwallet->DisableTransaction(tx);
         }
         return;
     }
 
-    BOOST_FOREACH(CWallet* pwallet, setpwalletRegistered)
+    BOOST_FOREACH(CWallet* pwallet, vpwalletRegistered)
         pwallet->AddToWalletIfInvolvingMe(tx, pblock, fUpdate);
     // Preloaded coins cache invalidation
     fCoinsDataActual = false;
@@ -329,28 +380,28 @@ void SyncWithWallets(const CTransaction& tx, const CBlock* pblock, bool fUpdate,
 // notify wallets about a new best chain
 void static SetBestChain(const CBlockLocator& loc)
 {
-    BOOST_FOREACH(CWallet* pwallet, setpwalletRegistered)
+    BOOST_FOREACH(CWallet* pwallet, vpwalletRegistered)
         pwallet->SetBestChain(loc);
 }
 
 // dump all wallets
 void static PrintWallets(const CBlock& block)
 {
-    BOOST_FOREACH(CWallet* pwallet, setpwalletRegistered)
+    BOOST_FOREACH(CWallet* pwallet, vpwalletRegistered)
         pwallet->PrintWallet(block);
 }
 
 // notify wallets about an incoming inventory (for request counts)
 void static Inventory(const uint256& hash)
 {
-    BOOST_FOREACH(CWallet* pwallet, setpwalletRegistered)
+    BOOST_FOREACH(CWallet* pwallet, vpwalletRegistered)
         pwallet->Inventory(hash);
 }
 
 // ask wallets to resend their transactions
 void ResendWalletTransactions()
 {
-    BOOST_FOREACH(CWallet* pwallet, setpwalletRegistered)
+    BOOST_FOREACH(CWallet* pwallet, vpwalletRegistered)
         pwallet->ResendWalletTransactions();
 }
 
