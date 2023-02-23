@@ -131,6 +131,7 @@ CFLAGS= \
 -Wformat \
 -Wformat-security \
 -Wno-unused-parameter \
+-std=gnu++11 \
 $(DEBUGFLAGS) \
 $(DEFS)
 
