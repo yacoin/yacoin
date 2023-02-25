@@ -249,6 +249,7 @@ SOURCES += src/qt/bitcoin.cpp src/qt/bitcoingui.cpp \
     src/qt/mintingview.cpp \
     src/kernelrecord.cpp \
     src/alert.cpp \
+    src/base58.cpp \
     src/version.cpp \
     src/sync.cpp \
     src/util.cpp \

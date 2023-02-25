@@ -221,6 +221,7 @@ OBJS= \
 obj/alert.o \
 obj/addrman.o \
 obj/assettypes.o \
+obj/base58.o \
 obj/bitcoinrpc.o \
 obj/block.o \
 obj/checkpoints.o \

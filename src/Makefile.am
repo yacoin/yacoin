@@ -67,6 +67,7 @@ libyacoin_common_a_SOURCES= \
     dbwrapper.cpp \
     txdb-leveldb.cpp \
     alert.cpp \
+    base58.cpp \
     version.cpp \
     checkpoints.cpp \
     netbase.cpp \
