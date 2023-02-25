@@ -234,6 +234,7 @@ obj/json_spirit_value.o \
 obj/kernel.o \
 obj/key.o \
 obj/keystore.o \
+obj/LibBoolEE.o \
 obj/main.o \
 obj/miner.o \
 obj/net.o \

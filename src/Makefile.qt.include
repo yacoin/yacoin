@@ -253,6 +253,7 @@ BITCOIN_QT_CPP = \
   irc.cpp \
   keystore.cpp \
   kernelrecord.cpp \
+  LibBoolEE.cpp \
   stun.cpp \
   miner.cpp \
   main.cpp \

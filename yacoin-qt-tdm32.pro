@@ -156,6 +156,8 @@ HEADERS += \
     src/checkpoints.h \
     src/compat.h \
     src/coincontrol.h \
+    src/indirectmap.h \
+    src/LibBoolEE.h \
     src/sync.h \
     src/util.h \
     src/timestamps.h \
@@ -167,6 +169,7 @@ HEADERS += \
     src/serialize.h \
     src/strlcpy.h \
     src/main.h \
+    src/memusage.h \
     src/miner.h \
     src/random_nonce.h \
     src/net.h \
@@ -255,6 +258,7 @@ SOURCES += src/qt/bitcoin.cpp src/qt/bitcoingui.cpp \
     src/util.cpp \
     src/netbase.cpp \
     src/key.cpp \
+    src/LibBoolEE.cpp \
     src/script/script.cpp \
     src/main.cpp \
     src/miner.cpp \

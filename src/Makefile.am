@@ -78,6 +78,7 @@ libyacoin_common_a_SOURCES= \
     irc.cpp \
     keystore.cpp \
     kernelrecord.cpp \
+    LibBoolEE.cpp \
     stun.cpp \
     miner.cpp \
     main.cpp \
