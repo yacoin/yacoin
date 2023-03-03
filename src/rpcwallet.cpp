@@ -20,6 +20,7 @@
  #include "init.h"
 #endif
 
+#include "coincontrol.h"
 #include <sstream>
 
 using namespace json_spirit;
@@ -893,7 +894,7 @@ Value sendmany(const Array& params, bool fHelp)
         wtx.mapValue["comment"] = params[3].get_str();
 
     set<CBitcoinAddress> setAddress;
-    vector<pair<CScript, int64_t> > vecSend;
+    vector<CRecipient> vecSend;
 
     int64_t totalAmount = 0;
     BOOST_FOREACH(const Pair& s, sendTo)
@@ -915,7 +916,8 @@ Value sendmany(const Array& params, bool fHelp)
 
         totalAmount += nAmount;
 
-        vecSend.push_back(make_pair(scriptPubKey, nAmount));
+        CRecipient recipient = {scriptPubKey, nAmount, false};
+        vecSend.push_back(recipient);
     }
 
     EnsureWalletIsUnlocked();
@@ -928,7 +930,10 @@ Value sendmany(const Array& params, bool fHelp)
     // Send
     CReserveKey keyChange(pwalletMain);
     int64_t nFeeRequired = 0;
-    bool fCreated = pwalletMain->CreateTransaction(vecSend, wtx, keyChange, nFeeRequired);
+    int nChangePosRet = -1;
+    std::string strFailReason;
+    CCoinControl coinControl;
+    bool fCreated = pwalletMain->CreateTransaction(vecSend, wtx, keyChange, nFeeRequired, nChangePosRet, strFailReason, coinControl);
     if (!fCreated)
     {
         int64_t nTotal = pwalletMain->GetBalance(), nWatchOnly = pwalletMain->GetWatchOnlyBalance();

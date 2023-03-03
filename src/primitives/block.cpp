@@ -972,64 +972,6 @@ bool CBlock::SignBlock(CWallet& wallet)
     //    a complete proof-of-stake block
     if (IsProofOfStake())   // seems like no signature on a PoS???
         return true;
-    // does this mean that here we are PoW?
-    static ::uint32_t nLastCoinStakeSearchTime = GetAdjustedTime(); // startup timestamp
-
-    CKey key;
-    CTransaction txCoinStake;
-    ::uint32_t nSearchTime = txCoinStake.nTime; // search to current time
-
-    if (nSearchTime > nLastCoinStakeSearchTime)
-    {
-        if (
-            wallet.CreateCoinStake(
-                                   wallet,
-                                   nBits,
-                                   nSearchTime - nLastCoinStakeSearchTime,
-                                   txCoinStake,
-                                   key
-                                  )
-           )
-        {
-            if (
-                txCoinStake.nTime >= max(
-                                         chainActive.Tip()->GetMedianTimePast() + 1,
-                                         PastDrift( chainActive.Tip()->GetBlockTime() )
-                                        )
-               )
-            {
-                // make sure coinstake would meet timestamp protocol
-                //    as it would be the same as the block timestamp
-                vtx[0].nTime = nTime = txCoinStake.nTime;
-                nTime = max(chainActive.Tip()->GetMedianTimePast()+1, GetMaxTransactionTime());
-                nTime = max(GetBlockTime(), PastDrift(chainActive.Tip()->GetBlockTime()));
-
-                // we have to make sure that we have no future timestamps in
-                //    our transactions set
-                for (
-                     vector<CTransaction>::iterator it = vtx.begin();
-                     it != vtx.end();
-                    )
-                {
-                    if (it->nTime > nTime)
-                    {
-                        it = vtx.erase(it);
-                    }
-                    else
-                    {
-                        ++it;
-                    }
-                }
-                vtx.insert(vtx.begin() + 1, txCoinStake);
-                hashMerkleRoot = BuildMerkleTree();
-
-                // append a signature to our block
-                return key.Sign(GetHash(), vchBlockSig);
-            }
-        }
-        nLastCoinStakeSearchInterval = nSearchTime - nLastCoinStakeSearchTime;
-        nLastCoinStakeSearchTime = nSearchTime;
-    }
 
     return false;
 }

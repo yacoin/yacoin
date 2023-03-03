@@ -2189,6 +2189,11 @@ bool SignSignature(const CKeyStore &keystore, const CTransaction& txFrom, CTrans
     return SignSignature(keystore, txout.scriptPubKey, txTo, nIn, nHashType);
 }
 
+bool SignSignature(const CKeyStore &keystore, const CTxOut& txOutFrom, CTransaction& txTo, unsigned int nIn, int nHashType)
+{
+    return SignSignature(keystore, txOutFrom.scriptPubKey, txTo, nIn, nHashType);
+}
+
 static CScript PushAll(const vector<valtype>& values)
 {
     CScript result;
