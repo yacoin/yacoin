@@ -89,6 +89,7 @@ libyacoin_common_a_SOURCES= \
     bitcoinrpc.cpp \
     price.cpp \
     random_nonce.cpp \
+    rpcassets.cpp \
     rpcdump.cpp \
     rpcnet.cpp \
     rpcmining.cpp \

@@ -243,6 +243,7 @@ obj/price.o \
 obj/protocol.o \
 obj/random_nonce.o \
 obj/rpcblockchain.o \
+obj/rpcassets.o \
 obj/rpcdump.o \
 obj/rpcmining.o \
 obj/rpcnet.o \

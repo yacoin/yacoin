@@ -163,6 +163,10 @@ extern std::string HexBits(unsigned int nBits);
 extern std::string HelpRequiringPassphrase();
 extern void EnsureWalletIsUnlocked();
 
+// Helper functions
+extern std::string HelpExampleCli(const std::string& methodname, const std::string& args);
+extern std::string HelpExampleRpc(const std::string& methodname, const std::string& args);
+
 //
 // Utilities: convert hex-encoded Values
 // (throws error if not hex).
@@ -268,5 +272,7 @@ extern json_spirit::Value getblocktimes(const json_spirit::Array& params, bool f
 extern json_spirit::Value getcheckpoint(const json_spirit::Array& params, bool fHelp);
 
 extern json_spirit::Value generatetoaddress(const json_spirit::Array& params, bool fHelp);
-
+/** YAC_ASSET START */
+extern json_spirit::Value issue(const json_spirit::Array& params, bool fHelp);
+/** YAC_ASSET END */
 #endif

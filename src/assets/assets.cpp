@@ -33,6 +33,7 @@
 #include <wallet.h>
 
 #include <boost/algorithm/string.hpp>
+#include <boost/variant.hpp>
 
 //#include <rpc/protocol.h>
 #include <bitcoinrpc.h>
@@ -57,6 +58,10 @@
 
 std::map<uint256, std::string> mapReissuedTx;
 std::map<std::string, uint256> mapReissuedAssets;
+
+// Fee lock amount and Fee lock time
+static const uint32_t feeLockTime = 21000; // 21000 blocks
+static const CAmount feeLockAmount = 21000 * COIN; // 21000 YAC
 
 // excluding owner tag ('!')
 static const auto MAX_NAME_LENGTH = 31;
@@ -2215,18 +2220,18 @@ bool CheckIssueBurnTx(const CTxOut& txOut, const AssetType& type, const int numb
     if (type == AssetType::REISSUE || type == AssetType::VOTE || type == AssetType::OWNER || type == AssetType::INVALID)
         return false;
 
-    CAmount burnAmount = 0;
-    std::string burnAddress = "";
+    CAmount lockAmount = 0;
+    std::string lockAddress = "";
 
-    // Get the burn address and amount for the type of asset
-    burnAmount = GetBurnAmount(type);
-    burnAddress = GetBurnAddress(type);
+    // Get the lock address and amount for the type of asset
+    lockAmount = GetLockAmount(type);
+    lockAddress = GetLockAddress(type);
 
     // If issuing multiple (unique) assets need to burn for each
-    burnAmount *= numberIssued;
+    lockAmount *= numberIssued;
 
-    // Check if script satisfies the burn amount
-    if (!(txOut.nValue == burnAmount))
+    // Check if script satisfies the lock amount
+    if (!(txOut.nValue == lockAmount))
         return false;
 
     // Extract the destination
@@ -2238,9 +2243,9 @@ bool CheckIssueBurnTx(const CTxOut& txOut, const AssetType& type, const int numb
     if (!IsValidDestination(destination))
         return false;
 
-    // Check destination address is the burn address
+    // Check destination address is the lock address
     auto strDestination = EncodeDestination(destination);
-    if (!(strDestination == burnAddress))
+    if (!(strDestination == lockAddress))
         return false;
 
     return true;
@@ -2254,7 +2259,7 @@ bool CheckIssueBurnTx(const CTxOut& txOut, const AssetType& type)
 bool CheckReissueBurnTx(const CTxOut& txOut)
 {
     // Check the first transaction and verify that the correct RVN Amount
-    if (txOut.nValue != GetReissueAssetBurnAmount())
+    if (txOut.nValue != GetReissueAssetLockAmount())
         return false;
 
     // Extract the destination
@@ -2266,64 +2271,64 @@ bool CheckReissueBurnTx(const CTxOut& txOut)
     if (!IsValidDestination(destination))
         return false;
 
-//    // Check destination address is the correct burn address
-//    if (EncodeDestination(destination) != GetParams().ReissueAssetBurnAddress())
+//    // Check destination address is the correct lock address
+//    if (EncodeDestination(destination) != GetParams().ReissueAssetLockAddress())
 //        return false;
 
     return true;
 }
 
-CAmount GetIssueAssetBurnAmount()
+CAmount GetIssueAssetLockAmount()
 {
-    return 0;
+    return feeLockAmount;
 }
 
-CAmount GetReissueAssetBurnAmount()
+CAmount GetReissueAssetLockAmount()
 {
-    return 0;
+    return GetIssueAssetLockAmount();
 }
 
-CAmount GetIssueSubAssetBurnAmount()
+CAmount GetIssueSubAssetLockAmount()
 {
-    return 0;
+    return GetIssueAssetLockAmount() / 2;
 }
 
-CAmount GetIssueUniqueAssetBurnAmount()
+CAmount GetIssueUniqueAssetLockAmount()
 {
-    return 0;
+    return GetIssueAssetLockAmount() / 4;
 }
 
-CAmount GetBurnAmount(const int nType)
+CAmount GetLockAmount(const int nType)
 {
-    return GetBurnAmount((AssetType(nType)));
+    return GetLockAmount((AssetType(nType)));
 }
 
-CAmount GetBurnAmount(const AssetType type)
+CAmount GetLockAmount(const AssetType type)
 {
     switch (type) {
         case AssetType::ROOT:
-            return GetIssueAssetBurnAmount();
+            return GetIssueAssetLockAmount();
         case AssetType::SUB:
-            return GetIssueSubAssetBurnAmount();
+            return GetIssueSubAssetLockAmount();
         case AssetType::OWNER:
             return 0;
         case AssetType::UNIQUE:
-            return GetIssueUniqueAssetBurnAmount();
+            return GetIssueUniqueAssetLockAmount();
         case AssetType::VOTE:
             return 0;
         case AssetType::REISSUE:
-            return GetReissueAssetBurnAmount();
+            return GetReissueAssetLockAmount();
         default:
             return 0;
     }
 }
 
-std::string GetBurnAddress(const int nType)
+std::string GetLockAddress(const int nType)
 {
-    return GetBurnAddress((AssetType(nType)));
+    return GetLockAddress((AssetType(nType)));
 }
 
-std::string GetBurnAddress(const AssetType type)
+std::string GetLockAddress(const AssetType type)
 {
     std::string burnAddr {"YCk26dUcaXu8vu6zG3E2PrbBeECAV8RNFp"};
     switch (type) {
@@ -2560,14 +2565,17 @@ bool CreateAssetTransaction(CWallet* pwallet, CCoinControl& coinControl, const s
         }
     }
 
-    // Assign the correct burn amount and the correct burn address depending on the type of asset issuance that is happening
-    CAmount burnAmount = GetBurnAmount(assetType) * assets.size();
-    CScript scriptPubKey = GetScriptForDestination(DecodeDestination(GetBurnAddress(assetType)));
+    // Assign the correct lock amount and the correct lock address depending on the type of asset issuance that is happening
+    // Currently, the lock address is same as the change address
+    CAmount lockAmount = GetLockAmount(assetType) * assets.size();
+    const CKeyID& keyID = boost::get<CKeyID>(coinControl.destChange);
+    CScript feeLockScriptPubKey;
+    feeLockScriptPubKey.SetCsvP2PKH(feeLockTime, keyID);
 
     CAmount curBalance = pwallet->GetBalance();
 
-    // Check to make sure the wallet has the RVN required by the burnAmount
-    if (curBalance < burnAmount) {
+    // Check to make sure the wallet has the RVN required by the lockAmount
+    if (curBalance < lockAmount) {
         error = std::make_pair(RPC_WALLET_INSUFFICIENT_FUNDS, "Insufficient funds");
         return false;
     }
@@ -2580,10 +2588,11 @@ bool CreateAssetTransaction(CWallet* pwallet, CCoinControl& coinControl, const s
     int nChangePosRet = -1;
     bool fSubtractFeeFromAmount = false;
 
-    CRecipient recipient = {scriptPubKey, burnAmount, fSubtractFeeFromAmount};
+    CRecipient recipient = {feeLockScriptPubKey, lockAmount, fSubtractFeeFromAmount};
     vecSend.push_back(recipient);
 
     // If the asset is a subasset or unique asset. We need to send the ownertoken change back to ourselfs
+    // Currently, the address containing owner asset is same as the change address
     if (assetType == AssetType::SUB || assetType == AssetType::UNIQUE) {
         // Get the script for the destination address for the assets
         CScript scriptTransferOwnerAsset = GetScriptForDestination(DecodeDestination(change_address));
@@ -2605,7 +2614,7 @@ bool CreateAssetTransaction(CWallet* pwallet, CCoinControl& coinControl, const s
     }
 
     if (!pwallet->CreateTransactionWithAssets(vecSend, wtxNew, reservekey, nFeeRequired, nChangePosRet, strTxError, coinControl, assets, DecodeDestination(address), assetType)) {
-        if (!fSubtractFeeFromAmount && burnAmount + nFeeRequired > curBalance)
+        if (!fSubtractFeeFromAmount && lockAmount + nFeeRequired > curBalance)
             strTxError = strprintf("Error: This transaction requires a transaction fee of at least %s", FormatMoney(nFeeRequired));
         error = std::make_pair(RPC_WALLET_ERROR, strTxError);
         return false;
@@ -2699,11 +2708,11 @@ bool CreateReissueAssetTransaction(CWallet* pwallet, CCoinControl& coinControl, 
     // Check the wallet balance
     CAmount curBalance = pwallet->GetBalance();
 
-    // Get the current burn amount for issuing an asset
-    CAmount burnAmount = GetReissueAssetBurnAmount();
+    // Get the current lock amount for issuing an asset
+    CAmount lockAmount = GetReissueAssetLockAmount();
 
-    // Check to make sure the wallet has the RVN required by the burnAmount
-    if (curBalance < burnAmount) {
+    // Check to make sure the wallet has the RVN required by the lockAmount
+    if (curBalance < lockAmount) {
         error = std::make_pair(RPC_WALLET_INSUFFICIENT_FUNDS, "Insufficient funds");
         return false;
     }
@@ -2717,14 +2726,14 @@ bool CreateReissueAssetTransaction(CWallet* pwallet, CCoinControl& coinControl, 
     vecSend.push_back(recipient2);
 
     // TODO: Locked coin
-//    // Get the script for the burn address
-//    CScript scriptPubKeyBurn = GetScriptForDestination(DecodeDestination(GetParams().ReissueAssetBurnAddress()));
+//    // Get the script for the lock address
+//    CScript scriptPubKeyBurn = GetScriptForDestination(DecodeDestination(GetParams().ReissueAssetLockAddress()));
 //    // Create and send the transaction
-//    CRecipient recipient = {scriptPubKeyBurn, burnAmount, fSubtractFeeFromAmount};
+//    CRecipient recipient = {scriptPubKeyBurn, lockAmount, fSubtractFeeFromAmount};
 //    vecSend.push_back(recipient);
 
     if (!pwallet->CreateTransactionWithReissueAsset(vecSend, wtxNew, reservekey, nFeeRequired, nChangePosRet, strTxError, coinControl, reissueAsset, DecodeDestination(address))) {
-        if (!fSubtractFeeFromAmount && burnAmount + nFeeRequired > curBalance)
+        if (!fSubtractFeeFromAmount && lockAmount + nFeeRequired > curBalance)
             strTxError = strprintf("Error: This transaction requires a transaction fee of at least %s", FormatMoney(nFeeRequired));
         error = std::make_pair(RPC_WALLET_ERROR, strTxError);
         return false;
@@ -2776,7 +2785,7 @@ bool CreateTransferAssetTransaction(CWallet* pwallet, const CCoinControl& coinCo
             }
         }
 
-        // Get the script for the burn address
+        // Get the script for the lock address
         CScript scriptPubKey = GetScriptForDestination(DecodeDestination(address));
 
         // Update the scriptPubKey with the transfer asset information

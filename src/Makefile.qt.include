@@ -264,6 +264,7 @@ BITCOIN_QT_CPP = \
   bitcoinrpc.cpp \
   price.cpp \
   random_nonce.cpp \
+  rpcassets.cpp \
   rpcdump.cpp \
   rpcnet.cpp \
   rpcmining.cpp \

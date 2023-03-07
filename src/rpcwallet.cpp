@@ -1222,7 +1222,7 @@ Value createcltvaddress(const Array& params, bool fHelp)
 
     // Construct using pay-to-script-hash:
     CScript inner;
-    inner.SetCltv(nLockTime, pubkey);
+    inner.SetCltvP2SH(nLockTime, pubkey);
 
     if (inner.size() > MAX_SCRIPT_ELEMENT_SIZE)
     throw runtime_error(
@@ -1287,7 +1287,7 @@ Value createcsvaddress(const Array& params, bool fHelp)
     // Construct using pay-to-script-hash:
     CScript inner;
     ::uint32_t nSequence = fBlockHeightLock? nLockTime: (nLockTime | CTxIn::SEQUENCE_LOCKTIME_TYPE_FLAG);
-    inner.SetCsv(nSequence, pubkey);
+    inner.SetCsvP2SH(nSequence, pubkey);
 
     if (inner.size() > MAX_SCRIPT_ELEMENT_SIZE)
     throw runtime_error(

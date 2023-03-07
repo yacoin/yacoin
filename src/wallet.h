@@ -113,6 +113,12 @@ private:
             const std::vector<COutput> &vAvailableCoins,
             std::set<CInputCoin> &setCoinsRet, CAmount &nValueRet,
             const CCoinControl *coinControl = NULL) const;
+    bool SelectAssets(
+        int64_t nSpendTime,
+        const std::map<std::string, std::vector<COutput> >& mapAvailableAssets,
+        const std::map<std::string, CAmount>& mapAssetTargetValue,
+        std::set<CInputCoin>& setCoinsRet,
+        std::map<std::string, CAmount>& mapValueRet) const;
 
     CWalletDB *pwalletdbEncryption, *pwalletdbDecryption;
 
@@ -227,7 +233,7 @@ public:
      */
     void AvailableCoinsAll(std::vector<COutput> &vCoins,
             std::map<std::string, std::vector<COutput> > &mapAssetCoins,
-            bool fGetRVN = true, bool fOnlyAssets = false,
+            bool fGetYAC = true, bool fGetAssets = false,
             bool fOnlySafe = true, const CCoinControl *coinControl = nullptr,
             const CScript *fromScriptPubKey = NULL,
             bool fCountCltvOrCsv = false, const CAmount &nMinimumAmount = 1,
@@ -245,6 +251,12 @@ public:
     bool SelectCoinsMinConf(const CAmount &nTargetValue, int64_t nSpendTime,
             int nConfMine, int nConfTheirs, std::vector<COutput> vCoins,
             std::set<CInputCoin> &setCoinsRet, CAmount &nValueRet) const;
+    bool SelectAssetsMinConf(const CAmount& nTargetValue, int64_t nSpendTime,
+                             int nConfMine, int nConfTheirs,
+                             const std::string& strAssetName,
+                             std::vector<COutput> vCoins,
+                             std::set<CInputCoin>& setCoinsRet,
+                             CAmount& nValueRet) const;
 
     // keystore implementation
     // Generate a new key

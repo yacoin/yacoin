@@ -1302,7 +1302,10 @@ static const CRPCCommand vRPCCommands[] =
     { "repairwallet",           &repairwallet,           false,  true  },
     { "resendtx",               &resendtx,               false,  true  },
     { "makekeypair",            &makekeypair,            false,  true  },
-    { "sendalert",              &sendalert,              false,  false }
+    { "sendalert",              &sendalert,              false,  false },
+    /** YAC_ASSET START */
+    { "issue",                  &issue,                  false,  false }
+    /** YAC_ASSET END */
 };
 
 CRPCTable::CRPCTable()
@@ -1405,7 +1408,13 @@ Array RPCConvertValues(std::string &strMethod, const std::vector<std::string> &s
     if (strMethod == "keypoolreset"           && n > 0) ConvertTo<boost::int64_t>(params[0]);
     if (strMethod == "importaddress"          && n > 2) ConvertTo<bool>(params[2]);
     if (strMethod == "generatetoaddress"      && n > 2) ConvertTo<int>(params[0]);
-    if (strMethod == "generatetoaddress"      && n > 2) ConvertTo<int>(params[2]);    
+    if (strMethod == "generatetoaddress"      && n > 2) ConvertTo<int>(params[2]);
+    /** YAC_ASSET START */
+    if (strMethod == "issue" && n > 1) ConvertTo<double>(params[1]); // qty
+    if (strMethod == "issue" && n > 4) ConvertTo<boost::int64_t>(params[4]); // units
+    if (strMethod == "issue" && n > 5) ConvertTo<bool>(params[5]); // reissuable
+    if (strMethod == "issue" && n > 6) ConvertTo<bool>(params[6]); // has_ipfs
+    /** YAC_ASSET END */
 
     return params;
 }
@@ -1491,7 +1500,16 @@ int CommandLineRPC(int argc, char *argv[])
     return nRet;
 }
 
+std::string HelpExampleCli(const std::string& methodname, const std::string& args)
+{
+    return "> yacoin-cli " + methodname + " " + args + "\n";
+}
 
+std::string HelpExampleRpc(const std::string& methodname, const std::string& args)
+{
+    return "> curl --user myusername --data-binary '{\"jsonrpc\": \"1.0\", \"id\":\"curltest\", "
+        "\"method\": \"" + methodname + "\", \"params\": [" + args + "] }' -H 'content-type: text/plain;' http://127.0.0.1:8332/\n";
+}
 
 
 #ifdef TEST

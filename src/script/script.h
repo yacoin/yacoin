@@ -769,8 +769,10 @@ public:
 
     void SetDestination(const CTxDestination& address);
     void SetMultisig(int nRequired, const std::vector<CKey>& keys);
-    void SetCltv(int nLockTime, const CPubKey& pubKey);
-    void SetCsv(::uint32_t nSequence, const CPubKey& pubKey);
+    void SetCltvP2SH(int nLockTime, const CPubKey& pubKey);
+    void SetCltvP2PKH(int nLockTime, const CKeyID &keyID);
+    void SetCsvP2SH(::uint32_t nSequence, const CPubKey& pubKey);
+    void SetCsvP2PKH(::uint32_t nSequence, const CKeyID &keyID);
 
     void PrintHex() const
     {

@@ -2183,7 +2183,7 @@ bool SignSignature(const CKeyStore &keystore, const CScript& fromPubKey, CTransa
         bool fSolved =
             Solver(keystore, subscript, hash2, nHashType, txin.scriptSig, subType) && subType != TX_SCRIPTHASH; // IMPORTANT HERE
         // Append serialized subscript whether or not it is completely signed:
-        txin.scriptSig << static_cast<valtype>(subscript);
+        txin.scriptSig << static_cast<valtype>(subscript); // append redeemscript to scriptSig
         if (!fSolved) return false;
     }
 
@@ -2551,7 +2551,7 @@ void CScript::SetMultisig(int nRequired, const std::vector<CKey>& keys)
     *this << EncodeOP_N((int)(keys.size())) << OP_CHECKMULTISIG;
 }
 
-void CScript::SetCltv(int nLockTime, const CPubKey& pubKey)
+void CScript::SetCltvP2SH(int nLockTime, const CPubKey& pubKey)
 {
     this->clear();
 
@@ -2560,13 +2560,31 @@ void CScript::SetCltv(int nLockTime, const CPubKey& pubKey)
 	*this << pubKey << OP_CHECKSIG;
 }
 
-void CScript::SetCsv(::uint32_t nSequence, const CPubKey& pubKey)
+void CScript::SetCltvP2PKH(int nLockTime, const CKeyID &keyID)
+{
+    this->clear();
+
+    *this << (CScriptNum)nLockTime;
+    *this << OP_CHECKLOCKTIMEVERIFY << OP_DROP;
+    *this  << OP_DUP << OP_HASH160 << keyID << OP_EQUALVERIFY << OP_CHECKSIG;
+}
+
+void CScript::SetCsvP2SH(::uint32_t nSequence, const CPubKey& pubKey)
 {
     this->clear();
 
     *this << (CScriptNum)nSequence;
     *this << OP_CHECKSEQUENCEVERIFY << OP_DROP;
     *this << pubKey << OP_CHECKSIG;
+}
+
+void CScript::SetCsvP2PKH(::uint32_t nSequence, const CKeyID &keyID)
+{
+    this->clear();
+
+    *this << (CScriptNum)nSequence;
+    *this << OP_CHECKSEQUENCEVERIFY << OP_DROP;
+    *this  << OP_DUP << OP_HASH160 << keyID << OP_EQUALVERIFY << OP_CHECKSIG;
 }
 
 CScript GetScriptForDestination(const CTxDestination& dest)
