@@ -2410,6 +2410,17 @@ bool CWallet::CreateTransactionWithReissueAsset(
 {
   CNewAsset asset;
   AssetType assetType = AssetType::REISSUE;
+  /*
+   *    vecSend: contains scriptPubKey for ownership asset transfer and scriptPubKey for reissue fee lock
+        coinControl: contain RVN change address
+        fNewAsset: false
+        assets: contains empty CNewAsset info
+        destination: address containing reissued asset
+        fTransferAsset: false
+        fReissueAsset: true
+        reissueAsset: contains CReissueAsset info
+        assetType: AssetType::REISSUE
+   */
   return CreateTransactionAll(vecSend, wtxNew, reservekey, nFeeRet,
                               nChangePosInOut, strFailReason, coinControl,
                               NULL, false, asset, destination, false, true,

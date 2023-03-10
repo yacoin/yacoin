@@ -2284,17 +2284,17 @@ CAmount GetIssueAssetLockAmount()
 
 CAmount GetReissueAssetLockAmount()
 {
-    return GetIssueAssetLockAmount();
+    return feeLockAmount / 5;
 }
 
 CAmount GetIssueSubAssetLockAmount()
 {
-    return GetIssueAssetLockAmount() / 2;
+    return feeLockAmount / 5;
 }
 
 CAmount GetIssueUniqueAssetLockAmount()
 {
-    return GetIssueAssetLockAmount() / 4;
+    return feeLockAmount / 100;
 }
 
 CAmount GetLockAmount(const int nType)
@@ -2696,9 +2696,6 @@ bool CreateReissueAssetTransaction(CWallet* pwallet, CCoinControl& coinControl, 
         return false;
     }
 
-    // strip of the first character of the asset name, this is used for restricted assets only
-    std::string stripped_asset_name = asset_name.substr(1, asset_name.size() - 1);
-
     // Verify that this wallet is the owner for the asset, and get the owner asset outpoint
     if (!VerifyWalletHasAsset(asset_name + OWNER_TAG, error)) {
         return false;
@@ -2724,12 +2721,13 @@ bool CreateReissueAssetTransaction(CWallet* pwallet, CCoinControl& coinControl, 
     CRecipient recipient2 = {scriptTransferOwnerAsset, 0, fSubtractFeeFromAmount};
     vecSend.push_back(recipient2);
 
-    // TODO: Locked coin
-//    // Get the script for the lock address
-//    CScript scriptPubKeyBurn = GetScriptForDestination(DecodeDestination(GetParams().ReissueAssetLockAddress()));
-//    // Create and send the transaction
-//    CRecipient recipient = {scriptPubKeyBurn, lockAmount, fSubtractFeeFromAmount};
-//    vecSend.push_back(recipient);
+    // Assign the correct lock amount and the correct lock address depending on the type of asset issuance that is happening
+    // Currently, the lock address is same as the change address
+    const CKeyID& keyID = boost::get<CKeyID>(coinControl.destChange);
+    CScript feeLockScriptPubKey;
+    feeLockScriptPubKey.SetCsvP2PKH(feeLockTime, keyID);
+    CRecipient recipient = {feeLockScriptPubKey, lockAmount, fSubtractFeeFromAmount};
+    vecSend.push_back(recipient);
 
     if (!pwallet->CreateTransactionWithReissueAsset(vecSend, wtxNew, reservekey, nFeeRequired, nChangePosRet, strTxError, coinControl, reissueAsset, DecodeDestination(address))) {
         if (!fSubtractFeeFromAmount && lockAmount + nFeeRequired > curBalance)
@@ -2994,7 +2992,7 @@ bool CheckNewAsset(const CNewAsset& asset, std::string& strError)
     }
 
     if (asset.units < 0 || asset.units > 8) {
-        strError = _("Invalid parameter: units must be between 0-8.");
+        strError = _("Invalid parameter: units must be between 0-6.");
         return false;
     }
 

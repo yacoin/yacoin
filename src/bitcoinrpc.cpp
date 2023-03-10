@@ -1306,7 +1306,8 @@ static const CRPCCommand vRPCCommands[] =
     /** YAC_ASSET START */
     { "issue",                  &issue,                  false,  false },
     { "transfer",               &transfer,               false,  false },
-    { "transferfromaddress",    &transferfromaddress,    false,  false }
+    { "transferfromaddress",    &transferfromaddress,    false,  false },
+    { "reissue",                &reissue,                false,  false }
     /** YAC_ASSET END */
 };
 
@@ -1418,6 +1419,9 @@ Array RPCConvertValues(std::string &strMethod, const std::vector<std::string> &s
     if (strMethod == "issue"               && n > 6) ConvertTo<bool>(params[6]); // has_ipfs
     if (strMethod == "transfer"            && n > 1) ConvertTo<double>(params[1]); // qty
     if (strMethod == "transferfromaddress" && n > 2) ConvertTo<double>(params[2]); // qty
+    if (strMethod == "reissue"             && n > 1) ConvertTo<double>(params[1]); // qty
+    if (strMethod == "reissue"             && n > 4) ConvertTo<bool>(params[4]); // reissuable
+    if (strMethod == "reissue"             && n > 5) ConvertTo<boost::int64_t>(params[5]); // new_units
     /** YAC_ASSET END */
 
     return params;

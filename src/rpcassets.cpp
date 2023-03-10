@@ -60,7 +60,7 @@ Value issue(const Array& params, bool fHelp)
             + AssetActivationWarning() +
             "\nIssue an asset, subasset or unique asset.\n"
             "Asset name must not conflict with any existing asset.\n"
-            "Unit as the number of decimals precision for the asset (0 for whole units (\"1\"), 8 for max precision (\"1.00000000\")\n"
+            "Unit as the number of decimals precision for the asset (0 for whole units (\"1\"), 6 for max precision (\"1.000000\")\n"
             "Reissuable is true/false for whether additional units can be issued by the original issuer.\n"
             "If issuing a unique asset these values are required (and will be defaulted to): qty=1, units=0, reissuable=false.\n"
 
@@ -69,7 +69,7 @@ Value issue(const Array& params, bool fHelp)
             "2. \"qty\"                   (numeric, optional, default=1) the number of units to be issued\n"
             "3. \"to_address\"            (string), optional, default=\"\"), address asset will be sent to, if it is empty, address will be generated for you\n"
             "4. \"change_address\"        (string), optional, default=\"\"), address the the rvn change will be sent to, if it is empty, change address will be generated for you\n"
-            "5. \"units\"                 (integer, optional, default=0, min=0, max=8), the number of decimals precision for the asset (0 for whole units (\"1\"), 8 for max precision (\"1.00000000\")\n"
+            "5. \"units\"                 (integer, optional, default=0, min=0, max=6), the number of decimals precision for the asset (0 for whole units (\"1\"), 6 for max precision (\"1.000000\")\n"
             "6. \"reissuable\"            (boolean, optional, default=true (false for unique assets)), whether future reissuance is allowed\n"
             "7. \"has_ipfs\"              (boolean, optional, default=false), whether ipfs hash is going to be added to the asset\n"
             "8. \"ipfs_hash\"             (string, optional but required if has_ipfs = 1), an ipfs hash or a txid hash once RIP5 is activated\n"
@@ -82,7 +82,7 @@ Value issue(const Array& params, bool fHelp)
             + HelpExampleCli("issue", "\"ASSET_NAME\" 1000 \"myaddress\"")
             + HelpExampleCli("issue", "\"ASSET_NAME\" 1000 \"myaddress\" \"changeaddress\" 4")
             + HelpExampleCli("issue", "\"ASSET_NAME\" 1000 \"myaddress\" \"changeaddress\" 2 true")
-            + HelpExampleCli("issue", "\"ASSET_NAME\" 1000 \"myaddress\" \"changeaddress\" 8 false true QmTqu3Lk3gmTsQVtjU7rYYM37EAW4xNmbuEAp2Mjr4AV7E")
+            + HelpExampleCli("issue", "\"ASSET_NAME\" 1000 \"myaddress\" \"changeaddress\" 6 false true QmTqu3Lk3gmTsQVtjU7rYYM37EAW4xNmbuEAp2Mjr4AV7E")
             + HelpExampleCli("issue", "\"ASSET_NAME/SUB_ASSET\" 1000 \"myaddress\" \"changeaddress\" 2 true")
             + HelpExampleCli("issue", "\"ASSET_NAME#uniquetag\"")
         );
@@ -389,6 +389,92 @@ Value transferfromaddress(const Array& params, bool fHelp)
         throw JSONRPCError(error.first, error.second);
 
     // Display the transaction id
+    return txid;
+}
+
+Value reissue(const Array& params, bool fHelp)
+{
+    if (fHelp || !AreAssetsDeployed() || params.size() > 7 || params.size() < 3)
+        throw std::runtime_error(
+                "reissue \"asset_name\" qty \"to_address\" \"change_address\" ( reissuable ) ( new_units) \"( new_ipfs )\" \n"
+                + AssetActivationWarning() +
+                "\nReissues a quantity of an asset to an owned address if you own the Owner Token"
+                "\nCan change the reissuable flag during reissuance"
+                "\nCan change the ipfs hash during reissuance"
+
+                "\nArguments:\n"
+                "1. \"asset_name\"               (string, required) name of asset that is being reissued\n"
+                "2. \"qty\"                      (numeric, required) number of assets to reissue\n"
+                "3. \"to_address\"               (string, required) address to send the asset to\n"
+                "4. \"change_address\"           (string, optional) address that the change of the transaction will be sent to\n"
+                "5. \"reissuable\"               (boolean, optional, default=true), whether future reissuance is allowed\n"
+                "6. \"new_units\"                (numeric, optional, default=-1), the new units that will be associated with the asset\n"
+                "7. \"new_ipfs\"                 (string, optional, default=\"\"), whether to update the current ipfs hash or txid once RIP5 is active\n"
+
+                "\nResult:\n"
+                "\"txid\"                     (string) The transaction id\n"
+
+                "\nExamples:\n"
+                + HelpExampleCli("reissue", "\"ASSET_NAME\" 20 \"address\"")
+                + HelpExampleRpc("reissue", "\"ASSET_NAME\" 20 \"address\" \"change_address\" \"true\" 6 \"Qmd286K6pohQcTKYqnS1YhWrCiS4gz7Xi34sdwMe9USZ7u\"")
+        );
+
+    if (pwalletMain->IsLocked())
+        throw JSONRPCError(RPC_WALLET_UNLOCK_NEEDED, "Error: Please enter the wallet passphrase with walletpassphrase first.");
+
+    // Get that paramaters
+    std::string asset_name = params[0].get_str();
+    CAmount nAmount = AmountFromValue(params[1]);
+    std::string address = params[2].get_str();
+
+    std::string changeAddress =  "";
+    if (params.size() > 3)
+        changeAddress = params[3].get_str();
+
+    bool reissuable = true;
+    if (params.size() > 4) {
+        reissuable = params[4].get_bool();
+    }
+
+    int newUnits = -1;
+    if (params.size() > 5) {
+        newUnits = params[5].get_int();
+    }
+
+    std::string newipfs = "";
+    if (params.size() > 6) {
+        newipfs = params[6].get_str();
+        if (newipfs.length() != 46)
+            throw JSONRPCError(RPC_INVALID_PARAMS, std::string("Invalid IPFS hash (must be 46 characters)"));
+        if (newipfs.substr(0,2) != "Qm")
+            throw JSONRPCError(RPC_INVALID_PARAMS, std::string("Invalid IPFS hash (doesn't start with 'Qm')"));
+        if (DecodeAssetData(newipfs).empty())
+            throw JSONRPCError(RPC_INVALID_PARAMS, std::string("Invalid IPFS hash (contains invalid characters)"));
+    }
+
+    CReissueAsset reissueAsset(asset_name, nAmount, newUnits, reissuable, DecodeAssetData(newipfs));
+
+    std::pair<int, std::string> error;
+    CReserveKey reservekey(pwalletMain);
+    CWalletTx transaction;
+    CAmount nRequiredFee;
+
+    CCoinControl crtl;
+    crtl.destChange = DecodeDestination(changeAddress);
+
+    // Create the Transaction
+    if (!CreateReissueAssetTransaction(pwalletMain, crtl, reissueAsset, address, error, transaction, reservekey, nRequiredFee))
+        throw JSONRPCError(error.first, error.second);
+
+    std::string strError = "";
+    if (!ContextualCheckReissueAsset(passets, reissueAsset, strError, transaction))
+        throw JSONRPCError(RPC_INVALID_REQUEST, strError);
+
+    // Send the Transaction to the network
+    std::string txid;
+    if (!SendAssetTransaction(pwalletMain, transaction, reservekey, error, txid))
+        throw JSONRPCError(error.first, error.second);
+
     return txid;
 }
 

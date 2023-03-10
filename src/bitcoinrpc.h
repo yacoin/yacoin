@@ -276,5 +276,6 @@ extern json_spirit::Value generatetoaddress(const json_spirit::Array& params, bo
 extern json_spirit::Value issue(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value transfer(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value transferfromaddress(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value reissue(const json_spirit::Array& params, bool fHelp);
 /** YAC_ASSET END */
 #endif
