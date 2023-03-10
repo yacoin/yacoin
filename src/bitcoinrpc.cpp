@@ -1304,7 +1304,8 @@ static const CRPCCommand vRPCCommands[] =
     { "makekeypair",            &makekeypair,            false,  true  },
     { "sendalert",              &sendalert,              false,  false },
     /** YAC_ASSET START */
-    { "issue",                  &issue,                  false,  false }
+    { "issue",                  &issue,                  false,  false },
+    { "transfer",               &transfer,               false,  false }
     /** YAC_ASSET END */
 };
 
@@ -1410,10 +1411,11 @@ Array RPCConvertValues(std::string &strMethod, const std::vector<std::string> &s
     if (strMethod == "generatetoaddress"      && n > 2) ConvertTo<int>(params[0]);
     if (strMethod == "generatetoaddress"      && n > 2) ConvertTo<int>(params[2]);
     /** YAC_ASSET START */
-    if (strMethod == "issue" && n > 1) ConvertTo<double>(params[1]); // qty
-    if (strMethod == "issue" && n > 4) ConvertTo<boost::int64_t>(params[4]); // units
-    if (strMethod == "issue" && n > 5) ConvertTo<bool>(params[5]); // reissuable
-    if (strMethod == "issue" && n > 6) ConvertTo<bool>(params[6]); // has_ipfs
+    if (strMethod == "issue"    && n > 1) ConvertTo<double>(params[1]); // qty
+    if (strMethod == "issue"    && n > 4) ConvertTo<boost::int64_t>(params[4]); // units
+    if (strMethod == "issue"    && n > 5) ConvertTo<bool>(params[5]); // reissuable
+    if (strMethod == "issue"    && n > 6) ConvertTo<bool>(params[6]); // has_ipfs
+    if (strMethod == "transfer" && n > 1) ConvertTo<double>(params[1]); // qty
     /** YAC_ASSET END */
 
     return params;

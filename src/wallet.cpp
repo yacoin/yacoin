@@ -2360,6 +2360,16 @@ bool CWallet::CreateTransactionWithAssets(
     const AssetType& type)
 {
   CReissueAsset reissueAsset;
+  /*
+   *    fNewAsset: true
+        assets: contains CNewAsset info
+        fTransferAsset: false
+        fReissueAsset: false
+        vecSend: contains fee lock address + owner asset address
+        coinControl.destChange: RVN change address
+        destination: address containing new asset
+        assetType: AssetType::ROOT, AssetType::SUB, AssetType::UNIQUE
+   */
   return CreateTransactionAll(vecSend, wtxNew, reservekey, nFeeRet,
                               nChangePosInOut, strFailReason, coinControl,
                               NULL, true, assets, destination, false, false,
@@ -2375,6 +2385,17 @@ bool CWallet::CreateTransactionWithTransferAsset(
   CReissueAsset reissueAsset;
   CTxDestination destination;
   AssetType assetType = AssetType::INVALID;
+/*
+ *  vecSend: contains receiver's asset scriptPubKey
+    coinControl: contain RVN change address and asset change address
+    fNewAsset: false
+    assets: contains empty CNewAsset info
+    destination: contains empty destination
+    fTransferAsset: true
+    fReissueAsset: false
+    reissueAsset: contains empty CReissueAsset info
+    assetType: AssetType::INVALID
+ */
   return CreateTransactionAll(vecSend, wtxNew, reservekey, nFeeRet,
                               nChangePosInOut, strFailReason, coinControl,
                               NULL, false, asset, destination, true, false,
@@ -2478,8 +2499,8 @@ bool CWallet::CreateTransactionAll(
         return error("%s : Tried reissuing an asset and the reissue data was null or the destination was invalid", __func__);
     /** YAC_ASSET END */
 
-    CAmount nValue = 0;
-    std::map<std::string, CAmount> mapAssetValue;
+    CAmount nValue = 0; // Contains YAC amount, not asset amount
+    std::map<std::string, CAmount> mapAssetValue; // Contains asset amount for each asset
     int nChangePosRequest = nChangePosInOut;
     unsigned int nSubtractFeeFromAmount = 0;
     for (const auto& recipient : vecSend)
@@ -2592,7 +2613,7 @@ bool CWallet::CreateTransactionAll(
                 if (nSubtractFeeFromAmount == 0)
                     nValueToSelect += nFeeRet;
 
-                // vouts to the payees
+                // vouts to the payees (for both YAC and asset)
                 for (const auto& recipient : vecSend)
                 {
                     CTxOut txout(recipient.nAmount, recipient.scriptPubKey);
@@ -2621,6 +2642,7 @@ bool CWallet::CreateTransactionAll(
                 const CAmount nChange = nValueIn - nValueToSelect;
 
                 /** YAC_ASSET START */
+                // asset vouts to ourself (for asset change)
                 if (AreAssetsDeployed()) {
                     // Add the change for the assets
                     std::map<std::string, CAmount> mapAssetChange;
@@ -2646,7 +2668,7 @@ bool CWallet::CreateTransactionAll(
 
                 if (nChange > 0)
                 {
-                    // Fill a vout to ourself
+                    // Fill a vout to ourself (for YAC change)
                     CTxOut newTxOut(nChange, scriptChange);
 
                     if (nChangePosInOut == -1)

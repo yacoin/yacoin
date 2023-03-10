@@ -197,6 +197,90 @@ Value issue(const Array& params, bool fHelp)
     return txid;
 }
 
+Value transfer(const Array& params, bool fHelp)
+{
+    if (fHelp || !AreAssetsDeployed() || params.size() < 3 || params.size() > 7)
+        throw std::runtime_error(
+                "transfer \"asset_name\" qty \"to_address\" \"message\" expire_time \"change_address\" \"asset_change_address\"\n"
+                + AssetActivationWarning() +
+                "\nTransfers a quantity of an owned asset to a given address"
+
+                "\nArguments:\n"
+                "1. \"asset_name\"               (string, required) name of asset\n"
+                "2. \"qty\"                      (numeric, required) number of assets you want to send to the address\n"
+                "3. \"to_address\"               (string, required) address to send the asset to\n"
+                "4. \"change_address\"           (string, optional, default = \"\") the transactions RVN change will be sent to this address\n"
+                "5. \"asset_change_address\"     (string, optional, default = \"\") the transactions Asset change will be sent to this address\n"
+
+                "\nResult:\n"
+                "txid"
+                "[ \n"
+                "txid\n"
+                "]\n"
+
+                "\nExamples:\n"
+                + HelpExampleCli("transfer", "\"ASSET_NAME\" 20 \"address\"")
+                + HelpExampleCli("transfer", "\"ASSET_NAME\" 20 \"address\"")
+        );
+
+    if (pwalletMain->IsLocked())
+        throw JSONRPCError(RPC_WALLET_UNLOCK_NEEDED, "Error: Please enter the wallet passphrase with walletpassphrase first.");
+
+    std::string asset_name = params[0].get_str();
+
+    CAmount nAmount = AmountFromValue(params[1]);
+
+    std::string to_address = params[2].get_str();
+    CTxDestination to_dest = DecodeDestination(to_address);
+    if (!IsValidDestination(to_dest)) {
+        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, std::string("Invalid Raven address: ") + to_address);
+    }
+
+    std::string rvn_change_address = "";
+    if (params.size() > 3) {
+        rvn_change_address = params[3].get_str();
+    }
+
+    std::string asset_change_address = "";
+    if (params.size() > 4) {
+        asset_change_address = params[4].get_str();
+    }
+
+    CTxDestination rvn_change_dest = DecodeDestination(rvn_change_address);
+    if (!rvn_change_address.empty() && !IsValidDestination(rvn_change_dest))
+        throw JSONRPCError(RPC_INVALID_PARAMETER, std::string("RVN change address must be a valid address. Invalid address: ") + rvn_change_address);
+
+    CTxDestination asset_change_dest = DecodeDestination(asset_change_address);
+    if (!asset_change_address.empty() && !IsValidDestination(asset_change_dest))
+        throw JSONRPCError(RPC_INVALID_PARAMETER, std::string("Asset change address must be a valid address. Invalid address: ") + asset_change_address);
+
+    std::pair<int, std::string> error;
+    std::vector< std::pair<CAssetTransfer, std::string> >vTransfers;
+
+    CAssetTransfer transfer(asset_name, nAmount);
+
+    vTransfers.emplace_back(std::make_pair(transfer, to_address));
+    CReserveKey reservekey(pwalletMain);
+    CWalletTx transaction;
+    CAmount nRequiredFee;
+
+    CCoinControl ctrl;
+    ctrl.destChange = rvn_change_dest;
+    ctrl.assetDestChange = asset_change_dest;
+
+    // Create the Transaction
+    if (!CreateTransferAssetTransaction(pwalletMain, ctrl, vTransfers, error, transaction, reservekey, nRequiredFee))
+        throw JSONRPCError(error.first, error.second);
+
+    // Send the Transaction to the network
+    std::string txid;
+    if (!SendAssetTransaction(pwalletMain, transaction, reservekey, error, txid))
+        throw JSONRPCError(error.first, error.second);
+
+    // Display the transaction id
+    return txid;
+}
+
 #ifdef _MSC_VER
     #include "msvc_warnings.pop.h"
 #endif
