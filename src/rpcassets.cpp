@@ -199,9 +199,9 @@ Value issue(const Array& params, bool fHelp)
 
 Value transfer(const Array& params, bool fHelp)
 {
-    if (fHelp || !AreAssetsDeployed() || params.size() < 3 || params.size() > 7)
+    if (fHelp || !AreAssetsDeployed() || params.size() < 3 || params.size() > 5)
         throw std::runtime_error(
-                "transfer \"asset_name\" qty \"to_address\" \"message\" expire_time \"change_address\" \"asset_change_address\"\n"
+                "transfer \"asset_name\" qty \"to_address\" \"change_address\" \"asset_change_address\"\n"
                 + AssetActivationWarning() +
                 "\nTransfers a quantity of an owned asset to a given address"
 
@@ -267,6 +267,117 @@ Value transfer(const Array& params, bool fHelp)
     CCoinControl ctrl;
     ctrl.destChange = rvn_change_dest;
     ctrl.assetDestChange = asset_change_dest;
+
+    // Create the Transaction
+    if (!CreateTransferAssetTransaction(pwalletMain, ctrl, vTransfers, error, transaction, reservekey, nRequiredFee))
+        throw JSONRPCError(error.first, error.second);
+
+    // Send the Transaction to the network
+    std::string txid;
+    if (!SendAssetTransaction(pwalletMain, transaction, reservekey, error, txid))
+        throw JSONRPCError(error.first, error.second);
+
+    // Display the transaction id
+    return txid;
+}
+
+Value transferfromaddress(const Array& params, bool fHelp)
+{
+    if (fHelp || !AreAssetsDeployed() || params.size() < 4 || params.size() > 6)
+        throw std::runtime_error(
+                "transferfromaddress \"asset_name\" \"from_address\" qty \"to_address\" \"rvn_change_address\" \"asset_change_address\"\n"
+                + AssetActivationWarning() +
+                "\nTransfer a quantity of an owned asset in a specific address to a given address"
+
+                "\nArguments:\n"
+                "1. \"asset_name\"               (string, required) name of asset\n"
+                "2. \"from_address\"             (string, required) address that the asset will be transferred from\n"
+                "3. \"qty\"                      (numeric, required) number of assets you want to send to the address\n"
+                "4. \"to_address\"               (string, required) address to send the asset to\n"
+                "5. \"rvn_change_address\"       (string, optional, default = \"\") the transaction RVN change will be sent to this address\n"
+                "6. \"asset_change_address\"     (string, optional, default = \"\") the transaction Asset change will be sent to this address\n"
+
+                "\nResult:\n"
+                "txid"
+                "[ \n"
+                "txid\n"
+                "]\n"
+
+                "\nExamples:\n"
+                + HelpExampleCli("transferfromaddress", "\"ASSET_NAME\" \"fromaddress\" 20 \"address\"")
+                + HelpExampleRpc("transferfromaddress", "\"ASSET_NAME\" \"fromaddress\" 20 \"address\"")
+        );
+
+    if (pwalletMain->IsLocked())
+        throw JSONRPCError(RPC_WALLET_UNLOCK_NEEDED, "Error: Please enter the wallet passphrase with walletpassphrase first.");
+
+    std::string asset_name = params[0].get_str();
+
+    std::string from_address = params[1].get_str();
+
+    // Check to make sure the given from address is valid
+    CTxDestination dest = DecodeDestination(from_address);
+    if (!IsValidDestination(dest))
+        throw JSONRPCError(RPC_INVALID_PARAMETER, std::string("From address must be valid addresses. Invalid address: ") + from_address);
+
+    CAmount nAmount = AmountFromValue(params[2]);
+
+    std::string address = params[3].get_str();
+
+    std::string rvn_change_address = "";
+    if (params.size() > 6) {
+        rvn_change_address = params[6].get_str();
+    }
+
+    std::string asset_change_address = "";
+    if (params.size() > 7) {
+        asset_change_address = params[7].get_str();
+    }
+
+    CTxDestination rvn_change_dest = DecodeDestination(rvn_change_address);
+    if (!rvn_change_address.empty() && !IsValidDestination(rvn_change_dest))
+        throw JSONRPCError(RPC_INVALID_PARAMETER, std::string("RVN change address must be a valid address. Invalid address: ") + rvn_change_address);
+
+    CTxDestination asset_change_dest = DecodeDestination(asset_change_address);
+    if (!asset_change_address.empty() && !IsValidDestination(asset_change_dest))
+        throw JSONRPCError(RPC_INVALID_PARAMETER, std::string("Asset change address must be a valid address. Invalid address: ") + asset_change_address);
+
+
+    std::pair<int, std::string> error;
+    std::vector< std::pair<CAssetTransfer, std::string> >vTransfers;
+
+    vTransfers.emplace_back(std::make_pair(CAssetTransfer(asset_name, nAmount), address));
+    CReserveKey reservekey(pwalletMain);
+    CWalletTx transaction;
+    CAmount nRequiredFee;
+
+    CCoinControl ctrl;
+    std::map<std::string, std::vector<COutput> > mapAssetCoins;
+    pwalletMain->AvailableAssets(mapAssetCoins);
+
+    // Set the change addresses
+    ctrl.destChange = rvn_change_dest;
+    ctrl.assetDestChange = asset_change_dest;
+
+    if (!mapAssetCoins.count(asset_name)) {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, std::string("Wallet doesn't own the asset_name: " + asset_name));
+    }
+
+    // Add all the asset outpoints that match the given from addresses
+    for (const auto& out : mapAssetCoins.at(asset_name)) {
+        // Get the address that the coin resides in, because to send a valid message. You need to send it to the same address that it currently resides in.
+        CTxDestination dest;
+        ExtractDestination(out.tx->vout[out.i].scriptPubKey, dest);
+
+        if (from_address == EncodeDestination(dest))
+            ctrl.SelectAsset(COutPoint(out.tx->GetHash(), out.i));
+    }
+
+    std::vector<COutPoint> outs;
+    ctrl.ListSelectedAssets(outs);
+    if (!outs.size()) {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, std::string("No asset outpoints are selected from the given address, failed to create the transaction"));
+    }
 
     // Create the Transaction
     if (!CreateTransferAssetTransaction(pwalletMain, ctrl, vTransfers, error, transaction, reservekey, nRequiredFee))
