@@ -499,7 +499,9 @@ bool EvalScript(
 
                     break;
                 }
-                case OP_NOP1: case OP_NOP4: case OP_NOP5:
+                case OP_YAC_ASSET:
+                    break;
+                case OP_NOP1: case OP_NOP5:
                 case OP_NOP6: case OP_NOP7: case OP_NOP8: case OP_NOP9: case OP_NOP10:
                 break;
 
@@ -1563,11 +1565,17 @@ bool Solver(
         // Sender provides N pubkeys, receivers provides M signatures
         mTemplates.insert(make_pair(TX_MULTISIG, CScript() << OP_SMALLINTEGER << OP_PUBKEYS << OP_SMALLINTEGER << OP_CHECKMULTISIG));
 
-        // CLTV transaction, sender provides hash of pubkey, receiver provides redeemscript and signature
-        mTemplates.insert(make_pair(TX_CLTV, CScript() << OP_SMALLDATA << OP_NOP2 << OP_DROP << OP_PUBKEYS << OP_CHECKSIG));
+        // CLTV-P2SH transaction, sender provides pubkey, receiver provides redeemscript and signature
+        mTemplates.insert(make_pair(TX_CLTV_P2SH, CScript() << OP_SMALLDATA << OP_NOP2 << OP_DROP << OP_PUBKEYS << OP_CHECKSIG));
 
-        // CSV transaction, sender provides hash of pubkey, receiver provides redeemscript and signature
-        mTemplates.insert(make_pair(TX_CSV, CScript() << OP_SMALLDATA << OP_NOP3 << OP_DROP << OP_PUBKEYS << OP_CHECKSIG));
+        // CSV-P2SH transaction, sender provides pubkey, receiver provides redeemscript and signature
+        mTemplates.insert(make_pair(TX_CSV_P2SH, CScript() << OP_SMALLDATA << OP_NOP3 << OP_DROP << OP_PUBKEYS << OP_CHECKSIG));
+
+        // CLTV-P2PKH transaction, sender provides hash of pubkey, receiver provides signature and pubkey
+        mTemplates.insert(make_pair(TX_CLTV_P2PKH, CScript() << OP_SMALLDATA << OP_NOP2 << OP_DROP << OP_DUP << OP_HASH160 << OP_PUBKEYHASH << OP_EQUALVERIFY << OP_CHECKSIG));
+
+        // CSV-P2PKH transaction, sender provides hash of pubkey, receiver provides signature and pubkey
+        mTemplates.insert(make_pair(TX_CSV_P2PKH, CScript() << OP_SMALLDATA << OP_NOP3 << OP_DROP << OP_DUP << OP_HASH160 << OP_PUBKEYHASH << OP_EQUALVERIFY << OP_CHECKSIG));
 
         if (!fUseOld044Rules)
         {   // Empty, provably prunable, data-carrying output
@@ -1589,6 +1597,7 @@ bool Solver(
     int nType = 0;
     bool fIsOwner = false;
     if (scriptPubKey.IsAssetScript(nType, fIsOwner)) {
+        // It is  OP_DUP OP_HASH160 20 <Hash160_public_key> OP_EQUALVERIFY OP_CHECKSIG OP_YAC_ASSET <asset_data> OP_DROP
         typeRet = (txnouttype)nType;
         std::vector<unsigned char> hashBytes(scriptPubKey.begin()+3, scriptPubKey.begin()+23);
         vSolutionsRet.push_back(hashBytes);
@@ -1598,7 +1607,7 @@ bool Solver(
 
     // Scan templates
     const CScript& script1 = scriptPubKey;
-    BOOST_FOREACH(const PAIRTYPE(txnouttype, CScript)& tplate, mTemplates)
+    for (const std::pair<txnouttype, CScript>& tplate : mTemplates)
     {
         const CScript& script2 = tplate.second;
         vSolutionsRet.clear();
@@ -1624,8 +1633,8 @@ bool Solver(
                         //typeRet = TX_NONSTANDARD;
                         return false;
                     }
-//#endif                    
-#endif                    
+//#endif
+#endif
                     // Additional checks for TX_MULTISIG:
                     unsigned char m = vSolutionsRet.front()[0];
                     unsigned char n = vSolutionsRet.back()[0];
@@ -1778,10 +1787,12 @@ bool Solver(
     case TX_NULL_DATA:  // this is not in 0.4.4 code
         return false;
     case TX_PUBKEY:
-    case TX_CLTV:
-    case TX_CSV:
+    case TX_CLTV_P2SH:
+    case TX_CSV_P2SH:
         keyID = CPubKey(vSolutions[0]).GetID();
         return Sign1(keyID, keystore, hash, nHashType, scriptSigRet);
+    case TX_CLTV_P2PKH:
+    case TX_CSV_P2PKH:
     case TX_PUBKEYHASH:
         keyID = CKeyID(uint160(vSolutions[0]));
         if (!Sign1(keyID, keystore, hash, nHashType, scriptSigRet))
@@ -1811,10 +1822,12 @@ int ScriptSigArgsExpected(txnouttype t, const std::vector<std::vector<unsigned c
         return -1;
     case TX_NULL_DATA:
         return 1;
-    case TX_CLTV:
-    case TX_CSV:
+    case TX_CLTV_P2SH:
+    case TX_CSV_P2SH:
     case TX_PUBKEY:
         return 1;
+    case TX_CLTV_P2PKH:
+    case TX_CSV_P2PKH:
     case TX_PUBKEYHASH:
         return 2;
     case TX_MULTISIG:
@@ -1906,7 +1919,7 @@ bool IsSpendableCltvUTXO(const CKeyStore &keystore,
 		}
 		break;
 	}
-	case TX_CLTV:
+	case TX_CLTV_P2SH:
 	{
 		CKeyID keyID = CPubKey(vSolutions[0]).GetID();
 		if (keystore.HaveKey(keyID))
@@ -1915,6 +1928,15 @@ bool IsSpendableCltvUTXO(const CKeyStore &keystore,
 		}
 		break;
 	}
+    case TX_CLTV_P2PKH:
+    {
+        CKeyID keyID = CKeyID(uint160(vSolutions[0]));
+        if (keystore.HaveKey(keyID))
+        {
+            return true;
+        }
+        break;
+    }
 	}
 
 	return false;
@@ -1941,9 +1963,18 @@ bool IsSpendableCsvUTXO(const CKeyStore &keystore,
         }
         break;
     }
-    case TX_CSV:
+    case TX_CSV_P2SH:
     {
         CKeyID keyID = CPubKey(vSolutions[0]).GetID();
+        if (keystore.HaveKey(keyID))
+        {
+            return true;
+        }
+        break;
+    }
+    case TX_CSV_P2PKH:
+    {
+        CKeyID keyID = CKeyID(uint160(vSolutions[0]));
         if (keystore.HaveKey(keyID))
         {
             return true;
@@ -1971,11 +2002,15 @@ isminetype IsMine(const CKeyStore &keystore, const CScript& scriptPubKey)
     case TX_NONSTANDARD:
     case TX_NULL_DATA:
         break;
+    case TX_CLTV_P2SH:
+    case TX_CSV_P2SH:
     case TX_PUBKEY:
         keyID = CPubKey(vSolutions[0]).GetID();
         if (keystore.HaveKey(keyID))
             return MINE_SPENDABLE;
         break;
+    case TX_CLTV_P2PKH:
+    case TX_CSV_P2PKH:
     case TX_PUBKEYHASH:
         keyID = CKeyID(uint160(vSolutions[0]));
         if (keystore.HaveKey(keyID))
@@ -2004,16 +2039,19 @@ isminetype IsMine(const CKeyStore &keystore, const CScript& scriptPubKey)
             return MINE_SPENDABLE;
         break;
     }
-    case TX_CLTV:
-    case TX_CSV:
+    /** YAC_ASSET START */
+    case TX_NEW_ASSET:
+    case TX_TRANSFER_ASSET:
+    case TX_REISSUE_ASSET:
     {
-       keyID = CPubKey(vSolutions[0]).GetID();
+        if (!AreAssetsDeployed())
+            return MINE_NO;
+        keyID = CKeyID(uint160(vSolutions[0]));
         if (keystore.HaveKey(keyID))
-        {
             return MINE_SPENDABLE;
-        }
         break;
     }
+    /** YAC_ASSET END*/
     }
 
     if (keystore.HaveWatchOnly(scriptPubKey))
@@ -2050,6 +2088,21 @@ bool ExtractDestination(const CScript& scriptPubKey, CTxDestination& addressRet)
      /** YAC_ASSET END */
     // Multisig txns have more than one address...
     return false;
+}
+
+bool ExtractLockDuration(const CScript& scriptPubKey, uint32_t& lockDuration)
+{
+    // Scan information from scriptPubKey to get lock duration
+    CScript::const_iterator pc = scriptPubKey.begin();
+    opcodetype opcode;
+    vector<unsigned char> vch;
+    if (!scriptPubKey.GetOp(pc, opcode, vch))
+    {
+        return false;
+    }
+
+    lockDuration = CScriptNum(vch).getint();
+    return true;
 }
 
 bool ExtractDestinations(const CScript& scriptPubKey, txnouttype& typeRet, vector<CTxDestination>& addressRet, int& nRequiredRet)

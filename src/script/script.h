@@ -257,16 +257,17 @@ static const unsigned int SOFT_FLAGS = STRICT_FLAGS & ~STRICT_FORMAT_FLAGS;
 /** Used as the flags parameter to sequence and nLocktime checks in non-consensus code. */
 static const unsigned int STANDARD_LOCKTIME_VERIFY_FLAGS = LOCKTIME_VERIFY_SEQUENCE;
 
-enum txnouttype
-{
+enum txnouttype {
     TX_NONSTANDARD,
     // 'standard' transaction types:
     TX_PUBKEY,
     TX_PUBKEYHASH,
     TX_SCRIPTHASH,
     TX_MULTISIG,
-	TX_CLTV,
-	TX_CSV,
+    TX_CLTV_P2SH,
+    TX_CSV_P2SH,
+    TX_CLTV_P2PKH,
+    TX_CSV_P2PKH,
     TX_NULL_DATA,
     /** YAC_ASSET START */
     TX_NEW_ASSET,
@@ -827,6 +828,7 @@ bool IsSpendableCltvUTXO(const CKeyStore &keystore, const CScript& scriptPubKey)
 bool IsSpendableCsvUTXO(const CKeyStore &keystore, const CScript& scriptPubKey);
 void ExtractAffectedKeys(const CKeyStore &keystore, const CScript& scriptPubKey, std::vector<CKeyID> &vKeys);
 bool ExtractDestination(const CScript& scriptPubKey, CTxDestination& addressRet);
+bool ExtractLockDuration(const CScript& scriptPubKey, uint32_t& lockDuration);
 bool ExtractDestinations(const CScript& scriptPubKey, txnouttype& typeRet, std::vector<CTxDestination>& addressRet, int& nRequiredRet);
 /** Check whether a CTxDestination is a CNoDestination. */
 bool IsValidDestination(const CTxDestination& dest);

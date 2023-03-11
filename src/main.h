@@ -76,6 +76,10 @@ extern bool fAssetIndex;
 void FlushAssetToDisk();
 bool AreAssetsDeployed();
 CAssetsCache* GetCurrentAssetCache();
+bool CheckTxAssets(
+    const CTransaction& tx, CValidationState& state, MapPrevTx inputs,
+    CAssetsCache* assetCache, bool fCheckMempool,
+    std::vector<std::pair<std::string, uint256> >& vPairReissueAssets);
 //
 // END OF FUNCTIONS USED FOR ASSET MANAGEMENT SYSTEM
 //
@@ -300,6 +304,9 @@ public:
 };
 /** The currently-connected chain of blocks. */
 extern CChain chainActive;
+
+/** Convert CValidationState to a human-readable message for logging */
+std::string FormatStateMessage(const CValidationState &state);
 
 void RegisterWallet(CWallet* pwalletIn);
 void CloseWallets();

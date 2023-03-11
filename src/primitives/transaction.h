@@ -393,8 +393,6 @@ public:
     /** Check for standard transaction types
         @return True if all outputs (scriptPubKeys) use only standard transaction forms
     */
-    bool IsStandard044(std::string& strReason) const;
-    bool oldIsStandard(std::string& strReason) const;
     bool IsStandard(std::string& strReason) const;
     //bool IsStandard() const
     //{

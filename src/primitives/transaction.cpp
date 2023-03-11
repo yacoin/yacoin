@@ -4,8 +4,12 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#include "assets/assets.h"
 #include "primitives/transaction.h"
 #include "txdb.h"
+#include "wallet.h"
+
+#include <map>
 
 using std::vector;
 using std::map;
@@ -106,13 +110,13 @@ bool CTransaction::ReadFromDisk(CDiskTxPos pos, FILE** pfileRet)
     return true;
 }
 
-bool CTransaction::oldIsStandard(std::string& strReason) const
+bool CTransaction::IsStandard(std::string& strReason) const
 {
     // TODO: Temporary fix to avoid warning for yacoind 1.0.0. Because in yacoind 1.0.0, there are two times
     // block version is upgraded:
-	// 1) At the time installing yacoind 1.0.0
-	// 2) At the time happening hardfork
-	// Need update this line at next yacoin version
+    // 1) At the time installing yacoind 1.0.0
+    // 2) At the time happening hardfork
+    // Need update this line at next yacoin version
     if (nVersion > CTransaction::CURRENT_VERSION_of_Tx_for_yac_new)
     {
         strReason = "version";
@@ -121,7 +125,7 @@ bool CTransaction::oldIsStandard(std::string& strReason) const
 
     unsigned int nDataOut = 0;
     txnouttype whichType;
-    BOOST_FOREACH(const CTxIn& txin, vin)
+    for (const CTxIn& txin : vin)
     {
         // Biggest 'standard' txin is a 15-of-15 P2SH multisig with compressed
         // keys. (remember the 520 byte limit on redeemScript size) That works
@@ -140,28 +144,29 @@ bool CTransaction::oldIsStandard(std::string& strReason) const
             strReason = "scriptsig-not-pushonly";
             return false;
         }
-        if (!txin.scriptSig.HasCanonicalPushes()) {
-            strReason = "txin-scriptsig-not-canonicalpushes";
-            return false;
-        }
+//        if (!txin.scriptSig.HasCanonicalPushes()) {
+//            strReason = "txin-scriptsig-not-canonicalpushes";
+//            return false;
+//        }
     }
-    BOOST_FOREACH(const CTxOut& txout, vout) {
+
+    for (const CTxOut& txout : vout) {
         if (!::IsStandard(txout.scriptPubKey, whichType)) {
             strReason = "scriptpubkey";
             return false;
         }
         if (whichType == TX_NULL_DATA)
             nDataOut++;
-        else {
-            if (txout.nValue == 0) {
-                strReason = "txout-value=0";
-                return false;
-            }
-            if (!txout.scriptPubKey.HasCanonicalPushes()) {
-                strReason = "txout-scriptsig-not-canonicalpushes";
-                return false;
-            }
+        else if (txout.nValue == 0 && !txout.scriptPubKey.IsAssetScript())
+        {
+            strReason = "txout-value=0";
+            return false;
         }
+//        else if (!txout.scriptPubKey.HasCanonicalPushes())
+//        {
+//            strReason = "txout-scriptsig-not-canonicalpushes";
+//            return false;
+//        }
     }
 
     // only one OP_RETURN txout is permitted
@@ -171,58 +176,6 @@ bool CTransaction::oldIsStandard(std::string& strReason) const
     }
 
     return true;
-}
-
-bool CTransaction::IsStandard044( std::string& strReason ) const
-{
-    // TODO: Temporary fix to avoid warning for yacoind 1.0.0. Because in yacoind 1.0.0, there are two times
-    // block version is upgraded:
-	// 1) At the time installing yacoind 1.0.0
-	// 2) At the time happening hardfork
-	// Need update this line at next yacoin version
-    if (nVersion > CTransaction::CURRENT_VERSION_of_Tx_for_yac_new) // same as in 0.4.4!?
-    {                                                   // if we test differently,
-        strReason = "version(in 0.4.4)";                // then shouldn't 0.4.5 be
-        return false;                                   // different?
-    }
-
-    BOOST_FOREACH(const CTxIn& txin, vin)
-    {
-        // Biggest 'standard' txin is a 3-signature 3-of-3 CHECKMULTISIG
-        // pay-to-script-hash, which is 3 ~80-byte signatures, 3
-        // ~65-byte public keys, plus a few script ops.
-        if (txin.scriptSig.size() > 500)
-        {
-            return false;
-        }
-        if (!txin.scriptSig.IsPushOnly())
-            return false;
-    }
-    txnouttype whichType;
-    BOOST_FOREACH(const CTxOut& txout, vout)
-    {
-      //if (!::IsStandard(txout.scriptPubKey))
-        if (!::IsStandard(txout.scriptPubKey, whichType))
-        {
-            strReason = "scriptpubkey0.4.4";
-            return false;
-        }
-        if (txout.nValue == 0)
-            return false;
-    }
-    return true;
-}
-
-bool CTransaction::IsStandard(std::string& strReason) const
-{
-    bool
-        fIsStandard = oldIsStandard( strReason );
-
-    if( !fIsStandard )
-    {
-        fIsStandard = IsStandard044( strReason );
-    }
-    return fIsStandard;
 }
 
 //
@@ -336,6 +289,11 @@ bool CTransaction::CheckTransaction(CValidationState &state) const
     ::int64_t
         nValueOut = 0;
 
+    /** YAC_ASSET START */
+    std::set<std::string> setAssetTransferNames;
+    /** YAC_ASSET END */
+
+    // Check transaction output
     for (unsigned int i = 0; i < vout.size(); ++i)
     {
         const CTxOut
@@ -351,6 +309,61 @@ bool CTransaction::CheckTransaction(CValidationState &state) const
         nValueOut += txout.nValue;
         if (!MoneyRange(nValueOut))
             return state.DoS(100, error("CTransaction::CheckTransaction() : txout total out of range"));
+
+        /** YAC_ASSET START */
+        bool isAsset = false;
+        int nType;
+        bool fIsOwner;
+        if (txout.scriptPubKey.IsAssetScript(nType, fIsOwner))
+            isAsset = true;
+
+        // Check for transfers that don't meet the assets units only if the assetCache is not null
+        if (isAsset) {
+            // Get the transfer transaction data from the scriptPubKey
+            if (nType == TX_TRANSFER_ASSET) {
+                CAssetTransfer transfer;
+                std::string address;
+                if (!TransferAssetFromScript(txout.scriptPubKey, transfer, address))
+                    return state.DoS(100, error("bad-txns-transfer-asset-bad-deserialize"));
+
+                // insert into set, so that later on we can check asset null data transactions
+                setAssetTransferNames.insert(transfer.strName);
+
+                // Check asset name validity and get type
+                AssetType assetType;
+                if (!IsAssetNameValid(transfer.strName, assetType)) {
+                    return state.DoS(100, error("bad-txns-transfer-asset-name-invalid"));
+                }
+
+                // If the transfer is an ownership asset. Check to make sure that it is OWNER_ASSET_AMOUNT
+                if (IsAssetNameAnOwner(transfer.strName)) {
+                    if (transfer.nAmount != OWNER_ASSET_AMOUNT)
+                        return state.DoS(100, error("bad-txns-transfer-owner-amount-was-not-1"));
+                }
+
+                // If the transfer is a unique asset. Check to make sure that it is UNIQUE_ASSET_AMOUNT
+                if (assetType == AssetType::UNIQUE) {
+                    if (transfer.nAmount != UNIQUE_ASSET_AMOUNT)
+                        return state.DoS(100, error("bad-txns-transfer-unique-amount-was-not-1"));
+                }
+
+                // Specific check and error message to go with to make sure the amount is 0
+                if (txout.nValue != 0)
+                    return state.DoS(100, error("bad-txns-asset-transfer-amount-isn't-zero"));
+            } else if (nType == TX_NEW_ASSET) {
+                // Specific check and error message to go with to make sure the amount is 0
+                if (txout.nValue != 0)
+                    return state.DoS(100, error("bad-txns-asset-issued-amount-isn't-zero"));
+            } else if (nType == TX_REISSUE_ASSET) {
+                // Specific check and error message to go with to make sure the amount is 0
+                if (txout.nValue != 0) {
+                    return state.DoS(0, error("bad-txns-asset-reissued-amount-isn't-zero"));
+                }
+            } else {
+                return state.DoS(0, error("bad-asset-type-not-any-of-the-main-three"));
+            }
+        }
+        /** YAC_ASSET END */
     }
 
     // Check for duplicate inputs
@@ -368,6 +381,11 @@ bool CTransaction::CheckTransaction(CValidationState &state) const
     {
         if (vin[0].scriptSig.size() < 2 || vin[0].scriptSig.size() > 100)
             return state.DoS(100, error("CTransaction::CheckTransaction() : coinbase script size is invalid"));
+        for (auto cbVout : vout) {
+            if (cbVout.scriptPubKey.IsAssetScript()) {
+                return state.DoS(0, error("%s: coinbase contains asset transaction", __func__));
+            }
+        }
     }
     else
     {
@@ -375,6 +393,88 @@ bool CTransaction::CheckTransaction(CValidationState &state) const
             if (txin.prevout.IsNull())
                 return state.DoS(10, error("CTransaction::CheckTransaction() : prevout is null"));
     }
+
+    /* YAC_ASSET START */
+    if (IsNewAsset()) {
+        /** Verify the reissue assets data */
+        std::string strError = "";
+        if(!VerifyNewAsset(strError))
+            return state.DoS(100, error(strError.c_str()));
+
+        CNewAsset asset;
+        std::string strAddress;
+        if (!AssetFromTransaction(*this, asset, strAddress))
+            return state.DoS(100, error("bad-txns-issue-asset-from-transaction"));
+
+        // Validate the new assets information
+        if (!IsNewOwnerTxValid(*this, asset.strName, strAddress, strError))
+            return state.DoS(100, error(strError.c_str()));
+
+        if(!CheckNewAsset(asset, strError))
+            return state.DoS(100, error(strError.c_str()));
+
+    } else if (IsReissueAsset()) {
+
+        /** Verify the reissue assets data */
+        std::string strError;
+        if (!VerifyReissueAsset(strError))
+            return state.DoS(100, error(strError.c_str()));
+
+        CReissueAsset reissue;
+        std::string strAddress;
+        if (!ReissueAssetFromTransaction(*this, reissue, strAddress))
+            return state.DoS(100, error("bad-txns-reissue-asset"));
+
+        if (!CheckReissueAsset(reissue, strError))
+            return state.DoS(100, error(strError.c_str()));
+
+        // Get the assetType
+        AssetType type;
+        IsAssetNameValid(reissue.strName, type);
+
+    } else if (IsNewUniqueAsset()) {
+
+        /** Verify the unique assets data */
+        std::string strError = "";
+        if (!VerifyNewUniqueAsset(strError)) {
+            return state.DoS(100, error(strError.c_str()));
+        }
+
+
+        for (auto out : vout)
+        {
+            if (IsScriptNewUniqueAsset(out.scriptPubKey))
+            {
+                CNewAsset asset;
+                std::string strAddress;
+                if (!AssetFromScript(out.scriptPubKey, asset, strAddress))
+                    return state.DoS(100, error("bad-txns-check-transaction-issue-unique-asset-serialization"));
+
+                if (!CheckNewAsset(asset, strError))
+                    return state.DoS(100, error(strError.c_str()));
+            }
+        }
+    }
+    else {
+        // Fail if transaction contains any non-transfer asset scripts and hasn't conformed to one of the
+        // above transaction types.  Also fail if it contains OP_YAC_ASSET opcode but wasn't a valid script.
+        for (auto out : vout) {
+            int nType;
+            bool _isOwner;
+            if (out.scriptPubKey.IsAssetScript(nType, _isOwner)) {
+                if (nType != TX_TRANSFER_ASSET) {
+                    return state.DoS(100, error("bad-txns-bad-asset-transaction"));
+                }
+            } else {
+                if (out.scriptPubKey.Find(OP_YAC_ASSET)) {
+                    if (out.scriptPubKey[0] != OP_YAC_ASSET) {
+                        return state.DoS(100, error("bad-txns-op-yac-asset-not-in-right-script-location"));
+                    }
+                }
+            }
+        }
+    }
+    /* YAC_ASSET END */
 
     return true;
 }

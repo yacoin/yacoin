@@ -59,8 +59,8 @@
 std::map<uint256, std::string> mapReissuedTx;
 std::map<std::string, uint256> mapReissuedAssets;
 
-// Fee lock amount and Fee lock time
-static const uint32_t feeLockTime = 21000; // 21000 blocks
+// Fee lock amount and Fee lock duration
+static const uint32_t feeLockDuration = 21000; // 21000 blocks
 static const CAmount feeLockAmount = 21000 * COIN; // 21000 YAC
 
 // excluding owner tag ('!')
@@ -579,7 +579,7 @@ bool CTransaction::IsNewAsset() const
     // New Asset transaction will always have at least three outputs.
     // 1. Owner Token output
     // 2. Issue Asset output
-    // 3. YAC Burn Fee
+    // 3. YAC Lock Fee
     if (vout.size() < 3) {
         return false;
     }
@@ -616,7 +616,7 @@ bool CTransaction::IsNewUniqueAsset() const
 //! Call this function after IsNewUniqueAsset
 bool CTransaction::VerifyNewUniqueAsset(std::string& strError) const
 {
-    // Must contain at least 3 outpoints (YAC burn, owner change and one or more new unique assets that share a root (should be in trailing position))
+    // Must contain at least 3 outpoints (YAC Lock, owner change and one or more new unique assets that share a root (should be in trailing position))
     if (vout.size() < 3) {
         strError  = "bad-txns-unique-vout-size-to-small";
         return false;
@@ -659,10 +659,10 @@ bool CTransaction::VerifyNewUniqueAsset(std::string& strError) const
         return false;
     }
 
-    // check for burn outpoint (must account for each new asset)
+    // check for lock outpoint (must account for each new asset)
     bool fBurnOutpointFound = false;
     for (auto out : vout) {
-        if (CheckIssueBurnTx(out, AssetType::UNIQUE, assetOutpointCount)) {
+        if (CheckIssueLockTx(out, AssetType::UNIQUE, assetOutpointCount)) {
             fBurnOutpointFound = true;
             break;
         }
@@ -708,7 +708,7 @@ bool CTransaction::VerifyNewUniqueAsset(std::string& strError) const
 
 //! To be called on CTransactions where IsNewAsset returns true
 bool CTransaction::VerifyNewAsset(std::string& strError) const {
-    // Issuing an Asset must contain at least 3 CTxOut( Raven Burn Tx, Any Number of other Outputs ..., Owner Asset Tx, New Asset Tx)
+    // Issuing an Asset must contain at least 3 CTxOut( Yacoin Lock Tx, Any Number of other Outputs ..., Owner Asset Tx, New Asset Tx)
     if (vout.size() < 3) {
         strError = "bad-txns-issue-vout-size-to-small";
         return false;
@@ -748,20 +748,21 @@ bool CTransaction::VerifyNewAsset(std::string& strError) const {
         return false;
     }
 
-    // Check for the Burn CTxOut in one of the vouts ( This is needed because the change CTxOut is places in a random position in the CWalletTx
-    bool fFoundIssueBurnTx = false;
+    // Check for the Lock CTxOut in one of the vouts
+    bool fFoundIssueLockTx = false;
     for (auto out : vout) {
-        if (CheckIssueBurnTx(out, assetType)) {
-            fFoundIssueBurnTx = true;
+        if (CheckIssueLockTx(out, assetType)) {
+            fFoundIssueLockTx = true;
             break;
         }
     }
 
-    if (!fFoundIssueBurnTx) {
+    if (!fFoundIssueLockTx) {
         strError = "bad-txns-issue-burn-not-found";
         return false;
     }
 
+    // If this is a sub asset, check if one of CTxOut contains owner asset transfer transaction
     if (assetType == AssetType::SUB) {
         std::string root = GetParentName(asset.strName);
         bool fOwnerOutFound = false;
@@ -809,7 +810,7 @@ bool CTransaction::IsReissueAsset() const
 //! To be called on CTransactions where IsReissueAsset returns true
 bool CTransaction::VerifyReissueAsset(std::string& strError) const
 {
-    // Reissuing an Asset must contain at least 3 CTxOut ( Raven Burn Tx, Any Number of other Outputs ..., Reissue Asset Tx, Owner Asset Change Tx)
+    // Reissuing an Asset must contain at least 3 CTxOut ( Yacoin Lock Tx, Any Number of other Outputs ..., Reissue Asset Tx, Owner Asset Change Tx)
     if (vout.size() < 3) {
         strError  = "bad-txns-vout-size-to-small";
         return false;
@@ -853,10 +854,10 @@ bool CTransaction::VerifyReissueAsset(std::string& strError) const
         return false;
     }
 
-    // Check for the Burn CTxOut in one of the vouts ( This is needed because the change CTxOut is placed in a random position in the CWalletTx
+    // Check for the Lock CTxOut in one of the vouts
     bool fFoundReissueBurnTx = false;
     for (auto out : vout) {
-        if (CheckReissueBurnTx(out)) {
+        if (CheckReissueLockTx(out)) {
             fFoundReissueBurnTx = true;
             break;
         }
@@ -2214,17 +2215,14 @@ bool GetAssetData(const CScript& script, CAssetOutputEntry& data)
 }
 
 // REMOVE LATER
-bool CheckIssueBurnTx(const CTxOut& txOut, const AssetType& type, const int numberIssued)
+bool CheckIssueLockTx(const CTxOut& txOut, const AssetType& type, const int numberIssued)
 {
     if (type == AssetType::REISSUE || type == AssetType::VOTE || type == AssetType::OWNER || type == AssetType::INVALID)
         return false;
 
-    CAmount lockAmount = 0;
-    std::string lockAddress = "";
-
-    // Get the lock address and amount for the type of asset
-    lockAmount = GetLockAmount(type);
-    lockAddress = GetLockAddress(type);
+    // Get the lock amount and lock duration for the type of asset
+    CAmount lockAmount = GetLockAmount(type);
+    uint32_t expectedLockDuration = GetLockDuration(type);
 
     // If issuing multiple (unique) assets need to burn for each
     lockAmount *= numberIssued;
@@ -2233,46 +2231,46 @@ bool CheckIssueBurnTx(const CTxOut& txOut, const AssetType& type, const int numb
     if (!(txOut.nValue == lockAmount))
         return false;
 
-    // Extract the destination
-    CTxDestination destination;
-    if (!ExtractDestination(txOut.scriptPubKey, destination))
+    // Scan information from scriptPubKey to get lock duration
+    uint32_t lockDuration = 0;
+    if (!ExtractLockDuration(txOut.scriptPubKey, lockDuration))
+    {
+        printf("CheckIssueLockTx(), Can't get lock duration from scriptPubKey\n");
         return false;
+    }
 
-    // Verify destination is valid
-    if (!IsValidDestination(destination))
-        return false;
-
-    // Check destination address is the lock address
-    auto strDestination = EncodeDestination(destination);
-    if (!(strDestination == lockAddress))
+    // Check lockDuration is expected
+    if (lockDuration != expectedLockDuration)
         return false;
 
     return true;
 }
 
-bool CheckIssueBurnTx(const CTxOut& txOut, const AssetType& type)
+bool CheckIssueLockTx(const CTxOut& txOut, const AssetType& type)
 {
-    return CheckIssueBurnTx(txOut, type, 1);
+    return CheckIssueLockTx(txOut, type, 1);
 }
 
-bool CheckReissueBurnTx(const CTxOut& txOut)
+bool CheckReissueLockTx(const CTxOut& txOut)
 {
     // Check the first transaction and verify that the correct YAC Amount
     if (txOut.nValue != GetReissueAssetLockAmount())
         return false;
 
-    // Extract the destination
-    CTxDestination destination;
-    if (!ExtractDestination(txOut.scriptPubKey, destination))
-        return false;
+    // Get the lock duration for the type of asset
+    uint32_t expectedLockDuration = GetLockDuration(AssetType::REISSUE);
 
-    // Verify destination is valid
-    if (!IsValidDestination(destination))
+    // Scan information from scriptPubKey to get lock duration
+    uint32_t lockDuration = 0;
+    if (!ExtractLockDuration(txOut.scriptPubKey, lockDuration))
+    {
+        printf("CheckReissueLockTx(), Can't get lock duration from scriptPubKey\n");
         return false;
+    }
 
-//    // Check destination address is the correct lock address
-//    if (EncodeDestination(destination) != GetParams().ReissueAssetLockAddress())
-//        return false;
+    // Check lockDuration is expected
+    if (lockDuration != expectedLockDuration)
+        return false;
 
     return true;
 }
@@ -2322,29 +2320,28 @@ CAmount GetLockAmount(const AssetType type)
     }
 }
 
-std::string GetLockAddress(const int nType)
+uint32_t GetLockDuration(const int nType)
 {
-    return GetLockAddress((AssetType(nType)));
+    return GetLockDuration((AssetType(nType)));
 }
 
-std::string GetLockAddress(const AssetType type)
+uint32_t GetLockDuration(const AssetType type)
 {
-    std::string burnAddr {"YCk26dUcaXu8vu6zG3E2PrbBeECAV8RNFp"};
     switch (type) {
         case AssetType::ROOT:
-            return burnAddr;
+            return feeLockDuration;
         case AssetType::SUB:
-            return burnAddr;
+            return feeLockDuration;
         case AssetType::OWNER:
-            return "";
+            return 0;
         case AssetType::UNIQUE:
-            return burnAddr;
+            return feeLockDuration;
         case AssetType::VOTE:
-            return "";
+            return 0;
         case AssetType::REISSUE:
-            return burnAddr;
+            return feeLockDuration;
         default:
-            return "";
+            return 0;
     }
 }
 // END OF REMOVE LATER
@@ -2569,7 +2566,7 @@ bool CreateAssetTransaction(CWallet* pwallet, CCoinControl& coinControl, const s
     CAmount lockAmount = GetLockAmount(assetType) * assets.size();
     const CKeyID& keyID = boost::get<CKeyID>(coinControl.destChange);
     CScript feeLockScriptPubKey;
-    feeLockScriptPubKey.SetCsvP2PKH(feeLockTime, keyID);
+    feeLockScriptPubKey.SetCsvP2PKH(feeLockDuration, keyID);
 
     CAmount curBalance = pwallet->GetBalance();
 
@@ -2725,7 +2722,7 @@ bool CreateReissueAssetTransaction(CWallet* pwallet, CCoinControl& coinControl, 
     // Currently, the lock address is same as the change address
     const CKeyID& keyID = boost::get<CKeyID>(coinControl.destChange);
     CScript feeLockScriptPubKey;
-    feeLockScriptPubKey.SetCsvP2PKH(feeLockTime, keyID);
+    feeLockScriptPubKey.SetCsvP2PKH(feeLockDuration, keyID);
     CRecipient recipient = {feeLockScriptPubKey, lockAmount, fSubtractFeeFromAmount};
     vecSend.push_back(recipient);
 
@@ -2991,7 +2988,7 @@ bool CheckNewAsset(const CNewAsset& asset, std::string& strError)
         return false;
     }
 
-    if (asset.units < 0 || asset.units > 8) {
+    if (asset.units < 0 || asset.units > MAX_UNIT) {
         strError = _("Invalid parameter: units must be between 0-6.");
         return false;
     }
@@ -3038,7 +3035,7 @@ bool ContextualCheckNewAsset(CAssetsCache* assetCache, const CNewAsset& asset, s
         }
     }
 
-    // Check the ipfs hash as it changes when messaging goes active
+    // Check the ipfs hash
     if (asset.nHasIPFS && asset.strIPFSHash.size() != 34) {
         strError = _("Invalid parameter: ipfs_hash must be 46 characters. Txid must be valid 64 character hash");
         return false;
@@ -3062,7 +3059,7 @@ bool CheckReissueAsset(const CReissueAsset& asset, std::string& strError)
     }
 
     if (asset.nUnits > MAX_UNIT || asset.nUnits < -1) {
-        strError = _("Unable to reissue asset: unit must be between 8 and -1");
+        strError = _("Unable to reissue asset: unit must be between 6 and -1");
         return false;
     }
 

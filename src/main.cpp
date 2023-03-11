@@ -109,6 +109,206 @@ CAssetsCache* GetCurrentAssetCache()
 {
     return passets;
 }
+
+bool CheckTxAssets(const CTransaction &tx, CValidationState &state,
+        MapPrevTx inputs, CAssetsCache *assetCache, bool fCheckMempool,
+        std::vector<std::pair<std::string, uint256>> &vPairReissueAssets)
+{
+    // Create map that stores the amount of an asset transaction input. Used to verify no assets are burned
+    std::map<std::string, CAmount> totalInputs;
+    std::map<std::string, std::string> mapAddresses;
+
+    for (unsigned int i = 0; i < tx.vin.size(); ++i)
+    {
+        const COutPoint &prevout = tx.vin[i].prevout;
+        Yassert(inputs.count(prevout.COutPointGetHash()) > 0);
+        CTxIndex &txindex = inputs[prevout.COutPointGetHash()].first;
+        CTransaction &txPrev = inputs[prevout.COutPointGetHash()].second;
+        CTxOut &txPrevOut = txPrev.vout[prevout.COutPointGet_n()];
+
+        if (!txindex.vSpent[prevout.COutPointGet_n()].IsNull())
+            return state.Invalid(
+                    error("CTransaction::CheckTxAssets() : %s prev tx already used at %s",
+                          tx.GetHash().ToString().substr(0, 10).c_str(),
+                          txindex.vSpent[prevout.COutPointGet_n()].ToString().c_str()));
+
+        if (txPrevOut.scriptPubKey.IsAssetScript())
+        {
+            CAssetOutputEntry data;
+            if (!GetAssetData(txPrevOut.scriptPubKey, data))
+                return state.DoS(100, error("bad-txns-failed-to-get-asset-from-script"));
+
+            // Add to the total value of assets in the inputs
+            if (totalInputs.count(data.assetName))
+                totalInputs.at(data.assetName) += data.nAmount;
+            else
+                totalInputs.insert(std::make_pair(data.assetName, data.nAmount));
+        }
+    }
+
+    // Create map that stores the amount of an asset transaction output. Used to
+    // verify no assets are burned
+    std::map<std::string, CAmount> totalOutputs;
+    int index = 0;
+    int64_t currentTime = GetTime();
+    std::string strError = "";
+    int i = 0;
+    for (const auto &txout : tx.vout)
+    {
+        i++;
+        bool fIsAsset = false;
+        int nType = 0;
+        bool fIsOwner = false;
+        if (txout.scriptPubKey.IsAssetScript(nType, fIsOwner))
+            fIsAsset = true;
+
+        if (assetCache)
+        {
+            if (fIsAsset && !AreAssetsDeployed())
+                return state.DoS(100, error("bad-txns-is-asset-and-asset-not-active"));
+        }
+
+        if (nType == TX_TRANSFER_ASSET)
+        {
+            CAssetTransfer transfer;
+            std::string address = "";
+            if (!TransferAssetFromScript(txout.scriptPubKey, transfer, address))
+                return state.DoS(100, error("bad-tx-asset-transfer-bad-deserialize"));
+
+            if (!ContextualCheckTransferAsset(assetCache, transfer, address, strError))
+                return state.DoS(100, error(strError.c_str()));
+
+            // Add to the total value of assets in the outputs
+            if (totalOutputs.count(transfer.strName))
+                totalOutputs.at(transfer.strName) += transfer.nAmount;
+            else
+                totalOutputs.insert(std::make_pair(transfer.strName, transfer.nAmount));
+
+            if (IsAssetNameAnOwner(transfer.strName))
+            {
+                if (transfer.nAmount != OWNER_ASSET_AMOUNT)
+                    return state.DoS(100, error("bad-txns-transfer-owner-amount-was-not-1"));
+            }
+            else
+            {
+                // For all other types of assets, make sure they are sending the right
+                // type of units
+                CNewAsset asset;
+                if (!assetCache->GetAssetMetaDataIfExists(transfer.strName, asset))
+                    return state.DoS(100, error("bad-txns-transfer-asset-not-exist"));
+
+                if (asset.strName != transfer.strName)
+                    return state.DoS(100, error("bad-txns-asset-database-corrupted"));
+
+                if (!CheckAmountWithUnits(transfer.nAmount, asset.units))
+                    return state.DoS(100, error("bad-txns-transfer-asset-amount-not-match-units"));
+            }
+        }
+        else if (nType == TX_REISSUE_ASSET)
+        {
+            CReissueAsset reissue;
+            std::string address;
+            if (!ReissueAssetFromScript(txout.scriptPubKey, reissue, address))
+                return state.DoS(100, error("bad-tx-asset-reissue-bad-deserialize"));
+
+            if (mapReissuedAssets.count(reissue.strName))
+            {
+                if (mapReissuedAssets.at(reissue.strName) != tx.GetHash())
+                    return state.DoS(100, error("bad-tx-reissue-chaining-not-allowed"));
+            }
+            else
+            {
+                vPairReissueAssets.emplace_back(std::make_pair(reissue.strName, tx.GetHash()));
+            }
+        }
+        index++;
+    }
+
+    if (assetCache)
+    {
+        if (tx.IsNewAsset())
+        {
+            // Get the asset type
+            CNewAsset asset;
+            std::string address;
+            if (!AssetFromScript(tx.vout[tx.vout.size() - 1].scriptPubKey, asset, address)) {
+                error("%s : Failed to get new asset from transaction: %s", __func__, tx.GetHash().GetHex());
+                return state.DoS(100, error("bad-txns-issue-serialzation-failed"));
+            }
+
+            AssetType assetType;
+            IsAssetNameValid(asset.strName, assetType);
+
+            if (!ContextualCheckNewAsset(assetCache, asset, strError, fCheckMempool))
+                return state.DoS(100, error(strError.c_str()));
+
+        }
+        else if (tx.IsReissueAsset())
+        {
+            CReissueAsset reissue_asset;
+            std::string address;
+            if (!ReissueAssetFromScript(tx.vout[tx.vout.size() - 1].scriptPubKey, reissue_asset, address))
+            {
+                error("%s : Failed to get new asset from transaction: %s", __func__, tx.GetHash().GetHex());
+                return state.DoS(100, error("bad-txns-reissue-serialzation-failed"));
+            }
+            if (!ContextualCheckReissueAsset(assetCache, reissue_asset, strError, tx))
+                return state.DoS(100, error("bad-txns-reissue-contextual-"));
+        }
+        else if (tx.IsNewUniqueAsset())
+        {
+            if (!ContextualCheckUniqueAssetTx(assetCache, strError, tx))
+                return state.DoS(100, error("bad-txns-issue-unique-contextual-"));
+        }
+        else
+        {
+            for (auto out : tx.vout)
+            {
+                int nType;
+                bool _isOwner;
+                if (out.scriptPubKey.IsAssetScript(nType, _isOwner))
+                {
+                    if (nType != TX_TRANSFER_ASSET)
+                    {
+                        return state.DoS(100, error("bad-txns-bad-asset-transaction"));
+                    }
+                }
+                else
+                {
+                    if (out.scriptPubKey.Find(OP_YAC_ASSET))
+                    {
+                        return state.DoS(100, error("bad-txns-bad-asset-script"));
+                    }
+                }
+            }
+        }
+    }
+
+    for (const auto &outValue : totalOutputs)
+    {
+        if (!totalInputs.count(outValue.first))
+        {
+            std::string errorMsg;
+            errorMsg =
+                    strprintf("Bad Transaction - Trying to create outpoint for asset that you don't have: %s", outValue.first);
+            return state.DoS(100, error("bad-tx-inputs-outputs-mismatch "));
+        }
+
+        if (totalInputs.at(outValue.first) != outValue.second)
+        {
+            std::string errorMsg;
+            errorMsg = strprintf("Bad Transaction - Assets would be burnt %s", outValue.first);
+            return state.DoS(100, error("bad-tx-inputs-outputs-mismatch "));
+        }
+    }
+
+    // Check the input size and the output size
+    if (totalOutputs.size() != totalInputs.size())
+    {
+        return state.DoS(100, error("bad-tx-asset-inputs-size-does-not-match-outputs-size"));
+    }
+    return true;
+}
 //
 // END OF FUNCTIONS USED FOR ASSET MANAGEMENT SYSTEM
 //
@@ -312,6 +512,13 @@ int64_t BLOCK_DOWNLOAD_TIMEOUT_BASE = HEADERS_DOWNLOAD_TIMEOUT_BASE; // 10 minut
 
 // These functions dispatch to one or all registered wallets
 
+/** Convert CValidationState to a human-readable message for logging */
+std::string FormatStateMessage(const CValidationState &state)
+{
+    return strprintf("%s (code %i)",
+        state.GetRejectReason(),
+        state.GetRejectCode());
+}
 
 void RegisterWallet(CWallet* pwalletIn)
 {
@@ -997,6 +1204,10 @@ bool CTxMemPool::accept(CValidationState &state, CTxDB& txdb, CTransaction &tx, 
     if (pfMissingInputs)
         *pfMissingInputs = false;
 
+    /** YAC_ASSET START */
+    std::vector<std::pair<std::string, uint256>> vReissueAssets;
+    /** YAC_ASSET END */
+
     if (tx.nVersion == CTransaction::CURRENT_VERSION_of_Tx_for_yac_old && isHardforkHappened())
         return error("CTxMemPool::accept() : Not accept transaction with old version");
 
@@ -1105,6 +1316,21 @@ bool CTxMemPool::accept(CValidationState &state, CTxDB& txdb, CTransaction &tx, 
                          hash.ToString().c_str(),
                          nFees, txMinFee);
 
+        /** YAC_ASSET START */
+        if (!AreAssetsDeployed()) {
+            for (auto out : tx.vout) {
+                if (out.scriptPubKey.IsAssetScript())
+                    return state.DoS(100, error("bad-txns-contained-asset-when-not-active"));
+            }
+        }
+
+        if (AreAssetsDeployed()) {
+            if (!CheckTxAssets(tx, state, mapInputs, GetCurrentAssetCache(), true, vReissueAssets))
+                return error("%s: Consensus::CheckTxAssets: %s, %s", __func__, tx.GetHash().ToString(),
+                             FormatStateMessage(state));
+        }
+        /** YAC_ASSET END */
+
         // Check against previous transactions
         // This is done last to help prevent CPU exhaustion denial-of-service attacks.
         if (
@@ -1135,6 +1361,31 @@ bool CTxMemPool::accept(CValidationState &state, CTxDB& txdb, CTransaction &tx, 
         }
         addUnchecked(hash, tx);
     }
+
+    // TODO: Add memory address index
+//    if (fAddressIndex) {
+//        pool.addAddressIndex(entry, view);
+//    }
+
+    /** YAC_ASSET START */
+    for (auto out : vReissueAssets) {
+        mapReissuedAssets.insert(out);
+        mapReissuedTx.insert(std::make_pair(out.second, out.first));
+    }
+    if (AreAssetsDeployed()) {
+        for (auto out : tx.vout) {
+            if (out.scriptPubKey.IsAssetScript()) {
+                CAssetOutputEntry data;
+                if (!GetAssetData(out.scriptPubKey, data))
+                    continue;
+                if (data.type == TX_NEW_ASSET && !IsAssetNameAnOwner(data.assetName)) {
+                    mapAssetToHash[data.assetName] = hash;
+                    mapHashToAsset[hash] = data.assetName;
+                }
+            }
+        }
+    }
+    /** YAC_ASSET END */
 
     ///// are we sure this is ok when loading transactions or restoring block txes
     // If updated, erase old tx from wallet

@@ -105,7 +105,7 @@ void LockTimeRedeemScriptToJSON(const CScript& redeemScript, txnouttype type, Ob
 
     // Convert to address
     CScriptID redeemScriptID = redeemScript.GetID();
-    if (type == TX_CLTV)
+    if (type == TX_CLTV_P2SH)
     {
         addressType += "CltvAddress";
         if (nLockTime < LOCKTIME_THRESHOLD)
@@ -121,7 +121,7 @@ void LockTimeRedeemScriptToJSON(const CScript& redeemScript, txnouttype type, Ob
             isTimeBasedLock = true;
         }
     }
-    else // TX_CSV
+    else // TX_CSV_P2SH
     {
         addressType += "CsvAddress";
         if (nLockTime & CTxIn::SEQUENCE_LOCKTIME_TYPE_FLAG)
@@ -1045,7 +1045,7 @@ Value describeredeemscript(const Array& params, bool fHelp)
         throw runtime_error(msg);
     }
 
-    if (whichType != TX_CLTV && whichType != TX_CSV)
+    if (whichType != TX_CLTV_P2SH && whichType != TX_CSV_P2SH)
     {
         string msg = "This is not CLTV/CSV redeemscript\n";
         throw runtime_error(msg);

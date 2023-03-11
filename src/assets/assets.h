@@ -258,9 +258,9 @@ CAmount GetIssueUniqueAssetLockAmount();
 CAmount GetLockAmount(const AssetType type);
 CAmount GetLockAmount(const int nType);
 
-//! Functions to be used to get access to the lock address for a given asset type issuance
-std::string GetLockAddress(const AssetType type);
-std::string GetLockAddress(const int nType);
+//! Functions to be used to get access to the lock duration for a given asset type issuance
+uint32_t GetLockDuration(const AssetType type);
+uint32_t GetLockDuration(const int nType);
 
 void GetTxOutAssetTypes(const std::vector<CTxOut>& vout, int& issues, int& reissues, int& transfers, int& owners);
 
@@ -300,12 +300,12 @@ bool OwnerAssetFromScript(const CScript& scriptPubKey, std::string& assetName, s
 bool ReissueAssetFromScript(const CScript& scriptPubKey, CReissueAsset& reissue, std::string& strAddress);
 
 //! Check to make sure the script contains the burn transaction
-bool CheckIssueBurnTx(const CTxOut& txOut, const AssetType& type, const int numberIssued);
-bool CheckIssueBurnTx(const CTxOut& txOut, const AssetType& type);
+bool CheckIssueLockTx(const CTxOut& txOut, const AssetType& type, const int numberIssued);
+bool CheckIssueLockTx(const CTxOut& txOut, const AssetType& type);
 
-// TODO, maybe remove this function and input that check into the CheckIssueBurnTx.
-//! Check to make sure the script contains the reissue burn data
-bool CheckReissueBurnTx(const CTxOut& txOut);
+// TODO, maybe remove this function and input that check into the CheckIssueLockTx.
+//! Check to make sure the script contains the reissue lock data
+bool CheckReissueLockTx(const CTxOut& txOut);
 
 //! issue asset scripts to make sure script meets the standards
 bool CheckIssueDataTx(const CTxOut& txOut); // OP_RAVEN_ASSET RVNQ (That is a Q as in Que not an O)
