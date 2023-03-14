@@ -48,10 +48,13 @@ void init_blockindex(DatabaseType dbType, leveldb::Options &options, bool fRemov
 	switch (dbType) {
 	case BLOCK_INDEX:
 	    directory = GetDataDir() / "txleveldb";
+	    break;
 	case ASSET_DATA:
 	    directory = GetDataDir() / "assets";
+	    break;
 	default:
 		printf("Unknown database type = %d\n", dbType);
+		break;
 	}
 
     if (fRemoveOld)

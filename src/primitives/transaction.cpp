@@ -526,7 +526,7 @@ bool CTransaction::DisconnectInputs(CValidationState &state, CTxDB& txdb)
 
 
 bool CTransaction::FetchInputs(CValidationState &state, CTxDB& txdb, const map<uint256, CTxIndex>& mapTestPool,
-                               bool fBlock, bool fMiner, MapPrevTx& inputsRet, bool& fInvalid)
+                               bool fBlock, bool fMiner, MapPrevTx& inputsRet, bool& fInvalid) const
 {
     // FetchInputs can return false either because we just haven't seen some inputs
     // (in which case the transaction should be stored as an orphan)
@@ -653,7 +653,7 @@ bool CTransaction::ConnectInputs(CValidationState &state,
                                  bool fScriptChecks,
                                  unsigned int flags,
                                  std::vector<CScriptCheck> *pvChecks
-                                )
+                                ) const
 {
     // Take over previous transactions' spent pointers
     // fBlock is true when this is called from AcceptBlock when a new best-block is added to the blockchain

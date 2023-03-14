@@ -1066,7 +1066,7 @@ bool CAssetsCache::ContainsAsset(const std::string& assetName)
     return CheckIfAssetExists(assetName);
 }
 
-bool CAssetsCache::UndoAssetCoin(const Coin& coin, const COutPoint& out)
+bool CAssetsCache::UndoAssetCoin(const CTxOut& prevTxout, const COutPoint& out)
 {
     std::string strAddress = "";
     std::string assetName = "";
@@ -1075,11 +1075,11 @@ bool CAssetsCache::UndoAssetCoin(const Coin& coin, const COutPoint& out)
     // Get the asset tx from the script
     int nType = -1;
     bool fIsOwner = false;
-    if(coin.out.scriptPubKey.IsAssetScript(nType, fIsOwner)) {
+    if(prevTxout.scriptPubKey.IsAssetScript(nType, fIsOwner)) {
 
         if (nType == TX_NEW_ASSET && !fIsOwner) {
             CNewAsset asset;
-            if (!AssetFromScript(coin.out.scriptPubKey, asset, strAddress)) {
+            if (!AssetFromScript(prevTxout.scriptPubKey, asset, strAddress)) {
                 return error("%s : Failed to get asset from script while trying to undo asset spend. OutPoint : %s",
                              __func__,
                              out.ToString());
@@ -1089,7 +1089,7 @@ bool CAssetsCache::UndoAssetCoin(const Coin& coin, const COutPoint& out)
             nAmount = asset.nAmount;
         } else if (nType == TX_TRANSFER_ASSET) {
             CAssetTransfer transfer;
-            if (!TransferAssetFromScript(coin.out.scriptPubKey, transfer, strAddress))
+            if (!TransferAssetFromScript(prevTxout.scriptPubKey, transfer, strAddress))
                 return error(
                         "%s : Failed to get transfer asset from script while trying to undo asset spend. OutPoint : %s",
                         __func__,
@@ -1099,7 +1099,7 @@ bool CAssetsCache::UndoAssetCoin(const Coin& coin, const COutPoint& out)
             nAmount = transfer.nAmount;
         } else if (nType == TX_NEW_ASSET && fIsOwner) {
             std::string ownerName;
-            if (!OwnerAssetFromScript(coin.out.scriptPubKey, ownerName, strAddress))
+            if (!OwnerAssetFromScript(prevTxout.scriptPubKey, ownerName, strAddress))
                 return error(
                         "%s : Failed to get owner asset from script while trying to undo asset spend. OutPoint : %s",
                         __func__, out.ToString());
@@ -1107,7 +1107,7 @@ bool CAssetsCache::UndoAssetCoin(const Coin& coin, const COutPoint& out)
             nAmount = OWNER_ASSET_AMOUNT;
         } else if (nType == TX_REISSUE_ASSET) {
             CReissueAsset reissue;
-            if (!ReissueAssetFromScript(coin.out.scriptPubKey, reissue, strAddress))
+            if (!ReissueAssetFromScript(prevTxout.scriptPubKey, reissue, strAddress))
                 return error(
                         "%s : Failed to get reissue asset from script while trying to undo asset spend. OutPoint : %s",
                         __func__, out.ToString());
@@ -1119,14 +1119,14 @@ bool CAssetsCache::UndoAssetCoin(const Coin& coin, const COutPoint& out)
     if (assetName == "" || strAddress == "" || nAmount == 0)
         return error("%s : AssetName, Address or nAmount is invalid., Asset Name: %s, Address: %s, Amount: %d", __func__, assetName, strAddress, nAmount);
 
-    if (!AddBackSpentAsset(assetName, strAddress, nAmount, out))
+    if (!AddBackSpentAsset(assetName, strAddress, nAmount))
         return error("%s : Failed to add back the spent asset. OutPoint : %s", __func__, out.ToString());
 
     return true;
 }
 
 //! Changes Memory Only
-bool CAssetsCache::AddBackSpentAsset(const std::string& assetName, const std::string& address, const CAmount& nAmount, const COutPoint& out)
+bool CAssetsCache::AddBackSpentAsset(const std::string& assetName, const std::string& address, const CAmount& nAmount)
 {
     if (fAssetIndex) {
         // Update the assets address balance

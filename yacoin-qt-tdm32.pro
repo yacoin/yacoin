@@ -151,6 +151,7 @@ HEADERS += \
     src/kernelrecord.h \
     src/alert.h \
     src/addrman.h \
+    src/addressindex.h \
     src/base58.h \
     src/bignum.h \
     src/checkpoints.h \
@@ -185,6 +186,8 @@ HEADERS += \
     src/init.h \
     src/irc.h \
     src/mruset.h \
+    src/compat/endian.h \
+    src/compat/byteswap.h \
     src/json/json_spirit_writer_template.h \
     src/json/json_spirit_writer.h \
     src/json/json_spirit_value.h \

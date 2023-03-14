@@ -336,8 +336,10 @@ case $host in
      ;;
    *linux*)
      TARGET_OS=linux
+     CPPFLAGS="$CPPFLAGS -DHAVE_ENDIAN_H"
      ;;
    *)
+     CPPFLAGS="$CPPFLAGS -DHAVE_ENDIAN_H"
      ;;
 esac
 

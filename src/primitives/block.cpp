@@ -4,6 +4,8 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#include "addressindex.h"
+#include "assets/assetdb.h"
 #include "primitives/block.h"
 #include "txdb.h"
 #include "checkpoints.h"
@@ -522,12 +524,286 @@ void CBlock::UpdateTime(const CBlockIndex* pindexPrev)
     nTime = max(GetBlockTime(), GetAdjustedTime());
 }
 
-bool CBlock::DisconnectBlock(CValidationState &state, CTxDB& txdb, CBlockIndex* pindex)
+bool CBlock::DisconnectBlock(CValidationState& state, CTxDB& txdb,
+                             CBlockIndex* pindex, CAssetsCache* assetsCache,
+                             bool ignoreAddressIndex)
 {
+    /** YAC_ASSET START */
+    std::vector<std::pair<std::string, CBlockAssetUndo> > vUndoData;
+    if (!passetsdb->ReadBlockUndoAssetData(this->GetHash(), vUndoData)) {
+        return error("DisconnectBlock(): block asset undo data inconsistent");
+    }
+    /** YAC_ASSET END */
+
+    std::vector<std::pair<CAddressIndexKey, CAmount> > addressIndex;
+    std::vector<std::pair<CAddressUnspentKey, CAddressUnspentValue> > addressUnspentIndex;
+
     // Disconnect in reverse order
-    for (int i = vtx.size()-1; i >= 0; i--)
-        if (!vtx[i].DisconnectInputs(state, txdb))
-            return false;
+    for (int i = vtx.size() - 1; i >= 0; i--)
+    {
+        const CTransaction &tx = vtx[i];
+        uint256 hash = tx.GetHash();
+
+        std::vector<int> vAssetTxIndex;
+        // Update address index database
+        if (fAddressIndex) {
+            for (unsigned int k = tx.vout.size(); k-- > 0;) {
+                const CTxOut &out = tx.vout[k];
+
+                if (out.scriptPubKey.IsPayToScriptHash()) {
+                    std::vector<unsigned char> hashBytes(out.scriptPubKey.begin()+2, out.scriptPubKey.begin()+22);
+
+                    // undo receiving activity
+                    addressIndex.push_back(std::make_pair(CAddressIndexKey(2, uint160(hashBytes), pindex->nHeight, i, hash, k, false), out.nValue));
+
+                    // undo unspent index
+                    addressUnspentIndex.push_back(std::make_pair(CAddressUnspentKey(2, uint160(hashBytes), hash, k), CAddressUnspentValue()));
+
+                } else if (out.scriptPubKey.IsPayToPublicKeyHash()) {
+                    std::vector<unsigned char> hashBytes(out.scriptPubKey.begin()+3, out.scriptPubKey.begin()+23);
+
+                    // undo receiving activity
+                    addressIndex.push_back(std::make_pair(CAddressIndexKey(1, uint160(hashBytes), pindex->nHeight, i, hash, k, false), out.nValue));
+
+                    // undo unspent index
+                    addressUnspentIndex.push_back(std::make_pair(CAddressUnspentKey(1, uint160(hashBytes), hash, k), CAddressUnspentValue()));
+
+                } else if (out.scriptPubKey.IsPayToPublicKey()) {
+                    uint160 hashBytes(Hash160(out.scriptPubKey.begin()+1, out.scriptPubKey.end()-1));
+                    addressIndex.push_back(std::make_pair(CAddressIndexKey(1, hashBytes, pindex->nHeight, i, hash, k, false), out.nValue));
+                    addressUnspentIndex.push_back(std::make_pair(CAddressUnspentKey(1, hashBytes, hash, k), CAddressUnspentValue()));
+                } else {
+                    /** YAC_ASSET START */
+                    if (AreAssetsDeployed()) {
+                        std::string assetName;
+                        CAmount assetAmount;
+                        uint160 hashBytes;
+
+                        if (ParseAssetScript(out.scriptPubKey, hashBytes, assetName, assetAmount)) {
+//                            std::cout << "ConnectBlock(): pushing assets onto addressIndex: " << "1" << ", " << hashBytes.GetHex() << ", " << assetName << ", " << pindex->nHeight
+//                                      << ", " << i << ", " << hash.GetHex() << ", " << k << ", " << "true" << ", " << assetAmount << std::endl;
+
+                            // undo receiving activity
+                            addressIndex.push_back(std::make_pair(
+                                    CAddressIndexKey(1, uint160(hashBytes), assetName, pindex->nHeight, i, hash, k,
+                                                     false), assetAmount));
+
+                            // undo unspent index
+                            addressUnspentIndex.push_back(
+                                    std::make_pair(CAddressUnspentKey(1, uint160(hashBytes), assetName, hash, k),
+                                                   CAddressUnspentValue()));
+                        } else {
+                            continue;
+                        }
+                    }
+                    /** YAC_ASSET END */
+                }
+            }
+        }
+
+        // TODO: Check that all outputs are available and match the outputs in the block itself exactly.
+        for (size_t o = 0; o < tx.vout.size(); o++) {
+            /** YAC_ASSET START */
+            if (AreAssetsDeployed()) {
+                if (assetsCache) {
+                    if (IsScriptTransferAsset(tx.vout[o].scriptPubKey))
+                        vAssetTxIndex.emplace_back(o);
+                }
+            }
+            /** YAC_ASSET START */
+        }
+
+        /** YAC_ASSET START */
+        // Update asset cache, it is used for updating asset database later
+        if (AreAssetsDeployed()) {
+            if (assetsCache) {
+                if (tx.IsNewAsset()) {
+                    // Remove the newly created asset
+                    CNewAsset asset;
+                    std::string strAddress;
+                    if (!AssetFromTransaction(tx, asset, strAddress)) {
+                        return error("%s : Failed to get asset from transaction. TXID : %s", __func__, tx.GetHash().GetHex());
+                    }
+                    if (assetsCache->ContainsAsset(asset)) {
+                        if (!assetsCache->RemoveNewAsset(asset, strAddress)) {
+                            return error("%s : Failed to Remove Asset. Asset Name : %s", __func__, asset.strName);
+                        }
+                    }
+
+                    // Get the owner from the transaction and remove it
+                    std::string ownerName;
+                    std::string ownerAddress;
+                    if (!OwnerFromTransaction(tx, ownerName, ownerAddress)) {
+                        return error("%s : Failed to get owner from transaction. TXID : %s", __func__, tx.GetHash().GetHex());
+                    }
+
+                    if (!assetsCache->RemoveOwnerAsset(ownerName, ownerAddress)) {
+                        return error("%s : Failed to Remove Owner from transaction. TXID : %s", __func__, tx.GetHash().GetHex());
+                    }
+                } else if (tx.IsReissueAsset()) {
+                    CReissueAsset reissue;
+                    std::string strAddress;
+
+                    if (!ReissueAssetFromTransaction(tx, reissue, strAddress)) {
+                        return  error("%s : Failed to get reissue asset from transaction. TXID : %s", __func__, tx.GetHash().GetHex());
+                    }
+
+                    if (assetsCache->ContainsAsset(reissue.strName)) {
+                        if (!assetsCache->RemoveReissueAsset(reissue, strAddress,
+                                                             COutPoint(tx.GetHash(), tx.vout.size() - 1),
+                                                             vUndoData)) {
+                            return error("%s : Failed to Undo Reissue Asset. Asset Name : %s", __func__, reissue.strName);
+                        }
+                    }
+                } else if (tx.IsNewUniqueAsset()) {
+                    for (int n = 0; n < (int)tx.vout.size(); n++) {
+                        auto out = tx.vout[n];
+                        CNewAsset asset;
+                        std::string strAddress;
+
+                        if (IsScriptNewUniqueAsset(out.scriptPubKey)) {
+                            if (!AssetFromScript(out.scriptPubKey, asset, strAddress)) {
+                                return error("%s : Failed to get unique asset from transaction. TXID : %s, vout: %s", __func__,
+                                        tx.GetHash().GetHex(), n);
+                            }
+
+                            if (assetsCache->ContainsAsset(asset.strName)) {
+                                if (!assetsCache->RemoveNewAsset(asset, strAddress)) {
+                                    return error("%s : Failed to Undo Unique Asset. Asset Name : %s", __func__, asset.strName);
+                                }
+                            }
+                        }
+                    }
+                }
+
+                for (auto index : vAssetTxIndex) {
+                    CAssetTransfer transfer;
+                    std::string strAddress;
+                    if (!TransferAssetFromScript(tx.vout[index].scriptPubKey, transfer, strAddress)) {
+                        return error("%s : Failed to get transfer asset from transaction. CTxOut : %s", __func__,
+                                tx.vout[index].ToString());
+                    }
+
+                    COutPoint out(hash, index);
+                    if (!assetsCache->RemoveTransfer(transfer, strAddress, out)) {
+                        return error("%s : Failed to Remove the transfer of an asset. Asset Name : %s, COutPoint : %s",
+                                __func__,
+                                transfer.strName, out.ToString());
+                    }
+                }
+            }
+        }
+        /** YAC_ASSET END */
+
+        // restore inputs
+        // Relinquish previous transactions' spent pointers
+        if (!tx.IsCoinBase())
+        {
+            for (unsigned int j = tx.vin.size(); j-- > 0;)
+            {
+                const CTxIn& input = tx.vin[j];
+                const COutPoint &prevout = tx.vin[j].prevout;
+
+                // Get prev txindex from disk
+                CTxIndex txindex;
+                if (!txdb.ReadTxIndex(prevout.COutPointGetHash(), txindex))
+                    return error("CBlock::DisconnectBlock() : ReadTxIndex failed");
+
+                if (prevout.COutPointGet_n() >= txindex.vSpent.size())
+                    return error("CBlock::DisconnectBlock() : prevout.n out of range");
+
+                // Mark outpoint as not spent
+                txindex.vSpent[prevout.COutPointGet_n()].SetNull();
+
+                // Write back
+                if (!txdb.UpdateTxIndex(prevout.COutPointGetHash(), txindex))
+                    return error("CBlock::DisconnectBlock() : UpdateTxIndex failed");
+
+                CTransaction txPrev;
+                // Get prev tx from disk
+                if (!txPrev.ReadFromDisk(txindex.pos))
+                    return error("CBlock::DisconnectBlock() : %s ReadFromDisk prev tx %s failed", tx.GetHash().ToString().substr(0,10).c_str(),  prevout.COutPointGetHash().ToString().substr(0,10).c_str());
+                const CTxOut &prevTxOut = txPrev.vout[prevout.COutPointGet_n()];
+
+                /** YAC_ASSET START */
+                if (AreAssetsDeployed()) {
+                    if (assetsCache && prevTxOut.scriptPubKey.IsAssetScript()) {
+                        if (!assetsCache->UndoAssetCoin(prevTxOut, prevout))
+                            return error("CBlock::DisconnectBlock() : Failed to undo asset coin");
+                    }
+                }
+
+                // Update address index database
+                if (fAddressIndex) {
+                    if (prevTxOut.scriptPubKey.IsPayToScriptHash()) {
+                        std::vector<unsigned char> hashBytes(prevTxOut.scriptPubKey.begin()+2, prevTxOut.scriptPubKey.begin()+22);
+
+                        // undo spending activity
+                        addressIndex.push_back(std::make_pair(CAddressIndexKey(2, uint160(hashBytes), pindex->nHeight, i, hash, j, true), prevTxOut.nValue * -1));
+
+                        // restore unspent index
+                        addressUnspentIndex.push_back(std::make_pair(CAddressUnspentKey(2, uint160(hashBytes), input.prevout.hash, input.prevout.n), CAddressUnspentValue(prevTxOut.nValue, prevTxOut.scriptPubKey, pindex->nHeight -1)));
+
+
+                    } else if (prevTxOut.scriptPubKey.IsPayToPublicKeyHash()) {
+                        std::vector<unsigned char> hashBytes(prevTxOut.scriptPubKey.begin()+3, prevTxOut.scriptPubKey.begin()+23);
+
+                        // undo spending activity
+                        addressIndex.push_back(std::make_pair(CAddressIndexKey(1, uint160(hashBytes), pindex->nHeight, i, hash, j, true), prevTxOut.nValue * -1));
+
+                        // restore unspent index
+                        addressUnspentIndex.push_back(std::make_pair(CAddressUnspentKey(1, uint160(hashBytes), input.prevout.hash, input.prevout.n), CAddressUnspentValue(prevTxOut.nValue, prevTxOut.scriptPubKey, pindex->nHeight -1)));
+
+                    } else if (prevTxOut.scriptPubKey.IsPayToPublicKey()) {
+                        uint160 hashBytes(Hash160(prevTxOut.scriptPubKey.begin()+1, prevTxOut.scriptPubKey.end()-1));
+                        addressIndex.push_back(std::make_pair(CAddressIndexKey(1, hashBytes, pindex->nHeight, i, hash, j, false), prevTxOut.nValue));
+                        addressUnspentIndex.push_back(std::make_pair(CAddressUnspentKey(1, hashBytes, hash, j), CAddressUnspentValue()));
+                    } else {
+                        if (AreAssetsDeployed()) {
+                            std::string assetName;
+                            CAmount assetAmount;
+                            uint160 hashBytes;
+
+                            if (ParseAssetScript(prevTxOut.scriptPubKey, hashBytes, assetName, assetAmount)) {
+//                                std::cout << "ConnectBlock(): pushing assets onto addressIndex: " << "1" << ", " << hashBytes.GetHex() << ", " << assetName << ", " << pindex->nHeight
+//                                          << ", " << i << ", " << hash.GetHex() << ", " << j << ", " << "true" << ", " << assetAmount * -1 << std::endl;
+
+                                // undo spending activity
+                                addressIndex.push_back(std::make_pair(
+                                        CAddressIndexKey(1, uint160(hashBytes), assetName, pindex->nHeight, i, hash, j,
+                                                         true), assetAmount * -1));
+
+                                // restore unspent index
+                                addressUnspentIndex.push_back(std::make_pair(
+                                        CAddressUnspentKey(1, uint160(hashBytes), assetName, input.prevout.hash,
+                                                           input.prevout.n),
+                                        CAddressUnspentValue(assetAmount, prevTxOut.scriptPubKey, pindex->nHeight -1)));
+                            } else {
+                                continue;
+                            }
+                        }
+                    }
+                }
+                /** YAC_ASSET END */
+            }
+        }
+
+        // Remove transaction from index
+        // This can fail if a duplicate of this transaction was in a chain that got
+        // reorganized away. This is only possible if this transaction was completely
+        // spent, so erasing it would be a no-op anyway.
+        txdb.EraseTxIndex(tx);
+    }
+
+
+    if (!ignoreAddressIndex && fAddressIndex) {
+        if (!txdb.EraseAddressIndex(addressIndex)) {
+            return error("Failed to delete address index");
+        }
+        if (!txdb.UpdateAddressUnspentIndex(addressUnspentIndex)) {
+            return error("Failed to write address unspent index");
+        }
+    }
 
     // Update block index on disk without changing it in memory.
     // The memory index structure will be changed after the db commits.
@@ -545,13 +821,13 @@ bool CBlock::DisconnectBlock(CValidationState &state, CTxDB& txdb, CBlockIndex* 
     }
 
     // ppcoin: clean up wallet after disconnecting coinstake
-    BOOST_FOREACH(CTransaction& tx, vtx)
+    BOOST_FOREACH (CTransaction& tx, vtx)
         SyncWithWallets(tx, this, false, false);
 
     return true;
 }
 
-bool CBlock::ConnectBlock(CValidationState &state, CTxDB& txdb, CBlockIndex* pindex, bool fJustCheck)
+bool CBlock::ConnectBlock(CValidationState &state, CTxDB& txdb, CBlockIndex* pindex, CAssetsCache* assetsCache, bool fJustCheck, bool ignoreAddressIndex)
 {
     // Check it again in case a previous version let a bad block in, but skip BlockSig checking
     if (!CheckBlock(state, !fJustCheck, !fJustCheck, false))
@@ -588,19 +864,28 @@ bool CBlock::ConnectBlock(CValidationState &state, CTxDB& txdb, CBlockIndex* pin
     ::int64_t nValueIn = 0;
     ::int64_t nValueOut = 0;
     unsigned int nSigOps = 0;
-    // Iterate through all transaction to check double spent, connect inputs
-    BOOST_FOREACH(CTransaction& tx, vtx)
-    {
-        uint256 hashTx = tx.GetHash();
 
+    /** YAC_ASSET START */
+    std::vector<std::pair<std::string, CBlockAssetUndo> > vUndoAssetData;
+    std::vector<std::pair<CAddressIndexKey, CAmount> > addressIndex;
+    std::vector<std::pair<CAddressUnspentKey, CAddressUnspentValue> > addressUnspentIndex;
+    /** YAC_ASSET END */
+
+    // Iterate through all transaction to check double spent, connect inputs
+    for (unsigned int i = 0; i < vtx.size(); i++)
+    {
+        const CTransaction &tx = vtx[i];
+        const uint256 hashTx = tx.GetHash();
         if (fEnforceBIP30) {
             CTxIndex txindexOld;
             if (txdb.ReadTxIndex(hashTx, txindexOld)) {
-                BOOST_FOREACH(CDiskTxPos &pos, txindexOld.vSpent)
+                for (const CDiskTxPos &pos : txindexOld.vSpent)
+                {
                     if (pos.IsNull())
                     {
                         return state.DoS(100, error("ConnectBlock() : tried to overwrite transaction"));
                     }
+                }
             }
         }
 
@@ -620,6 +905,25 @@ bool CBlock::ConnectBlock(CValidationState &state, CTxDB& txdb, CBlockIndex* pin
             bool fInvalid;
             if (!tx.FetchInputs(state, txdb, mapQueuedChanges, true, false, mapInputs, fInvalid))
                 return false;
+
+            /** YAC_ASSET START */
+            if (!AreAssetsDeployed()) {
+                for (auto out : tx.vout)
+                    if (out.scriptPubKey.IsAssetScript())
+                        return state.DoS(100, error("%s : Received Block with tx that contained an asset when assets wasn't active", __func__));
+            }
+
+            if (AreAssetsDeployed()) {
+                std::vector<std::pair<std::string, uint256>> vReissueAssets;
+                if (!CheckTxAssets(tx, state, mapInputs, assetsCache, false, vReissueAssets))
+                {
+                    state.SetFailedTransaction(tx.GetHash());
+                    return error("%s: CheckTxAssets: %s, %s", __func__, tx.GetHash().ToString(),
+                                 FormatStateMessage(state));
+                }
+            }
+
+            /** YAC_ASSET END */
 
             // Check that transaction is BIP68 final
             // BIP68 lock checks (as opposed to nLockTime checks) must
@@ -653,8 +957,69 @@ bool CBlock::ConnectBlock(CValidationState &state, CTxDB& txdb, CBlockIndex* pin
             }
             if (!SequenceLocks(tx, nLockTimeFlags, &prevheights, *pindex))
             {
-                return state.DoS(100, error("ConnectBlock(): contains a non-BIP68-final transaction", __func__));
+                return state.DoS(100, error("ConnectBlock(): contains a non-BIP68-final transaction"));
             }
+
+            /** YAC_ASSET START */
+            // Iterate through transaction inputs and update address index database
+            if (fAddressIndex)
+            {
+                for (size_t j = 0; j < tx.vin.size(); j++)
+                {
+                    const CTxIn& input = tx.vin[j];
+                    CTransaction txPrev;
+                    uint256 hashBlock = 0;
+                    if (!GetTransaction(input.prevout.COutPointGetHash(), txPrev, hashBlock))
+                    {
+                        return error("ConnectBlock(): can't find previous tx (hash: %s)", input.prevout.COutPointGetHash().GetHex());
+                    }
+                    const CTxOut &prevout = txPrev.vout[input.prevout.COutPointGet_n()];
+                    uint160 hashBytes;
+                    int addressType = 0;
+                    bool isAsset = false;
+                    std::string assetName;
+                    CAmount assetAmount;
+
+                    if (prevout.scriptPubKey.IsPayToScriptHash()) {
+                        hashBytes = uint160(std::vector <unsigned char>(prevout.scriptPubKey.begin()+2, prevout.scriptPubKey.begin()+22));
+                        addressType = 2;
+                    } else if (prevout.scriptPubKey.IsPayToPublicKeyHash()) {
+                        hashBytes = uint160(std::vector <unsigned char>(prevout.scriptPubKey.begin()+3, prevout.scriptPubKey.begin()+23));
+                        addressType = 1;
+                    } else if (prevout.scriptPubKey.IsPayToPublicKey()) {
+                        hashBytes = Hash160(prevout.scriptPubKey.begin() + 1, prevout.scriptPubKey.end() - 1);
+                        addressType = 1;
+                    } else {
+                        if (AreAssetsDeployed()) {
+                            hashBytes.SetNull();
+                            addressType = 0;
+
+                            if (ParseAssetScript(prevout.scriptPubKey, hashBytes, assetName, assetAmount)) {
+                                addressType = 1;
+                                isAsset = true;
+                            }
+                        }
+                    }
+
+                    if (fAddressIndex && addressType > 0)
+                    {
+                        if (isAsset) {
+                            // record spending activity
+                            addressIndex.push_back(std::make_pair(CAddressIndexKey(addressType, hashBytes, assetName, pindex->nHeight, i, hashTx, j, true), assetAmount * -1));
+
+                            // remove address from unspent index
+                            addressUnspentIndex.push_back(std::make_pair(CAddressUnspentKey(addressType, hashBytes, assetName, input.prevout.hash, input.prevout.n), CAddressUnspentValue()));
+                        } else {
+                            // record spending activity
+                            addressIndex.push_back(std::make_pair(CAddressIndexKey(addressType, hashBytes, pindex->nHeight, i, hashTx, j, true), prevout.nValue * -1));
+
+                            // remove address from unspent index
+                            addressUnspentIndex.push_back(std::make_pair(CAddressUnspentKey(addressType, hashBytes, input.prevout.hash, input.prevout.n), CAddressUnspentValue()));
+                        }
+                    }
+                }
+            }
+            /** YAC_ASSET END */
 
             // Add in sigops done by pay-to-script-hash inputs;
             // this is to prevent a "rogue miner" from creating
@@ -689,8 +1054,83 @@ bool CBlock::ConnectBlock(CValidationState &state, CTxDB& txdb, CBlockIndex* pin
             control.Add(vChecks);
         }
 
+        // This map is used to update block/tx index database later
+        // It contains all latest info about UTXOs
         mapQueuedChanges[hashTx] = CTxIndex(posThisTx, tx.vout.size());
-    }
+
+        /** YAC_ASSET START */
+        // Iterate through transaction outputs and update address index database
+        if (fAddressIndex)
+        {
+            for (unsigned int k = 0; k < tx.vout.size(); k++) {
+                const CTxOut &out = tx.vout[k];
+
+                if (out.scriptPubKey.IsPayToScriptHash()) {
+                    std::vector<unsigned char> hashBytes(out.scriptPubKey.begin()+2, out.scriptPubKey.begin()+22);
+
+                    // record receiving activity
+                    addressIndex.push_back(std::make_pair(CAddressIndexKey(2, uint160(hashBytes), pindex->nHeight, i, hashTx, k, false), out.nValue));
+
+                    // record unspent output
+                    addressUnspentIndex.push_back(std::make_pair(CAddressUnspentKey(2, uint160(hashBytes), hashTx, k), CAddressUnspentValue(out.nValue, out.scriptPubKey, pindex->nHeight)));
+
+                } else if (out.scriptPubKey.IsPayToPublicKeyHash()) {
+                    std::vector<unsigned char> hashBytes(out.scriptPubKey.begin()+3, out.scriptPubKey.begin()+23);
+
+                    // record receiving activity
+                    addressIndex.push_back(std::make_pair(CAddressIndexKey(1, uint160(hashBytes), pindex->nHeight, i, hashTx, k, false), out.nValue));
+
+                    // record unspent output
+                    addressUnspentIndex.push_back(std::make_pair(CAddressUnspentKey(1, uint160(hashBytes), hashTx, k), CAddressUnspentValue(out.nValue, out.scriptPubKey, pindex->nHeight)));
+
+                } else if (out.scriptPubKey.IsPayToPublicKey()) {
+                    uint160 hashBytes(Hash160(out.scriptPubKey.begin() + 1, out.scriptPubKey.end() - 1));
+                    addressIndex.push_back(
+                            std::make_pair(CAddressIndexKey(1, hashBytes, pindex->nHeight, i, hashTx, k, false),
+                                           out.nValue));
+                    addressUnspentIndex.push_back(std::make_pair(CAddressUnspentKey(1, hashBytes, hashTx, k),
+                                                                 CAddressUnspentValue(out.nValue, out.scriptPubKey,
+                                                                                      pindex->nHeight)));
+                } else {
+                    if (AreAssetsDeployed()) {
+                        std::string assetName;
+                        CAmount assetAmount;
+                        uint160 hashBytes;
+
+                        if (ParseAssetScript(out.scriptPubKey, hashBytes, assetName, assetAmount)) {
+                            // record receiving activity
+                            addressIndex.push_back(std::make_pair(
+                                    CAddressIndexKey(1, hashBytes, assetName, pindex->nHeight, i, hashTx, k, false),
+                                    assetAmount));
+
+                            // record unspent output
+                            addressUnspentIndex.push_back(
+                                    std::make_pair(CAddressUnspentKey(1, hashBytes, assetName, hashTx, k),
+                                                   CAddressUnspentValue(assetAmount, out.scriptPubKey,
+                                                                        pindex->nHeight)));
+                        }
+                    } else {
+                        continue;
+                    }
+                }
+            }
+        }
+        /** YAC_ASSET END */
+
+        /** YAC_ASSET START */
+        // Create the basic empty string pair for the undoblock
+        std::pair<std::string, CBlockAssetUndo> undoPair = std::make_pair("", CBlockAssetUndo());
+        std::pair<std::string, CBlockAssetUndo>* undoAssetData = &undoPair;
+
+        // Update asset info (assetCache, undoAssetData)
+        UpdateAssetInfo(tx, mapInputs, pindex->nHeight, GetHash(), assetsCache, undoAssetData);
+
+        if (!undoAssetData->first.empty()) {
+            vUndoAssetData.emplace_back(*undoAssetData);
+        }
+        /** YAC_ASSET END */
+    } // END OF for (unsigned int i = 0; i < vtx.size(); i++)
+
 //_____________________ this is new code here
     if (!control.Wait())
     {
@@ -736,6 +1176,23 @@ bool CBlock::ConnectBlock(CValidationState &state, CTxDB& txdb, CBlockIndex* pin
         if (!txdb.UpdateTxIndex((*mi).first, (*mi).second))
             return error("ConnectBlock() : UpdateTxIndex failed");
     }
+
+    /** YAC_ASSET START */
+    if (vUndoAssetData.size()) {
+        if (!passetsdb->WriteBlockUndoAssetData(GetHash(), vUndoAssetData))
+            return error("ConnectBlock(): Failed to write asset undo data");
+    }
+
+    if (!ignoreAddressIndex && fAddressIndex) {
+        if (!txdb.WriteAddressIndex(addressIndex)) {
+            return error("ConnectBlock(): Failed to write address index");
+        }
+
+        if (!txdb.UpdateAddressUnspentIndex(addressUnspentIndex)) {
+            return error("ConnectBlock(): Failed to write address unspent index");
+        }
+    }
+    /** YAC_ASSET END */
 
     pindex->RaiseValidity(BLOCK_VALID_SCRIPTS);
     // Update block index on disk without changing it in memory.

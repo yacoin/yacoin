@@ -65,6 +65,7 @@ extern CAssetsCache *passets;
 /** Global variable that point to the assets metadata LRU Cache (protected by cs_main) */
 extern CLRUCache<std::string, CDatabasedAssetData> *passetsCache;
 extern bool fAssetIndex;
+extern bool fAddressIndex;
 //
 // END OF GLOBAL VARIABLES USED FOR ASSET MANAGEMENT SYSTEM
 //
@@ -73,13 +74,16 @@ extern bool fAssetIndex;
 // FUNCTIONS USED FOR ASSET MANAGEMENT SYSTEM
 //
 /** Flush all state, indexes and buffers to disk. */
-void FlushAssetToDisk();
+bool FlushAssetToDisk();
 bool AreAssetsDeployed();
 CAssetsCache* GetCurrentAssetCache();
 bool CheckTxAssets(
     const CTransaction& tx, CValidationState& state, MapPrevTx inputs,
     CAssetsCache* assetCache, bool fCheckMempool,
     std::vector<std::pair<std::string, uint256> >& vPairReissueAssets);
+void UpdateAssetInfo(const CTransaction& tx, MapPrevTx& prevInputs, int nHeight, uint256 blockHash, CAssetsCache* assetsCache, std::pair<std::string, CBlockAssetUndo>* undoAssetData);
+void UpdateAssetInfoFromTxInputs(const COutPoint& out, const CTxOut& txOut, CAssetsCache* assetsCache);
+void UpdateAssetInfoFromTxOutputs(const CTransaction& tx, int nHeight, uint256 blockHash, CAssetsCache* assetsCache, std::pair<std::string, CBlockAssetUndo>* undoAssetData);
 //
 // END OF FUNCTIONS USED FOR ASSET MANAGEMENT SYSTEM
 //
@@ -1072,6 +1076,7 @@ private:
     std::string strRejectReason;
     unsigned char chRejectCode;
     bool corruptionPossible;
+    uint256 failedTransaction;
 public:
     CValidationState() : mode(MODE_VALID), nDoS(0), corruptionPossible(false) {}
     bool DoS(int level, bool ret = false,
@@ -1117,6 +1122,15 @@ public:
     bool CorruptionPossible() const {
         return corruptionPossible;
     }
+    void SetFailedTransaction(const uint256& txhash) {
+        failedTransaction = txhash;
+    }
+    uint256 GetFailedTransaction() {
+        return failedTransaction;
+    }
+    bool IsTransactionError() const  {
+        return failedTransaction != uint256();
+    }
     unsigned char GetRejectCode() const { return chRejectCode; }
     std::string GetRejectReason() const { return strRejectReason; }
 };
@@ -1133,7 +1147,10 @@ public:
     bool accept(CValidationState &state, CTxDB& txdb, CTransaction &tx,
                 bool fCheckInputs, bool* pfMissingInputs);
     bool addUnchecked(const uint256& hash, CTransaction &tx);
-    bool remove(CTransaction &tx);
+    void remove(const CTransaction& tx);
+    void remove(const std::vector<CTransaction>& vtx);
+    void remove(const std::vector<CTransaction>& vtx, ConnectedBlockAssetData& connectedBlockData);
+    void removeUnchecked(const CTransaction& tx, const uint256& hash);
     void clear();
     void queryHashes(std::vector<uint256>& vtxid);
 

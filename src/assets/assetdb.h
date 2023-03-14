@@ -6,6 +6,7 @@
 #ifndef YACOIN_ASSETDB_H
 #define YACOIN_ASSETDB_H
 
+#include "amount.h"
 #include "serialize.h"
 #include "dbwrapper.h"
 

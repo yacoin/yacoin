@@ -8,17 +8,10 @@
 #include "msvc_warnings.push.h"
 #endif
 
-#ifndef BITCOIN_CHECKPOINT_H
+#include "addressindex.h"
 #include "checkpoints.h"
-#endif
-
-#ifndef BITCOIN_TXDB_H
 #include "txdb.h"
-#endif
-
-#ifndef PPCOIN_KERNEL_H
 #include "kernel.h"
-#endif
 
 #include <map>
 #include <string>
@@ -39,6 +32,9 @@ using std::pair;
 using std::runtime_error;
 using std::string;
 using std::vector;
+
+static const char DB_ADDRESSINDEX = 'a';
+static const char DB_ADDRESSUNSPENTINDEX = 'u';
 
 // CDB subclasses are created and destroyed VERY OFTEN. That's why
 // we shouldn't treat this as a free operations.
@@ -74,6 +70,150 @@ bool CTxDB::EraseTxIndex(const CTransaction &tx)
     uint256 hash = tx.GetHash();
 
     return Erase(make_pair(string("tx"), hash));
+}
+
+bool CTxDB::UpdateAddressUnspentIndex(const std::vector<std::pair<CAddressUnspentKey, CAddressUnspentValue > >&vect) {
+    bool result = true;
+    for (std::vector<std::pair<CAddressUnspentKey, CAddressUnspentValue> >::const_iterator it=vect.begin(); it!=vect.end(); it++) {
+        if (it->second.IsNull()) {
+            result = Erase(std::make_pair(DB_ADDRESSUNSPENTINDEX, it->first));
+        } else {
+            result = Write(std::make_pair(DB_ADDRESSUNSPENTINDEX, it->first), it->second);
+        }
+
+        if (!result)
+        {
+            break;
+        }
+    }
+    return result;
+}
+
+bool CTxDB::ReadAddressUnspentIndex(uint160 addressHash, int type, std::string assetName,
+                                           std::vector<std::pair<CAddressUnspentKey, CAddressUnspentValue> > &unspentOutputs) {
+
+    boost::scoped_ptr<CDBIterator> pcursor(NewIterator());
+
+    pcursor->Seek(std::make_pair(DB_ADDRESSUNSPENTINDEX, CAddressIndexIteratorAssetKey(type, addressHash, assetName)));
+
+    while (pcursor->Valid()) {
+        boost::this_thread::interruption_point();
+        std::pair<char,CAddressUnspentKey> key;
+        if (pcursor->GetKey(key) && key.first == DB_ADDRESSUNSPENTINDEX && key.second.hashBytes == addressHash
+                && (assetName.empty() || key.second.asset == assetName)) {
+            CAddressUnspentValue nValue;
+            if (pcursor->GetValue(nValue)) {
+                unspentOutputs.push_back(std::make_pair(key.second, nValue));
+                pcursor->Next();
+            } else {
+                return error("failed to get address unspent value");
+            }
+        } else {
+            break;
+        }
+    }
+
+    return true;
+}
+
+bool CTxDB::ReadAddressUnspentIndex(uint160 addressHash, int type,
+                                           std::vector<std::pair<CAddressUnspentKey, CAddressUnspentValue> > &unspentOutputs) {
+
+    boost::scoped_ptr<CDBIterator> pcursor(NewIterator());
+
+    pcursor->Seek(std::make_pair(DB_ADDRESSUNSPENTINDEX, CAddressIndexIteratorKey(type, addressHash)));
+
+    while (pcursor->Valid()) {
+        boost::this_thread::interruption_point();
+        std::pair<char,CAddressUnspentKey> key;
+        if (pcursor->GetKey(key) && key.first == DB_ADDRESSUNSPENTINDEX && key.second.hashBytes == addressHash) {
+            CAddressUnspentValue nValue;
+            if (pcursor->GetValue(nValue)) {
+                if (key.second.asset != "YAC") {
+                    unspentOutputs.push_back(std::make_pair(key.second, nValue));
+                }
+                pcursor->Next();
+            } else {
+                return error("failed to get address unspent value");
+            }
+        } else {
+            break;
+        }
+    }
+
+    return true;
+}
+
+bool CTxDB::WriteAddressIndex(const std::vector<std::pair<CAddressIndexKey, CAmount > >&vect) {
+    bool result = true;
+    for (std::vector<std::pair<CAddressIndexKey, CAmount> >::const_iterator it=vect.begin(); it!=vect.end(); it++)
+    {
+        result = Write(std::make_pair(DB_ADDRESSINDEX, it->first), it->second);
+        if (!result)
+        {
+            break;
+        }
+    }
+    return result;
+}
+
+bool CTxDB::EraseAddressIndex(const std::vector<std::pair<CAddressIndexKey, CAmount > >&vect) {
+    bool result = true;
+    for (std::vector<std::pair<CAddressIndexKey, CAmount> >::const_iterator it=vect.begin(); it!=vect.end(); it++)
+    {
+        result = Erase(std::make_pair(DB_ADDRESSINDEX, it->first));
+        if (!result)
+        {
+            break;
+        }
+    }
+
+    return result;
+}
+
+bool CTxDB::ReadAddressIndex(uint160 addressHash, int type, std::string assetName,
+                                    std::vector<std::pair<CAddressIndexKey, CAmount> > &addressIndex,
+                                    int start, int end) {
+
+    boost::scoped_ptr<CDBIterator> pcursor(NewIterator());
+
+    if (!assetName.empty() && start > 0 && end > 0) {
+        pcursor->Seek(std::make_pair(DB_ADDRESSINDEX,
+                                     CAddressIndexIteratorHeightKey(type, addressHash, assetName, start)));
+    } else if (!assetName.empty()) {
+        pcursor->Seek(std::make_pair(DB_ADDRESSINDEX, CAddressIndexIteratorAssetKey(type, addressHash, assetName)));
+    } else {
+        pcursor->Seek(std::make_pair(DB_ADDRESSINDEX, CAddressIndexIteratorKey(type, addressHash)));
+    }
+
+    while (pcursor->Valid()) {
+        boost::this_thread::interruption_point();
+        std::pair<char,CAddressIndexKey> key;
+        if (pcursor->GetKey(key) && key.first == DB_ADDRESSINDEX && key.second.hashBytes == addressHash
+                && (assetName.empty() || key.second.asset == assetName)) {
+            if (end > 0 && key.second.blockHeight > end) {
+                break;
+            }
+            CAmount nValue;
+            if (pcursor->GetValue(nValue)) {
+                addressIndex.push_back(std::make_pair(key.second, nValue));
+                pcursor->Next();
+            } else {
+                return error("failed to get address index value");
+            }
+        } else {
+            break;
+        }
+    }
+
+    return true;
+}
+
+bool CTxDB::ReadAddressIndex(uint160 addressHash, int type,
+                                    std::vector<std::pair<CAddressIndexKey, CAmount> > &addressIndex,
+                                    int start, int end) {
+
+    return CTxDB::ReadAddressIndex(addressHash, type, "", addressIndex, start, end);
 }
 
 bool CTxDB::ContainsTx(uint256 hash)

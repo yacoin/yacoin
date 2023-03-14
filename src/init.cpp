@@ -401,6 +401,7 @@ std::string HelpMessage()
         "  -maxconnections=<n>    " + _("Maintain at most <n> connections to peers (default: 125)") + "\n" +
         "  -addnode=<ip>          " + _("Add a node to connect to and attempt to keep the connection open") + "\n" +
         "  -assetindex            " + _("Keep an index of assets. Requires a -reindex.") + "\n" +
+        "  -addressindex          " + _("Maintain a full address index, used to query for the balance, txids and unspent outputs for addresses.") + "\n" +
         "  -connect=<ip>          " + _("Connect only to the specified node(s)") + "\n" +
         "  -seednode=<ip>         " + _("Connect to a node to retrieve peer addresses, and disconnect") + "\n" +
         "  -externalip=<ip>       " + _("Specify your own public address") + "\n" +
@@ -567,6 +568,7 @@ bool AppInit2()
     fUseMemoryLog = GetBoolArg("-memorylog", true);
     // YAC_ASSET START
     fAssetIndex = GetBoolArg("-assetindex", false);
+    fAddressIndex = GetBoolArg("-addressindex", false);
     // YAC_ASSET END
     nMinerSleep = (unsigned int)(GetArg("-minersleep", nOneHundredMilliseconds));
 
@@ -1286,6 +1288,31 @@ bool AppInit2()
             return InitError(strLoadError);
         }
     }
+
+    /** YAC_ASSET START */
+    {
+        // Basic assets
+        delete passets;
+        delete passetsdb;
+        delete passetsCache;
+
+        // Basic assets
+        passetsdb = new CAssetsDB("cr+");
+        passets = new CAssetsCache();
+        passetsCache = new CLRUCache<std::string, CDatabasedAssetData>(MAX_CACHE_ASSETS_SIZE);
+
+        // Need to load assets before we verify the database
+        if (!passetsdb->LoadAssets()) {
+            return InitError("Failed to load Assets Database");
+        }
+
+        if (!passetsdb->ReadReissuedMempoolState())
+            printf("Database failed to load last Reissued Mempool State. Will have to start from empty state\n");
+
+        printf("Successfully loaded assets from database.\nCache of assets size: %d\n",
+                  passetsCache->Size());
+    }
+    /** YAC_ASSET END */
 
     // as LoadBlockIndex can take several minutes, it's possible the user
     // requested to kill bitcoin-qt during the last operation. If so, exit.

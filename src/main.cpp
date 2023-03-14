@@ -71,6 +71,7 @@ CAssetsDB *passetsdb = nullptr;
 CAssetsCache *passets = nullptr;
 CLRUCache<std::string, CDatabasedAssetData> *passetsCache = nullptr;
 bool fAssetIndex = false;
+bool fAddressIndex = false;
 //
 // END OF GLOBAL VARIABLES USED FOR ASSET MANAGEMENT SYSTEM
 //
@@ -79,7 +80,7 @@ bool fAssetIndex = false;
 // FUNCTIONS USED FOR ASSET MANAGEMENT SYSTEM
 //
 /** Flush all state, indexes and buffers to disk. */
-void FlushAssetToDisk()
+bool FlushAssetToDisk()
 {
     // Flush the assetstate
     if (AreAssetsDeployed()) {
@@ -87,7 +88,7 @@ void FlushAssetToDisk()
         auto currentActiveAssetCache = GetCurrentAssetCache();
         if (currentActiveAssetCache) {
             if (!currentActiveAssetCache->DumpCacheToDatabase())
-                AbortNode("Failed to write to asset database");
+                return error("FlushAssetToDisk(): Failed to write to asset database");
         }
     }
 
@@ -309,6 +310,130 @@ bool CheckTxAssets(const CTransaction &tx, CValidationState &state,
     }
     return true;
 }
+
+void UpdateAssetInfo(const CTransaction& tx, MapPrevTx& prevInputs, int nHeight, uint256 blockHash, CAssetsCache* assetsCache, std::pair<std::string, CBlockAssetUndo>* undoAssetData)
+{
+    // Iterate through tx inputs and update asset info
+    if (!tx.IsCoinBase()) {
+        for (const CTxIn &txin : tx.vin) {
+            const COutPoint&
+                prevout = txin.prevout;
+            const CTransaction
+                & txPrev = prevInputs[prevout.COutPointGetHash()].second;
+            UpdateAssetInfoFromTxInputs(prevout,txPrev.vout[prevout.COutPointGet_n()], assetsCache);
+        }
+    }
+
+    // Update asset info from Tx outputs
+    UpdateAssetInfoFromTxOutputs(tx, nHeight, blockHash, assetsCache, undoAssetData);
+}
+
+void UpdateAssetInfoFromTxInputs(const COutPoint& outpoint, const CTxOut& txOut, CAssetsCache* assetsCache)
+{
+    if (AreAssetsDeployed()) {
+        if (assetsCache) {
+            if (!assetsCache->TrySpendCoin(outpoint, txOut)) {
+                error("%s : Failed to try and spend the asset. COutPoint : %s", __func__, outpoint.ToString());
+            }
+        }
+    }
+}
+
+void UpdateAssetInfoFromTxOutputs(const CTransaction& tx, int nHeight, uint256 blockHash, CAssetsCache* assetsCache, std::pair<std::string, CBlockAssetUndo>* undoAssetData)
+{
+    bool fCoinbase = tx.IsCoinBase();
+    const uint256& txid = tx.GetHash();
+
+    if (AreAssetsDeployed()) {
+        if (assetsCache) {
+            if (tx.IsNewAsset()) { // This works are all new root assets, sub asset, and restricted assets
+                CNewAsset asset;
+                std::string strAddress;
+                AssetFromTransaction(tx, asset, strAddress);
+
+                std::string ownerName;
+                std::string ownerAddress;
+                OwnerFromTransaction(tx, ownerName, ownerAddress);
+
+                // Add the new asset to cache
+                if (!assetsCache->AddNewAsset(asset, strAddress, nHeight, blockHash))
+                    error("%s : Failed at adding a new asset to our cache. asset: %s", __func__,
+                          asset.strName);
+
+                // Add the owner asset to cache
+                if (!assetsCache->AddOwnerAsset(ownerName, ownerAddress))
+                    error("%s : Failed at adding a new asset to our cache. asset: %s", __func__,
+                          asset.strName);
+
+            } else if (tx.IsReissueAsset()) {
+                CReissueAsset reissue;
+                std::string strAddress;
+                ReissueAssetFromTransaction(tx, reissue, strAddress);
+
+                int reissueIndex = tx.vout.size() - 1;
+
+                // Get the asset before we change it
+                CNewAsset asset;
+                if (!assetsCache->GetAssetMetaDataIfExists(reissue.strName, asset))
+                    error("%s: Failed to get the original asset that is getting reissued. Asset Name : %s",
+                          __func__, reissue.strName);
+
+                if (!assetsCache->AddReissueAsset(reissue, strAddress, COutPoint(txid, reissueIndex)))
+                    error("%s: Failed to reissue an asset. Asset Name : %s", __func__, reissue.strName);
+
+                // Set the old IPFSHash for the blockundo
+                bool fIPFSChanged = !reissue.strIPFSHash.empty();
+                bool fUnitsChanged = reissue.nUnits != -1;
+
+                // If any of the following items were changed by reissuing, we need to database the old values so it can be undone correctly
+                if (fIPFSChanged || fUnitsChanged) {
+                    undoAssetData->first = reissue.strName; // Asset Name
+                    undoAssetData->second = CBlockAssetUndo {fIPFSChanged, fUnitsChanged, asset.strIPFSHash, asset.units}; // ipfschanged, unitchanged, Old Assets IPFSHash, old units
+                }
+            } else if (tx.IsNewUniqueAsset()) {
+                for (int n = 0; n < (int)tx.vout.size(); n++) {
+                    auto out = tx.vout[n];
+
+                    CNewAsset asset;
+                    std::string strAddress;
+
+                    if (IsScriptNewUniqueAsset(out.scriptPubKey)) {
+                        AssetFromScript(out.scriptPubKey, asset, strAddress);
+
+                        // Add the new asset to cache
+                        if (!assetsCache->AddNewAsset(asset, strAddress, nHeight, blockHash))
+                            error("%s : Failed at adding a new asset to our cache. asset: %s", __func__,
+                                  asset.strName);
+                    }
+                }
+            }
+        }
+    }
+
+    for (size_t i = 0; i < tx.vout.size(); ++i) {
+        if (AreAssetsDeployed()) {
+            if (assetsCache) {
+                CAssetOutputEntry assetData;
+                if (GetAssetData(tx.vout[i].scriptPubKey, assetData)) {
+
+                    // If this is a transfer asset, and the amount is greater than zero
+                    // We want to make sure it is added to the asset addresses database if (fAssetIndex == true)
+                    if (assetData.type == TX_TRANSFER_ASSET && assetData.nAmount > 0) {
+                        // Create the objects needed from the assetData
+                        CAssetTransfer assetTransfer(assetData.assetName, assetData.nAmount);
+                        std::string address = EncodeDestination(assetData.destination);
+
+                        // Add the transfer asset data to the asset cache
+                        if (!assetsCache->AddTransferAsset(assetTransfer, address, COutPoint(txid, i), tx.vout[i]))
+                            error("%s : ERROR - Failed to add transfer asset CTxOut: %s\n", __func__,
+                                      tx.vout[i].ToString());
+                    }
+                }
+            }
+        }
+    }
+}
+
 //
 // END OF FUNCTIONS USED FOR ASSET MANAGEMENT SYSTEM
 //
@@ -1326,7 +1451,7 @@ bool CTxMemPool::accept(CValidationState &state, CTxDB& txdb, CTransaction &tx, 
 
         if (AreAssetsDeployed()) {
             if (!CheckTxAssets(tx, state, mapInputs, GetCurrentAssetCache(), true, vReissueAssets))
-                return error("%s: Consensus::CheckTxAssets: %s, %s", __func__, tx.GetHash().ToString(),
+                return error("%s: CheckTxAssets: %s, %s", __func__, tx.GetHash().ToString(),
                              FormatStateMessage(state));
         }
         /** YAC_ASSET END */
@@ -1357,6 +1482,7 @@ bool CTxMemPool::accept(CValidationState &state, CTxDB& txdb, CTransaction &tx, 
         if (ptxOld)
         {
             printf("CTxMemPool::accept() : replacing tx %s with new version\n", ptxOld->GetHash().ToString().c_str());
+            ConnectedBlockAssetData connectedBlockData;
             remove(*ptxOld);
         }
         addUnchecked(hash, tx);
@@ -1420,22 +1546,70 @@ bool CTxMemPool::addUnchecked(const uint256& hash, CTransaction &tx)
     return true;
 }
 
+void CTxMemPool::removeUnchecked(const CTransaction& tx, const uint256& hash)
+{
+    for (const CTxIn& txin :tx.vin)
+    {
+        mapNextTx.erase(txin.prevout);
+    }
+    mapTx.erase(hash);
+    nTransactionsUpdated++;
 
-bool CTxMemPool::remove(CTransaction &tx)
+    /** YAC_ASSET START */
+    // If the transaction being removed from the mempool is locking other reissues. Free them
+    if (mapReissuedTx.count(hash)) {
+        if (mapReissuedAssets.count(mapReissuedTx.at(hash))) {
+            mapReissuedAssets.erase(mapReissuedTx.at((hash)));
+            mapReissuedTx.erase(hash);
+        }
+    }
+
+    // Erase from the asset mempool maps if they match txid
+    if (mapHashToAsset.count(hash)) {
+        mapAssetToHash.erase(mapHashToAsset.at(hash));
+        mapHashToAsset.erase(hash);
+    }
+    /** YAC_ASSET END */
+}
+
+void CTxMemPool::remove(const CTransaction& tx)
+{
+    ConnectedBlockAssetData connectedBlockData;
+    std::vector<CTransaction> vtx = {tx};
+    remove(vtx, connectedBlockData);
+}
+
+void CTxMemPool::remove(const std::vector<CTransaction>& vtx)
+{
+    ConnectedBlockAssetData connectedBlockData;
+    remove(vtx, connectedBlockData);
+}
+
+void CTxMemPool::remove(const std::vector<CTransaction>& vtx, ConnectedBlockAssetData& connectedBlockData)
 {
     // Remove transaction from memory pool
+    for(const CTransaction& tx : vtx)
     {
         LOCK(cs);
         uint256 hash = tx.GetHash();
         if (mapTx.count(hash))
         {
-            BOOST_FOREACH(const CTxIn& txin, tx.vin)
-                mapNextTx.erase(txin.prevout);
-            mapTx.erase(hash);
-            nTransactionsUpdated++;
+            removeUnchecked(tx, hash);
         }
     }
-    return true;
+
+    /** YAC_ASSET START */
+    // Remove newly added asset issue transactions from the mempool if they haven't been removed already    std::vector<CTransaction> trans;
+    for (auto it : connectedBlockData.newAssetsToAdd) {
+        if (mapAssetToHash.count(it.asset.strName)) {
+            const uint256& hash = mapAssetToHash.at(it.asset.strName);
+            auto itMapTx = mapTx.find(hash);
+            if (itMapTx != mapTx.end()) {
+                removeUnchecked(itMapTx->second, hash);
+            }
+        }
+    }
+    /** YAC_ASSET END */
 }
 
 void CTxMemPool::clear()
@@ -2627,13 +2801,20 @@ bool static DisconnectTip(CValidationState &state, CTxDB& txdb) {
     assert(pindexDelete);
     // Read block from disk.
     CBlock block;
-    if (!block.ReadFromDisk(pindexDelete))
-        return state.Abort(_("DisconnectTip() : ReadFromDisk for disconnect failed"));
-    if (!block.DisconnectBlock(state, txdb, pindexDelete))
-        return error("DisconnectTip() : DisconnectBlock %s failed", pindexDelete->GetBlockHash().ToString().substr(0,20).c_str());
-    // Write the chain state to disk, if necessary.
-    if (!WriteChainState(txdb, pindexDelete->pprev))
-        return false;
+    {
+        CAssetsCache assetCache;
+        if (!block.ReadFromDisk(pindexDelete))
+            return state.Abort(_("DisconnectTip() : ReadFromDisk for disconnect failed"));
+        if (!block.DisconnectBlock(state, txdb, pindexDelete, &assetCache))
+            return error("DisconnectTip() : DisconnectBlock %s failed", pindexDelete->GetBlockHash().ToString().substr(0,20).c_str());
+        // Write the chain state to disk, if necessary.
+        if (!WriteChainState(txdb, pindexDelete->pprev))
+            return false;
+        bool assetsFlushed = assetCache.Flush();
+        assert(assetsFlushed);
+    }
+
+    printf("DisconnectTip, disconnect block (height: %d, hash: %s)\n", pindexDelete->nHeight, block.GetHash().GetHex());
     // Ressurect mempool transactions from the disconnected block.
     BOOST_FOREACH(CTransaction &tx, block.vtx) {
         // ignore validation errors in resurrected transactions
@@ -2653,7 +2834,8 @@ bool static DisconnectTip(CValidationState &state, CTxDB& txdb) {
 }
 
 // Connect a new block to chainActive.
-bool static ConnectTip(CValidationState &state, CTxDB& txdb, CBlockIndex *pindexNew) {
+bool static ConnectTip(CValidationState &state, CTxDB& txdb, CBlockIndex *pindexNew)
+{
     uint256 hash = pindexNew->GetBlockHash();
 
     if ((chainActive.Genesis() == NULL)
@@ -2671,21 +2853,57 @@ bool static ConnectTip(CValidationState &state, CTxDB& txdb, CBlockIndex *pindex
         CBlock block;
         if (!block.ReadFromDisk(pindexNew))
             return state.Abort(_("ConnectTip() : ReadFromDisk for connect failed"));
+
+        /** YAC_ASSET START */
+        // Initialize sets used from removing asset entries from the mempool
+        ConnectedBlockAssetData assetDataFromBlock;
+
+        // Create the empty asset cache, that will be sent into the connect block
+        // All new data will be added to the cache, and will be flushed back into passets after a successful
+        // Connect Block cycle
+        CAssetsCache assetCache;
+        /** YAC_ASSET END */
+
         // Apply the block atomically to the chain state.
         CInv inv(MSG_BLOCK, hash);
-        if (!block.ConnectBlock(state, txdb, pindexNew)) {
+        if (!block.ConnectBlock(state, txdb, pindexNew, &assetCache)) {
             if (state.IsInvalid())
                 InvalidBlockFound(state, txdb, pindexNew);
             return error("ConnectTip() : ConnectBlock %s failed", pindexNew->GetBlockHash().ToString().substr(0,20).c_str());
         }
         mapBlockSource.erase(inv.hash);
+
+        /** YAC_ASSET START */
+        // Get the newly created assets, from the connectblock assetCache so we can remove the correct assets from the mempool
+        assetDataFromBlock = {assetCache.setNewAssetsToAdd};
+
+        // Remove all tx hashes, that were marked as reissued script from the mapReissuedTx.
+        // Without this check, you wouldn't be able to reissue for those assets again, as this maps block it
+        for (const auto& tx : block.vtx) {
+            const uint256& txHash = tx.GetHash();
+            if (mapReissuedTx.count(txHash))
+            {
+                mapReissuedAssets.erase(mapReissuedTx.at(txHash));
+                mapReissuedTx.erase(txHash);
+            }
+        }
+
+        // Flush asset to global asset cache passets
+        bool assetFlushed = assetCache.Flush();
+        assert(assetFlushed);
+        /** YAC_ASSET END */
+
         // Write the chain state to disk, if necessary.
         if (!WriteChainState(txdb, pindexNew))
             return false;
+
+        // Flush asset data to disk
+        if (!FlushAssetToDisk())
+            return false;
+
         // Remove conflicting transactions from the mempool.
-        BOOST_FOREACH(CTransaction &tx, block.vtx) {
-            mempool.remove(tx);
-        }
+        mempool.remove(block.vtx, assetDataFromBlock);
+
         // Connect longer branch, SPECIFIC FOR YACOIN
         if (pindexNew->pprev)
             pindexNew->pprev->pnext = pindexNew;
@@ -2750,6 +2968,7 @@ static bool ActivateBestChainStep(CValidationState &state, CTxDB& txdb, CBlockIn
         }
         if (!DisconnectTip(state, txdb)) // Disconnect the latest block on the chain
         {
+            error("ActivateBestChainStep, failed to disconnect block");
             txdb.TxnAbort();
             return false;
         }

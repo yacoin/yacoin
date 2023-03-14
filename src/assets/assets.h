@@ -98,7 +98,7 @@ std::string GetUserErrorString(const ErrorReport& report);
 class CAssetsCache : public CAssets
 {
 private:
-    bool AddBackSpentAsset(const std::string& assetName, const std::string& address, const CAmount& nAmount, const COutPoint& out);
+    bool AddBackSpentAsset(const std::string& assetName, const std::string& address, const CAmount& nAmount);
     void AddToAssetBalance(const std::string& strName, const std::string& address, const CAmount& nAmount);
     bool UndoTransfer(const CAssetTransfer& transfer, const std::string& address, const COutPoint& outToRemove);
 public :
@@ -184,7 +184,7 @@ public :
     bool RemoveTransfer(const CAssetTransfer& transfer, const std::string& address, const COutPoint& out);
     bool RemoveOwnerAsset(const std::string& assetsName, const std::string address);
     bool RemoveReissueAsset(const CReissueAsset& reissue, const std::string address, const COutPoint& out, const std::vector<std::pair<std::string, CBlockAssetUndo> >& vUndoIPFS);
-    bool UndoAssetCoin(const Coin& coin, const COutPoint& out);
+    bool UndoAssetCoin(const CTxOut& prevTxout, const COutPoint& out);
 
     //! Cache only add asset functions
     bool AddNewAsset(const CNewAsset& asset, const std::string address, const int& nHeight, const uint256& blockHash);

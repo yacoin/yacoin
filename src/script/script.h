@@ -13,8 +13,10 @@
 #ifndef BITCOIN_KEYSTORE_H
  #include "keystore.h"
 #endif
+#include "prevector.h"
 
 typedef std::vector< ::uint8_t> valtype;
+typedef prevector<28, unsigned char> CScriptBase;
 
 class CTransaction;
 class CTxOut;
@@ -737,6 +739,8 @@ public:
     // pay-to-script-hash transactions:
     unsigned int GetSigOpCount(const CScript& scriptSig) const;
 
+    bool IsPayToPublicKey() const;
+    bool IsPayToPublicKeyHash() const;
     bool IsPayToScriptHash() const;
 
     /** YAC_ASSET START */
