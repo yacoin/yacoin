@@ -660,6 +660,114 @@ Value listmyassets(const Array& params, bool fHelp)
     return result;
 }
 
+Value listassets(const Array& params, bool fHelp)
+{
+    if (fHelp || !AreAssetsDeployed() || params.size() > 4)
+        throw std::runtime_error(
+                "listassets \"( asset )\" ( verbose ) ( count ) ( start )\n"
+                + AssetActivationWarning() +
+                "\nReturns a list of all assets\n"
+                "\nThis could be a slow/expensive operation as it reads from the database\n"
+
+                "\nArguments:\n"
+                "1. \"asset\"                    (string, optional, default=\"*\") filters results -- must be an asset name or a partial asset name followed by '*' ('*' matches all trailing characters)\n"
+                "2. \"verbose\"                  (boolean, optional, default=false) when false result is just a list of asset names -- when true results are asset name mapped to metadata\n"
+                "3. \"count\"                    (integer, optional, default=ALL) truncates results to include only the first _count_ assets found\n"
+                "4. \"start\"                    (integer, optional, default=0) results skip over the first _start_ assets found (if negative it skips back from the end)\n"
+
+                "\nResult (verbose=false):\n"
+                "[\n"
+                "  asset_name,\n"
+                "  ...\n"
+                "]\n"
+
+                "\nResult (verbose=true):\n"
+                "{\n"
+                "  (asset_name):\n"
+                "    {\n"
+                "      amount: (number),\n"
+                "      units: (number),\n"
+                "      reissuable: (number),\n"
+                "      has_ipfs: (number),\n"
+                "      ipfs_hash: (hash) (only if has_ipfs = 1 and data is a ipfs hash)\n"
+                "      ipfs_hash: (hash) (only if has_ipfs = 1 and data is a txid hash)\n"
+                "    },\n"
+                "  {...}, {...}\n"
+                "}\n"
+
+                "\nExamples:\n"
+                + HelpExampleRpc("listassets", "")
+                + HelpExampleCli("listassets", "ASSET")
+                + HelpExampleCli("listassets", "\"ASSET*\" true 10 20")
+        );
+
+    if (!passetsdb)
+        throw JSONRPCError(RPC_INTERNAL_ERROR, "asset db unavailable.");
+
+    std::string filter = "*";
+    if (params.size() > 0)
+        filter = params[0].get_str();
+
+    if (filter == "")
+        filter = "*";
+
+    bool verbose = false;
+    if (params.size() > 1)
+        verbose = params[1].get_bool();
+
+    size_t count = INT_MAX;
+    if (params.size() > 2) {
+        if (params[2].get_int() < 1)
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "count must be greater than 1.");
+        count = params[2].get_int();
+    }
+
+    long start = 0;
+    if (params.size() > 3) {
+        start = params[3].get_int();
+    }
+
+    std::vector<CDatabasedAssetData> assets;
+    if (!passetsdb->AssetDir(assets, filter, count, start))
+        throw JSONRPCError(RPC_INTERNAL_ERROR, "couldn't retrieve asset directory.");
+
+    Object resultObj;
+    Array resultArr;
+
+    for (auto data : assets) {
+        CNewAsset asset = data.asset;
+        if (verbose) {
+            Object detail;
+            detail.push_back(Pair("name", asset.strName));
+            detail.push_back(Pair("amount", AssetValueFromAmount(asset.nAmount, asset.strName)));
+            detail.push_back(Pair("units", asset.units));
+            detail.push_back(Pair("reissuable", asset.nReissuable));
+            detail.push_back(Pair("has_ipfs", asset.nHasIPFS));
+            detail.push_back(Pair("block_height", data.nHeight));
+            detail.push_back(Pair("blockhash", data.blockHash.GetHex()));
+            if (asset.nHasIPFS) {
+                if (asset.strIPFSHash.size() == 32) {
+                    detail.push_back(Pair("txid_hash", EncodeAssetData(asset.strIPFSHash)));
+                } else {
+                    detail.push_back(Pair("ipfs_hash", EncodeAssetData(asset.strIPFSHash)));
+                }
+            }
+            resultObj.push_back(Pair(asset.strName, detail));
+        } else {
+            resultArr.push_back(asset.strName);
+        }
+    }
+
+    if (verbose)
+    {
+        return resultObj;
+    }
+    else
+    {
+        return resultArr;
+    }
+}
+
 #ifdef _MSC_VER
     #include "msvc_warnings.pop.h"
 #endif

@@ -1344,7 +1344,8 @@ static const CRPCCommand vRPCCommands[] =
     { "transfer",               &transfer,               false,  false },
     { "transferfromaddress",    &transferfromaddress,    false,  false },
     { "reissue",                &reissue,                false,  false },
-    { "listmyassets",           &listmyassets,           false,  false }
+    { "listmyassets",           &listmyassets,           false,  false },
+    { "listassets",             &listassets,             false,  false }
     /** YAC_ASSET END */
 };
 
@@ -1463,6 +1464,9 @@ Array RPCConvertValues(std::string &strMethod, const std::vector<std::string> &s
     if (strMethod == "listmyassets"        && n > 2) ConvertTo<boost::int64_t>(params[2]); // count
     if (strMethod == "listmyassets"        && n > 3) ConvertTo<boost::int64_t>(params[3]); // start
     if (strMethod == "listmyassets"        && n > 4) ConvertTo<boost::int64_t>(params[4]); // confs
+    if (strMethod == "listassets"          && n > 1) ConvertTo<bool>(params[1]); // verbose
+    if (strMethod == "listassets"          && n > 2) ConvertTo<boost::int64_t>(params[2]); // count
+    if (strMethod == "listassets"          && n > 3) ConvertTo<boost::int64_t>(params[3]); // start
     /** YAC_ASSET END */
 
     return params;
