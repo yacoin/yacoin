@@ -107,6 +107,11 @@ const char* GetTxnOutputType(txnouttype t)
     case TX_SCRIPTHASH: return "scripthash";
     case TX_MULTISIG: return "multisig";
     case TX_NULL_DATA: return "nulldata";
+    /** RVN START */
+    case TX_NEW_ASSET: return ASSET_NEW_STRING;
+    case TX_TRANSFER_ASSET: return ASSET_TRANSFER_STRING;
+    case TX_REISSUE_ASSET: return ASSET_REISSUE_STRING;
+    /** RVN END */
     }
     return NULL;
 }

@@ -843,8 +843,14 @@ int CWalletTx::GetRequestCount() const
     return nRequests;
 }
 
-void CWalletTx::GetAmounts(int64_t& nGeneratedImmature, int64_t& nGeneratedMature, list<pair<CTxDestination, int64_t> >& listReceived,
-                           list<pair<CTxDestination, int64_t> >& listSent, int64_t& nFee, string& strSentAccount, const isminefilter& filter) const
+void CWalletTx::GetAmounts(::int64_t& nGeneratedImmature,
+                           ::int64_t& nGeneratedMature,
+                           std::list<COutputEntry>& listReceived,
+                           std::list<COutputEntry>& listSent, CAmount& nFee,
+                           std::string& strSentAccount,
+                           const isminefilter& filter,
+                           std::list<CAssetOutputEntry>& assetsReceived,
+                           std::list<CAssetOutputEntry>& assetsSent) const
 {
     nGeneratedImmature = nGeneratedMature = nFee = 0;
     listReceived.clear();
@@ -861,16 +867,17 @@ void CWalletTx::GetAmounts(int64_t& nGeneratedImmature, int64_t& nGeneratedMatur
     }
 
     // Compute fee:
-    int64_t nDebit = GetDebit(filter);
+    CAmount nDebit = GetDebit(filter);
     if (nDebit > 0) // debit>0 means we signed/sent this transaction
     {
-        int64_t nValueOut = GetValueOut();
+        CAmount nValueOut = GetValueOut();
         nFee = nDebit - nValueOut;
     }
 
     // Sent/received.
-    BOOST_FOREACH(const CTxOut& txout, vout)
+    for (unsigned int i = 0; i < vout.size(); ++i)
     {
+        const CTxOut& txout = vout[i];
         isminetype fIsMine = pwallet->IsMine(txout);
         // Only need to handle txouts if AT LEAST one of these is true:
         //   1) they debit from us (sent)
@@ -893,15 +900,45 @@ void CWalletTx::GetAmounts(int64_t& nGeneratedImmature, int64_t& nGeneratedMatur
             address = CNoDestination();
         }
 
-        // If we are debited by the transaction, add the output as a "sent" entry
-        if (nDebit > 0)
-            listSent.push_back(make_pair(address, txout.nValue));
+        if (!txout.scriptPubKey.IsAssetScript()) {
+            COutputEntry output = {address, txout.nValue, (int) i};
 
-        // If we are receiving the output, add it as a "received" entry
-        if (fIsMine & filter)
-            listReceived.push_back(make_pair(address, txout.nValue));
+            // If we are debited by the transaction, add the output as a "sent" entry
+            if (nDebit > 0)
+                listSent.push_back(output);
+
+            // If we are receiving the output, add it as a "received" entry
+            if (fIsMine & filter)
+                listReceived.push_back(output);
+        }
+
+        /** YAC_ASSET START */
+        if (AreAssetsDeployed()) {
+            if (txout.scriptPubKey.IsAssetScript()) {
+                CAssetOutputEntry assetoutput;
+                assetoutput.vout = i;
+                GetAssetData(txout.scriptPubKey, assetoutput);
+
+                // The only asset type we send is transfer_asset. We need to skip all other types for the sent category
+                if (nDebit > 0 && assetoutput.type == TX_TRANSFER_ASSET)
+                    assetsSent.emplace_back(assetoutput);
+
+                if (fIsMine & filter)
+                    assetsReceived.emplace_back(assetoutput);
+            }
+        }
+        /** YAC_ASSET END */
     }
+}
 
+void CWalletTx::GetAmounts(::int64_t& nGeneratedImmature, ::int64_t& nGeneratedMature,
+                std::list<COutputEntry>& listReceived,
+                std::list<COutputEntry>& listSent, CAmount& nFee,
+                std::string& strSentAccount, const isminefilter& filter) const
+{
+    std::list<CAssetOutputEntry> assetsReceived;
+    std::list<CAssetOutputEntry> assetsSent;
+    GetAmounts(nGeneratedImmature, nGeneratedMature, listReceived, listSent, nFee, strSentAccount, filter, assetsReceived, assetsSent);
 }
 
 void CWalletTx::GetAccountAmounts(const string& strAccount, int64_t& nGenerated, int64_t& nReceived,
@@ -912,31 +949,33 @@ void CWalletTx::GetAccountAmounts(const string& strAccount, int64_t& nGenerated,
     int64_t allGeneratedImmature, allGeneratedMature, allFee;
     allGeneratedImmature = allGeneratedMature = allFee = 0;
     string strSentAccount;
-    list<pair<CTxDestination, int64_t> > listReceived;
-    list<pair<CTxDestination, int64_t> > listSent;
+    std::list<COutputEntry> listReceived;
+    std::list<COutputEntry> listSent;
     GetAmounts(allGeneratedImmature, allGeneratedMature, listReceived, listSent, allFee, strSentAccount, filter);
 
     if (strAccount == "")
         nGenerated = allGeneratedMature;
     if (strAccount == strSentAccount)
     {
-        BOOST_FOREACH(const PAIRTYPE(CTxDestination,int64_t)& s, listSent)
-            nSent += s.second;
+        for (const COutputEntry& s : listSent)
+        {
+            nSent += s.amount;
+        }
         nFee = allFee;
     }
     {
         LOCK(pwallet->cs_wallet);
-        BOOST_FOREACH(const PAIRTYPE(CTxDestination,int64_t)& r, listReceived)
+        for (const COutputEntry& r : listReceived)
         {
-            if (pwallet->mapAddressBook.count(r.first))
+            if (pwallet->mapAddressBook.count(r.destination))
             {
-                map<CTxDestination, string>::const_iterator mi = pwallet->mapAddressBook.find(r.first);
+                map<CTxDestination, string>::const_iterator mi = pwallet->mapAddressBook.find(r.destination);
                 if (mi != pwallet->mapAddressBook.end() && (*mi).second == strAccount)
-                    nReceived += r.second;
+                    nReceived += r.amount;
             }
             else if (strAccount.empty())
             {
-                nReceived += r.second;
+                nReceived += r.amount;
             }
         }
     }

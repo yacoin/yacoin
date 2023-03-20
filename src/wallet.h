@@ -579,6 +579,13 @@ static void WriteOrderPos(const ::int64_t& nOrderPos, mapValue_t& mapValue)
     mapValue["n"] = i64tostr(nOrderPos);
 }
 
+struct COutputEntry
+{
+    CTxDestination destination;
+    CAmount amount;
+    int vout;
+};
+
 /** YAC_ASSET START */
 struct CAssetOutputEntry
 {
@@ -586,8 +593,6 @@ struct CAssetOutputEntry
     std::string assetName;
     CTxDestination destination;
     CAmount nAmount = 0;
-    std::string message;
-    int64_t expireTime;
     int vout;
 };
 /** YAC_ASSET END */
@@ -1001,15 +1006,17 @@ public:
         return nChangeCached;
     }
 
-    void GetAmounts(
-                    ::int64_t& nGeneratedImmature, 
-                    ::int64_t& nGeneratedMature, 
-                    std::list<std::pair<CTxDestination, ::int64_t> >& listReceived,
-                    std::list<std::pair<CTxDestination, ::int64_t> >& listSent, 
-                    ::int64_t& nFee, 
-                    std::string& strSentAccount, 
-                    const isminefilter& filter
-                   ) const;
+    void GetAmounts(::int64_t& nGeneratedImmature, ::int64_t& nGeneratedMature,
+                    std::list<COutputEntry>& listReceived,
+                    std::list<COutputEntry>& listSent, CAmount& nFee,
+                    std::string& strSentAccount, const isminefilter& filter) const;
+
+    void GetAmounts(::int64_t& nGeneratedImmature, ::int64_t& nGeneratedMature,
+                    std::list<COutputEntry>& listReceived,
+                    std::list<COutputEntry>& listSent, CAmount& nFee,
+                    std::string& strSentAccount, const isminefilter& filter,
+                    std::list<CAssetOutputEntry>& assetsReceived,
+                    std::list<CAssetOutputEntry>& assetsSent) const;
 
     void GetAccountAmounts(
                            const std::string& strAccount, 

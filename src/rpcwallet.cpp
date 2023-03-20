@@ -742,8 +742,8 @@ Value getbalance(const Array& params, bool fHelp)
             allGeneratedImmature = allGeneratedMature = allFee = 0;
 
             string strSentAccount;
-            list<pair<CTxDestination, int64_t> > listReceived;
-            list<pair<CTxDestination, int64_t> > listSent;
+            std::list<COutputEntry> listReceived;
+            std::list<COutputEntry> listSent;
             wtx.GetAmounts(
                             allGeneratedImmature, 
                             allGeneratedMature, 
@@ -755,11 +755,15 @@ Value getbalance(const Array& params, bool fHelp)
                           );
             if (wtx.GetDepthInMainChain() >= nMinDepth)
             {
-                BOOST_FOREACH(const PAIRTYPE(CTxDestination,int64_t)& r, listReceived)
-                    nBalance += r.second;
+                for (const COutputEntry& r : listReceived)
+                {
+                    nBalance += r.amount;
+                }
             }
-            BOOST_FOREACH(const PAIRTYPE(CTxDestination,int64_t)& r, listSent)
-                nBalance -= r.second;
+            for (const COutputEntry& r : listSent)
+            {
+                nBalance -= r.amount;
+            }
             nBalance -= allFee;
             nBalance += allGeneratedMature;
         }
@@ -1483,14 +1487,16 @@ static void MaybePushAddress(Object & entry, const CTxDestination &dest)
         entry.push_back(Pair("address", addr.ToString()));
 }
 
-void ListTransactions(const CWalletTx& wtx, const string& strAccount, int nMinDepth, bool fLong, Array& ret, const isminefilter& filter)
+void ListTransactions(const CWalletTx& wtx, const string& strAccount, int nMinDepth, bool fLong, Array& ret, Array& retAssets, const isminefilter& filter)
 {
     int64_t nGeneratedImmature, nGeneratedMature, nFee;
     string strSentAccount;
-    list<pair<CTxDestination, int64_t> > listReceived;
-    list<pair<CTxDestination, int64_t> > listSent;
+    std::list<COutputEntry> listReceived;
+    std::list<COutputEntry> listSent;
+    std::list<CAssetOutputEntry> listAssetsReceived;
+    std::list<CAssetOutputEntry> listAssetsSent;
 
-    wtx.GetAmounts(nGeneratedImmature, nGeneratedMature, listReceived, listSent, nFee, strSentAccount, filter);
+    wtx.GetAmounts(nGeneratedImmature, nGeneratedMature, listReceived, listSent, nFee, strSentAccount, filter, listAssetsReceived, listAssetsSent);
 
     bool fAllAccounts = (strAccount == string("*"));
     bool involvesWatchonly = wtx.IsFromMe(MINE_WATCH_ONLY);
@@ -1518,13 +1524,13 @@ void ListTransactions(const CWalletTx& wtx, const string& strAccount, int nMinDe
     // Sent
     if ((!listSent.empty() || nFee != 0) && (fAllAccounts || strAccount == strSentAccount))
     {
-        BOOST_FOREACH(const PAIRTYPE(CTxDestination, int64_t)& s, listSent)
+        for (const COutputEntry& s : listSent)
         {
             Object entry;
             entry.push_back(Pair("account", strSentAccount));
-            if(involvesWatchonly || (::IsMine(*pwalletMain, s.first) & MINE_WATCH_ONLY))
+            if(involvesWatchonly || (::IsMine(*pwalletMain, s.destination) & MINE_WATCH_ONLY))
                 entry.push_back(Pair("involvesWatchonly", true));
-            MaybePushAddress(entry, s.first);
+            MaybePushAddress(entry, s.destination);
 
             if (wtx.GetDepthInMainChain() < 0) {
                 entry.push_back(Pair("category", "conflicted"));
@@ -1532,7 +1538,7 @@ void ListTransactions(const CWalletTx& wtx, const string& strAccount, int nMinDe
                 entry.push_back(Pair("category", "send"));
             }
 
-            entry.push_back(Pair("amount", ValueFromAmount(-s.second)));
+            entry.push_back(Pair("amount", ValueFromAmount(-s.amount)));
             entry.push_back(Pair("fee", ValueFromAmount(-nFee)));
             if (fLong)
                 WalletTxToJSON(wtx, entry);
@@ -1543,18 +1549,18 @@ void ListTransactions(const CWalletTx& wtx, const string& strAccount, int nMinDe
     // Received
     if (listReceived.size() > 0 && wtx.GetDepthInMainChain() >= nMinDepth)
     {
-        BOOST_FOREACH(const PAIRTYPE(CTxDestination, int64_t)& r, listReceived)
+        for (const COutputEntry& r : listReceived)
         {
             string account;
-            if (pwalletMain->mapAddressBook.count(r.first))
-                account = pwalletMain->mapAddressBook[r.first];
+            if (pwalletMain->mapAddressBook.count(r.destination))
+                account = pwalletMain->mapAddressBook[r.destination];
             if (fAllAccounts || (account == strAccount))
             {
                 Object entry;
                 entry.push_back(Pair("account", account));
-                if(involvesWatchonly || (::IsMine(*pwalletMain, r.first) & MINE_WATCH_ONLY))
+                if(involvesWatchonly || (::IsMine(*pwalletMain, r.destination) & MINE_WATCH_ONLY))
                     entry.push_back(Pair("involvesWatchonly", true));
-                MaybePushAddress(entry, r.first);
+                MaybePushAddress(entry, r.destination);
                 if (wtx.IsCoinBase())
                 {
                     if (wtx.GetDepthInMainChain() < 1)
@@ -1566,13 +1572,63 @@ void ListTransactions(const CWalletTx& wtx, const string& strAccount, int nMinDe
                 }
                 else
                     entry.push_back(Pair("category", "receive"));
-                entry.push_back(Pair("amount", ValueFromAmount(r.second)));
+                entry.push_back(Pair("amount", ValueFromAmount(r.amount)));
                 if (fLong)
                     WalletTxToJSON(wtx, entry);
                 ret.push_back(entry);
             }
         }
     }
+
+    /** YAC_ASSET START */
+    if (AreAssetsDeployed()) {
+        if (listAssetsReceived.size() > 0 && wtx.GetDepthInMainChain() >= nMinDepth) {
+            for (const CAssetOutputEntry &data : listAssetsReceived){
+                Object entry;
+
+                if (involvesWatchonly || (::IsMine(*pwalletMain, data.destination) & MINE_WATCH_ONLY)) {
+                    entry.push_back(Pair("involvesWatchonly", true));
+                }
+
+                entry.push_back(Pair("asset_type", GetTxnOutputType(data.type)));
+                entry.push_back(Pair("asset_name", data.assetName));
+                entry.push_back(Pair("amount", ValueFromAmount(data.nAmount)));
+                MaybePushAddress(entry, data.destination);
+                entry.push_back(Pair("vout", data.vout));
+                entry.push_back(Pair("category", "receive"));
+                if (fLong)
+                    WalletTxToJSON(wtx, entry);
+                retAssets.push_back(entry);
+            }
+        }
+
+        if ((!listAssetsSent.empty() || nFee != 0) && (fAllAccounts || strAccount == strSentAccount)) {
+            for (const CAssetOutputEntry &data : listAssetsSent) {
+                Object entry;
+
+                if (involvesWatchonly || (::IsMine(*pwalletMain, data.destination) & MINE_WATCH_ONLY)) {
+                    entry.push_back(Pair("involvesWatchonly", true));
+                }
+
+                entry.push_back(Pair("asset_type", GetTxnOutputType(data.type)));
+                entry.push_back(Pair("asset_name", data.assetName));
+                entry.push_back(Pair("amount", ValueFromAmount(data.nAmount)));
+                MaybePushAddress(entry, data.destination);
+                entry.push_back(Pair("vout", data.vout));
+                entry.push_back(Pair("category", "send"));
+                if (fLong)
+                    WalletTxToJSON(wtx, entry);
+                retAssets.push_back(entry);
+            }
+        }
+    }
+    /** YAC_ASSET END */
+}
+
+void ListTransactions(const CWalletTx& wtx, const string& strAccount, int nMinDepth, bool fLong, Array& ret, const isminefilter& filter)
+{
+    Array assetDetails;
+    ListTransactions(wtx, strAccount, nMinDepth, fLong, ret, assetDetails, filter);
 }
 
 void AcentryToJSON(const CAccountingEntry& acentry, const string& strAccount, Array& ret)
@@ -1705,11 +1761,9 @@ Value listaccounts(const Array& params, bool fHelp)
         string 
             strSentAccount;
 
-        list<pair<CTxDestination, int64_t> > 
-            listReceived;
+        std::list<COutputEntry> listReceived;
 
-        list<pair<CTxDestination, int64_t> > 
-            listSent;
+        std::list<COutputEntry> listSent;
 
         wtx.GetAmounts(
                         nGeneratedImmature, 
@@ -1722,16 +1776,19 @@ Value listaccounts(const Array& params, bool fHelp)
                        );
 
         mapAccountBalances[strSentAccount] -= nFee;
-        BOOST_FOREACH(const PAIRTYPE(CTxDestination, int64_t)& s, listSent)
-            mapAccountBalances[strSentAccount] -= s.second;
+        for (const COutputEntry& s : listSent)
+        {
+            mapAccountBalances[strSentAccount] -= s.amount;
+        }
         if (wtx.GetDepthInMainChain() >= nMinDepth)
         {
             mapAccountBalances[""] += nGeneratedMature;
-            BOOST_FOREACH(const PAIRTYPE(CTxDestination, int64_t)& r, listReceived)
-                if (pwalletMain->mapAddressBook.count(r.first))
-                    mapAccountBalances[pwalletMain->mapAddressBook[r.first]] += r.second;
+            for (const COutputEntry& r : listReceived)
+            {
+                if (pwalletMain->mapAddressBook.count(r.destination))
+                    mapAccountBalances[pwalletMain->mapAddressBook[r.destination]] += r.amount;
                 else
-                    mapAccountBalances[""] += r.second;
+                    mapAccountBalances[""] += r.amount;            }
         }
     }
 
@@ -1739,15 +1796,18 @@ Value listaccounts(const Array& params, bool fHelp)
         acentries;
 
     CWalletDB(pwalletMain->strWalletFile).ListAccountCreditDebit("*", acentries);
-    BOOST_FOREACH(const CAccountingEntry& entry, acentries)
+    for (const CAccountingEntry& entry : acentries)
+    {
         mapAccountBalances[entry.strAccount] += entry.nCreditDebit;
+    }
 
     Object 
         ret;
 
-    BOOST_FOREACH(const PAIRTYPE(string, int64_t)& accountBalance, mapAccountBalances) 
+    for (const PAIRTYPE(string, int64_t)& accountBalance : mapAccountBalances)
     {
         ret.push_back(Pair(accountBalance.first, ValueFromAmount(accountBalance.second)));
+
     }
     return ret;
 }
@@ -1883,8 +1943,10 @@ Value gettransaction(const Array& params, bool fHelp)
         WalletTxToJSON(wtx, entry);
 
         Array details;
-        ListTransactions(pwalletMain->mapWallet[hash], "*", 0, false, details, filter);
+        Array assetDetails;
+        ListTransactions(pwalletMain->mapWallet[hash], "*", 0, false, details, assetDetails, filter);
         entry.push_back(Pair("details", details));
+        entry.push_back(Pair("asset_details", assetDetails));
     }
     else
     {
