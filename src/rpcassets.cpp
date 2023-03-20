@@ -768,6 +768,76 @@ Value listassets(const Array& params, bool fHelp)
     }
 }
 
+Value listaddressesbyasset(const Array& params, bool fHelp)
+{
+    if (!fAssetIndex) {
+        return "_This rpc call is not functional unless -assetindex is enabled. To enable, please run the wallet with -assetindex, this will require a reindex to occur";
+    }
+
+    if (fHelp || !AreAssetsDeployed() || params.size() > 4 || params.size() < 1)
+        throw std::runtime_error(
+                "listaddressesbyasset \"asset_name\" (onlytotal) (count) (start)\n"
+                + AssetActivationWarning() +
+                "\nReturns a list of all address that own the given asset (with balances)"
+                "\nOr returns the total size of how many address own the given asset"
+
+                "\nArguments:\n"
+                "1. \"asset_name\"               (string, required) name of asset\n"
+                "2. \"onlytotal\"                (boolean, optional, default=false) when false result is just a list of addresses with balances -- when true the result is just a single number representing the number of addresses\n"
+                "3. \"count\"                    (integer, optional, default=50000, MAX=50000) truncates results to include only the first _count_ assets found\n"
+                "4. \"start\"                    (integer, optional, default=0) results skip over the first _start_ assets found (if negative it skips back from the end)\n"
+
+                "\nResult:\n"
+                "[ "
+                "  (address): balance,\n"
+                "  ...\n"
+                "]\n"
+
+                "\nExamples:\n"
+                + HelpExampleCli("listaddressesbyasset", "\"ASSET_NAME\" false 2 0")
+                + HelpExampleCli("listaddressesbyasset", "\"ASSET_NAME\" true")
+                + HelpExampleCli("listaddressesbyasset", "\"ASSET_NAME\"")
+        );
+
+    std::string asset_name = params[0].get_str();
+    bool fOnlyTotal = false;
+    if (params.size() > 1)
+        fOnlyTotal = params[1].get_bool();
+
+    size_t count = INT_MAX;
+    if (params.size() > 2) {
+        if (params[2].get_int() < 1)
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "count must be greater than 1.");
+        count = params[2].get_int();
+    }
+
+    long start = 0;
+    if (params.size() > 3) {
+        start = params[3].get_int();
+    }
+
+    if (!IsAssetNameValid(asset_name))
+        return "_Not a valid asset name";
+
+    std::vector<std::pair<std::string, CAmount> > vecAddressAmounts;
+    int nTotalEntries = 0;
+    if (!passetsdb->AssetAddressDir(vecAddressAmounts, nTotalEntries, fOnlyTotal, asset_name, count, start))
+        throw JSONRPCError(RPC_INTERNAL_ERROR, "couldn't retrieve address asset directory.");
+
+    // If only the number of addresses is wanted return it
+    if (fOnlyTotal) {
+        return nTotalEntries;
+    }
+
+    Object result;
+    for (auto& pair : vecAddressAmounts) {
+        result.push_back(Pair(pair.first, AssetValueFromAmount(pair.second, asset_name)));
+    }
+
+
+    return result;
+}
+
 #ifdef _MSC_VER
     #include "msvc_warnings.pop.h"
 #endif
