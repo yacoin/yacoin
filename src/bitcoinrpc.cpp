@@ -1346,7 +1346,8 @@ static const CRPCCommand vRPCCommands[] =
     { "reissue",                &reissue,                false,  false },
     { "listmyassets",           &listmyassets,           false,  false },
     { "listassets",             &listassets,             false,  false },
-    { "listaddressesbyasset",   &listaddressesbyasset,   false,  false }
+    { "listaddressesbyasset",   &listaddressesbyasset,   false,  false },
+    { "listassetbalancesbyaddress",   &listassetbalancesbyaddress,   false,  false }
     /** YAC_ASSET END */
 };
 
@@ -1468,9 +1469,12 @@ Array RPCConvertValues(std::string &strMethod, const std::vector<std::string> &s
     if (strMethod == "listassets"          && n > 1) ConvertTo<bool>(params[1]); // verbose
     if (strMethod == "listassets"          && n > 2) ConvertTo<boost::int64_t>(params[2]); // count
     if (strMethod == "listassets"          && n > 3) ConvertTo<boost::int64_t>(params[3]); // start
-    if (strMethod == "listaddressesbyasset" && n > 1) ConvertTo<bool>(params[1]); // onlytotal
-    if (strMethod == "listaddressesbyasset" && n > 2) ConvertTo<boost::int64_t>(params[2]); // count
-    if (strMethod == "listaddressesbyasset" && n > 3) ConvertTo<boost::int64_t>(params[3]); // start
+    if (strMethod == "listaddressesbyasset"       && n > 1) ConvertTo<bool>(params[1]); // onlytotal
+    if (strMethod == "listaddressesbyasset"       && n > 2) ConvertTo<boost::int64_t>(params[2]); // count
+    if (strMethod == "listaddressesbyasset"       && n > 3) ConvertTo<boost::int64_t>(params[3]); // start
+    if (strMethod == "listassetbalancesbyaddress" && n > 1) ConvertTo<bool>(params[1]); // onlytotal
+    if (strMethod == "listassetbalancesbyaddress" && n > 2) ConvertTo<boost::int64_t>(params[2]); // count
+    if (strMethod == "listassetbalancesbyaddress" && n > 3) ConvertTo<boost::int64_t>(params[3]); // start
     /** YAC_ASSET END */
 
     return params;

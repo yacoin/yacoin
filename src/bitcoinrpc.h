@@ -282,5 +282,6 @@ extern json_spirit::Value reissue(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value listmyassets(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value listassets(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value listaddressesbyasset(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value listassetbalancesbyaddress(const json_spirit::Array& params, bool fHelp);
 /** YAC_ASSET END */
 #endif

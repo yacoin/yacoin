@@ -34,7 +34,7 @@ using std::min;
 
 std::string AssetActivationWarning()
 {
-    return AreAssetsDeployed() ? "" : "\nTHIS COMMAND IS NOT YET ACTIVE!\nhttps://github.com/RavenProject/rips/blob/master/rip-0002.mediawiki\n";
+    return AreAssetsDeployed() ? "" : "\nTHIS COMMAND IS NOT YET ACTIVE!\n";
 }
 
 std::string AssetTypeToString(AssetType& assetType)
@@ -79,7 +79,7 @@ Value issue(const Array& params, bool fHelp)
             "1. \"asset_name\"            (string, required) a unique name\n"
             "2. \"qty\"                   (numeric, optional, default=1) the number of units to be issued\n"
             "3. \"to_address\"            (string), optional, default=\"\"), address asset will be sent to, if it is empty, address will be generated for you\n"
-            "4. \"change_address\"        (string), optional, default=\"\"), address the the rvn change will be sent to, if it is empty, change address will be generated for you\n"
+            "4. \"change_address\"        (string), optional, default=\"\"), address the yac change will be sent to, if it is empty, change address will be generated for you\n"
             "5. \"units\"                 (integer, optional, default=0, min=0, max=6), the number of decimals precision for the asset (0 for whole units (\"1\"), 6 for max precision (\"1.000000\")\n"
             "6. \"reissuable\"            (boolean, optional, default=true (false for unique assets)), whether future reissuance is allowed\n"
             "7. \"has_ipfs\"              (boolean, optional, default=false), whether ipfs hash is going to be added to the asset\n"
@@ -125,7 +125,7 @@ Value issue(const Array& params, bool fHelp)
     if (!address.empty()) {
         CTxDestination destination = DecodeDestination(address);
         if (!IsValidDestination(destination)) {
-            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, std::string("Invalid Raven address: ") + address);
+            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, std::string("Invalid Yacoin address: ") + address);
         }
     } else {
         // Create a new address
@@ -154,7 +154,7 @@ Value issue(const Array& params, bool fHelp)
             CTxDestination destination = DecodeDestination(change_address);
             if (!IsValidDestination(destination)) {
                 throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY,
-                                   std::string("Invalid Change Address: Invalid Raven address: ") + change_address);
+                                   std::string("Invalid Change Address: Invalid Yacoin address: ") + change_address);
             }
         }
     }
@@ -220,7 +220,7 @@ Value transfer(const Array& params, bool fHelp)
                 "1. \"asset_name\"               (string, required) name of asset\n"
                 "2. \"qty\"                      (numeric, required) number of assets you want to send to the address\n"
                 "3. \"to_address\"               (string, required) address to send the asset to\n"
-                "4. \"change_address\"           (string, optional, default = \"\") the transactions RVN change will be sent to this address\n"
+                "4. \"change_address\"           (string, optional, default = \"\") the transactions YAC change will be sent to this address\n"
                 "5. \"asset_change_address\"     (string, optional, default = \"\") the transactions Asset change will be sent to this address\n"
 
                 "\nResult:\n"
@@ -244,12 +244,12 @@ Value transfer(const Array& params, bool fHelp)
     std::string to_address = params[2].get_str();
     CTxDestination to_dest = DecodeDestination(to_address);
     if (!IsValidDestination(to_dest)) {
-        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, std::string("Invalid Raven address: ") + to_address);
+        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, std::string("Invalid Yacoin address: ") + to_address);
     }
 
-    std::string rvn_change_address = "";
+    std::string yac_change_address = "";
     if (params.size() > 3) {
-        rvn_change_address = params[3].get_str();
+        yac_change_address = params[3].get_str();
     }
 
     std::string asset_change_address = "";
@@ -257,9 +257,9 @@ Value transfer(const Array& params, bool fHelp)
         asset_change_address = params[4].get_str();
     }
 
-    CTxDestination rvn_change_dest = DecodeDestination(rvn_change_address);
-    if (!rvn_change_address.empty() && !IsValidDestination(rvn_change_dest))
-        throw JSONRPCError(RPC_INVALID_PARAMETER, std::string("RVN change address must be a valid address. Invalid address: ") + rvn_change_address);
+    CTxDestination yac_change_dest = DecodeDestination(yac_change_address);
+    if (!yac_change_address.empty() && !IsValidDestination(yac_change_dest))
+        throw JSONRPCError(RPC_INVALID_PARAMETER, std::string("YAC change address must be a valid address. Invalid address: ") + yac_change_address);
 
     CTxDestination asset_change_dest = DecodeDestination(asset_change_address);
     if (!asset_change_address.empty() && !IsValidDestination(asset_change_dest))
@@ -276,7 +276,7 @@ Value transfer(const Array& params, bool fHelp)
     CAmount nRequiredFee;
 
     CCoinControl ctrl;
-    ctrl.destChange = rvn_change_dest;
+    ctrl.destChange = yac_change_dest;
     ctrl.assetDestChange = asset_change_dest;
 
     // Create the Transaction
@@ -296,7 +296,7 @@ Value transferfromaddress(const Array& params, bool fHelp)
 {
     if (fHelp || !AreAssetsDeployed() || params.size() < 4 || params.size() > 6)
         throw std::runtime_error(
-                "transferfromaddress \"asset_name\" \"from_address\" qty \"to_address\" \"rvn_change_address\" \"asset_change_address\"\n"
+                "transferfromaddress \"asset_name\" \"from_address\" qty \"to_address\" \"yac_change_address\" \"asset_change_address\"\n"
                 + AssetActivationWarning() +
                 "\nTransfer a quantity of an owned asset in a specific address to a given address"
 
@@ -305,7 +305,7 @@ Value transferfromaddress(const Array& params, bool fHelp)
                 "2. \"from_address\"             (string, required) address that the asset will be transferred from\n"
                 "3. \"qty\"                      (numeric, required) number of assets you want to send to the address\n"
                 "4. \"to_address\"               (string, required) address to send the asset to\n"
-                "5. \"rvn_change_address\"       (string, optional, default = \"\") the transaction RVN change will be sent to this address\n"
+                "5. \"yac_change_address\"       (string, optional, default = \"\") the transaction YAC change will be sent to this address\n"
                 "6. \"asset_change_address\"     (string, optional, default = \"\") the transaction Asset change will be sent to this address\n"
 
                 "\nResult:\n"
@@ -335,9 +335,9 @@ Value transferfromaddress(const Array& params, bool fHelp)
 
     std::string address = params[3].get_str();
 
-    std::string rvn_change_address = "";
+    std::string yac_change_address = "";
     if (params.size() > 6) {
-        rvn_change_address = params[6].get_str();
+        yac_change_address = params[6].get_str();
     }
 
     std::string asset_change_address = "";
@@ -345,9 +345,9 @@ Value transferfromaddress(const Array& params, bool fHelp)
         asset_change_address = params[7].get_str();
     }
 
-    CTxDestination rvn_change_dest = DecodeDestination(rvn_change_address);
-    if (!rvn_change_address.empty() && !IsValidDestination(rvn_change_dest))
-        throw JSONRPCError(RPC_INVALID_PARAMETER, std::string("RVN change address must be a valid address. Invalid address: ") + rvn_change_address);
+    CTxDestination yac_change_dest = DecodeDestination(yac_change_address);
+    if (!yac_change_address.empty() && !IsValidDestination(yac_change_dest))
+        throw JSONRPCError(RPC_INVALID_PARAMETER, std::string("YAC change address must be a valid address. Invalid address: ") + yac_change_address);
 
     CTxDestination asset_change_dest = DecodeDestination(asset_change_address);
     if (!asset_change_address.empty() && !IsValidDestination(asset_change_dest))
@@ -367,7 +367,7 @@ Value transferfromaddress(const Array& params, bool fHelp)
     pwalletMain->AvailableAssets(mapAssetCoins);
 
     // Set the change addresses
-    ctrl.destChange = rvn_change_dest;
+    ctrl.destChange = yac_change_dest;
     ctrl.assetDestChange = asset_change_dest;
 
     if (!mapAssetCoins.count(asset_name)) {
@@ -834,6 +834,80 @@ Value listaddressesbyasset(const Array& params, bool fHelp)
         result.push_back(Pair(pair.first, AssetValueFromAmount(pair.second, asset_name)));
     }
 
+
+    return result;
+}
+
+Value listassetbalancesbyaddress(const Array& params, bool fHelp)
+{
+    if (!fAssetIndex) {
+        return "_This rpc call is not functional unless -assetindex is enabled. To enable, please run the wallet with -assetindex, this will require a reindex to occur";
+    }
+
+    if (fHelp || !AreAssetsDeployed() || params.size() > 4 || params.size() < 1)
+        throw std::runtime_error(
+            "listassetbalancesbyaddress \"address\" (onlytotal) (count) (start)\n"
+            + AssetActivationWarning() +
+            "\nReturns a list of all asset balances for an address.\n"
+
+            "\nArguments:\n"
+            "1. \"address\"                  (string, required) a yacoin address\n"
+            "2. \"onlytotal\"                (boolean, optional, default=false) when false result is just a list of assets balances -- when true the result is just a single number representing the number of assets\n"
+            "3. \"count\"                    (integer, optional, default=50000, MAX=50000) truncates results to include only the first _count_ assets found\n"
+            "4. \"start\"                    (integer, optional, default=0) results skip over the first _start_ assets found (if negative it skips back from the end)\n"
+
+            "\nResult:\n"
+            "{\n"
+            "  (asset_name) : (quantity),\n"
+            "  ...\n"
+            "}\n"
+
+
+            "\nExamples:\n"
+            + HelpExampleCli("listassetbalancesbyaddress", "\"myaddress\" false 2 0")
+            + HelpExampleCli("listassetbalancesbyaddress", "\"myaddress\" true")
+            + HelpExampleCli("listassetbalancesbyaddress", "\"myaddress\"")
+        );
+
+    std::string address = params[0].get_str();
+    CTxDestination destination = DecodeDestination(address);
+    if (!IsValidDestination(destination)) {
+        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, std::string("Invalid Yacoin address: ") + address);
+    }
+
+    bool fOnlyTotal = false;
+    if (params.size() > 1)
+        fOnlyTotal = params[1].get_bool();
+
+    size_t count = INT_MAX;
+    if (params.size() > 2) {
+        if (params[2].get_int() < 1)
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "count must be greater than 1.");
+        count = params[2].get_int();
+    }
+
+    long start = 0;
+    if (params.size() > 3) {
+        start = params[3].get_int();
+    }
+
+    if (!passetsdb)
+        throw JSONRPCError(RPC_INTERNAL_ERROR, "asset db unavailable.");
+
+    std::vector<std::pair<std::string, CAmount> > vecAssetAmounts;
+    int nTotalEntries = 0;
+    if (!passetsdb->AddressDir(vecAssetAmounts, nTotalEntries, fOnlyTotal, address, count, start))
+        throw JSONRPCError(RPC_INTERNAL_ERROR, "couldn't retrieve address asset directory.");
+
+    // If only the number of addresses is wanted return it
+    if (fOnlyTotal) {
+        return nTotalEntries;
+    }
+
+    Object result;
+    for (auto& pair : vecAssetAmounts) {
+        result.push_back(Pair(pair.first, AssetValueFromAmount(pair.second, pair.first)));
+    }
 
     return result;
 }
