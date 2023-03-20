@@ -1592,7 +1592,7 @@ void ListTransactions(const CWalletTx& wtx, const string& strAccount, int nMinDe
 
                 entry.push_back(Pair("asset_type", GetTxnOutputType(data.type)));
                 entry.push_back(Pair("asset_name", data.assetName));
-                entry.push_back(Pair("amount", ValueFromAmount(data.nAmount)));
+                entry.push_back(Pair("amount", AssetValueFromAmount(data.nAmount, data.assetName)));
                 MaybePushAddress(entry, data.destination);
                 entry.push_back(Pair("vout", data.vout));
                 entry.push_back(Pair("category", "receive"));
@@ -1612,7 +1612,7 @@ void ListTransactions(const CWalletTx& wtx, const string& strAccount, int nMinDe
 
                 entry.push_back(Pair("asset_type", GetTxnOutputType(data.type)));
                 entry.push_back(Pair("asset_name", data.assetName));
-                entry.push_back(Pair("amount", ValueFromAmount(data.nAmount)));
+                entry.push_back(Pair("amount", AssetValueFromAmount(data.nAmount, data.assetName)));
                 MaybePushAddress(entry, data.destination);
                 entry.push_back(Pair("vout", data.vout));
                 entry.push_back(Pair("category", "send"));

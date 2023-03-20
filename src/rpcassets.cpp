@@ -52,6 +52,17 @@ std::string AssetTypeToString(AssetType& assetType)
     }
 }
 
+template <class Iter, class Incr>
+void safe_advance(Iter& curr, const Iter& end, Incr n)
+{
+    size_t remaining(std::distance(curr, end));
+    if (remaining < n)
+    {
+        n = remaining;
+    }
+    std::advance(curr, n);
+};
+
 Value issue(const Array& params, bool fHelp)
 {
     if (fHelp || !AreAssetsDeployed() || params.size() < 1 || params.size() > 8)
@@ -476,6 +487,177 @@ Value reissue(const Array& params, bool fHelp)
         throw JSONRPCError(error.first, error.second);
 
     return txid;
+}
+
+Value listmyassets(const Array& params, bool fHelp)
+{
+    if (fHelp || !AreAssetsDeployed() || params.size() > 5)
+        throw std::runtime_error(
+                "listmyassets \"( asset )\" ( verbose ) ( count ) ( start ) (confs) \n"
+                + AssetActivationWarning() +
+                "\nReturns a list of all asset that are owned by this wallet\n"
+
+                "\nArguments:\n"
+                "1. \"asset\"                    (string, optional, default=\"*\") filters results -- must be an asset name or a partial asset name followed by '*' ('*' matches all trailing characters)\n"
+                "2. \"verbose\"                  (boolean, optional, default=false) when false results only contain balances -- when true results include outpoints\n"
+                "3. \"count\"                    (integer, optional, default=ALL) truncates results to include only the first _count_ assets found\n"
+                "4. \"start\"                    (integer, optional, default=0) results skip over the first _start_ assets found (if negative it skips back from the end)\n"
+                "5. \"confs\"                    (integet, optional, default=0) results are skipped if they don't have this number of confirmations\n"
+
+                "\nResult (verbose=false):\n"
+                "{\n"
+                "  (asset_name): balance,\n"
+                "  ...\n"
+                "}\n"
+
+                "\nResult (verbose=true):\n"
+                "{\n"
+                "  (asset_name):\n"
+                "    {\n"
+                "      \"balance\": balance,\n"
+                "      \"outpoints\":\n"
+                "        [\n"
+                "          {\n"
+                "            \"txid\": txid,\n"
+                "            \"vout\": vout,\n"
+                "            \"amount\": amount\n"
+                "          }\n"
+                "          {...}, {...}\n"
+                "        ]\n"
+                "    }\n"
+                "}\n"
+                "{...}, {...}\n"
+
+                "\nExamples:\n"
+                + HelpExampleRpc("listmyassets", "")
+                + HelpExampleCli("listmyassets", "ASSET")
+                + HelpExampleCli("listmyassets", "\"ASSET*\" true 10 20")
+                  + HelpExampleCli("listmyassets", "\"ASSET*\" true 10 20 1")
+        );
+
+    if (pwalletMain->IsLocked())
+        throw JSONRPCError(RPC_WALLET_UNLOCK_NEEDED, "Error: Please enter the wallet passphrase with walletpassphrase first.");
+
+    std::string filter = "*";
+    if (params.size() > 0)
+        filter = params[0].get_str();
+
+    if (filter == "")
+        filter = "*";
+
+    bool verbose = false;
+    if (params.size() > 1)
+        verbose = params[1].get_bool();
+
+    size_t count = INT_MAX;
+    if (params.size() > 2) {
+        if (params[2].get_int() < 1)
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "count must be greater than 1.");
+        count = params[2].get_int();
+    }
+
+    long start = 0;
+    if (params.size() > 3) {
+        start = params[3].get_int();
+    }
+
+    int confs = 0;
+    if (params.size() > 4) {
+        confs = params[4].get_int();
+    }
+
+    // retrieve balances
+    std::map<std::string, CAmount> balances;
+    std::map<std::string, std::vector<COutput> > outputs;
+    if (filter == "*") {
+        if (!GetAllMyAssetBalances(outputs, balances, confs))
+            throw JSONRPCError(RPC_INTERNAL_ERROR, "Couldn't get asset balances. For all assets");
+    }
+    else if (filter.back() == '*') {
+        std::vector<std::string> assetNames;
+        filter.pop_back();
+        if (!GetAllMyAssetBalances(outputs, balances, confs, filter))
+            throw JSONRPCError(RPC_INTERNAL_ERROR, "Couldn't get asset balances. For all assets");
+    }
+    else {
+        if (!IsAssetNameValid(filter))
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid asset name.");
+        if (!GetAllMyAssetBalances(outputs, balances, confs, filter))
+            throw JSONRPCError(RPC_INTERNAL_ERROR, "Couldn't get asset balances. For all assets");
+    }
+
+    // pagination setup
+    auto bal = balances.begin();
+    if (start >= 0)
+        safe_advance(bal, balances.end(), (size_t)start);
+    else
+        safe_advance(bal, balances.end(), balances.size() + start);
+    auto end = bal;
+    safe_advance(end, balances.end(), count);
+
+    // generate output
+    Object result;
+    if (verbose) {
+        for (; bal != end && bal != balances.end(); bal++) {
+            Object asset;
+            asset.push_back(Pair("balance", AssetValueFromAmount(bal->second, bal->first)));
+
+            Array outpoints;
+            for (auto const& out : outputs.at(bal->first)) {
+                Object tempOut;
+                tempOut.push_back(Pair("txid", out.tx->GetHash().GetHex()));
+                tempOut.push_back(Pair("vout", (int)out.i));
+
+                //
+                // get amount for this outpoint
+                CAmount txAmount = 0;
+                auto it = pwalletMain->mapWallet.find(out.tx->GetHash());
+                if (it == pwalletMain->mapWallet.end()) {
+                    throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid or non-wallet transaction id");
+                }
+                const CWalletTx* wtx = out.tx;
+                CTxOut txOut = wtx->vout[out.i];
+                std::string strAddress;
+                if (CheckIssueDataTx(txOut)) {
+                    CNewAsset asset;
+                    if (!AssetFromScript(txOut.scriptPubKey, asset, strAddress))
+                        throw JSONRPCError(RPC_INTERNAL_ERROR, "Couldn't get asset from script.");
+                    txAmount = asset.nAmount;
+                }
+                else if (CheckReissueDataTx(txOut)) {
+                    CReissueAsset asset;
+                    if (!ReissueAssetFromScript(txOut.scriptPubKey, asset, strAddress))
+                        throw JSONRPCError(RPC_INTERNAL_ERROR, "Couldn't get asset from script.");
+                    txAmount = asset.nAmount;
+                }
+                else if (CheckTransferOwnerTx(txOut)) {
+                    CAssetTransfer asset;
+                    if (!TransferAssetFromScript(txOut.scriptPubKey, asset, strAddress))
+                        throw JSONRPCError(RPC_INTERNAL_ERROR, "Couldn't get asset from script.");
+                    txAmount = asset.nAmount;
+                }
+                else if (CheckOwnerDataTx(txOut)) {
+                    std::string assetName;
+                    if (!OwnerAssetFromScript(txOut.scriptPubKey, assetName, strAddress))
+                        throw JSONRPCError(RPC_INTERNAL_ERROR, "Couldn't get asset from script.");
+                    txAmount = OWNER_ASSET_AMOUNT;
+                }
+                tempOut.push_back(Pair("amount", AssetValueFromAmount(txAmount, bal->first)));
+                //
+                //
+
+                outpoints.push_back(tempOut);
+            }
+            asset.push_back(Pair("outpoints", outpoints));
+            result.push_back(Pair(bal->first, asset));
+        }
+    }
+    else {
+        for (; bal != end && bal != balances.end(); bal++) {
+            result.push_back(Pair(bal->first, AssetValueFromAmount(bal->second, bal->first)));
+        }
+    }
+    return result;
 }
 
 #ifdef _MSC_VER

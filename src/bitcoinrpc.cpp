@@ -133,6 +133,42 @@ void RPCTypeCheck(const Object& o,
     return nAmount;
 }
 
+std::string AssetValueFromAmount(const CAmount& amount, const std::string asset_name)
+{
+
+    auto currentActiveAssetCache = GetCurrentAssetCache();
+    if (!currentActiveAssetCache)
+        throw JSONRPCError(RPC_INTERNAL_ERROR, "Asset cache isn't available.");
+
+    uint8_t units = OWNER_UNITS;
+    if (!IsAssetNameAnOwner(asset_name)) {
+        CNewAsset assetData;
+        if (!currentActiveAssetCache->GetAssetMetaDataIfExists(asset_name, assetData))
+            units = MAX_UNIT;
+            //throw JSONRPCError(RPC_INTERNAL_ERROR, "Couldn't load asset from cache: " + asset_name);
+        else
+            units = assetData.units;
+    }
+
+    return AssetValueFromAmountString(amount, units);
+}
+
+std::string AssetValueFromAmountString(const CAmount& amount, const int8_t units)
+{
+    bool sign = amount < 0;
+    int64_t n_abs = (sign ? -amount : amount);
+    int64_t quotient = n_abs / COIN;
+    int64_t remainder = n_abs % COIN;
+    remainder = remainder / pow(10, MAX_UNIT - units);
+
+    if (units == 0 && remainder == 0) {
+        return strprintf("%s%d", sign ? "-" : "", quotient);
+    }
+    else {
+        return strprintf("%s%d.%0" + std::to_string(units) + "d", sign ? "-" : "", quotient, remainder);
+    }
+}
+
 Value ValueFromAmount(::int64_t amount)
 {
     return (double)amount / (double)COIN;
@@ -1307,7 +1343,8 @@ static const CRPCCommand vRPCCommands[] =
     { "issue",                  &issue,                  false,  false },
     { "transfer",               &transfer,               false,  false },
     { "transferfromaddress",    &transferfromaddress,    false,  false },
-    { "reissue",                &reissue,                false,  false }
+    { "reissue",                &reissue,                false,  false },
+    { "listmyassets",           &listmyassets,           false,  false }
     /** YAC_ASSET END */
 };
 
@@ -1422,6 +1459,10 @@ Array RPCConvertValues(std::string &strMethod, const std::vector<std::string> &s
     if (strMethod == "reissue"             && n > 1) ConvertTo<double>(params[1]); // qty
     if (strMethod == "reissue"             && n > 4) ConvertTo<bool>(params[4]); // reissuable
     if (strMethod == "reissue"             && n > 5) ConvertTo<boost::int64_t>(params[5]); // new_units
+    if (strMethod == "listmyassets"        && n > 1) ConvertTo<bool>(params[1]); // verbose
+    if (strMethod == "listmyassets"        && n > 2) ConvertTo<boost::int64_t>(params[2]); // count
+    if (strMethod == "listmyassets"        && n > 3) ConvertTo<boost::int64_t>(params[3]); // start
+    if (strMethod == "listmyassets"        && n > 4) ConvertTo<boost::int64_t>(params[4]); // confs
     /** YAC_ASSET END */
 
     return params;

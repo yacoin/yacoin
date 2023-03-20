@@ -154,6 +154,8 @@ extern const CRPCTable tableRPC;
 extern int64_t nWalletUnlockTime;
 extern int64_t AmountFromValue(const json_spirit::Value& value);
 extern json_spirit::Value ValueFromAmount(int64_t amount);
+extern std::string AssetValueFromAmount(const CAmount& amount, const std::string asset_name);
+extern std::string AssetValueFromAmountString(const CAmount& amount, const int8_t units);
 extern double GetDifficulty(const CBlockIndex* blockindex = NULL);
 
 extern double GetPoWMHashPS();
@@ -277,5 +279,6 @@ extern json_spirit::Value issue(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value transfer(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value transferfromaddress(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value reissue(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value listmyassets(const json_spirit::Array& params, bool fHelp);
 /** YAC_ASSET END */
 #endif
