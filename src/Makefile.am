@@ -93,6 +93,7 @@ libyacoin_common_a_SOURCES= \
     rpcdump.cpp \
     rpcnet.cpp \
     rpcmining.cpp \
+    rpcmisc.cpp \
     rpcwallet.cpp \
     rpcblockchain.cpp \
     rpcrawtransaction.cpp \

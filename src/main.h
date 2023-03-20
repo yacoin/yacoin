@@ -33,6 +33,7 @@
 
 #include "primitives/transaction.h"
 #include "primitives/block.h"
+#include "addressindex.h"
 #include "assets/assettypes.h"
 #include "assets/assetdb.h"
 #include "assets/assets.h"
@@ -84,6 +85,12 @@ bool CheckTxAssets(
 void UpdateAssetInfo(const CTransaction& tx, MapPrevTx& prevInputs, int nHeight, uint256 blockHash, CAssetsCache* assetsCache, std::pair<std::string, CBlockAssetUndo>* undoAssetData);
 void UpdateAssetInfoFromTxInputs(const COutPoint& out, const CTxOut& txOut, CAssetsCache* assetsCache);
 void UpdateAssetInfoFromTxOutputs(const CTransaction& tx, int nHeight, uint256 blockHash, CAssetsCache* assetsCache, std::pair<std::string, CBlockAssetUndo>* undoAssetData);
+bool GetAddressIndex(uint160 addressHash, int type, std::string assetName,
+                     std::vector<std::pair<CAddressIndexKey, CAmount> > &addressIndex,
+                     int start = 0, int end = 0);
+bool GetAddressIndex(uint160 addressHash, int type,
+                     std::vector<std::pair<CAddressIndexKey, CAmount> > &addressIndex,
+                     int start = 0, int end = 0);
 //
 // END OF FUNCTIONS USED FOR ASSET MANAGEMENT SYSTEM
 //

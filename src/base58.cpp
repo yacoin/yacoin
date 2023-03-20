@@ -348,6 +348,23 @@ bool CBitcoinAddress::IsScript() const {
     }
 }
 
+bool CBitcoinAddress::GetIndexKey(uint160& hashBytes, int& type) const
+{
+    if (!IsValid()) {
+        return false;
+    } else if (nVersion == PUBKEY_ADDRESS) {
+        memcpy(&hashBytes, &vchData[0], 20);
+        type = 1;
+        return true;
+    } else if (nVersion == SCRIPT_ADDRESS) {
+        memcpy(&hashBytes, &vchData[0], 20);
+        type = 2;
+        return true;
+    }
+
+    return false;
+}
+
 /** A base58-encoded secret key */
 void CBitcoinSecret::SetSecret(const CSecret& vchSecret, bool fCompressed)
 {

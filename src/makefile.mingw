@@ -246,6 +246,7 @@ obj/rpcblockchain.o \
 obj/rpcassets.o \
 obj/rpcdump.o \
 obj/rpcmining.o \
+obj/rpcmisc.o \
 obj/rpcnet.o \
 obj/rpcrawtransaction.o \
 obj/rpcwallet.o \

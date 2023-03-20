@@ -434,6 +434,31 @@ void UpdateAssetInfoFromTxOutputs(const CTransaction& tx, int nHeight, uint256 b
     }
 }
 
+bool GetAddressIndex(uint160 addressHash, int type,
+                     std::vector<std::pair<CAddressIndexKey, CAmount> > &addressIndex, int start, int end)
+{
+    if (!fAddressIndex)
+        return error("address index not enabled");
+
+    CTxDB txdb;
+    if (!txdb.ReadAddressIndex(addressHash, type, addressIndex, start, end))
+        return error("unable to get txids for address");
+
+    return true;
+}
+
+bool GetAddressIndex(uint160 addressHash, int type, std::string assetName,
+                     std::vector<std::pair<CAddressIndexKey, CAmount> > &addressIndex, int start, int end)
+{
+    if (!fAddressIndex)
+        return error("address index not enabled");
+
+    CTxDB txdb;
+    if (!txdb.ReadAddressIndex(addressHash, type, assetName, addressIndex, start, end))
+        return error("unable to get txids for address");
+
+    return true;
+}
 //
 // END OF FUNCTIONS USED FOR ASSET MANAGEMENT SYSTEM
 //
