@@ -1350,7 +1350,8 @@ static const CRPCCommand vRPCCommands[] =
     { "listassetbalancesbyaddress",   &listassetbalancesbyaddress,   false,  false },
     { "getaddressbalance",      &getaddressbalance,      false,  false },
     { "getaddressdeltas",       &getaddressdeltas,       false,  false },
-    { "getaddressutxos",        &getaddressutxos,        false,  false }
+    { "getaddressutxos",        &getaddressutxos,        false,  false },
+    { "getaddresstxids",        &getaddresstxids,        false,  false }
     /** YAC_ASSET END */
 };
 
@@ -1482,6 +1483,8 @@ Array RPCConvertValues(std::string &strMethod, const std::vector<std::string> &s
     if (strMethod == "getaddressbalance"   && n > 1) ConvertTo<bool>(params[1]); // includeAssets
     if (strMethod == "getaddressdeltas"    && n > 0) ConvertTo<Object>(params[0]); // addresses
     if (strMethod == "getaddressutxos"     && n > 0) ConvertTo<Object>(params[0]); // addresses
+    if (strMethod == "getaddresstxids"     && n > 0) ConvertTo<Object>(params[0]); // addresses
+    if (strMethod == "getaddresstxids"     && n > 1) ConvertTo<bool>(params[1]); // includeAssets
     /** YAC_ASSET END */
 
     return params;

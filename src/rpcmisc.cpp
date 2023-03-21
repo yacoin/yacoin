@@ -443,6 +443,113 @@ Value getaddressutxos(const Array& params, bool fHelp)
     }
 }
 
+Value getaddresstxids(const Array& params, bool fHelp)
+{
+    if (fHelp || params.size() > 2)
+        throw std::runtime_error(
+            "getaddresstxids\n"
+            "\nReturns the txids for an address(es) (requires addressindex to be enabled).\n"
+            "\nArguments:\n"
+            "{\n"
+            "  \"addresses\"\n"
+            "    [\n"
+            "      \"address\"  (string) The base58check encoded address\n"
+            "      ,...\n"
+            "    ]\n"
+            "  \"start\" (number, optional) The start block height\n"
+            "  \"end\" (number, optional) The end block height\n"
+            "},\n"
+            "\"includeAssets\" (boolean, optional, default false)  If true this will return an expanded result which includes asset transactions\n"
+            "\nResult:\n"
+            "[\n"
+            "  \"transactionid\"  (string) The transaction id\n"
+            "  ,...\n"
+            "]\n"
+            "\nExamples:\n"
+            + HelpExampleCli("getaddresstxids", "'{\"addresses\": [\"12c6DSiU4Rq3P4ZxziKxzrL5LmMBrzjrJX\"]}'")
+            + HelpExampleRpc("getaddresstxids", "{\"addresses\": [\"12c6DSiU4Rq3P4ZxziKxzrL5LmMBrzjrJX\"]}")
+            + HelpExampleCli("getaddresstxids", "'{\"addresses\": [\"12c6DSiU4Rq3P4ZxziKxzrL5LmMBrzjrJX\"]}', true")
+            + HelpExampleRpc("getaddresstxids", "{\"addresses\": [\"12c6DSiU4Rq3P4ZxziKxzrL5LmMBrzjrJX\"]}, true")
+        );
+
+    std::vector<std::pair<uint160, int> > addresses;
+
+    if (!getAddressesFromParams(params, addresses)) {
+        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid address");
+    }
+
+    int start = 0;
+    int end = 0;
+    if (params[0].type() == obj_type) {
+        Value startValue = find_value(params[0].get_obj(), "start");
+        Value endValue = find_value(params[0].get_obj(), "end");
+        if (startValue.type() == int_type && endValue.type() == int_type) {
+            start = startValue.get_int();
+            end = endValue.get_int();
+        }
+    }
+
+    bool includeAssets = false;
+    if (params.size() > 1) {
+        includeAssets = params[1].get_bool();
+    }
+
+    if (includeAssets)
+        if (!AreAssetsDeployed())
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Assets aren't active.  includeAssets can't be true.");
+
+    std::vector<std::pair<CAddressIndexKey, CAmount> > addressIndex;
+
+    for (std::vector<std::pair<uint160, int> >::iterator it = addresses.begin(); it != addresses.end(); it++) {
+        if (includeAssets) {
+            if (start > 0 && end > 0) {
+                if (!GetAddressIndex((*it).first, (*it).second, addressIndex, start, end)) {
+                    throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "No information available for address");
+                }
+            } else {
+                if (!GetAddressIndex((*it).first, (*it).second, addressIndex)) {
+                    throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "No information available for address");
+                }
+            }
+        } else {
+            if (start > 0 && end > 0) {
+                if (!GetAddressIndex((*it).first, (*it).second, YAC, addressIndex, start, end)) {
+                    throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "No information available for address");
+                }
+            } else {
+                if (!GetAddressIndex((*it).first, (*it).second, YAC, addressIndex)) {
+                    throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "No information available for address");
+                }
+            }
+        }
+    }
+
+    std::set<std::pair<int, std::string> > txids;
+    Array result;
+
+    for (std::vector<std::pair<CAddressIndexKey, CAmount> >::const_iterator it=addressIndex.begin(); it!=addressIndex.end(); it++) {
+        int height = it->first.blockHeight;
+        std::string txid = it->first.txhash.GetHex();
+
+        if (addresses.size() > 1) {
+            txids.insert(std::make_pair(height, txid));
+        } else {
+            if (txids.insert(std::make_pair(height, txid)).second) {
+                result.push_back(txid);
+            }
+        }
+    }
+
+    if (addresses.size() > 1) {
+        for (std::set<std::pair<int, std::string> >::const_iterator it=txids.begin(); it!=txids.end(); it++) {
+            result.push_back(it->second);
+        }
+    }
+
+    return result;
+
+}
+
 #ifdef _MSC_VER
     #include "msvc_warnings.pop.h"
 #endif

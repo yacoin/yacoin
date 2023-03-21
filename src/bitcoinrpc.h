@@ -286,5 +286,6 @@ extern json_spirit::Value listassetbalancesbyaddress(const json_spirit::Array& p
 extern json_spirit::Value getaddressbalance(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value getaddressdeltas(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value getaddressutxos(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value getaddresstxids(const json_spirit::Array& params, bool fHelp);
 /** YAC_ASSET END */
 #endif
