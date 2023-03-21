@@ -459,6 +459,31 @@ bool GetAddressIndex(uint160 addressHash, int type, std::string assetName,
 
     return true;
 }
+bool GetAddressUnspent(uint160 addressHash, int type, std::string assetName,
+                       std::vector<std::pair<CAddressUnspentKey, CAddressUnspentValue> > &unspentOutputs)
+{
+    if (!fAddressIndex)
+        return error("address index not enabled");
+
+    CTxDB txdb;
+    if (!txdb.ReadAddressUnspentIndex(addressHash, type, assetName, unspentOutputs))
+        return error("unable to get txids for address");
+
+    return true;
+}
+
+bool GetAddressUnspent(uint160 addressHash, int type,
+                       std::vector<std::pair<CAddressUnspentKey, CAddressUnspentValue> > &unspentOutputs)
+{
+    if (!fAddressIndex)
+        return error("address index not enabled");
+
+    CTxDB txdb;
+    if (!txdb.ReadAddressUnspentIndex(addressHash, type, unspentOutputs))
+        return error("unable to get txids for address");
+
+    return true;
+}
 //
 // END OF FUNCTIONS USED FOR ASSET MANAGEMENT SYSTEM
 //

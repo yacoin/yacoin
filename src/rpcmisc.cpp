@@ -76,6 +76,11 @@ bool getAddressFromIndex(const int &type, const uint160 &hash, std::string &addr
     return true;
 }
 
+bool heightSort(std::pair<CAddressUnspentKey, CAddressUnspentValue> a,
+                std::pair<CAddressUnspentKey, CAddressUnspentValue> b) {
+    return a.second.blockHeight < b.second.blockHeight;
+}
+
 Value getaddressbalance(const Array& params, bool fHelp)
 {
     if (fHelp || params.size() > 2)
@@ -100,7 +105,7 @@ Value getaddressbalance(const Array& params, bool fHelp)
             "OR\n"
             "[\n"
             "  {\n"
-            "    \"assetName\"  (string) The asset associated with the balance (RVN for Ravencoin)\n"
+            "    \"assetName\"  (string) The asset associated with the balance (YAC for Yacoin)\n"
             "    \"balance\"  (string) The current balance in satoshis\n"
             "    \"received\"  (string) The total number of satoshis received (including change)\n"
             "  },...\n"
@@ -208,12 +213,12 @@ Value getaddressdeltas(const Array& params, bool fHelp)
             "  \"start\" (number) The start block height\n"
             "  \"end\" (number) The end block height\n"
             "  \"chainInfo\" (boolean) Include chain info in results, only applies if start and end specified\n"
-            "  \"assetName\"   (string, optional) Get deltas for a particular asset instead of RVN.\n"
+            "  \"assetName\"   (string, optional) Get deltas for a particular asset instead of YAC.\n"
             "}\n"
             "\nResult:\n"
             "[\n"
             "  {\n"
-            "    \"assetName\"  (string) The asset associated with the deltas (RVN for Ravencoin)\n"
+            "    \"assetName\"  (string) The asset associated with the deltas (YAC for Yacoin)\n"
             "    \"satoshis\"  (number) The difference of satoshis\n"
             "    \"txid\"  (string) The related txid\n"
             "    \"index\"  (number) The related input or output index\n"
@@ -325,6 +330,116 @@ Value getaddressdeltas(const Array& params, bool fHelp)
         return result;
     } else {
         return deltas;
+    }
+}
+
+Value getaddressutxos(const Array& params, bool fHelp)
+{
+    if (fHelp || params.size() != 1 || params[0].type() != obj_type)
+        throw std::runtime_error(
+            "getaddressutxos\n"
+            "\nReturns all unspent outputs for an address (requires addressindex to be enabled).\n"
+            "\nArguments:\n"
+            "{\n"
+            "  \"addresses\"\n"
+            "    [\n"
+            "      \"address\"  (string) The base58check encoded address\n"
+            "      ,...\n"
+            "    ],\n"
+            "  \"chainInfo\",  (boolean, optional, default false) Include chain info with results\n"
+            "  \"assetName\"   (string, optional) Get UTXOs for a particular asset instead of YAC ('*' for all assets).\n"
+            "}\n"
+            "\nResult\n"
+            "[\n"
+            "  {\n"
+            "    \"address\"  (string) The address base58check encoded\n"
+            "    \"assetName\" (string) The asset associated with the UTXOs (YAC for Yacoin)\n"
+            "    \"txid\"  (string) The output txid\n"
+            "    \"height\"  (number) The block height\n"
+            "    \"outputIndex\"  (number) The output index\n"
+            "    \"script\"  (strin) The script hex encoded\n"
+            "    \"satoshis\"  (number) The number of satoshis of the output\n"
+            "  }\n"
+            "]\n"
+            "\nExamples:\n"
+            + HelpExampleCli("getaddressutxos", "'{\"addresses\": [\"12c6DSiU4Rq3P4ZxziKxzrL5LmMBrzjrJX\"]}'")
+            + HelpExampleRpc("getaddressutxos", "{\"addresses\": [\"12c6DSiU4Rq3P4ZxziKxzrL5LmMBrzjrJX\"]}")
+            + HelpExampleCli("getaddressutxos", "'{\"addresses\": [\"12c6DSiU4Rq3P4ZxziKxzrL5LmMBrzjrJX\"],\"assetName\":\"MY_ASSET\"}'")
+            + HelpExampleRpc("getaddressutxos", "{\"addresses\": [\"12c6DSiU4Rq3P4ZxziKxzrL5LmMBrzjrJX\"],\"assetName\":\"MY_ASSET\"}")
+            );
+
+    bool includeChainInfo = false;
+    std::string assetName = YAC;
+    if (params[0].type() == obj_type) {
+        Value chainInfo = find_value(params[0].get_obj(), "chainInfo");
+        if (chainInfo.type() == bool_type) {
+            includeChainInfo = chainInfo.get_bool();
+        }
+        Value assetNameParam = find_value(params[0].get_obj(), "assetName");
+        if (assetNameParam.type() == str_type) {
+            if (!AreAssetsDeployed())
+                throw JSONRPCError(RPC_INVALID_PARAMETER, "Assets aren't active.  assetName can't be specified.");
+            assetName = assetNameParam.get_str();
+        }
+    }
+
+    std::vector<std::pair<uint160, int> > addresses;
+
+    if (!getAddressesFromParams(params, addresses)) {
+        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid address");
+    }
+
+    std::vector<std::pair<CAddressUnspentKey, CAddressUnspentValue> > unspentOutputs;
+
+    for (std::vector<std::pair<uint160, int> >::iterator it = addresses.begin(); it != addresses.end(); it++) {
+        if (assetName == "*") {
+            if (!GetAddressUnspent((*it).first, (*it).second, unspentOutputs)) {
+                throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "No information available for address");
+            }
+        } else {
+            if (!GetAddressUnspent((*it).first, (*it).second, assetName, unspentOutputs)) {
+                throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "No information available for address");
+            }
+        }
+    }
+
+    std::sort(unspentOutputs.begin(), unspentOutputs.end(), heightSort);
+
+    Array utxos;
+
+    for (std::vector<std::pair<CAddressUnspentKey, CAddressUnspentValue> >::const_iterator it=unspentOutputs.begin(); it!=unspentOutputs.end(); it++) {
+        Object output;
+        std::string address;
+        if (!getAddressFromIndex(it->first.type, it->first.hashBytes, address)) {
+            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Unknown address type");
+        }
+
+        std::string assetNameOut = "YAC";
+        if (assetName != "YAC") {
+            CAmount _amount;
+            if (!GetAssetInfoFromScript(it->second.script, assetNameOut, _amount)) {
+                throw JSONRPCError(RPC_INTERNAL_ERROR, "Couldn't decode asset script");
+            }
+        }
+
+        output.push_back(Pair("address", address));
+        output.push_back(Pair("assetName", assetNameOut));
+        output.push_back(Pair("txid", it->first.txhash.GetHex()));
+        output.push_back(Pair("outputIndex", (int)it->first.index));
+        output.push_back(Pair("script", HexStr(it->second.script.begin(), it->second.script.end())));
+        output.push_back(Pair("satoshis", it->second.satoshis));
+        output.push_back(Pair("height", it->second.blockHeight));
+        utxos.push_back(output);
+    }
+
+    if (includeChainInfo) {
+        Object result;
+        result.push_back(Pair("utxos", utxos));
+        result.push_back(Pair("hash", chainActive.Tip()->GetBlockHash().GetHex()));
+        result.push_back(Pair("height", (int)chainActive.Height()));
+        return result;
+    } else {
+        return utxos;
     }
 }
 
