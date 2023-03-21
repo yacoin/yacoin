@@ -64,6 +64,18 @@ bool getAddressesFromParams(const Array& params, std::vector<std::pair<uint160, 
     return true;
 }
 
+bool getAddressFromIndex(const int &type, const uint160 &hash, std::string &address)
+{
+    if (type == 2) {
+        address = CBitcoinAddress(CScriptID(hash)).ToString();
+    } else if (type == 1) {
+        address = CBitcoinAddress(CKeyID(hash)).ToString();
+    } else {
+        return false;
+    }
+    return true;
+}
+
 Value getaddressbalance(const Array& params, bool fHelp)
 {
     if (fHelp || params.size() > 2)
@@ -178,6 +190,142 @@ Value getaddressbalance(const Array& params, bool fHelp)
         return result;
     }
 
+}
+
+Value getaddressdeltas(const Array& params, bool fHelp)
+{
+    if (fHelp || params.size() != 1 || params[0].type() != obj_type)
+        throw std::runtime_error(
+            "getaddressdeltas\n"
+            "\nReturns all changes for an address (requires addressindex to be enabled).\n"
+            "\nArguments:\n"
+            "{\n"
+            "  \"addresses\"\n"
+            "    [\n"
+            "      \"address\"  (string) The base58check encoded address\n"
+            "      ,...\n"
+            "    ]\n"
+            "  \"start\" (number) The start block height\n"
+            "  \"end\" (number) The end block height\n"
+            "  \"chainInfo\" (boolean) Include chain info in results, only applies if start and end specified\n"
+            "  \"assetName\"   (string, optional) Get deltas for a particular asset instead of RVN.\n"
+            "}\n"
+            "\nResult:\n"
+            "[\n"
+            "  {\n"
+            "    \"assetName\"  (string) The asset associated with the deltas (RVN for Ravencoin)\n"
+            "    \"satoshis\"  (number) The difference of satoshis\n"
+            "    \"txid\"  (string) The related txid\n"
+            "    \"index\"  (number) The related input or output index\n"
+            "    \"height\"  (number) The block height\n"
+            "    \"address\"  (string) The base58check encoded address\n"
+            "  }\n"
+            "]\n"
+            "\nExamples:\n"
+            + HelpExampleCli("getaddressdeltas", "'{\"addresses\": [\"12c6DSiU4Rq3P4ZxziKxzrL5LmMBrzjrJX\"]}'")
+            + HelpExampleRpc("getaddressdeltas", "{\"addresses\": [\"12c6DSiU4Rq3P4ZxziKxzrL5LmMBrzjrJX\"]}")
+            + HelpExampleCli("getaddressdeltas", "'{\"addresses\": [\"12c6DSiU4Rq3P4ZxziKxzrL5LmMBrzjrJX\"],\"assetName\":\"MY_ASSET\"}'")
+            + HelpExampleRpc("getaddressdeltas", "{\"addresses\": [\"12c6DSiU4Rq3P4ZxziKxzrL5LmMBrzjrJX\"],\"assetName\":\"MY_ASSET\"}")
+        );
+
+
+    Value startValue = find_value(params[0].get_obj(), "start");
+    Value endValue = find_value(params[0].get_obj(), "end");
+
+    Value chainInfo = find_value(params[0].get_obj(), "chainInfo");
+    bool includeChainInfo = false;
+    if (chainInfo.type() == bool_type) {
+        includeChainInfo = chainInfo.get_bool();
+    }
+
+    std::string assetName = YAC;
+    Value assetNameParam = find_value(params[0].get_obj(), "assetName");
+    if (assetNameParam.type() == str_type) {
+        if (!AreAssetsDeployed())
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Assets aren't active.  assetName can't be specified.");
+        assetName = assetNameParam.get_str();
+    }
+
+    int start = 0;
+    int end = 0;
+
+    if (startValue.type() == int_type && endValue.type() == int_type) {
+        start = startValue.get_int();
+        end = endValue.get_int();
+        if (start <= 0 || end <= 0) {
+            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Start and end is expected to be greater than zero");
+        }
+        if (end < start) {
+            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "End value is expected to be greater than start");
+        }
+    }
+
+    std::vector<std::pair<uint160, int> > addresses;
+
+    if (!getAddressesFromParams(params, addresses)) {
+        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid address");
+    }
+
+    std::vector<std::pair<CAddressIndexKey, CAmount> > addressIndex;
+
+    for (std::vector<std::pair<uint160, int> >::iterator it = addresses.begin(); it != addresses.end(); it++) {
+        if (start > 0 && end > 0) {
+            if (!GetAddressIndex((*it).first, (*it).second, assetName, addressIndex, start, end)) {
+                throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "No information available for address");
+            }
+        } else {
+            if (!GetAddressIndex((*it).first, (*it).second, assetName, addressIndex)) {
+                throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "No information available for address");
+            }
+        }
+    }
+
+    Array deltas;
+
+    for (std::vector<std::pair<CAddressIndexKey, CAmount> >::const_iterator it=addressIndex.begin(); it!=addressIndex.end(); it++) {
+        std::string address;
+        if (!getAddressFromIndex(it->first.type, it->first.hashBytes, address)) {
+            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Unknown address type");
+        }
+
+        Object delta;
+        delta.push_back(Pair("assetName", it->first.asset));
+        delta.push_back(Pair("satoshis", it->second));
+        delta.push_back(Pair("txid", it->first.txhash.GetHex()));
+        delta.push_back(Pair("index", (int)it->first.index));
+        delta.push_back(Pair("blockindex", (int)it->first.txindex));
+        delta.push_back(Pair("height", it->first.blockHeight));
+        delta.push_back(Pair("address", address));
+        deltas.push_back(delta);
+    }
+
+    Object result;
+
+    if (includeChainInfo && start > 0 && end > 0) {
+        if (start > chainActive.Height() || end > chainActive.Height()) {
+            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Start or end is outside chain range");
+        }
+
+        CBlockIndex* startIndex = chainActive[start];
+        CBlockIndex* endIndex = chainActive[end];
+
+        Object startInfo;
+        Object endInfo;
+
+        startInfo.push_back(Pair("hash", startIndex->GetBlockHash().GetHex()));
+        startInfo.push_back(Pair("height", start));
+
+        endInfo.push_back(Pair("hash", endIndex->GetBlockHash().GetHex()));
+        endInfo.push_back(Pair("height", end));
+
+        result.push_back(Pair("deltas", deltas));
+        result.push_back(Pair("start", startInfo));
+        result.push_back(Pair("end", endInfo));
+
+        return result;
+    } else {
+        return deltas;
+    }
 }
 
 #ifdef _MSC_VER
