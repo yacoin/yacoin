@@ -60,8 +60,13 @@ std::map<uint256, std::string> mapReissuedTx;
 std::map<std::string, uint256> mapReissuedTokens;
 
 // Fee lock amount and Fee lock duration
+#ifndef LOW_DIFFICULTY_FOR_DEVELOPMENT
 static const uint32_t feeLockDuration = 21000; // 21000 blocks
-static const CAmount feeLockAmount = 21000 * COIN; // 21000 YAC
+static const CAmount feeLockAmount = 21000 * COIN; // 21000 YAC (YA-token: 21000 YAC, Sub-token: 4200 YAC, Unique-token: 210 YAC)
+#else
+static const uint32_t feeLockDuration = 10; // 10 blocks
+static const CAmount feeLockAmount = 50 * COIN; // 50 YAC (YA-token: 50 YAC, Sub-token: 10 YAC, Unique-token: 5 YAC)
+#endif
 
 // excluding owner tag ('!')
 static const auto MAX_NAME_LENGTH = 31;
@@ -2312,7 +2317,11 @@ CAmount GetIssueSubTokenLockAmount()
 
 CAmount GetIssueUniqueTokenLockAmount()
 {
+#ifndef LOW_DIFFICULTY_FOR_DEVELOPMENT
     return feeLockAmount / 100;
+#else
+    return feeLockAmount / 10;
+#endif
 }
 
 CAmount GetLockAmount(const int nType)
