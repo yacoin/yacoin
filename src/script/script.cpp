@@ -2106,7 +2106,7 @@ bool ExtractLockDuration(const CScript& scriptPubKey, uint32_t& lockDuration)
         return false;
     }
 
-    lockDuration = CScriptNum(vch).getint();
+    lockDuration = CScriptNum(vch).getuint();
     return true;
 }
 
@@ -2647,7 +2647,7 @@ void CScript::SetMultisig(int nRequired, const std::vector<CKey>& keys)
     *this << EncodeOP_N((int)(keys.size())) << OP_CHECKMULTISIG;
 }
 
-void CScript::SetCltvP2SH(int nLockTime, const CPubKey& pubKey)
+void CScript::SetCltvP2SH(uint32_t nLockTime, const CPubKey& pubKey)
 {
     this->clear();
 
@@ -2656,7 +2656,7 @@ void CScript::SetCltvP2SH(int nLockTime, const CPubKey& pubKey)
 	*this << pubKey << OP_CHECKSIG;
 }
 
-void CScript::SetCltvP2PKH(int nLockTime, const CKeyID &keyID)
+void CScript::SetCltvP2PKH(uint32_t nLockTime, const CKeyID &keyID)
 {
     this->clear();
 

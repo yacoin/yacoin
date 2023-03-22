@@ -1218,7 +1218,7 @@ Value createcltvaddress(const Array& params, bool fHelp)
         throw JSONRPCError(RPC_WALLET_KEYPOOL_RAN_OUT, "Error: Keypool ran out, please call keypoolrefill first");
 
     // Get lock time
-    int nLockTime = params[0].get_int();
+    uint32_t nLockTime = params[0].get_int64();
 
     string strAccount;
     if (params.size() > 1)
@@ -1276,7 +1276,7 @@ Value createcsvaddress(const Array& params, bool fHelp)
         throw runtime_error("Error: Keypool ran out, please call keypoolrefill first");
 
     // Get lock time
-    ::uint32_t nLockTime = params[0].get_int();
+    ::uint32_t nLockTime = params[0].get_int64();
     if (nLockTime < 1 || nLockTime > CTxIn::SEQUENCE_LOCKTIME_MASK)
         throw runtime_error("<lock_time> must be between 1 and 1073741823");
 

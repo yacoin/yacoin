@@ -136,6 +136,15 @@ public:
         return m_value;
     }
 
+    uint32_t getuint() const
+    {
+        if (m_value > std::numeric_limits<uint32_t>::max())
+            return std::numeric_limits<uint32_t>::max();
+        else if (m_value < std::numeric_limits<uint32_t>::min())
+            return std::numeric_limits<uint32_t>::min();
+        return m_value;
+    }
+
     std::vector<unsigned char> getvch() const
     {
         return serialize(m_value);
@@ -774,8 +783,8 @@ public:
 
     void SetDestination(const CTxDestination& address);
     void SetMultisig(int nRequired, const std::vector<CKey>& keys);
-    void SetCltvP2SH(int nLockTime, const CPubKey& pubKey);
-    void SetCltvP2PKH(int nLockTime, const CKeyID &keyID);
+    void SetCltvP2SH(uint32_t nLockTime, const CPubKey& pubKey);
+    void SetCltvP2PKH(uint32_t nLockTime, const CKeyID &keyID);
     void SetCsvP2SH(::uint32_t nSequence, const CPubKey& pubKey);
     void SetCsvP2PKH(::uint32_t nSequence, const CKeyID &keyID);
 

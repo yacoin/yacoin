@@ -2805,11 +2805,11 @@ bool CWallet::CreateTransactionAll(
                         if (isSpendableCltv)
                         {
                             nSequenceIn = 0;
-                            wtxNew.nLockTime = CScriptNum(vch).getint();
+                            wtxNew.nLockTime = CScriptNum(vch).getuint();
                         }
                         else //isSpendableCsv
                         {
-                            nSequenceIn = CScriptNum(vch).getint();
+                            nSequenceIn = CScriptNum(vch).getuint();
                         }
 
                     }
