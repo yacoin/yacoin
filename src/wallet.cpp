@@ -1539,7 +1539,7 @@ int64_t CWallet::GetImmatureWatchOnlyBalance() const
 void CWallet::AvailableCoins(std::vector<COutput>& vCoins, bool fOnlySafe,
                              const CCoinControl* coinControl,
                              const CScript* fromScriptPubKey,
-                             bool fCountCltvOrCsv,
+                             bool useLockTimeUTXO,
                              const CAmount& nMinimumAmount,
                              const CAmount& nMaximumAmount,
                              const CAmount& nMinimumSumAmount,
@@ -1548,7 +1548,7 @@ void CWallet::AvailableCoins(std::vector<COutput>& vCoins, bool fOnlySafe,
 {
   std::map<std::string, std::vector<COutput> > mapAssetCoins;
   AvailableCoinsAll(vCoins, mapAssetCoins, true, false, fOnlySafe, coinControl,
-                    fromScriptPubKey, fCountCltvOrCsv, nMinimumAmount,
+                    fromScriptPubKey, useLockTimeUTXO, nMinimumAmount,
                     nMaximumAmount, nMinimumSumAmount, nMaximumCount, nMinDepth,
                     nMaxDepth);
 }
@@ -1572,13 +1572,14 @@ void CWallet::AvailableAssets(
 void CWallet::AvailableCoinsWithAssets(
     std::vector<COutput>& vCoins,
     std::map<std::string, std::vector<COutput> >& mapAssetCoins, bool fOnlySafe,
-    const CCoinControl* coinControl, const CAmount& nMinimumAmount,
+    const CCoinControl* coinControl, const CScript *fromScriptPubKey,
+    bool useLockTimeUTXO, const CAmount& nMinimumAmount,
     const CAmount& nMaximumAmount, const CAmount& nMinimumSumAmount,
     const uint64_t& nMaximumCount, const int& nMinDepth,
     const int& nMaxDepth) const
 {
   AvailableCoinsAll(vCoins, mapAssetCoins, true, AreAssetsDeployed(), fOnlySafe,
-                    coinControl, NULL, false, nMinimumAmount, nMaximumAmount,
+                    coinControl, fromScriptPubKey, useLockTimeUTXO, nMinimumAmount, nMaximumAmount,
                     nMinimumSumAmount, nMaximumCount, nMinDepth, nMaxDepth);
 }
 
@@ -1586,7 +1587,7 @@ void CWallet::AvailableCoinsAll(
     std::vector<COutput>& vCoins,
     std::map<std::string, std::vector<COutput> >& mapAssetCoins, bool fGetYAC,
     bool fGetAssets, bool fOnlySafe, const CCoinControl* coinControl,
-    const CScript* fromScriptPubKey, bool fCountCltvOrCsv,
+    const CScript* fromScriptPubKey, bool useLockTimeUTXO,
     const CAmount& nMinimumAmount, const CAmount& nMaximumAmount,
     const CAmount& nMinimumSumAmount, const uint64_t& nMaximumCount,
     const int& nMinDepth, const int& nMaxDepth) const
@@ -1752,19 +1753,20 @@ void CWallet::AvailableCoinsAll(
             if (fYACLimitHit) // We hit our limit
                 continue;
 
-            // Check if the UTXO is locked by OP_CHECKLOCKTIMEVERIFY or
-            // OP_CHECKSEQUENCEVERIFY fCountCltvOrCsv = true => need to count all
+            // Check if the UTXO is locked by OP_CHECKLOCKTIMEVERIFY or OP_CHECKSEQUENCEVERIFY
+            // useLockTimeUTXO = true => can use any lock time UTXO
             // locked UTXO fromScriptPubKey = NULL => Don't select locked coin
             // fromScriptPubKey != NULL => only choose coin from this script
-            bool isSpendableCltvOrCsv = IsSpendableCltvUTXO(pcoin->vout[i]) |
-                                        IsSpendableCsvUTXO(pcoin->vout[i]);
-            if (isSpendableCltvOrCsv && !fCountCltvOrCsv &&
+            txnouttype utxoType = TX_NONSTANDARD;
+            uint32_t lockDuration = 0;
+            bool isSpendableTimelockUTXO = IsSpendableTimelockUTXO(pcoin->vout[i], utxoType, lockDuration);
+            if (isSpendableTimelockUTXO && !useLockTimeUTXO &&
                 (!fromScriptPubKey ||
                  (fromScriptPubKey &&
                   pcoin->vout[i].scriptPubKey != *fromScriptPubKey))) {
               continue;
             }
-            if (!isSpendableCltvOrCsv && fromScriptPubKey &&
+            if (!isSpendableTimelockUTXO && fromScriptPubKey &&
                 pcoin->vout[i].scriptPubKey != *fromScriptPubKey) {
               continue;
             }
@@ -2411,7 +2413,7 @@ bool CWallet::CreateTransactionWithAssets(
    */
   return CreateTransactionAll(vecSend, wtxNew, reservekey, nFeeRet,
                               nChangePosInOut, strFailReason, coinControl,
-                              NULL, true, assets, destination, false, false,
+                              NULL, false, true, assets, destination, false, false,
                               reissueAsset, type);
 }
 
@@ -2437,7 +2439,7 @@ bool CWallet::CreateTransactionWithTransferAsset(
  */
   return CreateTransactionAll(vecSend, wtxNew, reservekey, nFeeRet,
                               nChangePosInOut, strFailReason, coinControl,
-                              NULL, false, asset, destination, true, false,
+                              NULL, false, false, asset, destination, true, false,
                               reissueAsset, assetType);
 }
 
@@ -2462,7 +2464,7 @@ bool CWallet::CreateTransactionWithReissueAsset(
    */
   return CreateTransactionAll(vecSend, wtxNew, reservekey, nFeeRet,
                               nChangePosInOut, strFailReason, coinControl,
-                              NULL, false, asset, destination, false, true,
+                              NULL, false, false, asset, destination, false, true,
                               reissueAsset, assetType);
 }
 
@@ -2488,32 +2490,34 @@ bool CWallet::CreateTransaction(CScript scriptPubKey, ::int64_t nValue,
         CWalletTx &wtxNew, CReserveKey &reservekey, CAmount &nFeeRet,
         int &nChangePosInOut, std::string &strFailReason,
         const CCoinControl &coinControl,
-        const CScript *fromScriptPubKey)
+        const CScript *fromScriptPubKey,
+        bool useLockTimeUTXO)
 {
     vector<CRecipient> vecSend;
     CRecipient recipient = {scriptPubKey, nValue, false};
     vecSend.push_back(recipient);
-    return CreateTransaction(vecSend, wtxNew, reservekey, nFeeRet, nChangePosInOut, strFailReason, coinControl, fromScriptPubKey);
+    return CreateTransaction(vecSend, wtxNew, reservekey, nFeeRet, nChangePosInOut, strFailReason, coinControl, fromScriptPubKey, useLockTimeUTXO);
 }
 
 bool CWallet::CreateTransaction(const std::vector<CRecipient> &vecSend,
         CWalletTx &wtxNew, CReserveKey &reservekey, CAmount &nFeeRet,
         int &nChangePosInOut, std::string &strFailReason,
         const CCoinControl &coinControl,
-        const CScript *fromScriptPubKey)
+        const CScript *fromScriptPubKey,
+        bool useLockTimeUTXO)
 {
     CNewAsset asset;
     CReissueAsset reissueAsset;
     CTxDestination destination;
     AssetType assetType = AssetType::INVALID;
-    return CreateTransactionAll(vecSend, wtxNew, reservekey, nFeeRet, nChangePosInOut, strFailReason, coinControl, fromScriptPubKey, false,  asset, destination, false, false, reissueAsset, assetType);
+    return CreateTransactionAll(vecSend, wtxNew, reservekey, nFeeRet, nChangePosInOut, strFailReason, coinControl, fromScriptPubKey, useLockTimeUTXO, false, asset, destination, false, false, reissueAsset, assetType);
 }
 
 bool CWallet::CreateTransactionAll(
     const std::vector<CRecipient>& vecSend, CWalletTx& wtxNew,
     CReserveKey& reservekey, CAmount& nFeeRet, int& nChangePosInOut,
     std::string& strFailReason, const CCoinControl& coinControl,
-    const CScript* fromScriptPubKey, bool fNewAsset,
+    const CScript* fromScriptPubKey, bool useLockTimeUTXO, bool fNewAsset,
     const CNewAsset& asset, const CTxDestination destination,
     bool fTransferAsset, bool fReissueAsset,
     const CReissueAsset& reissueAsset, const AssetType& assetType)
@@ -2522,7 +2526,7 @@ bool CWallet::CreateTransactionAll(
     assets.push_back(asset);
     return CreateTransactionAll(
         vecSend, wtxNew, reservekey, nFeeRet, nChangePosInOut, strFailReason,
-        coinControl, fromScriptPubKey, fNewAsset, assets, destination,
+        coinControl, fromScriptPubKey, useLockTimeUTXO, fNewAsset, assets, destination,
         fTransferAsset, fReissueAsset, reissueAsset, assetType);
 }
 
@@ -2530,7 +2534,7 @@ bool CWallet::CreateTransactionAll(
     const std::vector<CRecipient>& vecSend, CWalletTx& wtxNew,
     CReserveKey& reservekey, CAmount& nFeeRet, int& nChangePosInOut,
     std::string& strFailReason, const CCoinControl& coinControl,
-    const CScript* fromScriptPubKey, bool fNewAsset,
+    const CScript* fromScriptPubKey, bool useLockTimeUTXO, bool fNewAsset,
     const std::vector<CNewAsset> assets, const CTxDestination destination,
     bool fTransferAsset, bool fReissueAsset,
     const CReissueAsset& reissueAsset, const AssetType& assetType)
@@ -2606,9 +2610,9 @@ bool CWallet::CreateTransactionAll(
             std::map<std::string, std::vector<COutput> > mapAssetCoins;
 
             if (fTransferAsset || fReissueAsset || assetType == AssetType::SUB || assetType == AssetType::UNIQUE)
-                AvailableCoinsWithAssets(vAvailableCoins, mapAssetCoins, true, &coinControl);
+                AvailableCoinsWithAssets(vAvailableCoins, mapAssetCoins, true, &coinControl, fromScriptPubKey, useLockTimeUTXO);
             else
-                AvailableCoins(vAvailableCoins, true, &coinControl, fromScriptPubKey);
+                AvailableCoins(vAvailableCoins, true, &coinControl, fromScriptPubKey, useLockTimeUTXO);
             /** YAC_ASSET END */
 
             // Create change script that will be used if we need change
@@ -2775,44 +2779,29 @@ bool CWallet::CreateTransactionAll(
                     // In order nLockTime and OP_CHECKLOCKTIMEVERIFY can work, set nSequence to another value which different with maxint
                     unsigned int nSequenceIn = CTxIn::SEQUENCE_FINAL;
                     const CTxOut& txout = coin.txout;
-                    bool isSpendableCltv = IsSpendableCltvUTXO(txout);
-                    bool isSpendableCsv = IsSpendableCsvUTXO(txout);
+                    txnouttype utxoType = TX_NONSTANDARD;
+                    uint32_t lockDuration = 0;
 
-                    if (isSpendableCltv || isSpendableCsv)
+                    if (IsSpendableTimelockUTXO(txout, utxoType, lockDuration))
                     {
-                        // Get redeemscript
-                        CTxDestination tmpAddr;
-                        CScript redeemScript;
-                        if (ExtractDestination(txout.scriptPubKey, tmpAddr))
+                        switch (utxoType)
                         {
-                            const CScriptID& hash = boost::get<CScriptID>(tmpAddr);
-                            if (!GetCScript(hash, redeemScript))
-                            {
-                                printf("CWallet::CreateTransaction, wallet doesn't manage redeemscript of this address\n");
-                                return false;
-                            }
-                        }
-
-                        // Scan information from redeemscript to get nSequence
-                        CScript::const_iterator pc = redeemScript.begin();
-                        opcodetype opcode;
-                        vector<unsigned char> vch;
-                        if (!redeemScript.GetOp(pc, opcode, vch))
-                        {
-                            printf("CWallet::CreateTransaction, Wallet can't get lock time from redeemscript\n");
-                        }
-
-                        if (isSpendableCltv)
+                        case TX_CLTV_P2SH:
+                        case TX_CLTV_P2PKH:
                         {
                             nSequenceIn = 0;
-                            wtxNew.nLockTime = CScriptNum(vch).getuint();
+                            wtxNew.nLockTime = lockDuration;
+                            break;
                         }
-                        else //isSpendableCsv
+                        case TX_CSV_P2SH:
+                        case TX_CSV_P2PKH:
                         {
-                            nSequenceIn = CScriptNum(vch).getuint();
+                            nSequenceIn = lockDuration;
+                            break;
                         }
-
+                        }
                     }
+
                     wtxNew.vin.push_back(
                             CTxIn(coin.outpoint, CScript(), nSequenceIn));
                 }
@@ -3157,7 +3146,7 @@ bool CWallet::CommitTransaction(CWalletTx& wtxNew, CReserveKey& reservekey)
 
 
 
-string CWallet::SendMoney(CScript scriptPubKey, int64_t nValue, CWalletTx& wtxNew, bool fAskFee, const CScript* fromScriptPubKey)
+string CWallet::SendMoney(CScript scriptPubKey, int64_t nValue, CWalletTx& wtxNew, bool fAskFee, const CScript* fromScriptPubKey, bool useLockTimeUTXO)
 {
     CReserveKey reservekey(this);
     int64_t nFeeRequired;
@@ -3178,7 +3167,7 @@ string CWallet::SendMoney(CScript scriptPubKey, int64_t nValue, CWalletTx& wtxNe
     int nChangePosInOut = -1;
     std::string strFailReason;
     CCoinControl coinControl;
-    if (!CreateTransaction(scriptPubKey, nValue, wtxNew, reservekey, nFeeRequired, nChangePosInOut, strFailReason, coinControl, fromScriptPubKey))
+    if (!CreateTransaction(scriptPubKey, nValue, wtxNew, reservekey, nFeeRequired, nChangePosInOut, strFailReason, coinControl, fromScriptPubKey, useLockTimeUTXO))
     {
         string strError;
         if (nValue + nFeeRequired > GetBalance())
@@ -3200,7 +3189,7 @@ string CWallet::SendMoney(CScript scriptPubKey, int64_t nValue, CWalletTx& wtxNe
 
 
 
-string CWallet::SendMoneyToDestination(const CTxDestination& address, int64_t nValue, CWalletTx& wtxNew, bool fAskFee, const CScript* fromScriptPubKey)
+string CWallet::SendMoneyToDestination(const CTxDestination& address, int64_t nValue, CWalletTx& wtxNew, bool fAskFee, const CScript* fromScriptPubKey, bool useLockTimeUTXO)
 {
     // Check amount
     if (nValue <= 0)
@@ -3212,7 +3201,7 @@ string CWallet::SendMoneyToDestination(const CTxDestination& address, int64_t nV
     CScript scriptPubKey;
     scriptPubKey.SetDestination(address);
 
-    return SendMoney(scriptPubKey, nValue, wtxNew, fAskFee, fromScriptPubKey);
+    return SendMoney(scriptPubKey, nValue, wtxNew, fAskFee, fromScriptPubKey, useLockTimeUTXO);
 }
 
 

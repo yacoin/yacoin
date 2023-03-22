@@ -196,7 +196,7 @@ public:
     void AvailableCoins(std::vector<COutput> &vCoins, bool fOnlySafe = true,
             const CCoinControl *coinControl = NULL,
             const CScript *fromScriptPubKey = NULL,
-            bool fCountCltvOrCsv = false, const CAmount &nMinimumAmount = 1,
+            bool useLockTimeUTXO = false, const CAmount &nMinimumAmount = 1,
             const CAmount &nMaximumAmount = MAX_MONEY,
             const CAmount &nMinimumSumAmount = MAX_MONEY,
             const uint64_t nMaximumCount = 0, const int nMinDepth = 0,
@@ -222,6 +222,7 @@ public:
         std::vector<COutput>& vCoins,
         std::map<std::string, std::vector<COutput> >& mapAssetCoins,
         bool fOnlySafe = true, const CCoinControl* coinControl = nullptr,
+        const CScript *fromScriptPubKey = NULL, bool useLockTimeUTXO = false,
         const CAmount& nMinimumAmount = 1,
         const CAmount& nMaximumAmount = MAX_MONEY,
         const CAmount& nMinimumSumAmount = MAX_MONEY,
@@ -236,7 +237,7 @@ public:
             bool fGetYAC = true, bool fGetAssets = false,
             bool fOnlySafe = true, const CCoinControl *coinControl = nullptr,
             const CScript *fromScriptPubKey = NULL,
-            bool fCountCltvOrCsv = false, const CAmount &nMinimumAmount = 1,
+            bool useLockTimeUTXO = false, const CAmount &nMinimumAmount = 1,
             const CAmount &nMaximumAmount = MAX_MONEY,
             const CAmount &nMinimumSumAmount = MAX_MONEY,
             const uint64_t &nMaximumCount = 0, const int &nMinDepth = 0,
@@ -333,19 +334,21 @@ public:
             CWalletTx &wtxNew, CReserveKey &reservekey, CAmount &nFeeRet,
             int &nChangePosInOut, std::string &strFailReason,
             const CCoinControl &coinControl,
-            const CScript *fromScriptPubKey = NULL);
+            const CScript *fromScriptPubKey = NULL,
+            bool useLockTimeUTXO = false);
 
     bool CreateTransaction(const std::vector<CRecipient> &vecSend,
             CWalletTx &wtxNew, CReserveKey &reservekey, CAmount &nFeeRet,
             int &nChangePosInOut, std::string &strFailReason,
             const CCoinControl &coinControl,
-            const CScript *fromScriptPubKey = NULL);
+            const CScript *fromScriptPubKey = NULL,
+            bool useLockTimeUTXO = false);
 
     bool CreateTransactionAll(
         const std::vector<CRecipient>& vecSend, CWalletTx& wtxNew,
         CReserveKey& reservekey, CAmount& nFeeRet, int& nChangePosInOut,
         std::string& strFailReason, const CCoinControl& coinControl,
-        const CScript* fromScriptPubKey, bool fNewAsset,
+        const CScript* fromScriptPubKey, bool useLockTimeUTXO, bool fNewAsset,
         const CNewAsset& asset, const CTxDestination destination,
         bool fTransferAsset, bool fReissueAsset,
         const CReissueAsset& reissueAsset, const AssetType& assetType);
@@ -354,7 +357,7 @@ public:
         const std::vector<CRecipient>& vecSend, CWalletTx& wtxNew,
         CReserveKey& reservekey, CAmount& nFeeRet, int& nChangePosInOut,
         std::string& strFailReason, const CCoinControl& coinControl,
-        const CScript* fromScriptPubKey, bool fNewAsset,
+        const CScript* fromScriptPubKey, bool useLockTimeUTXO, bool fNewAsset,
         const std::vector<CNewAsset> assets, const CTxDestination destination,
         bool fTransferAsset, bool fReissueAsset,
         const CReissueAsset& reissueAsset, const AssetType& assetType);
@@ -388,8 +391,8 @@ public:
     void GetStakeWeightFromValue(const ::int64_t& nTime, const ::int64_t& nValue, ::uint64_t& nWeight);
     bool MergeCoins(const ::int64_t& nAmount, const ::int64_t& nMinValue, const ::int64_t& nMaxValue, std::list<uint256>& listMerged);
 
-    std::string SendMoney(CScript scriptPubKey, ::int64_t nValue, CWalletTx& wtxNew, bool fAskFee=false, const CScript* fromScriptPubKey=NULL);
-    std::string SendMoneyToDestination(const CTxDestination &address, ::int64_t nValue, CWalletTx& wtxNew, bool fAskFee=false, const CScript* fromScriptPubKey=NULL);
+    std::string SendMoney(CScript scriptPubKey, ::int64_t nValue, CWalletTx& wtxNew, bool fAskFee=false, const CScript* fromScriptPubKey=NULL, bool useLockTimeUTXO = false);
+    std::string SendMoneyToDestination(const CTxDestination &address, ::int64_t nValue, CWalletTx& wtxNew, bool fAskFee=false, const CScript* fromScriptPubKey=NULL, bool useLockTimeUTXO = false);
 
     bool NewKeyPool(unsigned int nSize = 0);
     bool TopUpKeyPool(unsigned int nSize = 0);
@@ -410,13 +413,9 @@ public:
     {
         return ::IsMine(*this, txout.scriptPubKey);
     }
-    bool IsSpendableCltvUTXO(const CTxOut& txout) const
+    bool IsSpendableTimelockUTXO(const CTxOut& txout, txnouttype& retType, uint32_t& retLockDur) const
     {
-        return ::IsSpendableCltvUTXO(*this, txout.scriptPubKey);
-    }
-    bool IsSpendableCsvUTXO(const CTxOut& txout) const
-    {
-        return ::IsSpendableCsvUTXO(*this, txout.scriptPubKey);
+        return ::IsSpendableTimelockUTXO(*this, txout.scriptPubKey, retType, retLockDur);
     }
     ::int64_t GetCredit(const CTxOut& txout, const isminefilter& filter) const
     {

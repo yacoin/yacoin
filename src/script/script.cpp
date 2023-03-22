@@ -1903,8 +1903,8 @@ isminetype IsMine(const CKeyStore &keystore, const CTxDestination& dest)
     return IsMine(keystore, script);
 }
 
-bool IsSpendableCltvUTXO(const CKeyStore &keystore,
-		const CScript &scriptPubKey)
+bool IsSpendableTimelockUTXO(const CKeyStore &keystore,
+		const CScript &scriptPubKey, txnouttype& retType, uint32_t& retLockDur)
 {
 	vector<valtype> vSolutions;
 	txnouttype whichType;
@@ -1920,13 +1920,19 @@ bool IsSpendableCltvUTXO(const CKeyStore &keystore,
 		CScript subscript;
 		if (keystore.GetCScript(scriptID, subscript))
 		{
-			return IsSpendableCltvUTXO(keystore, subscript);
+			return IsSpendableTimelockUTXO(keystore, subscript, retType, retLockDur);
 		}
 		break;
 	}
 	case TX_CLTV_P2SH:
+	case TX_CSV_P2SH:
 	{
 		CKeyID keyID = CPubKey(vSolutions[0]).GetID();
+		retType = whichType;
+	    if (!ExtractLockDuration(scriptPubKey, retLockDur))
+	    {
+	        printf("IsSpendableTimelockUTXO(), Can't get lock duration from scriptPubKey\n");
+	    }
 		if (keystore.HaveKey(keyID))
 		{
 			return true;
@@ -1934,8 +1940,14 @@ bool IsSpendableCltvUTXO(const CKeyStore &keystore,
 		break;
 	}
     case TX_CLTV_P2PKH:
+    case TX_CSV_P2PKH:
     {
         CKeyID keyID = CKeyID(uint160(vSolutions[0]));
+        retType = whichType;
+        if (!ExtractLockDuration(scriptPubKey, retLockDur))
+        {
+            printf("IsSpendableTimelockUTXO(), Can't get lock duration from scriptPubKey\n");
+        }
         if (keystore.HaveKey(keyID))
         {
             return true;
@@ -1945,50 +1957,6 @@ bool IsSpendableCltvUTXO(const CKeyStore &keystore,
 	}
 
 	return false;
-}
-
-bool IsSpendableCsvUTXO(const CKeyStore &keystore,
-        const CScript &scriptPubKey)
-{
-    vector<valtype> vSolutions;
-    txnouttype whichType;
-    if (!Solver(scriptPubKey, whichType, vSolutions)) {
-        return false;
-    }
-
-    switch (whichType)
-    {
-    case TX_SCRIPTHASH:
-    {
-        CScriptID scriptID = CScriptID(uint160(vSolutions[0]));
-        CScript subscript;
-        if (keystore.GetCScript(scriptID, subscript))
-        {
-            return IsSpendableCsvUTXO(keystore, subscript);
-        }
-        break;
-    }
-    case TX_CSV_P2SH:
-    {
-        CKeyID keyID = CPubKey(vSolutions[0]).GetID();
-        if (keystore.HaveKey(keyID))
-        {
-            return true;
-        }
-        break;
-    }
-    case TX_CSV_P2PKH:
-    {
-        CKeyID keyID = CKeyID(uint160(vSolutions[0]));
-        if (keystore.HaveKey(keyID))
-        {
-            return true;
-        }
-        break;
-    }
-    }
-
-    return false;
 }
 
 isminetype IsMine(const CKeyStore &keystore, const CScript& scriptPubKey)
