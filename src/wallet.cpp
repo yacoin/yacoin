@@ -1760,6 +1760,7 @@ void CWallet::AvailableCoinsAll(
             txnouttype utxoType = TX_NONSTANDARD;
             uint32_t lockDuration = 0;
             bool isSpendableTimelockUTXO = IsSpendableTimelockUTXO(pcoin->vout[i], utxoType, lockDuration);
+
             if (isSpendableTimelockUTXO && !useLockTimeUTXO &&
                 (!fromScriptPubKey ||
                  (fromScriptPubKey &&
@@ -1769,6 +1770,41 @@ void CWallet::AvailableCoinsAll(
             if (!isSpendableTimelockUTXO && fromScriptPubKey &&
                 pcoin->vout[i].scriptPubKey != *fromScriptPubKey) {
               continue;
+            }
+
+            // Only add timelock UTXO if the timelock already expired
+            if (isSpendableTimelockUTXO)
+            {
+                CWalletTx tempWalletTx;
+                tempWalletTx.fTimeReceivedIsTxTime = true;
+                tempWalletTx.vin.clear();
+                tempWalletTx.vout.clear();
+                tempWalletTx.fFromMe = true;
+                CInputCoin inputCoin(pcoin, i);
+                unsigned int nSequenceIn = CTxIn::SEQUENCE_FINAL;
+                switch (utxoType)
+                {
+                    case TX_CLTV_P2SH:
+                    case TX_CLTV_P2PKH:
+                    {
+                        nSequenceIn = 0;
+                        tempWalletTx.nLockTime = lockDuration;
+                        break;
+                    }
+                    case TX_CSV_P2SH:
+                    case TX_CSV_P2PKH:
+                    {
+                        nSequenceIn = lockDuration;
+                        break;
+                    }
+                }
+                tempWalletTx.vin.push_back(CTxIn(inputCoin.outpoint, CScript(), nSequenceIn));
+
+                // Check if nLockTime and BIP68 sequence locked satisfy
+                if (!tempWalletTx.IsFinal() || !CheckSequenceLocks(tempWalletTx, STANDARD_LOCKTIME_VERIFY_FLAGS))
+                {
+                    continue;
+                }
             }
 
             vCoins.push_back(COutput(pcoin, i, nDepth, fSpendableIn, safeTx));
@@ -2413,7 +2449,7 @@ bool CWallet::CreateTransactionWithAssets(
    */
   return CreateTransactionAll(vecSend, wtxNew, reservekey, nFeeRet,
                               nChangePosInOut, strFailReason, coinControl,
-                              NULL, false, true, assets, destination, false, false,
+                              NULL, true, true, assets, destination, false, false,
                               reissueAsset, type);
 }
 
@@ -2439,7 +2475,7 @@ bool CWallet::CreateTransactionWithTransferAsset(
  */
   return CreateTransactionAll(vecSend, wtxNew, reservekey, nFeeRet,
                               nChangePosInOut, strFailReason, coinControl,
-                              NULL, false, false, asset, destination, true, false,
+                              NULL, true, false, asset, destination, true, false,
                               reissueAsset, assetType);
 }
 
@@ -2464,7 +2500,7 @@ bool CWallet::CreateTransactionWithReissueAsset(
    */
   return CreateTransactionAll(vecSend, wtxNew, reservekey, nFeeRet,
                               nChangePosInOut, strFailReason, coinControl,
-                              NULL, false, false, asset, destination, false, true,
+                              NULL, true, false, asset, destination, false, true,
                               reissueAsset, assetType);
 }
 

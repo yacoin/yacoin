@@ -1392,7 +1392,8 @@ Array RPCConvertValues(std::string &strMethod, const std::vector<std::string> &s
     if (strMethod == "getaddednodeinfo"       && n > 0) ConvertTo<bool>(params[0]);
     if (strMethod == "setgenerate"            && n > 0) ConvertTo<bool>(params[0]);
     if (strMethod == "setgenerate"            && n > 1) ConvertTo<boost::int64_t>(params[1]);
-    if (strMethod == "sendtoaddress"          && n > 1) ConvertTo<double>(params[1]);
+    if (strMethod == "sendtoaddress"          && n > 1) ConvertTo<double>(params[1]); // amount
+    if (strMethod == "sendtoaddress"          && n > 2) ConvertTo<bool>(params[2]); // useLockTimeUTXO
     if (strMethod == "mergecoins"            && n > 0) ConvertTo<double>(params[0]);
     if (strMethod == "mergecoins"            && n > 1) ConvertTo<double>(params[1]);
     if (strMethod == "mergecoins"            && n > 2) ConvertTo<double>(params[2]);
@@ -1412,7 +1413,8 @@ Array RPCConvertValues(std::string &strMethod, const std::vector<std::string> &s
     if (strMethod == "move"                   && n > 2) ConvertTo<double>(params[2]);
     if (strMethod == "move"                   && n > 3) ConvertTo<boost::int64_t>(params[3]);
     if (strMethod == "sendfrom"               && n > 2) ConvertTo<double>(params[2]);
-    if (strMethod == "sendfrom"               && n > 3) ConvertTo<boost::int64_t>(params[3]);
+    if (strMethod == "sendfrom"               && n > 3) ConvertTo<bool>(params[3]);
+    if (strMethod == "sendfrom"               && n > 4) ConvertTo<boost::int64_t>(params[4]);
     if (strMethod == "gettransaction"         && n > 1) ConvertTo<bool>(params[1]);
     if (strMethod == "listtransactions"       && n > 1) ConvertTo<boost::int64_t>(params[1]);
     if (strMethod == "listtransactions"       && n > 2) ConvertTo<boost::int64_t>(params[2]);
@@ -1431,7 +1433,8 @@ Array RPCConvertValues(std::string &strMethod, const std::vector<std::string> &s
     if (strMethod == "sendalert"              && n > 6) ConvertTo<boost::int64_t>(params[6]);
 
     if (strMethod == "sendmany"               && n > 1) ConvertTo<Object>(params[1]);
-    if (strMethod == "sendmany"               && n > 2) ConvertTo<boost::int64_t>(params[2]);
+    if (strMethod == "sendmany"               && n > 2) ConvertTo<bool>(params[2]);
+    if (strMethod == "sendmany"               && n > 3) ConvertTo<boost::int64_t>(params[3]);
     if (strMethod == "reservebalance"         && n > 0) ConvertTo<bool>(params[0]);
     if (strMethod == "reservebalance"         && n > 1) ConvertTo<double>(params[1]);
     if (strMethod == "addmultisigaddress"     && n > 0) ConvertTo<boost::int64_t>(params[0]);

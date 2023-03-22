@@ -450,9 +450,9 @@ Value mergecoins(const Array& params, bool fHelp)
 
 Value sendtoaddress(const Array& params, bool fHelp)
 {
-    if (fHelp || params.size() < 2 || params.size() > 4)
+    if (fHelp || params.size() < 2 || params.size() > 5)
         throw runtime_error(
-            "sendtoaddress <yacoinaddress> <amount> [comment] [comment-to]\n"
+            "sendtoaddress <yacoinaddress> <amount> [useLockTimeUTXO] [comment] [comment-to]\n"
             "<amount> is a real and is rounded to the nearest " + FormatMoney(MIN_TXOUT_AMOUNT)
             + HelpRequiringPassphrase());
 
@@ -466,17 +466,22 @@ Value sendtoaddress(const Array& params, bool fHelp)
     if (nAmount < MIN_TXOUT_AMOUNT)
         throw JSONRPCError(-101, "Send amount too small");
 
+    // Allow to use locktime UTXO
+    bool useLockTimeUTXO = false;
+    if (params.size() > 2 && params[2].type() == bool_type)
+        useLockTimeUTXO = params[2].get_bool();
+
     // Wallet comments
     CWalletTx wtx;
-    if (params.size() > 2 && params[2].type() != null_type && !params[2].get_str().empty())
-        wtx.mapValue["comment"] = params[2].get_str();
     if (params.size() > 3 && params[3].type() != null_type && !params[3].get_str().empty())
-        wtx.mapValue["to"]      = params[3].get_str();
+        wtx.mapValue["comment"] = params[3].get_str();
+    if (params.size() > 4 && params[4].type() != null_type && !params[4].get_str().empty())
+        wtx.mapValue["to"]      = params[4].get_str();
 
     if (pwalletMain->IsLocked())
         throw JSONRPCError(RPC_WALLET_UNLOCK_NEEDED, "Error: Please enter the wallet passphrase with walletpassphrase first.");
 
-    string strError = pwalletMain->SendMoneyToDestination(address.Get(), nAmount, wtx);
+    string strError = pwalletMain->SendMoneyToDestination(address.Get(), nAmount, wtx, false, NULL, useLockTimeUTXO);
     if (strError != "")
         throw JSONRPCError(RPC_WALLET_ERROR, strError);
 
@@ -836,9 +841,9 @@ Value movecmd(const Array& params, bool fHelp)
 
 Value sendfrom(const Array& params, bool fHelp)
 {
-    if (fHelp || params.size() < 3 || params.size() > 6)
+    if (fHelp || params.size() < 3 || params.size() > 7)
         throw runtime_error(
-            "sendfrom <fromaccount> <toyacoinaddress> <amount> [minconf=1] [comment] [comment-to]\n"
+            "sendfrom <fromaccount> <toyacoinaddress> <amount> [useLockTimeUTXO] [minconf=1] [comment] [comment-to]\n"
             "<amount> is a real and is rounded to the nearest " + FormatMoney(MIN_TXOUT_AMOUNT)
             + HelpRequiringPassphrase());
 
@@ -851,16 +856,21 @@ Value sendfrom(const Array& params, bool fHelp)
     if (nAmount < MIN_TXOUT_AMOUNT)
         throw JSONRPCError(-101, "Send amount too small");
 
+    // Allow to use locktime UTXO
+    bool useLockTimeUTXO = false;
+    if (params.size() > 3 && params[3].type() == bool_type)
+        useLockTimeUTXO = params[3].get_bool();
+
     int nMinDepth = 1;
-    if (params.size() > 3)
-        nMinDepth = params[3].get_int();
+    if (params.size() > 4)
+        nMinDepth = params[4].get_int();
 
     CWalletTx wtx;
     wtx.strFromAccount = strAccount;
-    if (params.size() > 4 && params[4].type() != null_type && !params[4].get_str().empty())
-        wtx.mapValue["comment"] = params[4].get_str();
     if (params.size() > 5 && params[5].type() != null_type && !params[5].get_str().empty())
-        wtx.mapValue["to"]      = params[5].get_str();
+        wtx.mapValue["comment"] = params[5].get_str();
+    if (params.size() > 6 && params[6].type() != null_type && !params[6].get_str().empty())
+        wtx.mapValue["to"]      = params[6].get_str();
 
     EnsureWalletIsUnlocked();
 
@@ -870,7 +880,7 @@ Value sendfrom(const Array& params, bool fHelp)
         throw JSONRPCError(RPC_WALLET_INSUFFICIENT_FUNDS, "Account has insufficient funds");
 
     // Send
-    string strError = pwalletMain->SendMoneyToDestination(address.Get(), nAmount, wtx);
+    string strError = pwalletMain->SendMoneyToDestination(address.Get(), nAmount, wtx, false, NULL, useLockTimeUTXO);
     if (strError != "")
         throw JSONRPCError(RPC_WALLET_ERROR, strError);
 
@@ -880,22 +890,28 @@ Value sendfrom(const Array& params, bool fHelp)
 
 Value sendmany(const Array& params, bool fHelp)
 {
-    if (fHelp || params.size() < 2 || params.size() > 4)
+    if (fHelp || params.size() < 2 || params.size() > 5)
         throw runtime_error(
-            "sendmany <fromaccount> {address:amount,...} [minconf=1] [comment]\n"
+            "sendmany <fromaccount> {address:amount,...} [useLockTimeUTXO] [minconf=1] [comment]\n"
             "amounts are double-precision floating point numbers"
             + HelpRequiringPassphrase());
 
     string strAccount = AccountFromValue(params[0]);
     Object sendTo = params[1].get_obj();
+
+    // Allow to use locktime UTXO
+    bool useLockTimeUTXO = false;
+    if (params.size() > 2 && params[2].type() == bool_type)
+        useLockTimeUTXO = params[2].get_bool();
+
     int nMinDepth = 1;
-    if (params.size() > 2)
-        nMinDepth = params[2].get_int();
+    if (params.size() > 3)
+        nMinDepth = params[3].get_int();
 
     CWalletTx wtx;
     wtx.strFromAccount = strAccount;
-    if (params.size() > 3 && params[3].type() != null_type && !params[3].get_str().empty())
-        wtx.mapValue["comment"] = params[3].get_str();
+    if (params.size() > 4 && params[4].type() != null_type && !params[4].get_str().empty())
+        wtx.mapValue["comment"] = params[4].get_str();
 
     set<CBitcoinAddress> setAddress;
     vector<CRecipient> vecSend;
@@ -937,7 +953,7 @@ Value sendmany(const Array& params, bool fHelp)
     int nChangePosRet = -1;
     std::string strFailReason;
     CCoinControl coinControl;
-    bool fCreated = pwalletMain->CreateTransaction(vecSend, wtx, keyChange, nFeeRequired, nChangePosRet, strFailReason, coinControl);
+    bool fCreated = pwalletMain->CreateTransaction(vecSend, wtx, keyChange, nFeeRequired, nChangePosRet, strFailReason, coinControl, NULL, useLockTimeUTXO);
     if (!fCreated)
     {
         int64_t nTotal = pwalletMain->GetBalance(), nWatchOnly = pwalletMain->GetWatchOnlyBalance();
