@@ -105,7 +105,7 @@ class OP_CLTV_Test(BitcoinTestFramework):
         receiver_balance = self.nodes[0].getreceivedbyaccount('receiver')
         assert_equal(receiver_balance, Decimal('0.0'))
 
-        assert_raises_rpc_error(-1, "unknown!?", self.nodes[1].spendcltv,cltv_address, receiver_address, 10.0)
+        assert_raises_rpc_error(-4, "Error: Transaction creation failed", self.nodes[1].spendcltv,cltv_address, receiver_address, 10.0)
 
         self.setmocktimeforallnodes(TIME_GENESIS_BLOCK + 60*60+1)
         self.mine_blocks(0, 1)

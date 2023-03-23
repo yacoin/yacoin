@@ -1156,10 +1156,6 @@ json_spirit::Value CRPCTable::execute(const std::string &strMethod, const json_s
     {
         throw JSONRPCError(RPC_MISC_ERROR, e.what());
     }
-    catch (...)
-    {
-        throw JSONRPCError(RPC_MISC_ERROR, "unknown!?");
-    }
 }
 
 
