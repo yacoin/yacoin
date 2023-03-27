@@ -1796,6 +1796,9 @@ bool Solver(
     case TX_CSV_P2SH:
         keyID = CPubKey(vSolutions[0]).GetID();
         return Sign1(keyID, keystore, hash, nHashType, scriptSigRet);
+    case TX_NEW_ASSET:
+    case TX_REISSUE_ASSET:
+    case TX_TRANSFER_ASSET:
     case TX_CLTV_P2PKH:
     case TX_CSV_P2PKH:
     case TX_PUBKEYHASH:
@@ -1831,6 +1834,9 @@ int ScriptSigArgsExpected(txnouttype t, const std::vector<std::vector<unsigned c
     case TX_CSV_P2SH:
     case TX_PUBKEY:
         return 1;
+    case TX_NEW_ASSET:
+    case TX_REISSUE_ASSET:
+    case TX_TRANSFER_ASSET:
     case TX_CLTV_P2PKH:
     case TX_CSV_P2PKH:
     case TX_PUBKEYHASH:
