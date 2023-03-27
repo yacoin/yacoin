@@ -799,6 +799,43 @@ bool CWallet::IsChange(const CTxOut& txout) const
     return false;
 }
 
+bool CWallet::IsTimelockUTXOExpired(const CInputCoin& inputCoin, txnouttype utxoType, uint32_t lockDuration) const
+{
+    CWalletTx tempWalletTx;
+    tempWalletTx.fTimeReceivedIsTxTime = true;
+    tempWalletTx.vin.clear();
+    tempWalletTx.vout.clear();
+    tempWalletTx.fFromMe = true;
+    unsigned int nSequenceIn = CTxIn::SEQUENCE_FINAL;
+    switch (utxoType)
+    {
+        case TX_CLTV_P2SH:
+        case TX_CLTV_P2PKH:
+        {
+            nSequenceIn = 0;
+            tempWalletTx.nLockTime = lockDuration;
+            break;
+        }
+        case TX_CSV_P2SH:
+        case TX_CSV_P2PKH:
+        {
+            nSequenceIn = lockDuration;
+            break;
+        }
+        default:
+            // not time lock UTXO
+            return true;
+    }
+    tempWalletTx.vin.push_back(CTxIn(inputCoin.outpoint, CScript(), nSequenceIn));
+
+    // Check if nLockTime and BIP68 sequence locked satisfy
+    if (!tempWalletTx.IsFinal() || !CheckSequenceLocks(tempWalletTx, STANDARD_LOCKTIME_VERIFY_FLAGS))
+    {
+        return false;
+    }
+    return true;
+}
+
 int64_t CWalletTx::GetTxTime() const
 {
     return nTime;
@@ -850,7 +887,8 @@ void CWalletTx::GetAmounts(::int64_t& nGeneratedImmature,
                            std::string& strSentAccount,
                            const isminefilter& filter,
                            std::list<CAssetOutputEntry>& assetsReceived,
-                           std::list<CAssetOutputEntry>& assetsSent) const
+                           std::list<CAssetOutputEntry>& assetsSent,
+                           bool fExcludeNotExpiredTimelock) const
 {
     nGeneratedImmature = nGeneratedMature = nFee = 0;
     listReceived.clear();
@@ -909,7 +947,25 @@ void CWalletTx::GetAmounts(::int64_t& nGeneratedImmature,
 
             // If we are receiving the output, add it as a "received" entry
             if (fIsMine & filter)
+            {
+                if (fExcludeNotExpiredTimelock)
+                {
+                    // Only count timelock UTXO if the timelock already expired
+                    txnouttype utxoType = TX_NONSTANDARD;
+                    uint32_t lockDuration = 0;
+                    bool isSpendableTimelockUTXO = pwallet->IsSpendableTimelockUTXO(txout, utxoType, lockDuration);
+
+                    if (isSpendableTimelockUTXO)
+                    {
+                        CInputCoin inputCoin(this, i);
+                        if(!pwallet->IsTimelockUTXOExpired(inputCoin, utxoType, lockDuration))
+                        {
+                            continue;
+                        }
+                    }
+                }
                 listReceived.push_back(output);
+            }
         }
 
         /** YAC_ASSET START */
@@ -934,15 +990,16 @@ void CWalletTx::GetAmounts(::int64_t& nGeneratedImmature,
 void CWalletTx::GetAmounts(::int64_t& nGeneratedImmature, ::int64_t& nGeneratedMature,
                 std::list<COutputEntry>& listReceived,
                 std::list<COutputEntry>& listSent, CAmount& nFee,
-                std::string& strSentAccount, const isminefilter& filter) const
+                std::string& strSentAccount, const isminefilter& filter,
+                bool fExcludeNotExpiredTimelock) const
 {
     std::list<CAssetOutputEntry> assetsReceived;
     std::list<CAssetOutputEntry> assetsSent;
-    GetAmounts(nGeneratedImmature, nGeneratedMature, listReceived, listSent, nFee, strSentAccount, filter, assetsReceived, assetsSent);
+    GetAmounts(nGeneratedImmature, nGeneratedMature, listReceived, listSent, nFee, strSentAccount, filter, assetsReceived, assetsSent, fExcludeNotExpiredTimelock);
 }
 
 void CWalletTx::GetAccountAmounts(const string& strAccount, int64_t& nGenerated, int64_t& nReceived,
-                                  int64_t& nSent, int64_t& nFee, const isminefilter& filter) const
+                                  int64_t& nSent, int64_t& nFee, const isminefilter& filter, bool fExcludeNotExpiredTimelock) const
 {
     nGenerated = nReceived = nSent = nFee = 0;
 
@@ -951,7 +1008,7 @@ void CWalletTx::GetAccountAmounts(const string& strAccount, int64_t& nGenerated,
     string strSentAccount;
     std::list<COutputEntry> listReceived;
     std::list<COutputEntry> listSent;
-    GetAmounts(allGeneratedImmature, allGeneratedMature, listReceived, listSent, allFee, strSentAccount, filter);
+    GetAmounts(allGeneratedImmature, allGeneratedMature, listReceived, listSent, allFee, strSentAccount, filter, fExcludeNotExpiredTimelock);
 
     if (strAccount == "")
         nGenerated = allGeneratedMature;
@@ -979,6 +1036,63 @@ void CWalletTx::GetAccountAmounts(const string& strAccount, int64_t& nGenerated,
             }
         }
     }
+}
+
+::int64_t CWalletTx::GetAvailableCredit(bool fUseCache, bool fExcludeNotExpiredTimelock) const
+{
+    // Must wait until coinbase is safely deep enough in the chain before valuing it
+    if (
+        (IsCoinBase() || IsCoinStake()) &&
+        (GetBlocksToMaturity() > 0)
+       )
+        return 0;
+
+    if (fUseCache & !fExcludeNotExpiredTimelock)
+    {
+        if (fAvailableCreditCached)
+            return nAvailableCreditCached;
+    }
+
+    ::int64_t
+        nCredit = 0;
+    for (unsigned int i = 0; i < vout.size(); ++i)
+    {
+        if (!IsSpent(i))
+        {
+            const CTxOut
+                &txout = vout[i];
+
+            if (fExcludeNotExpiredTimelock)
+            {
+                // Only count timelock UTXO if the timelock already expired
+                txnouttype utxoType = TX_NONSTANDARD;
+                uint32_t lockDuration = 0;
+                bool isSpendableTimelockUTXO = pwallet->IsSpendableTimelockUTXO(txout, utxoType, lockDuration);
+
+                if (isSpendableTimelockUTXO)
+                {
+                    CInputCoin inputCoin(this, i);
+                    if(!pwallet->IsTimelockUTXOExpired(inputCoin, utxoType, lockDuration))
+                    {
+                        continue;
+                    }
+                }
+            }
+
+
+            nCredit += pwallet->GetCredit(txout, MINE_SPENDABLE);
+            if (!MoneyRange(nCredit))
+                throw std::runtime_error("CWalletTx::GetAvailableCredit() : value out of range");
+        }
+    }
+
+    if (fUseCache & !fExcludeNotExpiredTimelock)
+    {
+        nAvailableCreditCached = nCredit;
+        fAvailableCreditCached = true;
+    }
+
+    return nCredit;
 }
 
 void CWalletTx::AddSupportingTransactions(CTxDB& txdb)
@@ -1444,8 +1558,7 @@ void CWallet::ResendWalletTransactions()
 // Actions
 //
 
-
-int64_t CWallet::GetBalance() const
+int64_t CWallet::GetBalance(bool fExcludeNotExpiredTimelock) const
 {
     int64_t nTotal = 0;
     {
@@ -1454,7 +1567,7 @@ int64_t CWallet::GetBalance() const
         {
             const CWalletTx* pcoin = &(*it).second;
             if (pcoin->IsTrusted())
-                nTotal += pcoin->GetAvailableCredit();
+                nTotal += pcoin->GetAvailableCredit(true, fExcludeNotExpiredTimelock);
         }
     }
 
@@ -1775,33 +1888,8 @@ void CWallet::AvailableCoinsAll(
             // Only add timelock UTXO if the timelock already expired
             if (isSpendableTimelockUTXO)
             {
-                CWalletTx tempWalletTx;
-                tempWalletTx.fTimeReceivedIsTxTime = true;
-                tempWalletTx.vin.clear();
-                tempWalletTx.vout.clear();
-                tempWalletTx.fFromMe = true;
                 CInputCoin inputCoin(pcoin, i);
-                unsigned int nSequenceIn = CTxIn::SEQUENCE_FINAL;
-                switch (utxoType)
-                {
-                    case TX_CLTV_P2SH:
-                    case TX_CLTV_P2PKH:
-                    {
-                        nSequenceIn = 0;
-                        tempWalletTx.nLockTime = lockDuration;
-                        break;
-                    }
-                    case TX_CSV_P2SH:
-                    case TX_CSV_P2PKH:
-                    {
-                        nSequenceIn = lockDuration;
-                        break;
-                    }
-                }
-                tempWalletTx.vin.push_back(CTxIn(inputCoin.outpoint, CScript(), nSequenceIn));
-
-                // Check if nLockTime and BIP68 sequence locked satisfy
-                if (!tempWalletTx.IsFinal() || !CheckSequenceLocks(tempWalletTx, STANDARD_LOCKTIME_VERIFY_FLAGS))
+                if(!IsTimelockUTXOExpired(inputCoin, utxoType, lockDuration))
                 {
                     continue;
                 }

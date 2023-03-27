@@ -320,7 +320,7 @@ public:
 //    int ScanForWalletTransaction(const uint256& hashTx);  NA
     void ReacceptWalletTransactions();
     void ResendWalletTransactions();
-    ::int64_t GetBalance() const;
+    ::int64_t GetBalance(bool fExcludeNotExpiredTimelock=false) const;
     ::int64_t GetWatchOnlyBalance() const;
     ::int64_t GetUnconfirmedBalance() const;
     ::int64_t GetUnconfirmedWatchOnlyBalance() const;
@@ -417,6 +417,8 @@ public:
     {
         return ::IsSpendableTimelockUTXO(*this, txout.scriptPubKey, retType, retLockDur);
     }
+    bool IsTimelockUTXOExpired(const CInputCoin& inputCoin, txnouttype utxoType, uint32_t lockDuration) const;
+
     ::int64_t GetCredit(const CTxOut& txout, const isminefilter& filter) const
     {
         if (!MoneyRange(txout.nValue))
@@ -926,40 +928,7 @@ public:
     }
 
 
-    ::int64_t GetAvailableCredit(bool fUseCache=true) const
-    {
-        // Must wait until coinbase is safely deep enough in the chain before valuing it
-        if (
-            (IsCoinBase() || IsCoinStake()) && 
-            (GetBlocksToMaturity() > 0)
-           )
-            return 0;
-
-        if (fUseCache) 
-        {
-            if (fAvailableCreditCached)
-                return nAvailableCreditCached;
-        }
-
-        ::int64_t 
-            nCredit = 0;
-        for (unsigned int i = 0; i < vout.size(); ++i)
-        {
-            if (!IsSpent(i))
-            {
-                const CTxOut 
-                    &txout = vout[i];
-                nCredit += pwallet->GetCredit(txout, MINE_SPENDABLE);
-                if (!MoneyRange(nCredit))
-                    throw std::runtime_error("CWalletTx::GetAvailableCredit() : value out of range");
-            }
-        }
-
-        nAvailableCreditCached = nCredit;
-        fAvailableCreditCached = true;
-
-        return nCredit;
-    }
+    ::int64_t GetAvailableCredit(bool fUseCache=true, bool fExcludeNotExpiredTimelock=false) const;
 
     ::int64_t GetAvailableWatchCredit(bool fUseCache=true) const
     {
@@ -1008,14 +977,16 @@ public:
     void GetAmounts(::int64_t& nGeneratedImmature, ::int64_t& nGeneratedMature,
                     std::list<COutputEntry>& listReceived,
                     std::list<COutputEntry>& listSent, CAmount& nFee,
-                    std::string& strSentAccount, const isminefilter& filter) const;
+                    std::string& strSentAccount, const isminefilter& filter,
+                    bool fExcludeNotExpiredTimelock=false) const;
 
     void GetAmounts(::int64_t& nGeneratedImmature, ::int64_t& nGeneratedMature,
                     std::list<COutputEntry>& listReceived,
                     std::list<COutputEntry>& listSent, CAmount& nFee,
                     std::string& strSentAccount, const isminefilter& filter,
                     std::list<CAssetOutputEntry>& assetsReceived,
-                    std::list<CAssetOutputEntry>& assetsSent) const;
+                    std::list<CAssetOutputEntry>& assetsSent,
+                    bool fExcludeNotExpiredTimelock=false) const;
 
     void GetAccountAmounts(
                            const std::string& strAccount, 
@@ -1023,7 +994,8 @@ public:
                            ::int64_t& nReceived,
                            ::int64_t& nSent, 
                            ::int64_t& nFee, 
-                           const isminefilter& filter
+                           const isminefilter& filter,
+                           bool fExcludeNotExpiredTimelock=false
                           ) const;
 
     bool IsFromMe(const isminefilter& filter) const

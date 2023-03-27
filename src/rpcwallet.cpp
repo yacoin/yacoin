@@ -679,7 +679,7 @@ Value getreceivedbyaccount(const Array& params, bool fHelp)
 }
 
 
-int64_t GetAccountBalance(CWalletDB& walletdb, const string& strAccount, int nMinDepth, const isminefilter& filter)
+int64_t GetAccountBalance(CWalletDB& walletdb, const string& strAccount, int nMinDepth, const isminefilter& filter, bool fExcludeNotExpiredTimelock=false)
 {
     int64_t nBalance = 0;
 
@@ -691,7 +691,7 @@ int64_t GetAccountBalance(CWalletDB& walletdb, const string& strAccount, int nMi
             continue;
 
         int64_t nGenerated, nReceived, nSent, nFee;
-        wtx.GetAccountAmounts(strAccount, nGenerated, nReceived, nSent, nFee, filter);
+        wtx.GetAccountAmounts(strAccount, nGenerated, nReceived, nSent, nFee, filter, fExcludeNotExpiredTimelock);
 
         if (nReceived != 0 && wtx.GetDepthInMainChain() >= nMinDepth)
             nBalance += nReceived;
@@ -704,10 +704,10 @@ int64_t GetAccountBalance(CWalletDB& walletdb, const string& strAccount, int nMi
     return nBalance;
 }
 
-int64_t GetAccountBalance(const string& strAccount, int nMinDepth, const isminefilter& filter)
+int64_t GetAccountBalance(const string& strAccount, int nMinDepth, const isminefilter& filter, bool fExcludeNotExpiredTimelock=false)
 {
     CWalletDB walletdb(pwalletMain->strWalletFile);
-    return GetAccountBalance(walletdb, strAccount, nMinDepth, filter);
+    return GetAccountBalance(walletdb, strAccount, nMinDepth, filter, fExcludeNotExpiredTimelock);
 }
 
 
@@ -731,7 +731,7 @@ Value getbalance(const Array& params, bool fHelp)
         if(params[2].get_bool())
             filter = filter | MINE_WATCH_ONLY;
 
-    if (params[0].get_str() == "*") 
+    if (params[0].get_str() == "*")
     {
         // Calculate total balance a different way from GetBalance()
         // (GetBalance() sums up all unspent TxOuts)
@@ -784,6 +784,80 @@ Value getbalance(const Array& params, bool fHelp)
     return ValueFromAmount(nBalance);
 }
 
+Value getavailablebalance(const Array& params, bool fHelp)
+{
+    if (fHelp || params.size() > 2)
+        throw runtime_error(
+            "getavailablebalance [account] [minconf=1] [watchonly=0]\n"
+            "If [account] is not specified, returns the server's total available balance.\n"
+            "If [account] is specified, returns the balance in the account.\n"
+            "if [includeWatchonly] is specified, include balance in watchonly addresses (see 'importaddress').");
+
+    bool fExcludeNotExpiredTimelock = true;
+    if (params.size() == 0)
+        return  ValueFromAmount(pwalletMain->GetBalance(fExcludeNotExpiredTimelock));
+
+    int nMinDepth = 1;
+    if (params.size() > 1)
+        nMinDepth = params[1].get_int();
+    isminefilter filter = MINE_SPENDABLE;
+    if(params.size() > 2)
+        if(params[2].get_bool())
+            filter = filter | MINE_WATCH_ONLY;
+
+    if (params[0].get_str() == "*")
+    {
+        // Calculate total balance a different way from GetBalance()
+        // (GetBalance() sums up all unspent TxOuts)
+        // getbalance and getbalance '*' 0 should return the same number.
+        int64_t nBalance = 0;
+        for (map<uint256, CWalletTx>::iterator it = pwalletMain->mapWallet.begin(); it != pwalletMain->mapWallet.end(); ++it)
+        {
+            const CWalletTx& wtx = (*it).second;
+            if (!wtx.IsTrusted())
+                continue;
+
+            int64_t allGeneratedImmature, allGeneratedMature, allFee;
+            allGeneratedImmature = allGeneratedMature = allFee = 0;
+
+            string strSentAccount;
+            std::list<COutputEntry> listReceived;
+            std::list<COutputEntry> listSent;
+            wtx.GetAmounts(
+                            allGeneratedImmature,
+                            allGeneratedMature,
+                            listReceived,
+                            listSent,
+                            allFee,
+                            strSentAccount,
+                            filter,
+                            fExcludeNotExpiredTimelock
+                          );
+            if (wtx.GetDepthInMainChain() >= nMinDepth)
+            {
+                for (const COutputEntry& r : listReceived)
+                {
+                    nBalance += r.amount;
+                }
+            }
+            for (const COutputEntry& r : listSent)
+            {
+                nBalance -= r.amount;
+            }
+            nBalance -= allFee;
+            nBalance += allGeneratedMature;
+        }
+        return  ValueFromAmount(nBalance);
+    }
+
+    string
+        strAccount = AccountFromValue(params[0]);
+
+    int64_t
+        nBalance = GetAccountBalance(strAccount, nMinDepth, filter, fExcludeNotExpiredTimelock);
+
+    return ValueFromAmount(nBalance);
+}
 
 Value movecmd(const Array& params, bool fHelp)
 {
