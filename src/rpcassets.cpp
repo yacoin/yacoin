@@ -608,6 +608,15 @@ Value listmyassets(const Array& params, bool fHelp)
                 tempOut.push_back(Pair("txid", out.tx->GetHash().GetHex()));
                 tempOut.push_back(Pair("vout", (int)out.i));
 
+                // Get address
+                CTxDestination address;
+                if (ExtractDestination(out.tx->vout[out.i].scriptPubKey, address))
+                {
+                    tempOut.push_back(Pair("address", CBitcoinAddress(address).ToString()));
+                    if (pwalletMain->mapAddressBook.count(address))
+                        tempOut.push_back(Pair("account", pwalletMain->mapAddressBook[address]));
+                }
+
                 //
                 // get amount for this outpoint
                 CAmount txAmount = 0;
