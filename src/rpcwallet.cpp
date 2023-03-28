@@ -452,7 +452,7 @@ Value sendtoaddress(const Array& params, bool fHelp)
 {
     if (fHelp || params.size() < 2 || params.size() > 5)
         throw runtime_error(
-            "sendtoaddress <yacoinaddress> <amount> [useLockTimeUTXO] [comment] [comment-to]\n"
+            "sendtoaddress <yacoinaddress> <amount> [useExpiredTimelockUTXO] [comment] [comment-to]\n"
             "<amount> is a real and is rounded to the nearest " + FormatMoney(MIN_TXOUT_AMOUNT)
             + HelpRequiringPassphrase());
 
@@ -467,9 +467,9 @@ Value sendtoaddress(const Array& params, bool fHelp)
         throw JSONRPCError(-101, "Send amount too small");
 
     // Allow to use locktime UTXO
-    bool useLockTimeUTXO = false;
+    bool useExpiredTimelockUTXO = true;
     if (params.size() > 2 && params[2].type() == bool_type)
-        useLockTimeUTXO = params[2].get_bool();
+        useExpiredTimelockUTXO = params[2].get_bool();
 
     // Wallet comments
     CWalletTx wtx;
@@ -481,7 +481,7 @@ Value sendtoaddress(const Array& params, bool fHelp)
     if (pwalletMain->IsLocked())
         throw JSONRPCError(RPC_WALLET_UNLOCK_NEEDED, "Error: Please enter the wallet passphrase with walletpassphrase first.");
 
-    string strError = pwalletMain->SendMoneyToDestination(address.Get(), nAmount, wtx, false, NULL, useLockTimeUTXO);
+    string strError = pwalletMain->SendMoneyToDestination(address.Get(), nAmount, wtx, false, NULL, useExpiredTimelockUTXO);
     if (strError != "")
         throw JSONRPCError(RPC_WALLET_ERROR, strError);
 
@@ -917,7 +917,7 @@ Value sendfrom(const Array& params, bool fHelp)
 {
     if (fHelp || params.size() < 3 || params.size() > 7)
         throw runtime_error(
-            "sendfrom <fromaccount> <toyacoinaddress> <amount> [useLockTimeUTXO] [minconf=1] [comment] [comment-to]\n"
+            "sendfrom <fromaccount> <toyacoinaddress> <amount> [useExpiredTimelockUTXO] [minconf=1] [comment] [comment-to]\n"
             "<amount> is a real and is rounded to the nearest " + FormatMoney(MIN_TXOUT_AMOUNT)
             + HelpRequiringPassphrase());
 
@@ -931,9 +931,9 @@ Value sendfrom(const Array& params, bool fHelp)
         throw JSONRPCError(-101, "Send amount too small");
 
     // Allow to use locktime UTXO
-    bool useLockTimeUTXO = false;
+    bool useExpiredTimelockUTXO = true;
     if (params.size() > 3 && params[3].type() == bool_type)
-        useLockTimeUTXO = params[3].get_bool();
+        useExpiredTimelockUTXO = params[3].get_bool();
 
     int nMinDepth = 1;
     if (params.size() > 4)
@@ -954,7 +954,7 @@ Value sendfrom(const Array& params, bool fHelp)
         throw JSONRPCError(RPC_WALLET_INSUFFICIENT_FUNDS, "Account has insufficient funds");
 
     // Send
-    string strError = pwalletMain->SendMoneyToDestination(address.Get(), nAmount, wtx, false, NULL, useLockTimeUTXO);
+    string strError = pwalletMain->SendMoneyToDestination(address.Get(), nAmount, wtx, false, NULL, useExpiredTimelockUTXO);
     if (strError != "")
         throw JSONRPCError(RPC_WALLET_ERROR, strError);
 
@@ -966,7 +966,7 @@ Value sendmany(const Array& params, bool fHelp)
 {
     if (fHelp || params.size() < 2 || params.size() > 5)
         throw runtime_error(
-            "sendmany <fromaccount> {address:amount,...} [useLockTimeUTXO] [minconf=1] [comment]\n"
+            "sendmany <fromaccount> {address:amount,...} [useExpiredTimelockUTXO] [minconf=1] [comment]\n"
             "amounts are double-precision floating point numbers"
             + HelpRequiringPassphrase());
 
@@ -974,9 +974,9 @@ Value sendmany(const Array& params, bool fHelp)
     Object sendTo = params[1].get_obj();
 
     // Allow to use locktime UTXO
-    bool useLockTimeUTXO = false;
+    bool useExpiredTimelockUTXO = true;
     if (params.size() > 2 && params[2].type() == bool_type)
-        useLockTimeUTXO = params[2].get_bool();
+        useExpiredTimelockUTXO = params[2].get_bool();
 
     int nMinDepth = 1;
     if (params.size() > 3)
@@ -1027,13 +1027,13 @@ Value sendmany(const Array& params, bool fHelp)
     int nChangePosRet = -1;
     std::string strFailReason;
     CCoinControl coinControl;
-    bool fCreated = pwalletMain->CreateTransaction(vecSend, wtx, keyChange, nFeeRequired, nChangePosRet, strFailReason, coinControl, NULL, useLockTimeUTXO);
+    bool fCreated = pwalletMain->CreateTransaction(vecSend, wtx, keyChange, nFeeRequired, nChangePosRet, strFailReason, coinControl, NULL, useExpiredTimelockUTXO);
     if (!fCreated)
     {
         int64_t nTotal = pwalletMain->GetBalance(), nWatchOnly = pwalletMain->GetWatchOnlyBalance();
         if (totalAmount + nFeeRequired > nTotal - nWatchOnly)
             throw JSONRPCError(RPC_WALLET_INSUFFICIENT_FUNDS, "Insufficient funds");
-        throw JSONRPCError(RPC_WALLET_ERROR, "Transaction creation failed");
+        throw JSONRPCError(RPC_WALLET_ERROR, std::string("Transaction creation failed: ") + strFailReason);
     }
     if (!pwalletMain->CommitTransaction(wtx, keyChange))
         throw JSONRPCError(RPC_WALLET_ERROR, "Transaction commit failed");

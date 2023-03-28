@@ -1390,7 +1390,7 @@ Array RPCConvertValues(std::string &strMethod, const std::vector<std::string> &s
     if (strMethod == "setgenerate"            && n > 0) ConvertTo<bool>(params[0]);
     if (strMethod == "setgenerate"            && n > 1) ConvertTo<boost::int64_t>(params[1]);
     if (strMethod == "sendtoaddress"          && n > 1) ConvertTo<double>(params[1]); // amount
-    if (strMethod == "sendtoaddress"          && n > 2) ConvertTo<bool>(params[2]); // useLockTimeUTXO
+    if (strMethod == "sendtoaddress"          && n > 2) ConvertTo<bool>(params[2]); // useExpiredTimelockUTXO
     if (strMethod == "mergecoins"            && n > 0) ConvertTo<double>(params[0]);
     if (strMethod == "mergecoins"            && n > 1) ConvertTo<double>(params[1]);
     if (strMethod == "mergecoins"            && n > 2) ConvertTo<double>(params[2]);
