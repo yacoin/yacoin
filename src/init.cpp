@@ -143,7 +143,6 @@ void Shutdown(void* parg)
         if (fDebug)
             if (fPrintToConsole)
                 printf("wallet unregistered\n");
-        delete pwalletMain;
         NewThread(ExitTimeout, NULL);
         if (fDebug)
             if (fPrintToConsole)
