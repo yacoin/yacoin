@@ -107,6 +107,10 @@ const char* GetTxnOutputType(txnouttype t)
     case TX_SCRIPTHASH: return "scripthash";
     case TX_MULTISIG: return "multisig";
     case TX_NULL_DATA: return "nulldata";
+    case TX_CLTV_P2SH: return "CLTV_P2SH_timelock";
+    case TX_CSV_P2SH: return "CSV_P2SH_timelock";
+    case TX_CLTV_P2PKH: return "CLTV_P2PKH_timelock";
+    case TX_CSV_P2PKH: return "CSV_P2PKH_timelock";
     /** RVN START */
     case TX_NEW_ASSET: return ASSET_NEW_STRING;
     case TX_TRANSFER_ASSET: return ASSET_TRANSFER_STRING;
