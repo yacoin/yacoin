@@ -181,6 +181,7 @@ HEADERS += \
     src/db.h \
     src/dbwrapper.h \
     src/txdb.h \
+    src/tinyformat.h \
     src/walletdb.h \
     src/script/script.h \
     src/init.h \

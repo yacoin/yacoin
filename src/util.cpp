@@ -422,17 +422,6 @@ string real_strprintf(const std::string &format, int dummy, ...)
     return str;
 }
 
-bool error(const char *format, ...)
-{
-    va_list arg_ptr;
-    va_start(arg_ptr, format);
-    std::string str = vstrprintf(format, arg_ptr);
-    va_end(arg_ptr);
-    printf("ERROR: %s\n", str.c_str());
-    return false;
-}
-
-
 void ParseString(const string& str, char c, vector<string>& v)
 {
     if (str.empty())

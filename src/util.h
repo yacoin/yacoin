@@ -39,6 +39,7 @@
  #include "netbase.h" // for AddTimeData
 #endif
 #include "amount.h"
+#include "tinyformat.h"
 
 //THEREFORE
 const int COINdecimalPower = 16;     // i.e. log10( COIN )
@@ -220,9 +221,6 @@ std::string ATTR_WARN_PRINTF(1,3) real_strprintf(const char *format, int dummy, 
 std::string real_strprintf(const std::string &format, int dummy, ...);
 #define strprintf(format, ...) real_strprintf(format, 0, __VA_ARGS__)
 std::string vstrprintf(const char *format, va_list ap);
-
-bool ATTR_WARN_PRINTF(1,2) error(const char *format, ...);
-
 /* Redefine printf so that it directs output to debug.log
  *
  * Do this *after* defining the other printf-like functions, because otherwise the
@@ -230,6 +228,14 @@ bool ATTR_WARN_PRINTF(1,2) error(const char *format, ...);
  * which confuses gcc.
  */
 #define printf OutputDebugStringF
+
+template<typename... Args>
+bool error(const char *fmt, const Args &... args)
+{
+    std::string str = tfm::format(fmt, args...);
+    printf("ERROR: %s\n", str.c_str());
+    return false;
+}
 
 extern unsigned long long getTotalSystemMemory( void );
 void LogException(std::exception* pex, const char* pszThread);
