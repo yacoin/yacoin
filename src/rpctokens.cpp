@@ -41,14 +41,14 @@ std::string TokenTypeToString(TokenType& tokenType)
 {
     switch (tokenType)
     {
-        case TokenType::ROOT:               return "ROOT";
-        case TokenType::SUB:                return "SUB";
-        case TokenType::UNIQUE:             return "UNIQUE";
-        case TokenType::OWNER:              return "OWNER";
-        case TokenType::VOTE:               return "VOTE";
-        case TokenType::REISSUE:            return "REISSUE";
-        case TokenType::INVALID:            return "INVALID";
-        default:                            return "UNKNOWN";
+        case TokenType::YATOKEN:            return "YA-token";
+        case TokenType::SUB:                return "Sub-token";
+        case TokenType::UNIQUE:             return "Unique-token";
+        case TokenType::OWNER:              return "Owner-token";
+        case TokenType::VOTE:               return "Vote";
+        case TokenType::REISSUE:            return "Reissue";
+        case TokenType::INVALID:            return "Invalid";
+        default:                            return "Unknown";
     }
 }
 

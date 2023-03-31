@@ -346,7 +346,7 @@ void UpdateTokenInfoFromTxOutputs(const CTransaction& tx, int nHeight, uint256 b
 
     if (AreTokensDeployed()) {
         if (tokensCache) {
-            if (tx.IsNewToken()) { // This works are all new root tokens, sub token, and restricted tokens
+            if (tx.IsNewToken()) { // This works are all new yatoken tokens, sub token, and restricted tokens
                 CNewToken token;
                 std::string strAddress;
                 TokenFromTransaction(tx, token, strAddress);

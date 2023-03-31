@@ -2415,7 +2415,7 @@ bool CWallet::SelectTokensMinConf(const CAmount& nTargetValue,
     }
 
     CAmount nTempAmount = 0;
-    if (nType == TX_NEW_TOKEN && !fIsOwner) { // Root/Sub Token
+    if (nType == TX_NEW_TOKEN && !fIsOwner) { // Yatoken/Sub Token
         CNewToken tokenTemp;
         std::string address;
         if (!TokenFromScript(coin.txout.scriptPubKey, tokenTemp, address))
@@ -2533,7 +2533,7 @@ bool CWallet::CreateTransactionWithTokens(
         vecSend: contains fee lock address + owner token address
         coinControl.destChange: RVN change address
         destination: address containing new token
-        tokenType: TokenType::ROOT, TokenType::SUB, TokenType::UNIQUE
+        tokenType: TokenType::YATOKEN, TokenType::SUB, TokenType::UNIQUE
    */
   return CreateTransactionAll(vecSend, wtxNew, reservekey, nFeeRet,
                               nChangePosInOut, strFailReason, coinControl,

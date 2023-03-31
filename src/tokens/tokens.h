@@ -275,12 +275,12 @@ bool IsUniqueTagValid(const std::string& tag);
 //! Check if an token is an owner
 bool IsTokenNameAnOwner(const std::string& name);
 
-bool IsTokenNameARoot(const std::string& name);
+bool IsTokenNameAYatoken(const std::string& name);
 
-//! Get the root name of an token
+//! Get the yatoken name of an token
 std::string GetParentName(const std::string& name); // Gets the parent name of a subtoken TEST/TESTSUB would return TEST
 
-//! Build a unique token buy giving the root name, and the tag name (ROOT, TAG) => ROOT#TAG
+//! Build a unique token buy giving the root name, and the tag name (YATOKEN, TAG) => YATOKEN#TAG
 std::string GetUniqueTokenName(const std::string& parent, const std::string& tag);
 
 //! Given a type, and an token name, return if that name is valid based on the type

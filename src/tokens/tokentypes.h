@@ -21,7 +21,7 @@ class CTokensCache;
 
 enum class TokenType
 {
-    ROOT = 0,
+    YATOKEN = 0,
     SUB = 1,
     UNIQUE = 2,
     OWNER = 3,

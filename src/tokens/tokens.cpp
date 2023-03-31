@@ -68,7 +68,7 @@ static const auto MAX_NAME_LENGTH = 31;
 static const auto MAX_CHANNEL_NAME_LENGTH = 12;
 
 // min lengths are expressed by quantifiers
-static const std::regex ROOT_NAME_CHARACTERS("^[A-Z0-9._]{3,}$");
+static const std::regex YATOKEN_NAME_CHARACTERS("^[A-Z0-9._]{3,}$");
 static const std::regex SUB_NAME_CHARACTERS("^[A-Z0-9._]+$");
 static const std::regex UNIQUE_TAG_CHARACTERS("^[-A-Za-z0-9@$%&*()[\\]{}_.?:]+$");
 static const std::regex VOTE_TAG_CHARACTERS("^[A-Z0-9._]+$");
@@ -87,9 +87,9 @@ static const std::regex VOTE_INDICATOR(R"(^[^^~#!]+\^[^~#!\/]+$)");
 
 static const std::regex YACOIN_NAMES("^YAC$|^YACOIN$|^#YAC$|^#YACOIN$");
 
-bool IsRootNameValid(const std::string& name)
+bool IsYatokenNameValid(const std::string& name)
 {
-    return std::regex_match(name, ROOT_NAME_CHARACTERS)
+    return std::regex_match(name, YATOKEN_NAME_CHARACTERS)
         && !std::regex_match(name, DOUBLE_PUNCTUATION)
         && !std::regex_match(name, LEADING_PUNCTUATION)
         && !std::regex_match(name, TRAILING_PUNCTUATION)
@@ -119,7 +119,7 @@ bool IsNameValidBeforeTag(const std::string& name)
     std::vector<std::string> parts;
     boost::split(parts, name, boost::is_any_of(SUB_NAME_DELIMITER));
 
-    if (!IsRootNameValid(parts.front())) return false;
+    if (!IsYatokenNameValid(parts.front())) return false;
 
     if (parts.size() > 1)
     {
@@ -137,7 +137,7 @@ bool IsTokenNameASubtoken(const std::string& name)
     std::vector<std::string> parts;
     boost::split(parts, name, boost::is_any_of(SUB_NAME_DELIMITER));
 
-    if (!IsRootNameValid(parts.front())) return false;
+    if (!IsYatokenNameValid(parts.front())) return false;
 
     return parts.size() > 1;
 }
@@ -176,7 +176,7 @@ bool IsTokenNameValid(const std::string& name, TokenType& tokenType, std::string
     }
     else
     {
-        auto type = IsTokenNameASubtoken(name) ? TokenType::SUB : TokenType::ROOT;
+        auto type = IsTokenNameASubtoken(name) ? TokenType::SUB : TokenType::YATOKEN;
         bool ret = IsTypeCheckNameValid(type, name, error);
         if (ret)
             tokenType = type;
@@ -198,10 +198,10 @@ bool IsTokenNameValid(const std::string& name, TokenType& tokenType)
     return IsTokenNameValid(name, tokenType, _error);
 }
 
-bool IsTokenNameARoot(const std::string& name)
+bool IsTokenNameAYatoken(const std::string& name)
 {
     TokenType type;
-    return IsTokenNameValid(name, type) && type == TokenType::ROOT;
+    return IsTokenNameValid(name, type) && type == TokenType::YATOKEN;
 }
 
 bool IsTokenNameAnOwner(const std::string& name)
@@ -254,7 +254,7 @@ std::string GetParentName(const std::string& name)
         index = name.find_last_of(UNIQUE_TAG_DELIMITER);
     } else if (type == TokenType::VOTE) {
         index = name.find_last_of(VOTE_TAG_DELIMITER);
-    } else if (type == TokenType::ROOT) {
+    } else if (type == TokenType::YATOKEN) {
         return name;
     }
 
@@ -616,15 +616,15 @@ bool CTransaction::IsNewUniqueToken() const
 //! Call this function after IsNewUniqueToken
 bool CTransaction::VerifyNewUniqueToken(std::string& strError) const
 {
-    // Must contain at least 3 outpoints (YAC Lock, owner change and one or more new unique tokens that share a root (should be in trailing position))
+    // Must contain at least 3 outpoints (YAC Lock, owner change and one or more new unique tokens that share a yatoken (should be in trailing position))
     if (vout.size() < 3) {
         strError  = "bad-txns-unique-vout-size-to-small";
         return false;
     }
 
-    // check for (and count) new unique token outpoints.  make sure they share a root.
+    // check for (and count) new unique token outpoints.  make sure they share a yatoken.
     std::set<std::string> setUniqueTokens;
-    std::string tokenRoot = "";
+    std::string tokenYatoken = "";
     int tokenOutpointCount = 0;
 
     for (auto out : vout) {
@@ -635,10 +635,10 @@ bool CTransaction::VerifyNewUniqueToken(std::string& strError) const
                 strError = "bad-txns-issue-unique-token-from-script";
                 return false;
             }
-            std::string root = GetParentName(token.strName);
-            if (tokenRoot.compare("") == 0)
-                tokenRoot = root;
-            if (tokenRoot.compare(root) != 0) {
+            std::string yatoken = GetParentName(token.strName);
+            if (tokenYatoken.compare("") == 0)
+                tokenYatoken = yatoken;
+            if (tokenYatoken.compare(yatoken) != 0) {
                 strError = "bad-txns-issue-unique-token-compare-failed";
                 return false;
             }
@@ -673,13 +673,13 @@ bool CTransaction::VerifyNewUniqueToken(std::string& strError) const
         return false;
     }
 
-    // check for owner change outpoint that matches root
+    // check for owner change outpoint that matches yatoken
     bool fOwnerOutFound = false;
     for (auto out : vout) {
         CTokenTransfer transfer;
         std::string transferAddress;
         if (TransferTokenFromScript(out.scriptPubKey, transfer, transferAddress)) {
-            if (tokenRoot + OWNER_TAG == transfer.strName) {
+            if (tokenYatoken + OWNER_TAG == transfer.strName) {
                 fOwnerOutFound = true;
                 break;
             }
@@ -764,13 +764,13 @@ bool CTransaction::VerifyNewToken(std::string& strError) const {
 
     // If this is a sub token, check if one of CTxOut contains owner token transfer transaction
     if (tokenType == TokenType::SUB) {
-        std::string root = GetParentName(token.strName);
+        std::string yatoken = GetParentName(token.strName);
         bool fOwnerOutFound = false;
         for (auto out : this->vout) {
             CTokenTransfer transfer;
             std::string transferAddress;
             if (TransferTokenFromScript(out.scriptPubKey, transfer, transferAddress)) {
-                if (root + OWNER_TAG == transfer.strName) {
+                if (yatoken + OWNER_TAG == transfer.strName) {
                     fOwnerOutFound = true;
                     break;
                 }
@@ -2303,7 +2303,7 @@ CAmount GetLockAmount(const int nType)
 CAmount GetLockAmount(const TokenType type)
 {
     switch (type) {
-        case TokenType::ROOT:
+        case TokenType::YATOKEN:
             return GetIssueTokenLockAmount();
         case TokenType::SUB:
             return GetIssueSubTokenLockAmount();
@@ -2328,7 +2328,7 @@ uint32_t GetLockDuration(const int nType)
 uint32_t GetLockDuration(const TokenType type)
 {
     switch (type) {
-        case TokenType::ROOT:
+        case TokenType::YATOKEN:
             return feeLockDuration;
         case TokenType::SUB:
             return feeLockDuration;
