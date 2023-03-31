@@ -12,3 +12,18 @@ int IntFromTokenType(TokenType type) {
 TokenType TokenTypeFromInt(int nType) {
     return (TokenType)nType;
 }
+
+std::string TokenTypeToString(TokenType& tokenType)
+{
+    switch (tokenType)
+    {
+        case TokenType::YATOKEN:            return "YA-token";
+        case TokenType::SUB:                return "Sub-token";
+        case TokenType::UNIQUE:             return "Unique-token";
+        case TokenType::OWNER:              return "Owner-token";
+        case TokenType::VOTE:               return "Vote";
+        case TokenType::REISSUE:            return "Reissue";
+        case TokenType::INVALID:            return "Invalid";
+        default:                            return "Unknown";
+    }
+}

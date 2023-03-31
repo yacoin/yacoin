@@ -1680,8 +1680,15 @@ void ListTransactions(const CWalletTx& wtx, const string& strAccount, int nMinDe
                     entry.push_back(Pair("involvesWatchonly", true));
                 }
 
-                entry.push_back(Pair("token_type", GetTxnOutputType(data.type)));
+                TokenType tokenType;
+                std::string tokenError = "";
+                if (!IsTokenNameValid(data.tokenName, tokenType, tokenError)) {
+                    throw JSONRPCError(RPC_INVALID_PARAMETER, std::string("Invalid token name: ") + data.tokenName + std::string("\nError: ") + tokenError);
+                }
+
+                entry.push_back(Pair("token_operation", GetTxnOutputType(data.type)));
                 entry.push_back(Pair("token_name", data.tokenName));
+                entry.push_back(Pair("token_type", TokenTypeToString(tokenType)));
                 entry.push_back(Pair("amount", TokenValueFromAmount(data.nAmount, data.tokenName)));
                 MaybePushAddress(entry, data.destination);
                 entry.push_back(Pair("vout", data.vout));

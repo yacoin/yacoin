@@ -32,6 +32,7 @@ enum class TokenType
 
 int IntFromTokenType(TokenType type);
 TokenType TokenTypeFromInt(int nType);
+std::string TokenTypeToString(TokenType& tokenType);
 
 const char IPFS_SHA2_256 = 0x12;
 const char TXID_NOTIFIER = 0x54;

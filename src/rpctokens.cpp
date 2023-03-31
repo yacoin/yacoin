@@ -37,21 +37,6 @@ std::string TokenActivationWarning()
     return AreTokensDeployed() ? "" : "\nTHIS COMMAND IS NOT YET ACTIVE!\n";
 }
 
-std::string TokenTypeToString(TokenType& tokenType)
-{
-    switch (tokenType)
-    {
-        case TokenType::YATOKEN:            return "YA-token";
-        case TokenType::SUB:                return "Sub-token";
-        case TokenType::UNIQUE:             return "Unique-token";
-        case TokenType::OWNER:              return "Owner-token";
-        case TokenType::VOTE:               return "Vote";
-        case TokenType::REISSUE:            return "Reissue";
-        case TokenType::INVALID:            return "Invalid";
-        default:                            return "Unknown";
-    }
-}
-
 template <class Iter, class Incr>
 void safe_advance(Iter& curr, const Iter& end, Incr n)
 {
@@ -658,6 +643,13 @@ Value listmytokens(const Array& params, bool fHelp)
                 outpoints.push_back(tempOut);
             }
             token.push_back(Pair("outpoints", outpoints));
+
+            TokenType tokenType;
+            std::string tokenError = "";
+            if (!IsTokenNameValid(bal->first, tokenType, tokenError)) {
+                throw JSONRPCError(RPC_INVALID_PARAMETER, std::string("Invalid token name: ") + bal->first + std::string("\nError: ") + tokenError);
+            }
+            token.push_back(Pair("token_type", TokenTypeToString(tokenType)));
             result.push_back(Pair(bal->first, token));
         }
     }
@@ -747,7 +739,13 @@ Value listtokens(const Array& params, bool fHelp)
         CNewToken token = data.token;
         if (verbose) {
             Object detail;
+            TokenType tokenType;
+            std::string tokenError = "";
+            if (!IsTokenNameValid(token.strName, tokenType, tokenError)) {
+                throw JSONRPCError(RPC_INVALID_PARAMETER, std::string("Invalid token name: ") + token.strName + std::string("\nError: ") + tokenError);
+            }
             detail.push_back(Pair("name", token.strName));
+            detail.push_back(Pair("token_type", TokenTypeToString(tokenType)));
             detail.push_back(Pair("amount", TokenValueFromAmount(token.nAmount, token.strName)));
             detail.push_back(Pair("units", token.units));
             detail.push_back(Pair("reissuable", token.nReissuable));
