@@ -5,25 +5,25 @@
 
 #include "tokentypes.h"
 
-int IntFromTokenType(TokenType type) {
+int IntFromETokenType(ETokenType type) {
     return (int)type;
 }
 
-TokenType TokenTypeFromInt(int nType) {
-    return (TokenType)nType;
+ETokenType ETokenTypeFromInt(int nType) {
+    return (ETokenType)nType;
 }
 
-std::string TokenTypeToString(TokenType& tokenType)
+std::string ETokenTypeToString(ETokenType& tokenType)
 {
     switch (tokenType)
     {
-        case TokenType::YATOKEN:            return "YA-token";
-        case TokenType::SUB:                return "Sub-token";
-        case TokenType::UNIQUE:             return "Unique-token";
-        case TokenType::OWNER:              return "Owner-token";
-        case TokenType::VOTE:               return "Vote";
-        case TokenType::REISSUE:            return "Reissue";
-        case TokenType::INVALID:            return "Invalid";
+        case ETokenType::YATOKEN:            return "YA-token";
+        case ETokenType::SUB:                return "Sub-token";
+        case ETokenType::UNIQUE:             return "Unique-token";
+        case ETokenType::OWNER:              return "Owner-token";
+        case ETokenType::VOTE:               return "Vote";
+        case ETokenType::REISSUE:            return "Reissue";
+        case ETokenType::INVALID:            return "Invalid";
         default:                            return "Unknown";
     }
 }

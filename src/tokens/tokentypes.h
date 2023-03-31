@@ -19,7 +19,7 @@
 
 class CTokensCache;
 
-enum class TokenType
+enum class ETokenType
 {
     YATOKEN = 0,
     SUB = 1,
@@ -30,9 +30,9 @@ enum class TokenType
     INVALID = 6
 };
 
-int IntFromTokenType(TokenType type);
-TokenType TokenTypeFromInt(int nType);
-std::string TokenTypeToString(TokenType& tokenType);
+int IntFromETokenType(ETokenType type);
+ETokenType ETokenTypeFromInt(int nType);
+std::string ETokenTypeToString(ETokenType& tokenType);
 
 const char IPFS_SHA2_256 = 0x12;
 const char TXID_NOTIFIER = 0x54;

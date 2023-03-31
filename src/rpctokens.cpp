@@ -88,15 +88,15 @@ Value issue(const Array& params, bool fHelp)
 
     // Check token name and infer tokenType
     std::string tokenName = params[0].get_str();
-    TokenType tokenType;
+    ETokenType tokenType;
     std::string tokenError = "";
     if (!IsTokenNameValid(tokenName, tokenType, tokenError)) {
         throw JSONRPCError(RPC_INVALID_PARAMETER, std::string("Invalid token name: ") + tokenName + std::string("\nError: ") + tokenError);
     }
 
     // Check for unsupported token types
-    if (tokenType == TokenType::VOTE || tokenType == TokenType::REISSUE || tokenType == TokenType::OWNER || tokenType == TokenType::INVALID) {
-        throw JSONRPCError(RPC_INVALID_PARAMETER, std::string("Unsupported token type: ") + TokenTypeToString(tokenType));
+    if (tokenType == ETokenType::VOTE || tokenType == ETokenType::REISSUE || tokenType == ETokenType::OWNER || tokenType == ETokenType::INVALID) {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, std::string("Unsupported token type: ") + ETokenTypeToString(tokenType));
     }
 
     CAmount nAmount = COIN;
@@ -148,7 +148,7 @@ Value issue(const Array& params, bool fHelp)
     if (params.size() > 4)
         units = params[4].get_int();
 
-    bool reissuable = tokenType != TokenType::UNIQUE;
+    bool reissuable = tokenType != ETokenType::UNIQUE;
     if (params.size() > 5)
         reissuable = params[5].get_bool();
 
@@ -167,7 +167,7 @@ Value issue(const Array& params, bool fHelp)
     }
 
     // check for required unique token params
-    if (tokenType == TokenType::UNIQUE && (nAmount != COIN || units != 0 || reissuable)) {
+    if (tokenType == ETokenType::UNIQUE && (nAmount != COIN || units != 0 || reissuable)) {
         throw JSONRPCError(RPC_INVALID_PARAMETER, std::string("Invalid parameters for issuing a unique token."));
     }
 
@@ -644,12 +644,12 @@ Value listmytokens(const Array& params, bool fHelp)
             }
             token.push_back(Pair("outpoints", outpoints));
 
-            TokenType tokenType;
+            ETokenType tokenType;
             std::string tokenError = "";
             if (!IsTokenNameValid(bal->first, tokenType, tokenError)) {
                 throw JSONRPCError(RPC_INVALID_PARAMETER, std::string("Invalid token name: ") + bal->first + std::string("\nError: ") + tokenError);
             }
-            token.push_back(Pair("token_type", TokenTypeToString(tokenType)));
+            token.push_back(Pair("token_type", ETokenTypeToString(tokenType)));
             result.push_back(Pair(bal->first, token));
         }
     }
@@ -739,13 +739,13 @@ Value listtokens(const Array& params, bool fHelp)
         CNewToken token = data.token;
         if (verbose) {
             Object detail;
-            TokenType tokenType;
+            ETokenType tokenType;
             std::string tokenError = "";
             if (!IsTokenNameValid(token.strName, tokenType, tokenError)) {
                 throw JSONRPCError(RPC_INVALID_PARAMETER, std::string("Invalid token name: ") + token.strName + std::string("\nError: ") + tokenError);
             }
             detail.push_back(Pair("name", token.strName));
-            detail.push_back(Pair("token_type", TokenTypeToString(tokenType)));
+            detail.push_back(Pair("token_type", ETokenTypeToString(tokenType)));
             detail.push_back(Pair("amount", TokenValueFromAmount(token.nAmount, token.strName)));
             detail.push_back(Pair("units", token.units));
             detail.push_back(Pair("reissuable", token.nReissuable));

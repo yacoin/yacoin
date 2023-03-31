@@ -330,7 +330,7 @@ bool CTransaction::CheckTransaction(CValidationState &state) const
                 setTokenTransferNames.insert(transfer.strName);
 
                 // Check token name validity and get type
-                TokenType tokenType;
+                ETokenType tokenType;
                 if (!IsTokenNameValid(transfer.strName, tokenType)) {
                     return state.DoS(100, error("bad-txns-transfer-token-name-invalid"));
                 }
@@ -342,7 +342,7 @@ bool CTransaction::CheckTransaction(CValidationState &state) const
                 }
 
                 // If the transfer is a unique token. Check to make sure that it is UNIQUE_TOKEN_AMOUNT
-                if (tokenType == TokenType::UNIQUE) {
+                if (tokenType == ETokenType::UNIQUE) {
                     if (transfer.nAmount != UNIQUE_TOKEN_AMOUNT)
                         return state.DoS(100, error("bad-txns-transfer-unique-amount-was-not-1"));
                 }
@@ -429,7 +429,7 @@ bool CTransaction::CheckTransaction(CValidationState &state) const
             return state.DoS(100, error(strError.c_str()));
 
         // Get the tokenType
-        TokenType type;
+        ETokenType type;
         IsTokenNameValid(reissue.strName, type);
 
     } else if (IsNewUniqueToken()) {

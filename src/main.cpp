@@ -237,7 +237,7 @@ bool CheckTxTokens(const CTransaction &tx, CValidationState &state,
                 return state.DoS(100, error("bad-txns-issue-serialzation-failed"));
             }
 
-            TokenType tokenType;
+            ETokenType tokenType;
             IsTokenNameValid(token.strName, tokenType);
 
             if (!ContextualCheckNewToken(tokenCache, token, strError, fCheckMempool))

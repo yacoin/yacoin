@@ -2522,7 +2522,7 @@ bool CWallet::CreateTransactionWithTokens(
     CReserveKey& reservekey, CAmount& nFeeRet, int& nChangePosInOut,
     std::string& strFailReason, const CCoinControl& coinControl,
     const std::vector<CNewToken> tokens, const CTxDestination destination,
-    const TokenType& type)
+    const ETokenType& type)
 {
   CReissueToken reissueToken;
   /*
@@ -2533,7 +2533,7 @@ bool CWallet::CreateTransactionWithTokens(
         vecSend: contains fee lock address + owner token address
         coinControl.destChange: RVN change address
         destination: address containing new token
-        tokenType: TokenType::YATOKEN, TokenType::SUB, TokenType::UNIQUE
+        tokenType: ETokenType::YATOKEN, ETokenType::SUB, ETokenType::UNIQUE
    */
   return CreateTransactionAll(vecSend, wtxNew, reservekey, nFeeRet,
                               nChangePosInOut, strFailReason, coinControl,
@@ -2549,7 +2549,7 @@ bool CWallet::CreateTransactionWithTransferToken(
   CNewToken token;
   CReissueToken reissueToken;
   CTxDestination destination;
-  TokenType tokenType = TokenType::INVALID;
+  ETokenType tokenType = ETokenType::INVALID;
 /*
  *  vecSend: contains receiver's token scriptPubKey
     coinControl: contain RVN change address and token change address
@@ -2559,7 +2559,7 @@ bool CWallet::CreateTransactionWithTransferToken(
     fTransferToken: true
     fReissueToken: false
     reissueToken: contains empty CReissueToken info
-    tokenType: TokenType::INVALID
+    tokenType: ETokenType::INVALID
  */
   return CreateTransactionAll(vecSend, wtxNew, reservekey, nFeeRet,
                               nChangePosInOut, strFailReason, coinControl,
@@ -2574,7 +2574,7 @@ bool CWallet::CreateTransactionWithReissueToken(
     const CReissueToken& reissueToken, const CTxDestination destination)
 {
   CNewToken token;
-  TokenType tokenType = TokenType::REISSUE;
+  ETokenType tokenType = ETokenType::REISSUE;
   /*
    *    vecSend: contains scriptPubKey for ownership token transfer and scriptPubKey for reissue fee lock
         coinControl: contain RVN change address
@@ -2584,7 +2584,7 @@ bool CWallet::CreateTransactionWithReissueToken(
         fTransferToken: false
         fReissueToken: true
         reissueToken: contains CReissueToken info
-        tokenType: TokenType::REISSUE
+        tokenType: ETokenType::REISSUE
    */
   return CreateTransactionAll(vecSend, wtxNew, reservekey, nFeeRet,
                               nChangePosInOut, strFailReason, coinControl,
@@ -2633,7 +2633,7 @@ bool CWallet::CreateTransaction(const std::vector<CRecipient> &vecSend,
     CNewToken token;
     CReissueToken reissueToken;
     CTxDestination destination;
-    TokenType tokenType = TokenType::INVALID;
+    ETokenType tokenType = ETokenType::INVALID;
     return CreateTransactionAll(vecSend, wtxNew, reservekey, nFeeRet, nChangePosInOut, strFailReason, coinControl, fromScriptPubKey, useExpiredTimelockUTXO, false, token, destination, false, false, reissueToken, tokenType);
 }
 
@@ -2644,7 +2644,7 @@ bool CWallet::CreateTransactionAll(
     const CScript* fromScriptPubKey, bool useExpiredTimelockUTXO, bool fNewToken,
     const CNewToken& token, const CTxDestination destination,
     bool fTransferToken, bool fReissueToken,
-    const CReissueToken& reissueToken, const TokenType& tokenType)
+    const CReissueToken& reissueToken, const ETokenType& tokenType)
 {
     std::vector<CNewToken> tokens;
     tokens.push_back(token);
@@ -2661,7 +2661,7 @@ bool CWallet::CreateTransactionAll(
     const CScript* fromScriptPubKey, bool useExpiredTimelockUTXO, bool fNewToken,
     const std::vector<CNewToken> tokens, const CTxDestination destination,
     bool fTransferToken, bool fReissueToken,
-    const CReissueToken& reissueToken, const TokenType& tokenType)
+    const CReissueToken& reissueToken, const ETokenType& tokenType)
 {
     /** YAC_TOKEN START */
     if (!AreTokensDeployed() && (fTransferToken || fNewToken || fReissueToken))
@@ -2684,7 +2684,7 @@ bool CWallet::CreateTransactionAll(
     for (const auto& recipient : vecSend)
     {
         /** YAC_TOKEN START */
-        if (fTransferToken || fReissueToken || tokenType == TokenType::SUB || tokenType == TokenType::UNIQUE) {
+        if (fTransferToken || fReissueToken || tokenType == ETokenType::SUB || tokenType == ETokenType::UNIQUE) {
             CTokenTransfer tokenTransfer;
             std::string address;
             if (TransferTokenFromScript(recipient.scriptPubKey, tokenTransfer, address)) {
@@ -2733,7 +2733,7 @@ bool CWallet::CreateTransactionAll(
             std::vector<COutput> vAvailableCoins;
             std::map<std::string, std::vector<COutput> > mapTokenCoins;
 
-            if (fTransferToken || fReissueToken || tokenType == TokenType::SUB || tokenType == TokenType::UNIQUE)
+            if (fTransferToken || fReissueToken || tokenType == ETokenType::SUB || tokenType == ETokenType::UNIQUE)
                 AvailableCoinsWithTokens(vAvailableCoins, mapTokenCoins, true, &coinControl, fromScriptPubKey, useExpiredTimelockUTXO);
             else
                 AvailableCoins(vAvailableCoins, true, &coinControl, fromScriptPubKey, useExpiredTimelockUTXO);
@@ -2871,7 +2871,7 @@ bool CWallet::CreateTransactionAll(
                     if (fNewToken) {
                         for (auto token : tokens) {
                             // Create the owner token output for non-unique tokens
-                            if (tokenType != TokenType::UNIQUE) {
+                            if (tokenType != ETokenType::UNIQUE) {
                                 CScript ownerScript = GetScriptForDestination(destination);
                                 token.ConstructOwnerTransaction(ownerScript);
                                 CTxOut ownerTxOut(0, ownerScript);

@@ -142,41 +142,41 @@ bool IsTokenNameASubtoken(const std::string& name)
     return parts.size() > 1;
 }
 
-bool IsTokenNameValid(const std::string& name, TokenType& tokenType, std::string& error)
+bool IsTokenNameValid(const std::string& name, ETokenType& tokenType, std::string& error)
 {
     // Do a max length check first to stop the possibility of a stack exhaustion.
     // We check for a value that is larger than the max token name
     if (name.length() > 40)
         return false;
 
-    tokenType = TokenType::INVALID;
+    tokenType = ETokenType::INVALID;
     if (std::regex_match(name, UNIQUE_INDICATOR))
     {
-        bool ret = IsTypeCheckNameValid(TokenType::UNIQUE, name, error);
+        bool ret = IsTypeCheckNameValid(ETokenType::UNIQUE, name, error);
         if (ret)
-            tokenType = TokenType::UNIQUE;
+            tokenType = ETokenType::UNIQUE;
 
         return ret;
     }
     else if (std::regex_match(name, OWNER_INDICATOR))
     {
-        bool ret = IsTypeCheckNameValid(TokenType::OWNER, name, error);
+        bool ret = IsTypeCheckNameValid(ETokenType::OWNER, name, error);
         if (ret)
-            tokenType = TokenType::OWNER;
+            tokenType = ETokenType::OWNER;
 
         return ret;
     }
     else if (std::regex_match(name, VOTE_INDICATOR))
     {
-        bool ret = IsTypeCheckNameValid(TokenType::VOTE, name, error);
+        bool ret = IsTypeCheckNameValid(ETokenType::VOTE, name, error);
         if (ret)
-            tokenType = TokenType::VOTE;
+            tokenType = ETokenType::VOTE;
 
         return ret;
     }
     else
     {
-        auto type = IsTokenNameASubtoken(name) ? TokenType::SUB : TokenType::YATOKEN;
+        auto type = IsTokenNameASubtoken(name) ? ETokenType::SUB : ETokenType::YATOKEN;
         bool ret = IsTypeCheckNameValid(type, name, error);
         if (ret)
             tokenType = type;
@@ -187,12 +187,12 @@ bool IsTokenNameValid(const std::string& name, TokenType& tokenType, std::string
 
 bool IsTokenNameValid(const std::string& name)
 {
-    TokenType _tokenType;
+    ETokenType _tokenType;
     std::string _error;
     return IsTokenNameValid(name, _tokenType, _error);
 }
 
-bool IsTokenNameValid(const std::string& name, TokenType& tokenType)
+bool IsTokenNameValid(const std::string& name, ETokenType& tokenType)
 {
     std::string _error;
     return IsTokenNameValid(name, tokenType, _error);
@@ -200,8 +200,8 @@ bool IsTokenNameValid(const std::string& name, TokenType& tokenType)
 
 bool IsTokenNameAYatoken(const std::string& name)
 {
-    TokenType type;
-    return IsTokenNameValid(name, type) && type == TokenType::YATOKEN;
+    ETokenType type;
+    return IsTokenNameValid(name, type) && type == ETokenType::YATOKEN;
 }
 
 bool IsTokenNameAnOwner(const std::string& name)
@@ -210,21 +210,21 @@ bool IsTokenNameAnOwner(const std::string& name)
 }
 
 // TODO get the string translated below
-bool IsTypeCheckNameValid(const TokenType type, const std::string& name, std::string& error)
+bool IsTypeCheckNameValid(const ETokenType type, const std::string& name, std::string& error)
 {
-    if (type == TokenType::UNIQUE) {
+    if (type == ETokenType::UNIQUE) {
         if (name.size() > MAX_NAME_LENGTH) { error = "Name is greater than max length of " + std::to_string(MAX_NAME_LENGTH); return false; }
         std::vector<std::string> parts;
         boost::split(parts, name, boost::is_any_of(UNIQUE_TAG_DELIMITER));
         bool valid = IsNameValidBeforeTag(parts.front()) && IsUniqueTagValid(parts.back());
         if (!valid) { error = "Unique name contains invalid characters (Valid characters are: A-Z a-z 0-9 @ $ % & * ( ) [ ] { } _ . ? : -)";  return false; }
         return true;
-    } else if (type == TokenType::OWNER) {
+    } else if (type == ETokenType::OWNER) {
         if (name.size() > MAX_NAME_LENGTH) { error = "Name is greater than max length of " + std::to_string(MAX_NAME_LENGTH); return false; }
         bool valid = IsNameValidBeforeTag(name.substr(0, name.size() - 1));
         if (!valid) { error = "Owner name contains invalid characters (Valid characters are: A-Z 0-9 _ .) (special characters can't be the first or last characters)";  return false; }
         return true;
-    } else if (type == TokenType::VOTE) {
+    } else if (type == ETokenType::VOTE) {
         if (name.size() > MAX_NAME_LENGTH) { error = "Name is greater than max length of " + std::to_string(MAX_NAME_LENGTH); return false; }
         std::vector<std::string> parts;
         boost::split(parts, name, boost::is_any_of(VOTE_TAG_DELIMITER));
@@ -243,18 +243,18 @@ bool IsTypeCheckNameValid(const TokenType type, const std::string& name, std::st
 
 std::string GetParentName(const std::string& name)
 {
-    TokenType type;
+    ETokenType type;
     if (!IsTokenNameValid(name, type))
         return "";
 
     auto index = std::string::npos;
-    if (type == TokenType::SUB) {
+    if (type == ETokenType::SUB) {
         index = name.find_last_of(SUB_NAME_DELIMITER);
-    } else if (type == TokenType::UNIQUE) {
+    } else if (type == ETokenType::UNIQUE) {
         index = name.find_last_of(UNIQUE_TAG_DELIMITER);
-    } else if (type == TokenType::VOTE) {
+    } else if (type == ETokenType::VOTE) {
         index = name.find_last_of(VOTE_TAG_DELIMITER);
-    } else if (type == TokenType::YATOKEN) {
+    } else if (type == ETokenType::YATOKEN) {
         return name;
     }
 
@@ -270,12 +270,12 @@ std::string GetUniqueTokenName(const std::string& parent, const std::string& tag
 {
     std::string unique = parent + "#" + tag;
 
-    TokenType type;
+    ETokenType type;
     if (!IsTokenNameValid(unique, type)) {
         return "";
     }
 
-    if (type != TokenType::UNIQUE)
+    if (type != ETokenType::UNIQUE)
         return "";
 
     return unique;
@@ -662,7 +662,7 @@ bool CTransaction::VerifyNewUniqueToken(std::string& strError) const
     // check for lock outpoint (must account for each new token)
     bool fBurnOutpointFound = false;
     for (auto out : vout) {
-        if (CheckIssueLockTx(out, TokenType::UNIQUE, tokenOutpointCount)) {
+        if (CheckIssueLockTx(out, ETokenType::UNIQUE, tokenOutpointCount)) {
             fBurnOutpointFound = true;
             break;
         }
@@ -696,7 +696,7 @@ bool CTransaction::VerifyNewUniqueToken(std::string& strError) const
     int nOwners = 0;
     int nIssues = 0;
     int nReissues = 0;
-    GetTxOutTokenTypes(vout, nIssues, nReissues, nTransfers, nOwners);
+    GetTxOutETokenTypes(vout, nIssues, nReissues, nTransfers, nOwners);
 
     if (nOwners > 0 || nReissues > 0 || nIssues != tokenOutpointCount) {
         strError = "bad-txns-failed-unique-token-formatting-check";
@@ -734,7 +734,7 @@ bool CTransaction::VerifyNewToken(std::string& strError) const {
         return error("%s : Failed to get new token from transaction: %s", __func__, this->GetHash().GetHex());
     }
 
-    TokenType tokenType;
+    ETokenType tokenType;
     IsTokenNameValid(token.strName, tokenType);
 
     std::string strOwnerName;
@@ -763,7 +763,7 @@ bool CTransaction::VerifyNewToken(std::string& strError) const {
     }
 
     // If this is a sub token, check if one of CTxOut contains owner token transfer transaction
-    if (tokenType == TokenType::SUB) {
+    if (tokenType == ETokenType::SUB) {
         std::string yatoken = GetParentName(token.strName);
         bool fOwnerOutFound = false;
         for (auto out : this->vout) {
@@ -788,7 +788,7 @@ bool CTransaction::VerifyNewToken(std::string& strError) const {
     int nOwners = 0;
     int nIssues = 0;
     int nReissues = 0;
-    GetTxOutTokenTypes(vout, nIssues, nReissues, nTransfers, nOwners);
+    GetTxOutETokenTypes(vout, nIssues, nReissues, nTransfers, nOwners);
 
     if (nOwners != 1 || nIssues != 1 || nReissues > 0) {
         strError = "bad-txns-failed-issue-token-formatting-check";
@@ -830,7 +830,7 @@ bool CTransaction::VerifyReissueToken(std::string& strError) const
     }
 
     // Reissuing a regular token checks the reissue_token_name + "!"
-    TokenType token_type = TokenType::INVALID;
+    ETokenType token_type = ETokenType::INVALID;
     IsTokenNameValid(reissue.strName, token_type);
 
     // This is going to be the token name that we need to verify that the owner token of was added to the transaction
@@ -873,7 +873,7 @@ bool CTransaction::VerifyReissueToken(std::string& strError) const
     int nOwners = 0;
     int nIssues = 0;
     int nReissues = 0;
-    GetTxOutTokenTypes(vout, nIssues, nReissues, nTransfers, nOwners);
+    GetTxOutETokenTypes(vout, nIssues, nReissues, nTransfers, nOwners);
 
     if (nOwners > 0 || nReissues != 1 || nIssues > 0) {
         strError = "bad-txns-failed-reissue-token-formatting-check";
@@ -1928,11 +1928,11 @@ bool IsScriptNewUniqueToken(const CScript &scriptPubKey, int &nStartingIndex)
     if (!TokenFromScript(scriptPubKey, token, address))
         return false;
 
-    TokenType tokenType;
+    ETokenType tokenType;
     if (!IsTokenNameValid(token.strName, tokenType))
         return false;
 
-    return TokenType::UNIQUE == tokenType;
+    return ETokenType::UNIQUE == tokenType;
 }
 
 bool IsScriptOwnerToken(const CScript& scriptPubKey)
@@ -2215,9 +2215,9 @@ bool GetTokenData(const CScript& script, CTokenOutputEntry& data)
 }
 
 // REMOVE LATER
-bool CheckIssueLockTx(const CTxOut& txOut, const TokenType& type, const int numberIssued)
+bool CheckIssueLockTx(const CTxOut& txOut, const ETokenType& type, const int numberIssued)
 {
-    if (type == TokenType::REISSUE || type == TokenType::VOTE || type == TokenType::OWNER || type == TokenType::INVALID)
+    if (type == ETokenType::REISSUE || type == ETokenType::VOTE || type == ETokenType::OWNER || type == ETokenType::INVALID)
         return false;
 
     // Get the lock amount and lock duration for the type of token
@@ -2246,7 +2246,7 @@ bool CheckIssueLockTx(const CTxOut& txOut, const TokenType& type, const int numb
     return true;
 }
 
-bool CheckIssueLockTx(const CTxOut& txOut, const TokenType& type)
+bool CheckIssueLockTx(const CTxOut& txOut, const ETokenType& type)
 {
     return CheckIssueLockTx(txOut, type, 1);
 }
@@ -2258,7 +2258,7 @@ bool CheckReissueLockTx(const CTxOut& txOut)
         return false;
 
     // Get the lock duration for the type of token
-    uint32_t expectedLockDuration = GetLockDuration(TokenType::REISSUE);
+    uint32_t expectedLockDuration = GetLockDuration(ETokenType::REISSUE);
 
     // Scan information from scriptPubKey to get lock duration
     uint32_t lockDuration = 0;
@@ -2297,23 +2297,23 @@ CAmount GetIssueUniqueTokenLockAmount()
 
 CAmount GetLockAmount(const int nType)
 {
-    return GetLockAmount((TokenType(nType)));
+    return GetLockAmount((ETokenType(nType)));
 }
 
-CAmount GetLockAmount(const TokenType type)
+CAmount GetLockAmount(const ETokenType type)
 {
     switch (type) {
-        case TokenType::YATOKEN:
+        case ETokenType::YATOKEN:
             return GetIssueTokenLockAmount();
-        case TokenType::SUB:
+        case ETokenType::SUB:
             return GetIssueSubTokenLockAmount();
-        case TokenType::OWNER:
+        case ETokenType::OWNER:
             return 0;
-        case TokenType::UNIQUE:
+        case ETokenType::UNIQUE:
             return GetIssueUniqueTokenLockAmount();
-        case TokenType::VOTE:
+        case ETokenType::VOTE:
             return 0;
-        case TokenType::REISSUE:
+        case ETokenType::REISSUE:
             return GetReissueTokenLockAmount();
         default:
             return 0;
@@ -2322,23 +2322,23 @@ CAmount GetLockAmount(const TokenType type)
 
 uint32_t GetLockDuration(const int nType)
 {
-    return GetLockDuration((TokenType(nType)));
+    return GetLockDuration((ETokenType(nType)));
 }
 
-uint32_t GetLockDuration(const TokenType type)
+uint32_t GetLockDuration(const ETokenType type)
 {
     switch (type) {
-        case TokenType::YATOKEN:
+        case ETokenType::YATOKEN:
             return feeLockDuration;
-        case TokenType::SUB:
+        case ETokenType::SUB:
             return feeLockDuration;
-        case TokenType::OWNER:
+        case ETokenType::OWNER:
             return 0;
-        case TokenType::UNIQUE:
+        case ETokenType::UNIQUE:
             return feeLockDuration;
-        case TokenType::VOTE:
+        case ETokenType::VOTE:
             return 0;
-        case TokenType::REISSUE:
+        case ETokenType::REISSUE:
             return feeLockDuration;
         default:
             return 0;
@@ -2541,14 +2541,14 @@ bool CreateTokenTransaction(CWallet* pwallet, CCoinControl& coinControl, const s
         coinControl.destChange = DecodeDestination(change_address);
     }
 
-    TokenType tokenType;
+    ETokenType tokenType;
     std::string parentName;
     for (auto token : tokens) {
         if (!IsTokenNameValid(token.strName, tokenType)) {
             error = std::make_pair(RPC_INVALID_PARAMETER, "Token name not valid");
             return false;
         }
-        if (tokens.size() > 1 && tokenType != TokenType::UNIQUE) {
+        if (tokens.size() > 1 && tokenType != ETokenType::UNIQUE) {
             error = std::make_pair(RPC_INVALID_PARAMETER, "Only unique tokens can be issued in bulk.");
             return false;
         }
@@ -2589,7 +2589,7 @@ bool CreateTokenTransaction(CWallet* pwallet, CCoinControl& coinControl, const s
 
     // If the token is a subtoken or unique token. We need to send the ownertoken change back to ourselfs
     // Currently, the address containing owner token is same as the change address
-    if (tokenType == TokenType::SUB || tokenType == TokenType::UNIQUE) {
+    if (tokenType == ETokenType::SUB || tokenType == ETokenType::UNIQUE) {
         // Get the script for the destination address for the tokens
         CScript scriptTransferOwnerToken = GetScriptForDestination(DecodeDestination(change_address));
 
@@ -2600,7 +2600,7 @@ bool CreateTokenTransaction(CWallet* pwallet, CCoinControl& coinControl, const s
     }
 
     // Get the owner outpoints if this is a subtoken or unique token
-    if (tokenType == TokenType::SUB || tokenType == TokenType::UNIQUE) {
+    if (tokenType == ETokenType::SUB || tokenType == ETokenType::UNIQUE) {
         // Verify that this wallet is the owner for the token, and get the owner token outpoint
         for (auto token : tokens) {
             if (!VerifyWalletHasToken(parentName + OWNER_TAG, error)) {
@@ -2631,7 +2631,7 @@ bool CreateReissueTokenTransaction(CWallet* pwallet, CCoinControl& coinControl, 
     std::string change_address = EncodeDestination(coinControl.destChange);
 
     // Get the token type
-    TokenType token_type = TokenType::INVALID;
+    ETokenType token_type = ETokenType::INVALID;
     IsTokenNameValid(token_name, token_type);
 
     // Check that validitity of the address
@@ -2856,7 +2856,7 @@ bool CheckEncoded(const std::string& hash, std::string& strError) {
     return false;
 }
 
-void GetTxOutTokenTypes(const std::vector<CTxOut>& vout, int& issues, int& reissues, int& transfers, int& owners)
+void GetTxOutETokenTypes(const std::vector<CTxOut>& vout, int& issues, int& reissues, int& transfers, int& owners)
 {
     for (auto out: vout) {
         int type;
@@ -2934,7 +2934,7 @@ bool ParseTokenScript(CScript scriptPubKey, uint160 &hashBytes, std::string &tok
 bool ContextualCheckTransferToken(CTokensCache* tokenCache, const CTokenTransfer& transfer, const std::string& address, std::string& strError)
 {
     strError = "";
-    TokenType tokenType;
+    ETokenType tokenType;
     if (!IsTokenNameValid(transfer.strName, tokenType)) {
         strError = "Invalid parameter: token_name must only consist of valid characters and have a size between 3 and 30 characters. See help for more details.";
         return false;
@@ -2952,13 +2952,13 @@ bool CheckNewToken(const CNewToken& token, std::string& strError)
 {
     strError = "";
 
-    TokenType tokenType;
+    ETokenType tokenType;
     if (!IsTokenNameValid(std::string(token.strName), tokenType)) {
         strError = _("Invalid parameter: token_name must only consist of valid characters and have a size between 3 and 30 characters. See help for more details.");
         return false;
     }
 
-    if (tokenType == TokenType::UNIQUE) {
+    if (tokenType == ETokenType::UNIQUE) {
         if (token.units != UNIQUE_TOKEN_UNITS) {
             strError = _("Invalid parameter: units must be ") + std::to_string(UNIQUE_TOKEN_UNITS);
             return false;
@@ -3068,7 +3068,7 @@ bool CheckReissueToken(const CReissueToken& token, std::string& strError)
         return false;
     }
 
-    TokenType type;
+    ETokenType type;
     IsTokenNameValid(token.strName, type);
 
     return true;

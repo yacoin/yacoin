@@ -351,7 +351,7 @@ public:
         const CScript* fromScriptPubKey, bool useExpiredTimelockUTXO, bool fNewToken,
         const CNewToken& token, const CTxDestination destination,
         bool fTransferToken, bool fReissueToken,
-        const CReissueToken& reissueToken, const TokenType& tokenType);
+        const CReissueToken& reissueToken, const ETokenType& tokenType);
 
     bool CreateTransactionAll(
         const std::vector<CRecipient>& vecSend, CWalletTx& wtxNew,
@@ -360,7 +360,7 @@ public:
         const CScript* fromScriptPubKey, bool useExpiredTimelockUTXO, bool fNewToken,
         const std::vector<CNewToken> tokens, const CTxDestination destination,
         bool fTransferToken, bool fReissueToken,
-        const CReissueToken& reissueToken, const TokenType& tokenType);
+        const CReissueToken& reissueToken, const ETokenType& tokenType);
 
     /** YAC_TOKEN START */
     bool CreateTransactionWithTokens(
@@ -368,7 +368,7 @@ public:
         CReserveKey& reservekey, CAmount& nFeeRet, int& nChangePosInOut,
         std::string& strFailReason, const CCoinControl& coinControl,
         const std::vector<CNewToken> tokens, const CTxDestination destination,
-        const TokenType& tokenType);
+        const ETokenType& tokenType);
 
     bool CreateTransactionWithTransferToken(
         const std::vector<CRecipient>& vecSend, CWalletTx& wtxNew,

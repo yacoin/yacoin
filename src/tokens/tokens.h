@@ -255,19 +255,19 @@ CAmount GetIssueTokenLockAmount();
 CAmount GetReissueTokenLockAmount();
 CAmount GetIssueSubTokenLockAmount();
 CAmount GetIssueUniqueTokenLockAmount();
-CAmount GetLockAmount(const TokenType type);
+CAmount GetLockAmount(const ETokenType type);
 CAmount GetLockAmount(const int nType);
 
 //! Functions to be used to get access to the lock duration for a given token type issuance
-uint32_t GetLockDuration(const TokenType type);
+uint32_t GetLockDuration(const ETokenType type);
 uint32_t GetLockDuration(const int nType);
 
-void GetTxOutTokenTypes(const std::vector<CTxOut>& vout, int& issues, int& reissues, int& transfers, int& owners);
+void GetTxOutETokenTypes(const std::vector<CTxOut>& vout, int& issues, int& reissues, int& transfers, int& owners);
 
 //! Check is an token name is valid, and being able to return the token type if needed
 bool IsTokenNameValid(const std::string& name);
-bool IsTokenNameValid(const std::string& name, TokenType& tokenType);
-bool IsTokenNameValid(const std::string& name, TokenType& tokenType, std::string& error);
+bool IsTokenNameValid(const std::string& name, ETokenType& tokenType);
+bool IsTokenNameValid(const std::string& name, ETokenType& tokenType, std::string& error);
 
 //! Check if an unique tagname is valid
 bool IsUniqueTagValid(const std::string& tag);
@@ -284,7 +284,7 @@ std::string GetParentName(const std::string& name); // Gets the parent name of a
 std::string GetUniqueTokenName(const std::string& parent, const std::string& tag);
 
 //! Given a type, and an token name, return if that name is valid based on the type
-bool IsTypeCheckNameValid(const TokenType type, const std::string& name, std::string& error);
+bool IsTypeCheckNameValid(const ETokenType type, const std::string& name, std::string& error);
 
 //! These types of token tx, have specific metadata at certain indexes in the transaction.
 //! These functions pull data from the scripts at those indexes
@@ -300,8 +300,8 @@ bool OwnerTokenFromScript(const CScript& scriptPubKey, std::string& tokenName, s
 bool ReissueTokenFromScript(const CScript& scriptPubKey, CReissueToken& reissue, std::string& strAddress);
 
 //! Check to make sure the script contains the burn transaction
-bool CheckIssueLockTx(const CTxOut& txOut, const TokenType& type, const int numberIssued);
-bool CheckIssueLockTx(const CTxOut& txOut, const TokenType& type);
+bool CheckIssueLockTx(const CTxOut& txOut, const ETokenType& type, const int numberIssued);
+bool CheckIssueLockTx(const CTxOut& txOut, const ETokenType& type);
 
 // TODO, maybe remove this function and input that check into the CheckIssueLockTx.
 //! Check to make sure the script contains the reissue lock data
