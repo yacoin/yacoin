@@ -113,10 +113,10 @@ private:
             const std::vector<COutput> &vAvailableCoins,
             std::set<CInputCoin> &setCoinsRet, CAmount &nValueRet,
             const CCoinControl *coinControl = NULL) const;
-    bool SelectAssets(
+    bool SelectTokens(
         int64_t nSpendTime,
-        const std::map<std::string, std::vector<COutput> >& mapAvailableAssets,
-        const std::map<std::string, CAmount>& mapAssetTargetValue,
+        const std::map<std::string, std::vector<COutput> >& mapAvailableTokens,
+        const std::map<std::string, CAmount>& mapTokenTargetValue,
         std::set<CInputCoin>& setCoinsRet,
         std::map<std::string, CAmount>& mapValueRet) const;
 
@@ -203,10 +203,10 @@ public:
             const int nMaxDepth = 9999999) const;
 
     /**
-     * Helper function that calls AvailableCoinsAll, used for transfering assets
+     * Helper function that calls AvailableCoinsAll, used for transfering tokens
      */
-    void AvailableAssets(
-        std::map<std::string, std::vector<COutput> >& mapAssetCoins,
+    void AvailableTokens(
+        std::map<std::string, std::vector<COutput> >& mapTokenCoins,
         bool fOnlySafe = true, const CCoinControl* coinControl = nullptr,
         const CAmount& nMinimumAmount = 1,
         const CAmount& nMaximumAmount = MAX_MONEY,
@@ -216,11 +216,11 @@ public:
 
     /**
      * Helper function that calls AvailableCoinsAll, used to receive all coins,
-     * Assets and RVN
+     * Tokens and RVN
      */
-    void AvailableCoinsWithAssets(
+    void AvailableCoinsWithTokens(
         std::vector<COutput>& vCoins,
-        std::map<std::string, std::vector<COutput> >& mapAssetCoins,
+        std::map<std::string, std::vector<COutput> >& mapTokenCoins,
         bool fOnlySafe = true, const CCoinControl* coinControl = nullptr,
         const CScript *fromScriptPubKey = NULL, bool useExpiredTimelockUTXO = false,
         const CAmount& nMinimumAmount = 1,
@@ -230,11 +230,11 @@ public:
         const int& nMaxDepth = 9999999) const;
 
     /**
-     * populate vCoins with vector of available COutputs, and populates vAssetCoins in fWithAssets is set to true.
+     * populate vCoins with vector of available COutputs, and populates vTokenCoins in fWithTokens is set to true.
      */
     void AvailableCoinsAll(std::vector<COutput> &vCoins,
-            std::map<std::string, std::vector<COutput> > &mapAssetCoins,
-            bool fGetYAC = true, bool fGetAssets = false,
+            std::map<std::string, std::vector<COutput> > &mapTokenCoins,
+            bool fGetYAC = true, bool fGetTokens = false,
             bool fOnlySafe = true, const CCoinControl *coinControl = nullptr,
             const CScript *fromScriptPubKey = NULL,
             bool useExpiredTimelockUTXO = false, const CAmount &nMinimumAmount = 1,
@@ -252,9 +252,9 @@ public:
     bool SelectCoinsMinConf(const CAmount &nTargetValue, int64_t nSpendTime,
             int nConfMine, int nConfTheirs, std::vector<COutput> vCoins,
             std::set<CInputCoin> &setCoinsRet, CAmount &nValueRet) const;
-    bool SelectAssetsMinConf(const CAmount& nTargetValue, int64_t nSpendTime,
+    bool SelectTokensMinConf(const CAmount& nTargetValue, int64_t nSpendTime,
                              int nConfMine, int nConfTheirs,
-                             const std::string& strAssetName,
+                             const std::string& strTokenName,
                              std::vector<COutput> vCoins,
                              std::set<CInputCoin>& setCoinsRet,
                              CAmount& nValueRet) const;
@@ -348,42 +348,42 @@ public:
         const std::vector<CRecipient>& vecSend, CWalletTx& wtxNew,
         CReserveKey& reservekey, CAmount& nFeeRet, int& nChangePosInOut,
         std::string& strFailReason, const CCoinControl& coinControl,
-        const CScript* fromScriptPubKey, bool useExpiredTimelockUTXO, bool fNewAsset,
-        const CNewAsset& asset, const CTxDestination destination,
-        bool fTransferAsset, bool fReissueAsset,
-        const CReissueAsset& reissueAsset, const AssetType& assetType);
+        const CScript* fromScriptPubKey, bool useExpiredTimelockUTXO, bool fNewToken,
+        const CNewToken& token, const CTxDestination destination,
+        bool fTransferToken, bool fReissueToken,
+        const CReissueToken& reissueToken, const TokenType& tokenType);
 
     bool CreateTransactionAll(
         const std::vector<CRecipient>& vecSend, CWalletTx& wtxNew,
         CReserveKey& reservekey, CAmount& nFeeRet, int& nChangePosInOut,
         std::string& strFailReason, const CCoinControl& coinControl,
-        const CScript* fromScriptPubKey, bool useExpiredTimelockUTXO, bool fNewAsset,
-        const std::vector<CNewAsset> assets, const CTxDestination destination,
-        bool fTransferAsset, bool fReissueAsset,
-        const CReissueAsset& reissueAsset, const AssetType& assetType);
+        const CScript* fromScriptPubKey, bool useExpiredTimelockUTXO, bool fNewToken,
+        const std::vector<CNewToken> tokens, const CTxDestination destination,
+        bool fTransferToken, bool fReissueToken,
+        const CReissueToken& reissueToken, const TokenType& tokenType);
 
-    /** YAC_ASSET START */
-    bool CreateTransactionWithAssets(
+    /** YAC_TOKEN START */
+    bool CreateTransactionWithTokens(
         const std::vector<CRecipient>& vecSend, CWalletTx& wtxNew,
         CReserveKey& reservekey, CAmount& nFeeRet, int& nChangePosInOut,
         std::string& strFailReason, const CCoinControl& coinControl,
-        const std::vector<CNewAsset> assets, const CTxDestination destination,
-        const AssetType& assetType);
+        const std::vector<CNewToken> tokens, const CTxDestination destination,
+        const TokenType& tokenType);
 
-    bool CreateTransactionWithTransferAsset(
+    bool CreateTransactionWithTransferToken(
         const std::vector<CRecipient>& vecSend, CWalletTx& wtxNew,
         CReserveKey& reservekey, CAmount& nFeeRet, int& nChangePosInOut,
         std::string& strFailReason, const CCoinControl& coinControl);
 
-    bool CreateTransactionWithReissueAsset(
+    bool CreateTransactionWithReissueToken(
         const std::vector<CRecipient>& vecSend, CWalletTx& wtxNew,
         CReserveKey& reservekey, CAmount& nFeeRet, int& nChangePosInOut,
         std::string& strFailReason, const CCoinControl& coinControl,
-        const CReissueAsset& reissueAsset, const CTxDestination destination);
+        const CReissueToken& reissueToken, const CTxDestination destination);
 
     bool CreateNewChangeAddress(CReserveKey& reservekey, CKeyID& keyID,
                                 std::string& strFailReason);
-    /** YAC_ASSET END */
+    /** YAC_TOKEN END */
 
     bool CommitTransaction(CWalletTx& wtxNew, CReserveKey& reservekey);
 
@@ -435,7 +435,7 @@ public:
     bool IsMine(const CTransaction& tx) const
     {
         BOOST_FOREACH(const CTxOut& txout, tx.vout)
-            if (IsMine(txout) && txout.nValue >= 0) // Asset UTXO has nValue = 0
+            if (IsMine(txout) && txout.nValue >= 0) // Token UTXO has nValue = 0
                 return true;
         return false;
     }
@@ -587,16 +587,16 @@ struct COutputEntry
     int vout;
 };
 
-/** YAC_ASSET START */
-struct CAssetOutputEntry
+/** YAC_TOKEN START */
+struct CTokenOutputEntry
 {
     txnouttype type;
-    std::string assetName;
+    std::string tokenName;
     CTxDestination destination;
     CAmount nAmount = 0;
     int vout;
 };
-/** YAC_ASSET END */
+/** YAC_TOKEN END */
 
 /** A transaction with a bunch of additional info that only the owner cares about.
  * It includes any unrecorded transactions needed to link it back to the block chain.
@@ -984,8 +984,8 @@ public:
                     std::list<COutputEntry>& listReceived,
                     std::list<COutputEntry>& listSent, CAmount& nFee,
                     std::string& strSentAccount, const isminefilter& filter,
-                    std::list<CAssetOutputEntry>& assetsReceived,
-                    std::list<CAssetOutputEntry>& assetsSent,
+                    std::list<CTokenOutputEntry>& tokensReceived,
+                    std::list<CTokenOutputEntry>& tokensSent,
                     bool fExcludeNotExpiredTimelock=false) const;
 
     void GetAccountAmounts(

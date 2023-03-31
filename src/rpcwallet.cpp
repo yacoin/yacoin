@@ -1577,16 +1577,16 @@ static void MaybePushAddress(Object & entry, const CTxDestination &dest)
         entry.push_back(Pair("address", addr.ToString()));
 }
 
-void ListTransactions(const CWalletTx& wtx, const string& strAccount, int nMinDepth, bool fLong, Array& ret, Array& retAssets, const isminefilter& filter)
+void ListTransactions(const CWalletTx& wtx, const string& strAccount, int nMinDepth, bool fLong, Array& ret, Array& retTokens, const isminefilter& filter)
 {
     int64_t nGeneratedImmature, nGeneratedMature, nFee;
     string strSentAccount;
     std::list<COutputEntry> listReceived;
     std::list<COutputEntry> listSent;
-    std::list<CAssetOutputEntry> listAssetsReceived;
-    std::list<CAssetOutputEntry> listAssetsSent;
+    std::list<CTokenOutputEntry> listTokensReceived;
+    std::list<CTokenOutputEntry> listTokensSent;
 
-    wtx.GetAmounts(nGeneratedImmature, nGeneratedMature, listReceived, listSent, nFee, strSentAccount, filter, listAssetsReceived, listAssetsSent);
+    wtx.GetAmounts(nGeneratedImmature, nGeneratedMature, listReceived, listSent, nFee, strSentAccount, filter, listTokensReceived, listTokensSent);
 
     bool fAllAccounts = (strAccount == string("*"));
     bool involvesWatchonly = wtx.IsFromMe(MINE_WATCH_ONLY);
@@ -1670,55 +1670,55 @@ void ListTransactions(const CWalletTx& wtx, const string& strAccount, int nMinDe
         }
     }
 
-    /** YAC_ASSET START */
-    if (AreAssetsDeployed()) {
-        if (listAssetsReceived.size() > 0 && wtx.GetDepthInMainChain() >= nMinDepth) {
-            for (const CAssetOutputEntry &data : listAssetsReceived){
+    /** YAC_TOKEN START */
+    if (AreTokensDeployed()) {
+        if (listTokensReceived.size() > 0 && wtx.GetDepthInMainChain() >= nMinDepth) {
+            for (const CTokenOutputEntry &data : listTokensReceived){
                 Object entry;
 
                 if (involvesWatchonly || (::IsMine(*pwalletMain, data.destination) & MINE_WATCH_ONLY)) {
                     entry.push_back(Pair("involvesWatchonly", true));
                 }
 
-                entry.push_back(Pair("asset_type", GetTxnOutputType(data.type)));
-                entry.push_back(Pair("asset_name", data.assetName));
-                entry.push_back(Pair("amount", AssetValueFromAmount(data.nAmount, data.assetName)));
+                entry.push_back(Pair("token_type", GetTxnOutputType(data.type)));
+                entry.push_back(Pair("token_name", data.tokenName));
+                entry.push_back(Pair("amount", TokenValueFromAmount(data.nAmount, data.tokenName)));
                 MaybePushAddress(entry, data.destination);
                 entry.push_back(Pair("vout", data.vout));
                 entry.push_back(Pair("category", "receive"));
                 if (fLong)
                     WalletTxToJSON(wtx, entry);
-                retAssets.push_back(entry);
+                retTokens.push_back(entry);
             }
         }
 
-        if ((!listAssetsSent.empty() || nFee != 0) && (fAllAccounts || strAccount == strSentAccount)) {
-            for (const CAssetOutputEntry &data : listAssetsSent) {
+        if ((!listTokensSent.empty() || nFee != 0) && (fAllAccounts || strAccount == strSentAccount)) {
+            for (const CTokenOutputEntry &data : listTokensSent) {
                 Object entry;
 
                 if (involvesWatchonly || (::IsMine(*pwalletMain, data.destination) & MINE_WATCH_ONLY)) {
                     entry.push_back(Pair("involvesWatchonly", true));
                 }
 
-                entry.push_back(Pair("asset_type", GetTxnOutputType(data.type)));
-                entry.push_back(Pair("asset_name", data.assetName));
-                entry.push_back(Pair("amount", AssetValueFromAmount(data.nAmount, data.assetName)));
+                entry.push_back(Pair("token_type", GetTxnOutputType(data.type)));
+                entry.push_back(Pair("token_name", data.tokenName));
+                entry.push_back(Pair("amount", TokenValueFromAmount(data.nAmount, data.tokenName)));
                 MaybePushAddress(entry, data.destination);
                 entry.push_back(Pair("vout", data.vout));
                 entry.push_back(Pair("category", "send"));
                 if (fLong)
                     WalletTxToJSON(wtx, entry);
-                retAssets.push_back(entry);
+                retTokens.push_back(entry);
             }
         }
     }
-    /** YAC_ASSET END */
+    /** YAC_TOKEN END */
 }
 
 void ListTransactions(const CWalletTx& wtx, const string& strAccount, int nMinDepth, bool fLong, Array& ret, const isminefilter& filter)
 {
-    Array assetDetails;
-    ListTransactions(wtx, strAccount, nMinDepth, fLong, ret, assetDetails, filter);
+    Array tokenDetails;
+    ListTransactions(wtx, strAccount, nMinDepth, fLong, ret, tokenDetails, filter);
 }
 
 void AcentryToJSON(const CAccountingEntry& acentry, const string& strAccount, Array& ret)
@@ -2033,10 +2033,10 @@ Value gettransaction(const Array& params, bool fHelp)
         WalletTxToJSON(wtx, entry);
 
         Array details;
-        Array assetDetails;
-        ListTransactions(pwalletMain->mapWallet[hash], "*", 0, false, details, assetDetails, filter);
+        Array tokenDetails;
+        ListTransactions(pwalletMain->mapWallet[hash], "*", 0, false, details, tokenDetails, filter);
         entry.push_back(Pair("details", details));
-        entry.push_back(Pair("asset_details", assetDetails));
+        entry.push_back(Pair("token_details", tokenDetails));
     }
     else
     {

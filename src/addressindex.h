@@ -17,18 +17,18 @@ static const std::string YAC = "YAC";
 struct CAddressUnspentKey {
     unsigned int type;
     uint160 hashBytes;
-    std::string asset;
+    std::string token;
     uint256 txhash;
     size_t index;
 
     size_t GetSerializeSize() const {
-        return 57 + asset.size();
+        return 57 + token.size();
     }
     template<typename Stream>
     void Serialize(Stream& s, int nType, int nVersion) const {
         ser_writedata8(s, type);
         hashBytes.Serialize(s, nType, nVersion);
-        ::Serialize(s, asset, nType, nVersion);
+        ::Serialize(s, token, nType, nVersion);
         txhash.Serialize(s, nType, nVersion);
         ser_writedata32(s, index);
     }
@@ -36,7 +36,7 @@ struct CAddressUnspentKey {
     void Unserialize(Stream& s, int nType, int nVersion) {
         type = ser_readdata8(s);
         hashBytes.Unserialize(s, nType, nVersion);
-        ::Unserialize(s, asset, nType, nVersion);
+        ::Unserialize(s, token, nType, nVersion);
         txhash.Unserialize(s, nType, nVersion);
         index = ser_readdata32(s);
     }
@@ -44,15 +44,15 @@ struct CAddressUnspentKey {
     CAddressUnspentKey(unsigned int addressType, uint160 addressHash, uint256 txid, size_t indexValue) {
         type = addressType;
         hashBytes = addressHash;
-        asset = YAC;
+        token = YAC;
         txhash = txid;
         index = indexValue;
     }
 
-    CAddressUnspentKey(unsigned int addressType, uint160 addressHash, std::string assetName, uint256 txid, size_t indexValue) {
+    CAddressUnspentKey(unsigned int addressType, uint160 addressHash, std::string tokenName, uint256 txid, size_t indexValue) {
         type = addressType;
         hashBytes = addressHash;
-        asset = assetName;
+        token = tokenName;
         txhash = txid;
         index = indexValue;
     }
@@ -64,7 +64,7 @@ struct CAddressUnspentKey {
     void SetNull() {
         type = 0;
         hashBytes.SetNull();
-        asset.clear();
+        token.clear();
         txhash.SetNull();
         index = 0;
     }
@@ -109,7 +109,7 @@ struct CAddressUnspentValue {
 struct CAddressIndexKey {
     unsigned int type;
     uint160 hashBytes;
-    std::string asset;
+    std::string token;
     int blockHeight;
     unsigned int txindex;
     uint256 txhash;
@@ -117,13 +117,13 @@ struct CAddressIndexKey {
     bool spending;
 
     size_t GetSerializeSize() const {
-        return 34 + asset.size();
+        return 34 + token.size();
     }
     template<typename Stream>
     void Serialize(Stream& s, int nType, int nVersion) const {
         ser_writedata8(s, type);
         hashBytes.Serialize(s, nType, nVersion);
-        ::Serialize(s, asset, nType, nVersion);
+        ::Serialize(s, token, nType, nVersion);
         // Heights are stored big-endian for key sorting in LevelDB
         ser_writedata32be(s, blockHeight);
         ser_writedata32be(s, txindex);
@@ -136,7 +136,7 @@ struct CAddressIndexKey {
     void Unserialize(Stream& s, int nType, int nVersion) {
         type = ser_readdata8(s);
         hashBytes.Unserialize(s, nType, nVersion);
-        ::Unserialize(s, asset, nType, nVersion);
+        ::Unserialize(s, token, nType, nVersion);
         blockHeight = ser_readdata32be(s);
         txindex = ser_readdata32be(s);
         txhash.Unserialize(s, nType, nVersion);
@@ -149,7 +149,7 @@ struct CAddressIndexKey {
                      uint256 txid, size_t indexValue, bool isSpending) {
         type = addressType;
         hashBytes = addressHash;
-        asset = YAC;
+        token = YAC;
         blockHeight = height;
         txindex = blockindex;
         txhash = txid;
@@ -157,11 +157,11 @@ struct CAddressIndexKey {
         spending = isSpending;
     }
 
-    CAddressIndexKey(unsigned int addressType, uint160 addressHash, std::string assetName, int height, int blockindex,
+    CAddressIndexKey(unsigned int addressType, uint160 addressHash, std::string tokenName, int height, int blockindex,
                      uint256 txid, size_t indexValue, bool isSpending) {
         type = addressType;
         hashBytes = addressHash;
-        asset = assetName;
+        token = tokenName;
         blockHeight = height;
         txindex = blockindex;
         txhash = txid;
@@ -176,7 +176,7 @@ struct CAddressIndexKey {
     void SetNull() {
         type = 0;
         hashBytes.SetNull();
-        asset.clear();
+        token.clear();
         blockHeight = 0;
         txindex = 0;
         txhash.SetNull();
@@ -219,85 +219,85 @@ struct CAddressIndexIteratorKey {
     }
 };
 
-struct CAddressIndexIteratorAssetKey {
+struct CAddressIndexIteratorTokenKey {
     unsigned int type;
     uint160 hashBytes;
-    std::string asset;
+    std::string token;
 
     size_t GetSerializeSize() const {
-        return 21 + asset.size();
+        return 21 + token.size();
     }
     template<typename Stream>
     void Serialize(Stream& s, int nType, int nVersion) const {
         ser_writedata8(s, type);
         hashBytes.Serialize(s, nType, nVersion);
-        ::Serialize(s, asset, nType, nVersion);
+        ::Serialize(s, token, nType, nVersion);
     }
     template<typename Stream>
     void Unserialize(Stream& s, int nType, int nVersion) {
         type = ser_readdata8(s);
         hashBytes.Unserialize(s, nType, nVersion);
-        ::Unserialize(s, asset, nType, nVersion);
+        ::Unserialize(s, token, nType, nVersion);
     }
 
-    CAddressIndexIteratorAssetKey(unsigned int addressType, uint160 addressHash) {
+    CAddressIndexIteratorTokenKey(unsigned int addressType, uint160 addressHash) {
         type = addressType;
         hashBytes = addressHash;
-        asset = YAC;
+        token = YAC;
     }
 
-    CAddressIndexIteratorAssetKey(unsigned int addressType, uint160 addressHash, std::string assetName) {
+    CAddressIndexIteratorTokenKey(unsigned int addressType, uint160 addressHash, std::string tokenName) {
         type = addressType;
         hashBytes = addressHash;
-        asset = assetName;
+        token = tokenName;
     }
 
-    CAddressIndexIteratorAssetKey() {
+    CAddressIndexIteratorTokenKey() {
         SetNull();
     }
 
     void SetNull() {
         type = 0;
         hashBytes.SetNull();
-        asset.clear();
+        token.clear();
     }
 };
 
 struct CAddressIndexIteratorHeightKey {
     unsigned int type;
     uint160 hashBytes;
-    std::string asset;
+    std::string token;
     int blockHeight;
 
     size_t GetSerializeSize() const {
-        return 25 + asset.size();
+        return 25 + token.size();
     }
     template<typename Stream>
     void Serialize(Stream& s, int nType, int nVersion) const {
         ser_writedata8(s, type);
         hashBytes.Serialize(s, nType, nVersion);
-        ::Serialize(s, asset, nType, nVersion);
+        ::Serialize(s, token, nType, nVersion);
         ser_writedata32be(s, blockHeight);
     }
     template<typename Stream>
     void Unserialize(Stream& s, int nType, int nVersion) {
         type = ser_readdata8(s);
         hashBytes.Unserialize(s, nType, nVersion);
-        ::Unserialize(s, asset, nType, nVersion);
+        ::Unserialize(s, token, nType, nVersion);
         blockHeight = ser_readdata32be(s);
     }
 
     CAddressIndexIteratorHeightKey(unsigned int addressType, uint160 addressHash, int height) {
         type = addressType;
         hashBytes = addressHash;
-        asset = YAC;
+        token = YAC;
         blockHeight = height;
     }
 
-    CAddressIndexIteratorHeightKey(unsigned int addressType, uint160 addressHash, std::string assetName, int height) {
+    CAddressIndexIteratorHeightKey(unsigned int addressType, uint160 addressHash, std::string tokenName, int height) {
         type = addressType;
         hashBytes = addressHash;
-        asset = assetName;
+        token = tokenName;
         blockHeight = height;
     }
 
@@ -308,7 +308,7 @@ struct CAddressIndexIteratorHeightKey {
     void SetNull() {
         type = 0;
         hashBytes.SetNull();
-        asset.clear();
+        token.clear();
         blockHeight = 0;
     }
 };
@@ -339,16 +339,16 @@ struct CMempoolAddressDeltaKey
 {
     int type;
     uint160 addressBytes;
-    std::string asset;
+    std::string token;
     uint256 txhash;
     unsigned int index;
     int spending;
 
-    CMempoolAddressDeltaKey(int addressType, uint160 addressHash, std::string assetName,
+    CMempoolAddressDeltaKey(int addressType, uint160 addressHash, std::string tokenName,
                             uint256 hash, unsigned int i, int s) {
         type = addressType;
         addressBytes = addressHash;
-        asset = assetName;
+        token = tokenName;
         txhash = hash;
         index = i;
         spending = s;
@@ -357,16 +357,16 @@ struct CMempoolAddressDeltaKey
     CMempoolAddressDeltaKey(int addressType, uint160 addressHash, uint256 hash, unsigned int i, int s) {
         type = addressType;
         addressBytes = addressHash;
-        asset = "";
+        token = "";
         txhash = hash;
         index = i;
         spending = s;
     }
 
-    CMempoolAddressDeltaKey(int addressType, uint160 addressHash, std::string assetName) {
+    CMempoolAddressDeltaKey(int addressType, uint160 addressHash, std::string tokenName) {
         type = addressType;
         addressBytes = addressHash;
-        asset = assetName;
+        token = tokenName;
         txhash.SetNull();
         index = 0;
         spending = 0;
@@ -375,7 +375,7 @@ struct CMempoolAddressDeltaKey
     CMempoolAddressDeltaKey(int addressType, uint160 addressHash) {
         type = addressType;
         addressBytes = addressHash;
-        asset = "";
+        token = "";
         txhash.SetNull();
         index = 0;
         spending = 0;
@@ -387,7 +387,7 @@ struct CMempoolAddressDeltaKeyCompare
     bool operator()(const CMempoolAddressDeltaKey& a, const CMempoolAddressDeltaKey& b) const {
         if (a.type == b.type) {
             if (a.addressBytes == b.addressBytes) {
-                if (a.asset == b.asset) {
+                if (a.token == b.token) {
                     if (a.txhash == b.txhash) {
                         if (a.index == b.index) {
                             return a.spending < b.spending;
@@ -398,7 +398,7 @@ struct CMempoolAddressDeltaKeyCompare
                         return a.txhash < b.txhash;
                     }
                 } else {
-                    return a.asset < b.asset;
+                    return a.token < b.token;
                 }
             } else {
                 return a.addressBytes < b.addressBytes;

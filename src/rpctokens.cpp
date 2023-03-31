@@ -8,8 +8,8 @@
     #include "msvc_warnings.push.h"
 #endif
 
-#include "assets/assets.h"
-#include "assets/assetdb.h"
+#include "tokens/tokens.h"
+#include "tokens/tokendb.h"
 #include "bitcoinrpc.h"
 #include "coincontrol.h"
 #include "init.h"
@@ -32,22 +32,22 @@ using std::pair;
 using std::max;
 using std::min;
 
-std::string AssetActivationWarning()
+std::string TokenActivationWarning()
 {
-    return AreAssetsDeployed() ? "" : "\nTHIS COMMAND IS NOT YET ACTIVE!\n";
+    return AreTokensDeployed() ? "" : "\nTHIS COMMAND IS NOT YET ACTIVE!\n";
 }
 
-std::string AssetTypeToString(AssetType& assetType)
+std::string TokenTypeToString(TokenType& tokenType)
 {
-    switch (assetType)
+    switch (tokenType)
     {
-        case AssetType::ROOT:               return "ROOT";
-        case AssetType::SUB:                return "SUB";
-        case AssetType::UNIQUE:             return "UNIQUE";
-        case AssetType::OWNER:              return "OWNER";
-        case AssetType::VOTE:               return "VOTE";
-        case AssetType::REISSUE:            return "REISSUE";
-        case AssetType::INVALID:            return "INVALID";
+        case TokenType::ROOT:               return "ROOT";
+        case TokenType::SUB:                return "SUB";
+        case TokenType::UNIQUE:             return "UNIQUE";
+        case TokenType::OWNER:              return "OWNER";
+        case TokenType::VOTE:               return "VOTE";
+        case TokenType::REISSUE:            return "REISSUE";
+        case TokenType::INVALID:            return "INVALID";
         default:                            return "UNKNOWN";
     }
 }
@@ -65,53 +65,53 @@ void safe_advance(Iter& curr, const Iter& end, Incr n)
 
 Value issue(const Array& params, bool fHelp)
 {
-    if (fHelp || !AreAssetsDeployed() || params.size() < 1 || params.size() > 8)
+    if (fHelp || !AreTokensDeployed() || params.size() < 1 || params.size() > 8)
         throw runtime_error(
-            "issue \"asset_name\" qty \"( to_address )\" \"( change_address )\" ( units ) ( reissuable ) ( has_ipfs ) \"( ipfs_hash )\"\n"
-            + AssetActivationWarning() +
-            "\nIssue an asset, subasset or unique asset.\n"
-            "Asset name must not conflict with any existing asset.\n"
-            "Unit as the number of decimals precision for the asset (0 for whole units (\"1\"), 6 for max precision (\"1.000000\")\n"
+            "issue \"token_name\" qty \"( to_address )\" \"( change_address )\" ( units ) ( reissuable ) ( has_ipfs ) \"( ipfs_hash )\"\n"
+            + TokenActivationWarning() +
+            "\nIssue an token, subtoken or unique token.\n"
+            "Token name must not conflict with any existing token.\n"
+            "Unit as the number of decimals precision for the token (0 for whole units (\"1\"), 6 for max precision (\"1.000000\")\n"
             "Reissuable is true/false for whether additional units can be issued by the original issuer.\n"
-            "If issuing a unique asset these values are required (and will be defaulted to): qty=1, units=0, reissuable=false.\n"
+            "If issuing a unique token these values are required (and will be defaulted to): qty=1, units=0, reissuable=false.\n"
 
             "\nArguments:\n"
-            "1. \"asset_name\"            (string, required) a unique name\n"
+            "1. \"token_name\"            (string, required) a unique name\n"
             "2. \"qty\"                   (numeric, optional, default=1) the number of units to be issued\n"
-            "3. \"to_address\"            (string), optional, default=\"\"), address asset will be sent to, if it is empty, address will be generated for you\n"
+            "3. \"to_address\"            (string), optional, default=\"\"), address token will be sent to, if it is empty, address will be generated for you\n"
             "4. \"change_address\"        (string), optional, default=\"\"), address the yac change will be sent to, if it is empty, change address will be generated for you\n"
-            "5. \"units\"                 (integer, optional, default=0, min=0, max=6), the number of decimals precision for the asset (0 for whole units (\"1\"), 6 for max precision (\"1.000000\")\n"
-            "6. \"reissuable\"            (boolean, optional, default=true (false for unique assets)), whether future reissuance is allowed\n"
-            "7. \"has_ipfs\"              (boolean, optional, default=false), whether ipfs hash is going to be added to the asset\n"
+            "5. \"units\"                 (integer, optional, default=0, min=0, max=6), the number of decimals precision for the token (0 for whole units (\"1\"), 6 for max precision (\"1.000000\")\n"
+            "6. \"reissuable\"            (boolean, optional, default=true (false for unique tokens)), whether future reissuance is allowed\n"
+            "7. \"has_ipfs\"              (boolean, optional, default=false), whether ipfs hash is going to be added to the token\n"
             "8. \"ipfs_hash\"             (string, optional but required if has_ipfs = 1), an ipfs hash or a txid hash once RIP5 is activated\n"
 
             "\nResult:\n"
             "\"txid\"                     (string) The transaction id\n"
 
             "\nExamples:\n"
-            + HelpExampleCli("issue", "\"ASSET_NAME\" 1000")
-            + HelpExampleCli("issue", "\"ASSET_NAME\" 1000 \"myaddress\"")
-            + HelpExampleCli("issue", "\"ASSET_NAME\" 1000 \"myaddress\" \"changeaddress\" 4")
-            + HelpExampleCli("issue", "\"ASSET_NAME\" 1000 \"myaddress\" \"changeaddress\" 2 true")
-            + HelpExampleCli("issue", "\"ASSET_NAME\" 1000 \"myaddress\" \"changeaddress\" 6 false true QmTqu3Lk3gmTsQVtjU7rYYM37EAW4xNmbuEAp2Mjr4AV7E")
-            + HelpExampleCli("issue", "\"ASSET_NAME/SUB_ASSET\" 1000 \"myaddress\" \"changeaddress\" 2 true")
-            + HelpExampleCli("issue", "\"ASSET_NAME#uniquetag\"")
+            + HelpExampleCli("issue", "\"TOKEN_NAME\" 1000")
+            + HelpExampleCli("issue", "\"TOKEN_NAME\" 1000 \"myaddress\"")
+            + HelpExampleCli("issue", "\"TOKEN_NAME\" 1000 \"myaddress\" \"changeaddress\" 4")
+            + HelpExampleCli("issue", "\"TOKEN_NAME\" 1000 \"myaddress\" \"changeaddress\" 2 true")
+            + HelpExampleCli("issue", "\"TOKEN_NAME\" 1000 \"myaddress\" \"changeaddress\" 6 false true QmTqu3Lk3gmTsQVtjU7rYYM37EAW4xNmbuEAp2Mjr4AV7E")
+            + HelpExampleCli("issue", "\"TOKEN_NAME/SUB_TOKEN\" 1000 \"myaddress\" \"changeaddress\" 2 true")
+            + HelpExampleCli("issue", "\"TOKEN_NAME#uniquetag\"")
         );
 
     if (pwalletMain->IsLocked())
         throw JSONRPCError(RPC_WALLET_UNLOCK_NEEDED, "Error: Please enter the wallet passphrase with walletpassphrase first.");
 
-    // Check asset name and infer assetType
-    std::string assetName = params[0].get_str();
-    AssetType assetType;
-    std::string assetError = "";
-    if (!IsAssetNameValid(assetName, assetType, assetError)) {
-        throw JSONRPCError(RPC_INVALID_PARAMETER, std::string("Invalid asset name: ") + assetName + std::string("\nError: ") + assetError);
+    // Check token name and infer tokenType
+    std::string tokenName = params[0].get_str();
+    TokenType tokenType;
+    std::string tokenError = "";
+    if (!IsTokenNameValid(tokenName, tokenType, tokenError)) {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, std::string("Invalid token name: ") + tokenName + std::string("\nError: ") + tokenError);
     }
 
-    // Check for unsupported asset types
-    if (assetType == AssetType::VOTE || assetType == AssetType::REISSUE || assetType == AssetType::OWNER || assetType == AssetType::INVALID) {
-        throw JSONRPCError(RPC_INVALID_PARAMETER, std::string("Unsupported asset type: ") + AssetTypeToString(assetType));
+    // Check for unsupported token types
+    if (tokenType == TokenType::VOTE || tokenType == TokenType::REISSUE || tokenType == TokenType::OWNER || tokenType == TokenType::INVALID) {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, std::string("Unsupported token type: ") + TokenTypeToString(tokenType));
     }
 
     CAmount nAmount = COIN;
@@ -163,7 +163,7 @@ Value issue(const Array& params, bool fHelp)
     if (params.size() > 4)
         units = params[4].get_int();
 
-    bool reissuable = assetType != AssetType::UNIQUE;
+    bool reissuable = tokenType != TokenType::UNIQUE;
     if (params.size() > 5)
         reissuable = params[5].get_bool();
 
@@ -181,12 +181,12 @@ Value issue(const Array& params, bool fHelp)
             throw JSONRPCError(RPC_INVALID_PARAMS, std::string("Invalid IPFS hash (doesn't start with 'Qm')"));
     }
 
-    // check for required unique asset params
-    if (assetType == AssetType::UNIQUE && (nAmount != COIN || units != 0 || reissuable)) {
-        throw JSONRPCError(RPC_INVALID_PARAMETER, std::string("Invalid parameters for issuing a unique asset."));
+    // check for required unique token params
+    if (tokenType == TokenType::UNIQUE && (nAmount != COIN || units != 0 || reissuable)) {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, std::string("Invalid parameters for issuing a unique token."));
     }
 
-    CNewAsset asset(assetName, nAmount, units, reissuable ? 1 : 0, has_ipfs ? 1 : 0, DecodeAssetData(ipfs_hash));
+    CNewToken token(tokenName, nAmount, units, reissuable ? 1 : 0, has_ipfs ? 1 : 0, DecodeTokenData(ipfs_hash));
 
     CReserveKey reservekey(pwalletMain);
     CWalletTx transaction;
@@ -197,12 +197,12 @@ Value issue(const Array& params, bool fHelp)
     crtl.destChange = DecodeDestination(change_address);
 
     // Create the Transaction
-    if (!CreateAssetTransaction(pwalletMain, crtl, asset, address, error, transaction, reservekey, nRequiredFee))
+    if (!CreateTokenTransaction(pwalletMain, crtl, token, address, error, transaction, reservekey, nRequiredFee))
         throw JSONRPCError(error.first, error.second);
 
     // Send the Transaction to the network
     std::string txid;
-    if (!SendAssetTransaction(pwalletMain, transaction, reservekey, error, txid))
+    if (!SendTokenTransaction(pwalletMain, transaction, reservekey, error, txid))
         throw JSONRPCError(error.first, error.second);
 
     return txid;
@@ -210,18 +210,18 @@ Value issue(const Array& params, bool fHelp)
 
 Value transfer(const Array& params, bool fHelp)
 {
-    if (fHelp || !AreAssetsDeployed() || params.size() < 3 || params.size() > 5)
+    if (fHelp || !AreTokensDeployed() || params.size() < 3 || params.size() > 5)
         throw std::runtime_error(
-                "transfer \"asset_name\" qty \"to_address\" \"change_address\" \"asset_change_address\"\n"
-                + AssetActivationWarning() +
-                "\nTransfers a quantity of an owned asset to a given address"
+                "transfer \"token_name\" qty \"to_address\" \"change_address\" \"token_change_address\"\n"
+                + TokenActivationWarning() +
+                "\nTransfers a quantity of an owned token to a given address"
 
                 "\nArguments:\n"
-                "1. \"asset_name\"               (string, required) name of asset\n"
-                "2. \"qty\"                      (numeric, required) number of assets you want to send to the address\n"
-                "3. \"to_address\"               (string, required) address to send the asset to\n"
+                "1. \"token_name\"               (string, required) name of token\n"
+                "2. \"qty\"                      (numeric, required) number of tokens you want to send to the address\n"
+                "3. \"to_address\"               (string, required) address to send the token to\n"
                 "4. \"change_address\"           (string, optional, default = \"\") the transactions YAC change will be sent to this address\n"
-                "5. \"asset_change_address\"     (string, optional, default = \"\") the transactions Asset change will be sent to this address\n"
+                "5. \"token_change_address\"     (string, optional, default = \"\") the transactions Token change will be sent to this address\n"
 
                 "\nResult:\n"
                 "txid"
@@ -230,14 +230,14 @@ Value transfer(const Array& params, bool fHelp)
                 "]\n"
 
                 "\nExamples:\n"
-                + HelpExampleCli("transfer", "\"ASSET_NAME\" 20 \"address\"")
-                + HelpExampleCli("transfer", "\"ASSET_NAME\" 20 \"address\"")
+                + HelpExampleCli("transfer", "\"TOKEN_NAME\" 20 \"address\"")
+                + HelpExampleCli("transfer", "\"TOKEN_NAME\" 20 \"address\"")
         );
 
     if (pwalletMain->IsLocked())
         throw JSONRPCError(RPC_WALLET_UNLOCK_NEEDED, "Error: Please enter the wallet passphrase with walletpassphrase first.");
 
-    std::string asset_name = params[0].get_str();
+    std::string token_name = params[0].get_str();
 
     CAmount nAmount = AmountFromValue(params[1]);
 
@@ -252,23 +252,23 @@ Value transfer(const Array& params, bool fHelp)
         yac_change_address = params[3].get_str();
     }
 
-    std::string asset_change_address = "";
+    std::string token_change_address = "";
     if (params.size() > 4) {
-        asset_change_address = params[4].get_str();
+        token_change_address = params[4].get_str();
     }
 
     CTxDestination yac_change_dest = DecodeDestination(yac_change_address);
     if (!yac_change_address.empty() && !IsValidDestination(yac_change_dest))
         throw JSONRPCError(RPC_INVALID_PARAMETER, std::string("YAC change address must be a valid address. Invalid address: ") + yac_change_address);
 
-    CTxDestination asset_change_dest = DecodeDestination(asset_change_address);
-    if (!asset_change_address.empty() && !IsValidDestination(asset_change_dest))
-        throw JSONRPCError(RPC_INVALID_PARAMETER, std::string("Asset change address must be a valid address. Invalid address: ") + asset_change_address);
+    CTxDestination token_change_dest = DecodeDestination(token_change_address);
+    if (!token_change_address.empty() && !IsValidDestination(token_change_dest))
+        throw JSONRPCError(RPC_INVALID_PARAMETER, std::string("Token change address must be a valid address. Invalid address: ") + token_change_address);
 
     std::pair<int, std::string> error;
-    std::vector< std::pair<CAssetTransfer, std::string> >vTransfers;
+    std::vector< std::pair<CTokenTransfer, std::string> >vTransfers;
 
-    CAssetTransfer transfer(asset_name, nAmount);
+    CTokenTransfer transfer(token_name, nAmount);
 
     vTransfers.emplace_back(std::make_pair(transfer, to_address));
     CReserveKey reservekey(pwalletMain);
@@ -277,15 +277,15 @@ Value transfer(const Array& params, bool fHelp)
 
     CCoinControl ctrl;
     ctrl.destChange = yac_change_dest;
-    ctrl.assetDestChange = asset_change_dest;
+    ctrl.tokenDestChange = token_change_dest;
 
     // Create the Transaction
-    if (!CreateTransferAssetTransaction(pwalletMain, ctrl, vTransfers, error, transaction, reservekey, nRequiredFee))
+    if (!CreateTransferTokenTransaction(pwalletMain, ctrl, vTransfers, error, transaction, reservekey, nRequiredFee))
         throw JSONRPCError(error.first, error.second);
 
     // Send the Transaction to the network
     std::string txid;
-    if (!SendAssetTransaction(pwalletMain, transaction, reservekey, error, txid))
+    if (!SendTokenTransaction(pwalletMain, transaction, reservekey, error, txid))
         throw JSONRPCError(error.first, error.second);
 
     // Display the transaction id
@@ -294,19 +294,19 @@ Value transfer(const Array& params, bool fHelp)
 
 Value transferfromaddress(const Array& params, bool fHelp)
 {
-    if (fHelp || !AreAssetsDeployed() || params.size() < 4 || params.size() > 6)
+    if (fHelp || !AreTokensDeployed() || params.size() < 4 || params.size() > 6)
         throw std::runtime_error(
-                "transferfromaddress \"asset_name\" \"from_address\" qty \"to_address\" \"yac_change_address\" \"asset_change_address\"\n"
-                + AssetActivationWarning() +
-                "\nTransfer a quantity of an owned asset in a specific address to a given address"
+                "transferfromaddress \"token_name\" \"from_address\" qty \"to_address\" \"yac_change_address\" \"token_change_address\"\n"
+                + TokenActivationWarning() +
+                "\nTransfer a quantity of an owned token in a specific address to a given address"
 
                 "\nArguments:\n"
-                "1. \"asset_name\"               (string, required) name of asset\n"
-                "2. \"from_address\"             (string, required) address that the asset will be transferred from\n"
-                "3. \"qty\"                      (numeric, required) number of assets you want to send to the address\n"
-                "4. \"to_address\"               (string, required) address to send the asset to\n"
+                "1. \"token_name\"               (string, required) name of token\n"
+                "2. \"from_address\"             (string, required) address that the token will be transferred from\n"
+                "3. \"qty\"                      (numeric, required) number of tokens you want to send to the address\n"
+                "4. \"to_address\"               (string, required) address to send the token to\n"
                 "5. \"yac_change_address\"       (string, optional, default = \"\") the transaction YAC change will be sent to this address\n"
-                "6. \"asset_change_address\"     (string, optional, default = \"\") the transaction Asset change will be sent to this address\n"
+                "6. \"token_change_address\"     (string, optional, default = \"\") the transaction Token change will be sent to this address\n"
 
                 "\nResult:\n"
                 "txid"
@@ -315,14 +315,14 @@ Value transferfromaddress(const Array& params, bool fHelp)
                 "]\n"
 
                 "\nExamples:\n"
-                + HelpExampleCli("transferfromaddress", "\"ASSET_NAME\" \"fromaddress\" 20 \"address\"")
-                + HelpExampleRpc("transferfromaddress", "\"ASSET_NAME\" \"fromaddress\" 20 \"address\"")
+                + HelpExampleCli("transferfromaddress", "\"TOKEN_NAME\" \"fromaddress\" 20 \"address\"")
+                + HelpExampleRpc("transferfromaddress", "\"TOKEN_NAME\" \"fromaddress\" 20 \"address\"")
         );
 
     if (pwalletMain->IsLocked())
         throw JSONRPCError(RPC_WALLET_UNLOCK_NEEDED, "Error: Please enter the wallet passphrase with walletpassphrase first.");
 
-    std::string asset_name = params[0].get_str();
+    std::string token_name = params[0].get_str();
 
     std::string from_address = params[1].get_str();
 
@@ -340,63 +340,63 @@ Value transferfromaddress(const Array& params, bool fHelp)
         yac_change_address = params[6].get_str();
     }
 
-    std::string asset_change_address = "";
+    std::string token_change_address = "";
     if (params.size() > 7) {
-        asset_change_address = params[7].get_str();
+        token_change_address = params[7].get_str();
     }
 
     CTxDestination yac_change_dest = DecodeDestination(yac_change_address);
     if (!yac_change_address.empty() && !IsValidDestination(yac_change_dest))
         throw JSONRPCError(RPC_INVALID_PARAMETER, std::string("YAC change address must be a valid address. Invalid address: ") + yac_change_address);
 
-    CTxDestination asset_change_dest = DecodeDestination(asset_change_address);
-    if (!asset_change_address.empty() && !IsValidDestination(asset_change_dest))
-        throw JSONRPCError(RPC_INVALID_PARAMETER, std::string("Asset change address must be a valid address. Invalid address: ") + asset_change_address);
+    CTxDestination token_change_dest = DecodeDestination(token_change_address);
+    if (!token_change_address.empty() && !IsValidDestination(token_change_dest))
+        throw JSONRPCError(RPC_INVALID_PARAMETER, std::string("Token change address must be a valid address. Invalid address: ") + token_change_address);
 
 
     std::pair<int, std::string> error;
-    std::vector< std::pair<CAssetTransfer, std::string> >vTransfers;
+    std::vector< std::pair<CTokenTransfer, std::string> >vTransfers;
 
-    vTransfers.emplace_back(std::make_pair(CAssetTransfer(asset_name, nAmount), address));
+    vTransfers.emplace_back(std::make_pair(CTokenTransfer(token_name, nAmount), address));
     CReserveKey reservekey(pwalletMain);
     CWalletTx transaction;
     CAmount nRequiredFee;
 
     CCoinControl ctrl;
-    std::map<std::string, std::vector<COutput> > mapAssetCoins;
-    pwalletMain->AvailableAssets(mapAssetCoins);
+    std::map<std::string, std::vector<COutput> > mapTokenCoins;
+    pwalletMain->AvailableTokens(mapTokenCoins);
 
     // Set the change addresses
     ctrl.destChange = yac_change_dest;
-    ctrl.assetDestChange = asset_change_dest;
+    ctrl.tokenDestChange = token_change_dest;
 
-    if (!mapAssetCoins.count(asset_name)) {
-        throw JSONRPCError(RPC_INVALID_PARAMETER, std::string("Wallet doesn't own the asset_name: " + asset_name));
+    if (!mapTokenCoins.count(token_name)) {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, std::string("Wallet doesn't own the token_name: " + token_name));
     }
 
-    // Add all the asset outpoints that match the given from addresses
-    for (const auto& out : mapAssetCoins.at(asset_name)) {
+    // Add all the token outpoints that match the given from addresses
+    for (const auto& out : mapTokenCoins.at(token_name)) {
         // Get the address that the coin resides in, because to send a valid message. You need to send it to the same address that it currently resides in.
         CTxDestination dest;
         ExtractDestination(out.tx->vout[out.i].scriptPubKey, dest);
 
         if (from_address == EncodeDestination(dest))
-            ctrl.SelectAsset(COutPoint(out.tx->GetHash(), out.i));
+            ctrl.SelectToken(COutPoint(out.tx->GetHash(), out.i));
     }
 
     std::vector<COutPoint> outs;
-    ctrl.ListSelectedAssets(outs);
+    ctrl.ListSelectedTokens(outs);
     if (!outs.size()) {
-        throw JSONRPCError(RPC_INVALID_PARAMETER, std::string("No asset outpoints are selected from the given address, failed to create the transaction"));
+        throw JSONRPCError(RPC_INVALID_PARAMETER, std::string("No token outpoints are selected from the given address, failed to create the transaction"));
     }
 
     // Create the Transaction
-    if (!CreateTransferAssetTransaction(pwalletMain, ctrl, vTransfers, error, transaction, reservekey, nRequiredFee))
+    if (!CreateTransferTokenTransaction(pwalletMain, ctrl, vTransfers, error, transaction, reservekey, nRequiredFee))
         throw JSONRPCError(error.first, error.second);
 
     // Send the Transaction to the network
     std::string txid;
-    if (!SendAssetTransaction(pwalletMain, transaction, reservekey, error, txid))
+    if (!SendTokenTransaction(pwalletMain, transaction, reservekey, error, txid))
         throw JSONRPCError(error.first, error.second);
 
     // Display the transaction id
@@ -405,36 +405,36 @@ Value transferfromaddress(const Array& params, bool fHelp)
 
 Value reissue(const Array& params, bool fHelp)
 {
-    if (fHelp || !AreAssetsDeployed() || params.size() > 7 || params.size() < 3)
+    if (fHelp || !AreTokensDeployed() || params.size() > 7 || params.size() < 3)
         throw std::runtime_error(
-                "reissue \"asset_name\" qty \"to_address\" \"change_address\" ( reissuable ) ( new_units) \"( new_ipfs )\" \n"
-                + AssetActivationWarning() +
-                "\nReissues a quantity of an asset to an owned address if you own the Owner Token"
+                "reissue \"token_name\" qty \"to_address\" \"change_address\" ( reissuable ) ( new_units) \"( new_ipfs )\" \n"
+                + TokenActivationWarning() +
+                "\nReissues a quantity of an token to an owned address if you own the Owner Token"
                 "\nCan change the reissuable flag during reissuance"
                 "\nCan change the ipfs hash during reissuance"
 
                 "\nArguments:\n"
-                "1. \"asset_name\"               (string, required) name of asset that is being reissued\n"
-                "2. \"qty\"                      (numeric, required) number of assets to reissue\n"
-                "3. \"to_address\"               (string, required) address to send the asset to\n"
+                "1. \"token_name\"               (string, required) name of token that is being reissued\n"
+                "2. \"qty\"                      (numeric, required) number of tokens to reissue\n"
+                "3. \"to_address\"               (string, required) address to send the token to\n"
                 "4. \"change_address\"           (string, optional) address that the change of the transaction will be sent to\n"
                 "5. \"reissuable\"               (boolean, optional, default=true), whether future reissuance is allowed\n"
-                "6. \"new_units\"                (numeric, optional, default=-1), the new units that will be associated with the asset\n"
+                "6. \"new_units\"                (numeric, optional, default=-1), the new units that will be associated with the token\n"
                 "7. \"new_ipfs\"                 (string, optional, default=\"\"), whether to update the current ipfs hash or txid once RIP5 is active\n"
 
                 "\nResult:\n"
                 "\"txid\"                     (string) The transaction id\n"
 
                 "\nExamples:\n"
-                + HelpExampleCli("reissue", "\"ASSET_NAME\" 20 \"address\"")
-                + HelpExampleRpc("reissue", "\"ASSET_NAME\" 20 \"address\" \"change_address\" \"true\" 6 \"Qmd286K6pohQcTKYqnS1YhWrCiS4gz7Xi34sdwMe9USZ7u\"")
+                + HelpExampleCli("reissue", "\"TOKEN_NAME\" 20 \"address\"")
+                + HelpExampleRpc("reissue", "\"TOKEN_NAME\" 20 \"address\" \"change_address\" \"true\" 6 \"Qmd286K6pohQcTKYqnS1YhWrCiS4gz7Xi34sdwMe9USZ7u\"")
         );
 
     if (pwalletMain->IsLocked())
         throw JSONRPCError(RPC_WALLET_UNLOCK_NEEDED, "Error: Please enter the wallet passphrase with walletpassphrase first.");
 
     // Get that paramaters
-    std::string asset_name = params[0].get_str();
+    std::string token_name = params[0].get_str();
     CAmount nAmount = AmountFromValue(params[1]);
     std::string address = params[2].get_str();
 
@@ -459,11 +459,11 @@ Value reissue(const Array& params, bool fHelp)
             throw JSONRPCError(RPC_INVALID_PARAMS, std::string("Invalid IPFS hash (must be 46 characters)"));
         if (newipfs.substr(0,2) != "Qm")
             throw JSONRPCError(RPC_INVALID_PARAMS, std::string("Invalid IPFS hash (doesn't start with 'Qm')"));
-        if (DecodeAssetData(newipfs).empty())
+        if (DecodeTokenData(newipfs).empty())
             throw JSONRPCError(RPC_INVALID_PARAMS, std::string("Invalid IPFS hash (contains invalid characters)"));
     }
 
-    CReissueAsset reissueAsset(asset_name, nAmount, newUnits, reissuable, DecodeAssetData(newipfs));
+    CReissueToken reissueToken(token_name, nAmount, newUnits, reissuable, DecodeTokenData(newipfs));
 
     std::pair<int, std::string> error;
     CReserveKey reservekey(pwalletMain);
@@ -474,45 +474,45 @@ Value reissue(const Array& params, bool fHelp)
     crtl.destChange = DecodeDestination(changeAddress);
 
     // Create the Transaction
-    if (!CreateReissueAssetTransaction(pwalletMain, crtl, reissueAsset, address, error, transaction, reservekey, nRequiredFee))
+    if (!CreateReissueTokenTransaction(pwalletMain, crtl, reissueToken, address, error, transaction, reservekey, nRequiredFee))
         throw JSONRPCError(error.first, error.second);
 
     std::string strError = "";
-    if (!ContextualCheckReissueAsset(passets, reissueAsset, strError, transaction))
+    if (!ContextualCheckReissueToken(ptokens, reissueToken, strError, transaction))
         throw JSONRPCError(RPC_INVALID_REQUEST, strError);
 
     // Send the Transaction to the network
     std::string txid;
-    if (!SendAssetTransaction(pwalletMain, transaction, reservekey, error, txid))
+    if (!SendTokenTransaction(pwalletMain, transaction, reservekey, error, txid))
         throw JSONRPCError(error.first, error.second);
 
     return txid;
 }
 
-Value listmyassets(const Array& params, bool fHelp)
+Value listmytokens(const Array& params, bool fHelp)
 {
-    if (fHelp || !AreAssetsDeployed() || params.size() > 5)
+    if (fHelp || !AreTokensDeployed() || params.size() > 5)
         throw std::runtime_error(
-                "listmyassets \"( asset )\" ( verbose ) ( count ) ( start ) (confs) \n"
-                + AssetActivationWarning() +
-                "\nReturns a list of all asset that are owned by this wallet\n"
+                "listmytokens \"( token )\" ( verbose ) ( count ) ( start ) (confs) \n"
+                + TokenActivationWarning() +
+                "\nReturns a list of all token that are owned by this wallet\n"
 
                 "\nArguments:\n"
-                "1. \"asset\"                    (string, optional, default=\"*\") filters results -- must be an asset name or a partial asset name followed by '*' ('*' matches all trailing characters)\n"
+                "1. \"token\"                    (string, optional, default=\"*\") filters results -- must be an token name or a partial token name followed by '*' ('*' matches all trailing characters)\n"
                 "2. \"verbose\"                  (boolean, optional, default=false) when false results only contain balances -- when true results include outpoints\n"
-                "3. \"count\"                    (integer, optional, default=ALL) truncates results to include only the first _count_ assets found\n"
-                "4. \"start\"                    (integer, optional, default=0) results skip over the first _start_ assets found (if negative it skips back from the end)\n"
+                "3. \"count\"                    (integer, optional, default=ALL) truncates results to include only the first _count_ tokens found\n"
+                "4. \"start\"                    (integer, optional, default=0) results skip over the first _start_ tokens found (if negative it skips back from the end)\n"
                 "5. \"confs\"                    (integet, optional, default=0) results are skipped if they don't have this number of confirmations\n"
 
                 "\nResult (verbose=false):\n"
                 "{\n"
-                "  (asset_name): balance,\n"
+                "  (token_name): balance,\n"
                 "  ...\n"
                 "}\n"
 
                 "\nResult (verbose=true):\n"
                 "{\n"
-                "  (asset_name):\n"
+                "  (token_name):\n"
                 "    {\n"
                 "      \"balance\": balance,\n"
                 "      \"outpoints\":\n"
@@ -529,10 +529,10 @@ Value listmyassets(const Array& params, bool fHelp)
                 "{...}, {...}\n"
 
                 "\nExamples:\n"
-                + HelpExampleRpc("listmyassets", "")
-                + HelpExampleCli("listmyassets", "ASSET")
-                + HelpExampleCli("listmyassets", "\"ASSET*\" true 10 20")
-                  + HelpExampleCli("listmyassets", "\"ASSET*\" true 10 20 1")
+                + HelpExampleRpc("listmytokens", "")
+                + HelpExampleCli("listmytokens", "TOKEN")
+                + HelpExampleCli("listmytokens", "\"TOKEN*\" true 10 20")
+                  + HelpExampleCli("listmytokens", "\"TOKEN*\" true 10 20 1")
         );
 
     if (pwalletMain->IsLocked())
@@ -570,20 +570,20 @@ Value listmyassets(const Array& params, bool fHelp)
     std::map<std::string, CAmount> balances;
     std::map<std::string, std::vector<COutput> > outputs;
     if (filter == "*") {
-        if (!GetAllMyAssetBalances(outputs, balances, confs))
-            throw JSONRPCError(RPC_INTERNAL_ERROR, "Couldn't get asset balances. For all assets");
+        if (!GetAllMyTokenBalances(outputs, balances, confs))
+            throw JSONRPCError(RPC_INTERNAL_ERROR, "Couldn't get token balances. For all tokens");
     }
     else if (filter.back() == '*') {
-        std::vector<std::string> assetNames;
+        std::vector<std::string> tokenNames;
         filter.pop_back();
-        if (!GetAllMyAssetBalances(outputs, balances, confs, filter))
-            throw JSONRPCError(RPC_INTERNAL_ERROR, "Couldn't get asset balances. For all assets");
+        if (!GetAllMyTokenBalances(outputs, balances, confs, filter))
+            throw JSONRPCError(RPC_INTERNAL_ERROR, "Couldn't get token balances. For all tokens");
     }
     else {
-        if (!IsAssetNameValid(filter))
-            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid asset name.");
-        if (!GetAllMyAssetBalances(outputs, balances, confs, filter))
-            throw JSONRPCError(RPC_INTERNAL_ERROR, "Couldn't get asset balances. For all assets");
+        if (!IsTokenNameValid(filter))
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid token name.");
+        if (!GetAllMyTokenBalances(outputs, balances, confs, filter))
+            throw JSONRPCError(RPC_INTERNAL_ERROR, "Couldn't get token balances. For all tokens");
     }
 
     // pagination setup
@@ -599,8 +599,8 @@ Value listmyassets(const Array& params, bool fHelp)
     Object result;
     if (verbose) {
         for (; bal != end && bal != balances.end(); bal++) {
-            Object asset;
-            asset.push_back(Pair("balance", AssetValueFromAmount(bal->second, bal->first)));
+            Object token;
+            token.push_back(Pair("balance", TokenValueFromAmount(bal->second, bal->first)));
 
             Array outpoints;
             for (auto const& out : outputs.at(bal->first)) {
@@ -628,71 +628,71 @@ Value listmyassets(const Array& params, bool fHelp)
                 CTxOut txOut = wtx->vout[out.i];
                 std::string strAddress;
                 if (CheckIssueDataTx(txOut)) {
-                    CNewAsset asset;
-                    if (!AssetFromScript(txOut.scriptPubKey, asset, strAddress))
-                        throw JSONRPCError(RPC_INTERNAL_ERROR, "Couldn't get asset from script.");
-                    txAmount = asset.nAmount;
+                    CNewToken token;
+                    if (!TokenFromScript(txOut.scriptPubKey, token, strAddress))
+                        throw JSONRPCError(RPC_INTERNAL_ERROR, "Couldn't get token from script.");
+                    txAmount = token.nAmount;
                 }
                 else if (CheckReissueDataTx(txOut)) {
-                    CReissueAsset asset;
-                    if (!ReissueAssetFromScript(txOut.scriptPubKey, asset, strAddress))
-                        throw JSONRPCError(RPC_INTERNAL_ERROR, "Couldn't get asset from script.");
-                    txAmount = asset.nAmount;
+                    CReissueToken token;
+                    if (!ReissueTokenFromScript(txOut.scriptPubKey, token, strAddress))
+                        throw JSONRPCError(RPC_INTERNAL_ERROR, "Couldn't get token from script.");
+                    txAmount = token.nAmount;
                 }
                 else if (CheckTransferOwnerTx(txOut)) {
-                    CAssetTransfer asset;
-                    if (!TransferAssetFromScript(txOut.scriptPubKey, asset, strAddress))
-                        throw JSONRPCError(RPC_INTERNAL_ERROR, "Couldn't get asset from script.");
-                    txAmount = asset.nAmount;
+                    CTokenTransfer token;
+                    if (!TransferTokenFromScript(txOut.scriptPubKey, token, strAddress))
+                        throw JSONRPCError(RPC_INTERNAL_ERROR, "Couldn't get token from script.");
+                    txAmount = token.nAmount;
                 }
                 else if (CheckOwnerDataTx(txOut)) {
-                    std::string assetName;
-                    if (!OwnerAssetFromScript(txOut.scriptPubKey, assetName, strAddress))
-                        throw JSONRPCError(RPC_INTERNAL_ERROR, "Couldn't get asset from script.");
-                    txAmount = OWNER_ASSET_AMOUNT;
+                    std::string tokenName;
+                    if (!OwnerTokenFromScript(txOut.scriptPubKey, tokenName, strAddress))
+                        throw JSONRPCError(RPC_INTERNAL_ERROR, "Couldn't get token from script.");
+                    txAmount = OWNER_TOKEN_AMOUNT;
                 }
-                tempOut.push_back(Pair("amount", AssetValueFromAmount(txAmount, bal->first)));
+                tempOut.push_back(Pair("amount", TokenValueFromAmount(txAmount, bal->first)));
                 //
                 //
 
                 outpoints.push_back(tempOut);
             }
-            asset.push_back(Pair("outpoints", outpoints));
-            result.push_back(Pair(bal->first, asset));
+            token.push_back(Pair("outpoints", outpoints));
+            result.push_back(Pair(bal->first, token));
         }
     }
     else {
         for (; bal != end && bal != balances.end(); bal++) {
-            result.push_back(Pair(bal->first, AssetValueFromAmount(bal->second, bal->first)));
+            result.push_back(Pair(bal->first, TokenValueFromAmount(bal->second, bal->first)));
         }
     }
     return result;
 }
 
-Value listassets(const Array& params, bool fHelp)
+Value listtokens(const Array& params, bool fHelp)
 {
-    if (fHelp || !AreAssetsDeployed() || params.size() > 4)
+    if (fHelp || !AreTokensDeployed() || params.size() > 4)
         throw std::runtime_error(
-                "listassets \"( asset )\" ( verbose ) ( count ) ( start )\n"
-                + AssetActivationWarning() +
-                "\nReturns a list of all assets\n"
+                "listtokens \"( token )\" ( verbose ) ( count ) ( start )\n"
+                + TokenActivationWarning() +
+                "\nReturns a list of all tokens\n"
                 "\nThis could be a slow/expensive operation as it reads from the database\n"
 
                 "\nArguments:\n"
-                "1. \"asset\"                    (string, optional, default=\"*\") filters results -- must be an asset name or a partial asset name followed by '*' ('*' matches all trailing characters)\n"
-                "2. \"verbose\"                  (boolean, optional, default=false) when false result is just a list of asset names -- when true results are asset name mapped to metadata\n"
-                "3. \"count\"                    (integer, optional, default=ALL) truncates results to include only the first _count_ assets found\n"
-                "4. \"start\"                    (integer, optional, default=0) results skip over the first _start_ assets found (if negative it skips back from the end)\n"
+                "1. \"token\"                    (string, optional, default=\"*\") filters results -- must be an token name or a partial token name followed by '*' ('*' matches all trailing characters)\n"
+                "2. \"verbose\"                  (boolean, optional, default=false) when false result is just a list of token names -- when true results are token name mapped to metadata\n"
+                "3. \"count\"                    (integer, optional, default=ALL) truncates results to include only the first _count_ tokens found\n"
+                "4. \"start\"                    (integer, optional, default=0) results skip over the first _start_ tokens found (if negative it skips back from the end)\n"
 
                 "\nResult (verbose=false):\n"
                 "[\n"
-                "  asset_name,\n"
+                "  token_name,\n"
                 "  ...\n"
                 "]\n"
 
                 "\nResult (verbose=true):\n"
                 "{\n"
-                "  (asset_name):\n"
+                "  (token_name):\n"
                 "    {\n"
                 "      amount: (number),\n"
                 "      units: (number),\n"
@@ -705,13 +705,13 @@ Value listassets(const Array& params, bool fHelp)
                 "}\n"
 
                 "\nExamples:\n"
-                + HelpExampleRpc("listassets", "")
-                + HelpExampleCli("listassets", "ASSET")
-                + HelpExampleCli("listassets", "\"ASSET*\" true 10 20")
+                + HelpExampleRpc("listtokens", "")
+                + HelpExampleCli("listtokens", "TOKEN")
+                + HelpExampleCli("listtokens", "\"TOKEN*\" true 10 20")
         );
 
-    if (!passetsdb)
-        throw JSONRPCError(RPC_INTERNAL_ERROR, "asset db unavailable.");
+    if (!ptokensdb)
+        throw JSONRPCError(RPC_INTERNAL_ERROR, "token db unavailable.");
 
     std::string filter = "*";
     if (params.size() > 0)
@@ -736,34 +736,34 @@ Value listassets(const Array& params, bool fHelp)
         start = params[3].get_int();
     }
 
-    std::vector<CDatabasedAssetData> assets;
-    if (!passetsdb->AssetDir(assets, filter, count, start))
-        throw JSONRPCError(RPC_INTERNAL_ERROR, "couldn't retrieve asset directory.");
+    std::vector<CDatabasedTokenData> tokens;
+    if (!ptokensdb->TokenDir(tokens, filter, count, start))
+        throw JSONRPCError(RPC_INTERNAL_ERROR, "couldn't retrieve token directory.");
 
     Object resultObj;
     Array resultArr;
 
-    for (auto data : assets) {
-        CNewAsset asset = data.asset;
+    for (auto data : tokens) {
+        CNewToken token = data.token;
         if (verbose) {
             Object detail;
-            detail.push_back(Pair("name", asset.strName));
-            detail.push_back(Pair("amount", AssetValueFromAmount(asset.nAmount, asset.strName)));
-            detail.push_back(Pair("units", asset.units));
-            detail.push_back(Pair("reissuable", asset.nReissuable));
-            detail.push_back(Pair("has_ipfs", asset.nHasIPFS));
+            detail.push_back(Pair("name", token.strName));
+            detail.push_back(Pair("amount", TokenValueFromAmount(token.nAmount, token.strName)));
+            detail.push_back(Pair("units", token.units));
+            detail.push_back(Pair("reissuable", token.nReissuable));
+            detail.push_back(Pair("has_ipfs", token.nHasIPFS));
             detail.push_back(Pair("block_height", data.nHeight));
             detail.push_back(Pair("blockhash", data.blockHash.GetHex()));
-            if (asset.nHasIPFS) {
-                if (asset.strIPFSHash.size() == 32) {
-                    detail.push_back(Pair("txid_hash", EncodeAssetData(asset.strIPFSHash)));
+            if (token.nHasIPFS) {
+                if (token.strIPFSHash.size() == 32) {
+                    detail.push_back(Pair("txid_hash", EncodeTokenData(token.strIPFSHash)));
                 } else {
-                    detail.push_back(Pair("ipfs_hash", EncodeAssetData(asset.strIPFSHash)));
+                    detail.push_back(Pair("ipfs_hash", EncodeTokenData(token.strIPFSHash)));
                 }
             }
-            resultObj.push_back(Pair(asset.strName, detail));
+            resultObj.push_back(Pair(token.strName, detail));
         } else {
-            resultArr.push_back(asset.strName);
+            resultArr.push_back(token.strName);
         }
     }
 
@@ -777,24 +777,24 @@ Value listassets(const Array& params, bool fHelp)
     }
 }
 
-Value listaddressesbyasset(const Array& params, bool fHelp)
+Value listaddressesbytoken(const Array& params, bool fHelp)
 {
-    if (!fAssetIndex) {
-        return "_This rpc call is not functional unless -assetindex is enabled. To enable, please run the wallet with -assetindex, this will require a reindex to occur";
+    if (!fTokenIndex) {
+        return "_This rpc call is not functional unless -tokenindex is enabled. To enable, please run the wallet with -tokenindex, this will require a reindex to occur";
     }
 
-    if (fHelp || !AreAssetsDeployed() || params.size() > 4 || params.size() < 1)
+    if (fHelp || !AreTokensDeployed() || params.size() > 4 || params.size() < 1)
         throw std::runtime_error(
-                "listaddressesbyasset \"asset_name\" (onlytotal) (count) (start)\n"
-                + AssetActivationWarning() +
-                "\nReturns a list of all address that own the given asset (with balances)"
-                "\nOr returns the total size of how many address own the given asset"
+                "listaddressesbytoken \"token_name\" (onlytotal) (count) (start)\n"
+                + TokenActivationWarning() +
+                "\nReturns a list of all address that own the given token (with balances)"
+                "\nOr returns the total size of how many address own the given token"
 
                 "\nArguments:\n"
-                "1. \"asset_name\"               (string, required) name of asset\n"
+                "1. \"token_name\"               (string, required) name of token\n"
                 "2. \"onlytotal\"                (boolean, optional, default=false) when false result is just a list of addresses with balances -- when true the result is just a single number representing the number of addresses\n"
-                "3. \"count\"                    (integer, optional, default=50000, MAX=50000) truncates results to include only the first _count_ assets found\n"
-                "4. \"start\"                    (integer, optional, default=0) results skip over the first _start_ assets found (if negative it skips back from the end)\n"
+                "3. \"count\"                    (integer, optional, default=50000, MAX=50000) truncates results to include only the first _count_ tokens found\n"
+                "4. \"start\"                    (integer, optional, default=0) results skip over the first _start_ tokens found (if negative it skips back from the end)\n"
 
                 "\nResult:\n"
                 "[ "
@@ -803,12 +803,12 @@ Value listaddressesbyasset(const Array& params, bool fHelp)
                 "]\n"
 
                 "\nExamples:\n"
-                + HelpExampleCli("listaddressesbyasset", "\"ASSET_NAME\" false 2 0")
-                + HelpExampleCli("listaddressesbyasset", "\"ASSET_NAME\" true")
-                + HelpExampleCli("listaddressesbyasset", "\"ASSET_NAME\"")
+                + HelpExampleCli("listaddressesbytoken", "\"TOKEN_NAME\" false 2 0")
+                + HelpExampleCli("listaddressesbytoken", "\"TOKEN_NAME\" true")
+                + HelpExampleCli("listaddressesbytoken", "\"TOKEN_NAME\"")
         );
 
-    std::string asset_name = params[0].get_str();
+    std::string token_name = params[0].get_str();
     bool fOnlyTotal = false;
     if (params.size() > 1)
         fOnlyTotal = params[1].get_bool();
@@ -825,13 +825,13 @@ Value listaddressesbyasset(const Array& params, bool fHelp)
         start = params[3].get_int();
     }
 
-    if (!IsAssetNameValid(asset_name))
-        return "_Not a valid asset name";
+    if (!IsTokenNameValid(token_name))
+        return "_Not a valid token name";
 
     std::vector<std::pair<std::string, CAmount> > vecAddressAmounts;
     int nTotalEntries = 0;
-    if (!passetsdb->AssetAddressDir(vecAddressAmounts, nTotalEntries, fOnlyTotal, asset_name, count, start))
-        throw JSONRPCError(RPC_INTERNAL_ERROR, "couldn't retrieve address asset directory.");
+    if (!ptokensdb->TokenAddressDir(vecAddressAmounts, nTotalEntries, fOnlyTotal, token_name, count, start))
+        throw JSONRPCError(RPC_INTERNAL_ERROR, "couldn't retrieve address token directory.");
 
     // If only the number of addresses is wanted return it
     if (fOnlyTotal) {
@@ -840,42 +840,42 @@ Value listaddressesbyasset(const Array& params, bool fHelp)
 
     Object result;
     for (auto& pair : vecAddressAmounts) {
-        result.push_back(Pair(pair.first, AssetValueFromAmount(pair.second, asset_name)));
+        result.push_back(Pair(pair.first, TokenValueFromAmount(pair.second, token_name)));
     }
 
 
     return result;
 }
 
-Value listassetbalancesbyaddress(const Array& params, bool fHelp)
+Value listtokenbalancesbyaddress(const Array& params, bool fHelp)
 {
-    if (!fAssetIndex) {
-        return "_This rpc call is not functional unless -assetindex is enabled. To enable, please run the wallet with -assetindex, this will require a reindex to occur";
+    if (!fTokenIndex) {
+        return "_This rpc call is not functional unless -tokenindex is enabled. To enable, please run the wallet with -tokenindex, this will require a reindex to occur";
     }
 
-    if (fHelp || !AreAssetsDeployed() || params.size() > 4 || params.size() < 1)
+    if (fHelp || !AreTokensDeployed() || params.size() > 4 || params.size() < 1)
         throw std::runtime_error(
-            "listassetbalancesbyaddress \"address\" (onlytotal) (count) (start)\n"
-            + AssetActivationWarning() +
-            "\nReturns a list of all asset balances for an address.\n"
+            "listtokenbalancesbyaddress \"address\" (onlytotal) (count) (start)\n"
+            + TokenActivationWarning() +
+            "\nReturns a list of all token balances for an address.\n"
 
             "\nArguments:\n"
             "1. \"address\"                  (string, required) a yacoin address\n"
-            "2. \"onlytotal\"                (boolean, optional, default=false) when false result is just a list of assets balances -- when true the result is just a single number representing the number of assets\n"
-            "3. \"count\"                    (integer, optional, default=50000, MAX=50000) truncates results to include only the first _count_ assets found\n"
-            "4. \"start\"                    (integer, optional, default=0) results skip over the first _start_ assets found (if negative it skips back from the end)\n"
+            "2. \"onlytotal\"                (boolean, optional, default=false) when false result is just a list of tokens balances -- when true the result is just a single number representing the number of tokens\n"
+            "3. \"count\"                    (integer, optional, default=50000, MAX=50000) truncates results to include only the first _count_ tokens found\n"
+            "4. \"start\"                    (integer, optional, default=0) results skip over the first _start_ tokens found (if negative it skips back from the end)\n"
 
             "\nResult:\n"
             "{\n"
-            "  (asset_name) : (quantity),\n"
+            "  (token_name) : (quantity),\n"
             "  ...\n"
             "}\n"
 
 
             "\nExamples:\n"
-            + HelpExampleCli("listassetbalancesbyaddress", "\"myaddress\" false 2 0")
-            + HelpExampleCli("listassetbalancesbyaddress", "\"myaddress\" true")
-            + HelpExampleCli("listassetbalancesbyaddress", "\"myaddress\"")
+            + HelpExampleCli("listtokenbalancesbyaddress", "\"myaddress\" false 2 0")
+            + HelpExampleCli("listtokenbalancesbyaddress", "\"myaddress\" true")
+            + HelpExampleCli("listtokenbalancesbyaddress", "\"myaddress\"")
         );
 
     std::string address = params[0].get_str();
@@ -900,13 +900,13 @@ Value listassetbalancesbyaddress(const Array& params, bool fHelp)
         start = params[3].get_int();
     }
 
-    if (!passetsdb)
-        throw JSONRPCError(RPC_INTERNAL_ERROR, "asset db unavailable.");
+    if (!ptokensdb)
+        throw JSONRPCError(RPC_INTERNAL_ERROR, "token db unavailable.");
 
-    std::vector<std::pair<std::string, CAmount> > vecAssetAmounts;
+    std::vector<std::pair<std::string, CAmount> > vecTokenAmounts;
     int nTotalEntries = 0;
-    if (!passetsdb->AddressDir(vecAssetAmounts, nTotalEntries, fOnlyTotal, address, count, start))
-        throw JSONRPCError(RPC_INTERNAL_ERROR, "couldn't retrieve address asset directory.");
+    if (!ptokensdb->AddressDir(vecTokenAmounts, nTotalEntries, fOnlyTotal, address, count, start))
+        throw JSONRPCError(RPC_INTERNAL_ERROR, "couldn't retrieve address token directory.");
 
     // If only the number of addresses is wanted return it
     if (fOnlyTotal) {
@@ -914,8 +914,8 @@ Value listassetbalancesbyaddress(const Array& params, bool fHelp)
     }
 
     Object result;
-    for (auto& pair : vecAssetAmounts) {
-        result.push_back(Pair(pair.first, AssetValueFromAmount(pair.second, pair.first)));
+    for (auto& pair : vecTokenAmounts) {
+        result.push_back(Pair(pair.first, TokenValueFromAmount(pair.second, pair.first)));
     }
 
     return result;

@@ -34,9 +34,9 @@
 #include "primitives/transaction.h"
 #include "primitives/block.h"
 #include "addressindex.h"
-#include "assets/assettypes.h"
-#include "assets/assetdb.h"
-#include "assets/assets.h"
+#include "tokens/tokentypes.h"
+#include "tokens/tokendb.h"
+#include "tokens/tokens.h"
 #include "amount.h"
 #include <list>
 #include <map>
@@ -55,48 +55,48 @@ class CNode;
 class CBlockIndexWorkComparator;
 
 //
-// GLOBAL VARIABLES USED FOR ASSET MANAGEMENT SYSTEM
+// GLOBAL VARIABLES USED FOR TOKEN MANAGEMENT SYSTEM
 //
-/** Global variable that point to the active assets database (protected by cs_main) */
-extern CAssetsDB *passetsdb;
+/** Global variable that point to the active tokens database (protected by cs_main) */
+extern CTokensDB *ptokensdb;
 
-/** Global variable that point to the active assets (protected by cs_main) */
-extern CAssetsCache *passets;
+/** Global variable that point to the active tokens (protected by cs_main) */
+extern CTokensCache *ptokens;
 
-/** Global variable that point to the assets metadata LRU Cache (protected by cs_main) */
-extern CLRUCache<std::string, CDatabasedAssetData> *passetsCache;
-extern bool fAssetIndex;
+/** Global variable that point to the tokens metadata LRU Cache (protected by cs_main) */
+extern CLRUCache<std::string, CDatabasedTokenData> *ptokensCache;
+extern bool fTokenIndex;
 extern bool fAddressIndex;
 //
-// END OF GLOBAL VARIABLES USED FOR ASSET MANAGEMENT SYSTEM
+// END OF GLOBAL VARIABLES USED FOR TOKEN MANAGEMENT SYSTEM
 //
 
 //
-// FUNCTIONS USED FOR ASSET MANAGEMENT SYSTEM
+// FUNCTIONS USED FOR TOKEN MANAGEMENT SYSTEM
 //
 /** Flush all state, indexes and buffers to disk. */
-bool FlushAssetToDisk();
-bool AreAssetsDeployed();
-CAssetsCache* GetCurrentAssetCache();
-bool CheckTxAssets(
+bool FlushTokenToDisk();
+bool AreTokensDeployed();
+CTokensCache* GetCurrentTokenCache();
+bool CheckTxTokens(
     const CTransaction& tx, CValidationState& state, MapPrevTx inputs,
-    CAssetsCache* assetCache, bool fCheckMempool,
-    std::vector<std::pair<std::string, uint256> >& vPairReissueAssets);
-void UpdateAssetInfo(const CTransaction& tx, MapPrevTx& prevInputs, int nHeight, uint256 blockHash, CAssetsCache* assetsCache, std::pair<std::string, CBlockAssetUndo>* undoAssetData);
-void UpdateAssetInfoFromTxInputs(const COutPoint& out, const CTxOut& txOut, CAssetsCache* assetsCache);
-void UpdateAssetInfoFromTxOutputs(const CTransaction& tx, int nHeight, uint256 blockHash, CAssetsCache* assetsCache, std::pair<std::string, CBlockAssetUndo>* undoAssetData);
-bool GetAddressIndex(uint160 addressHash, int type, std::string assetName,
+    CTokensCache* tokenCache, bool fCheckMempool,
+    std::vector<std::pair<std::string, uint256> >& vPairReissueTokens);
+void UpdateTokenInfo(const CTransaction& tx, MapPrevTx& prevInputs, int nHeight, uint256 blockHash, CTokensCache* tokensCache, std::pair<std::string, CBlockTokenUndo>* undoTokenData);
+void UpdateTokenInfoFromTxInputs(const COutPoint& out, const CTxOut& txOut, CTokensCache* tokensCache);
+void UpdateTokenInfoFromTxOutputs(const CTransaction& tx, int nHeight, uint256 blockHash, CTokensCache* tokensCache, std::pair<std::string, CBlockTokenUndo>* undoTokenData);
+bool GetAddressIndex(uint160 addressHash, int type, std::string tokenName,
                      std::vector<std::pair<CAddressIndexKey, CAmount> > &addressIndex,
                      int start = 0, int end = 0);
 bool GetAddressIndex(uint160 addressHash, int type,
                      std::vector<std::pair<CAddressIndexKey, CAmount> > &addressIndex,
                      int start = 0, int end = 0);
-bool GetAddressUnspent(uint160 addressHash, int type, std::string assetName,
+bool GetAddressUnspent(uint160 addressHash, int type, std::string tokenName,
                        std::vector<std::pair<CAddressUnspentKey, CAddressUnspentValue> > &unspentOutputs);
 bool GetAddressUnspent(uint160 addressHash, int type,
                        std::vector<std::pair<CAddressUnspentKey, CAddressUnspentValue> > &unspentOutputs);
 //
-// END OF FUNCTIONS USED FOR ASSET MANAGEMENT SYSTEM
+// END OF FUNCTIONS USED FOR TOKEN MANAGEMENT SYSTEM
 //
 
 
@@ -1152,15 +1152,15 @@ public:
     mutable CCriticalSection cs;
     std::map<uint256, CTransaction> mapTx;
     std::map<COutPoint, CInPoint> mapNextTx;
-    std::map<std::string, uint256> mapAssetToHash;
-    std::map<uint256, std::string> mapHashToAsset;
+    std::map<std::string, uint256> mapTokenToHash;
+    std::map<uint256, std::string> mapHashToToken;
 
     bool accept(CValidationState &state, CTxDB& txdb, CTransaction &tx,
                 bool fCheckInputs, bool* pfMissingInputs);
     bool addUnchecked(const uint256& hash, CTransaction &tx);
     void remove(const CTransaction& tx);
     void remove(const std::vector<CTransaction>& vtx);
-    void remove(const std::vector<CTransaction>& vtx, ConnectedBlockAssetData& connectedBlockData);
+    void remove(const std::vector<CTransaction>& vtx, ConnectedBlockTokenData& connectedBlockData);
     void removeUnchecked(const CTransaction& tx, const uint256& hash);
     void clear();
     void queryHashes(std::vector<uint256>& vtxid);

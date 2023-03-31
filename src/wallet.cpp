@@ -54,7 +54,7 @@ struct CompareValueOnly
     }
 };
 
-struct CompareAssetValueOnly
+struct CompareTokenValueOnly
 {
     bool operator()(const std::pair<CInputCoin, CAmount>& t1,
                     const std::pair<CInputCoin, CAmount>& t2) const
@@ -886,8 +886,8 @@ void CWalletTx::GetAmounts(::int64_t& nGeneratedImmature,
                            std::list<COutputEntry>& listSent, CAmount& nFee,
                            std::string& strSentAccount,
                            const isminefilter& filter,
-                           std::list<CAssetOutputEntry>& assetsReceived,
-                           std::list<CAssetOutputEntry>& assetsSent,
+                           std::list<CTokenOutputEntry>& tokensReceived,
+                           std::list<CTokenOutputEntry>& tokensSent,
                            bool fExcludeNotExpiredTimelock) const
 {
     nGeneratedImmature = nGeneratedMature = nFee = 0;
@@ -938,7 +938,7 @@ void CWalletTx::GetAmounts(::int64_t& nGeneratedImmature,
             address = CNoDestination();
         }
 
-        if (!txout.scriptPubKey.IsAssetScript()) {
+        if (!txout.scriptPubKey.IsTokenScript()) {
             COutputEntry output = {address, txout.nValue, (int) i};
 
             // If we are debited by the transaction, add the output as a "sent" entry
@@ -968,22 +968,22 @@ void CWalletTx::GetAmounts(::int64_t& nGeneratedImmature,
             }
         }
 
-        /** YAC_ASSET START */
-        if (AreAssetsDeployed()) {
-            if (txout.scriptPubKey.IsAssetScript()) {
-                CAssetOutputEntry assetoutput;
-                assetoutput.vout = i;
-                GetAssetData(txout.scriptPubKey, assetoutput);
+        /** YAC_TOKEN START */
+        if (AreTokensDeployed()) {
+            if (txout.scriptPubKey.IsTokenScript()) {
+                CTokenOutputEntry tokenoutput;
+                tokenoutput.vout = i;
+                GetTokenData(txout.scriptPubKey, tokenoutput);
 
-                // The only asset type we send is transfer_asset. We need to skip all other types for the sent category
-                if (nDebit > 0 && assetoutput.type == TX_TRANSFER_ASSET)
-                    assetsSent.emplace_back(assetoutput);
+                // The only token type we send is transfer_token. We need to skip all other types for the sent category
+                if (nDebit > 0 && tokenoutput.type == TX_TRANSFER_TOKEN)
+                    tokensSent.emplace_back(tokenoutput);
 
                 if (fIsMine & filter)
-                    assetsReceived.emplace_back(assetoutput);
+                    tokensReceived.emplace_back(tokenoutput);
             }
         }
-        /** YAC_ASSET END */
+        /** YAC_TOKEN END */
     }
 }
 
@@ -993,9 +993,9 @@ void CWalletTx::GetAmounts(::int64_t& nGeneratedImmature, ::int64_t& nGeneratedM
                 std::string& strSentAccount, const isminefilter& filter,
                 bool fExcludeNotExpiredTimelock) const
 {
-    std::list<CAssetOutputEntry> assetsReceived;
-    std::list<CAssetOutputEntry> assetsSent;
-    GetAmounts(nGeneratedImmature, nGeneratedMature, listReceived, listSent, nFee, strSentAccount, filter, assetsReceived, assetsSent, fExcludeNotExpiredTimelock);
+    std::list<CTokenOutputEntry> tokensReceived;
+    std::list<CTokenOutputEntry> tokensSent;
+    GetAmounts(nGeneratedImmature, nGeneratedMature, listReceived, listSent, nFee, strSentAccount, filter, tokensReceived, tokensSent, fExcludeNotExpiredTimelock);
 }
 
 void CWalletTx::GetAccountAmounts(const string& strAccount, int64_t& nGenerated, int64_t& nReceived,
@@ -1659,47 +1659,47 @@ void CWallet::AvailableCoins(std::vector<COutput>& vCoins, bool fOnlySafe,
                              const uint64_t nMaximumCount, const int nMinDepth,
                              const int nMaxDepth) const
 {
-  std::map<std::string, std::vector<COutput> > mapAssetCoins;
-  AvailableCoinsAll(vCoins, mapAssetCoins, true, false, fOnlySafe, coinControl,
+  std::map<std::string, std::vector<COutput> > mapTokenCoins;
+  AvailableCoinsAll(vCoins, mapTokenCoins, true, false, fOnlySafe, coinControl,
                     fromScriptPubKey, useExpiredTimelockUTXO, nMinimumAmount,
                     nMaximumAmount, nMinimumSumAmount, nMaximumCount, nMinDepth,
                     nMaxDepth);
 }
 
-void CWallet::AvailableAssets(
-    std::map<std::string, std::vector<COutput> >& mapAssetCoins, bool fOnlySafe,
+void CWallet::AvailableTokens(
+    std::map<std::string, std::vector<COutput> >& mapTokenCoins, bool fOnlySafe,
     const CCoinControl* coinControl, const CAmount& nMinimumAmount,
     const CAmount& nMaximumAmount, const CAmount& nMinimumSumAmount,
     const uint64_t& nMaximumCount, const int& nMinDepth,
     const int& nMaxDepth) const
 {
-  if (!AreAssetsDeployed()) return;
+  if (!AreTokensDeployed()) return;
 
   std::vector<COutput> vCoins;
 
-  AvailableCoinsAll(vCoins, mapAssetCoins, false, true, fOnlySafe, coinControl,
+  AvailableCoinsAll(vCoins, mapTokenCoins, false, true, fOnlySafe, coinControl,
                     NULL, false, nMinimumAmount, nMaximumAmount,
                     nMinimumSumAmount, nMaximumCount, nMinDepth, nMaxDepth);
 }
 
-void CWallet::AvailableCoinsWithAssets(
+void CWallet::AvailableCoinsWithTokens(
     std::vector<COutput>& vCoins,
-    std::map<std::string, std::vector<COutput> >& mapAssetCoins, bool fOnlySafe,
+    std::map<std::string, std::vector<COutput> >& mapTokenCoins, bool fOnlySafe,
     const CCoinControl* coinControl, const CScript *fromScriptPubKey,
     bool useExpiredTimelockUTXO, const CAmount& nMinimumAmount,
     const CAmount& nMaximumAmount, const CAmount& nMinimumSumAmount,
     const uint64_t& nMaximumCount, const int& nMinDepth,
     const int& nMaxDepth) const
 {
-  AvailableCoinsAll(vCoins, mapAssetCoins, true, AreAssetsDeployed(), fOnlySafe,
+  AvailableCoinsAll(vCoins, mapTokenCoins, true, AreTokensDeployed(), fOnlySafe,
                     coinControl, fromScriptPubKey, useExpiredTimelockUTXO, nMinimumAmount, nMaximumAmount,
                     nMinimumSumAmount, nMaximumCount, nMinDepth, nMaxDepth);
 }
 
 void CWallet::AvailableCoinsAll(
     std::vector<COutput>& vCoins,
-    std::map<std::string, std::vector<COutput> >& mapAssetCoins, bool fGetYAC,
-    bool fGetAssets, bool fOnlySafe, const CCoinControl* coinControl,
+    std::map<std::string, std::vector<COutput> >& mapTokenCoins, bool fGetYAC,
+    bool fGetTokens, bool fOnlySafe, const CCoinControl* coinControl,
     const CScript* fromScriptPubKey, bool useExpiredTimelockUTXO,
     const CAmount& nMinimumAmount, const CAmount& nMaximumAmount,
     const CAmount& nMinimumSumAmount, const uint64_t& nMaximumCount,
@@ -1713,8 +1713,8 @@ void CWallet::AvailableCoinsAll(
     CAmount nTotal = 0;
 
     bool fYACLimitHit = false;
-    std::map<std::string, CAmount> mapAssetTotals;
-    std::set<std::string> setAssetMaxFound;
+    std::map<std::string, CAmount> mapTokenTotals;
+    std::set<std::string> setTokenMaxFound;
 
     for (const auto& entry : mapWallet) {
       const uint256& wtxid = entry.first;
@@ -1791,22 +1791,22 @@ void CWallet::AvailableCoinsAll(
 
       for (unsigned int i = 0; i < pcoin->vout.size(); i++) {
 
-        /** YAC_ASSET START */
+        /** YAC_TOKEN START */
         int nType;
         bool fIsOwner;
-        bool isAssetScript =
-            pcoin->vout[i].scriptPubKey.IsAssetScript(nType, fIsOwner);
-        /** YAC_ASSET END */
+        bool isTokenScript =
+            pcoin->vout[i].scriptPubKey.IsTokenScript(nType, fIsOwner);
+        /** YAC_TOKEN END */
 
         // If there is coin control, only select coins from selected set
-        if (coinControl && !isAssetScript && coinControl->HasSelected() &&
+        if (coinControl && !isTokenScript && coinControl->HasSelected() &&
             !coinControl->fAllowOtherInputs &&
             !coinControl->IsSelected(entry.first, i))
           continue;
 
-        if (coinControl && isAssetScript && coinControl->HasAssetSelected() &&
+        if (coinControl && isTokenScript && coinControl->HasTokenSelected() &&
             !coinControl->fAllowOtherInputs &&
-            !coinControl->IsAssetSelected(COutPoint(entry.first, i)))
+            !coinControl->IsTokenSelected(COutPoint(entry.first, i)))
           continue;
 
         // Ignore spent coins
@@ -1820,49 +1820,49 @@ void CWallet::AvailableCoinsAll(
         }
         bool fSpendableIn = ((mine & MINE_SPENDABLE) != MINE_NO);
 
-        // Looking for Asset Tx OutPoints Only
-        if (fGetAssets && AreAssetsDeployed() && isAssetScript) {
+        // Looking for Token Tx OutPoints Only
+        if (fGetTokens && AreTokensDeployed() && isTokenScript) {
             std::string address;
-            CAssetOutputEntry output_data;
-            if (!GetAssetData(pcoin->vout[i].scriptPubKey, output_data))
+            CTokenOutputEntry output_data;
+            if (!GetTokenData(pcoin->vout[i].scriptPubKey, output_data))
                 continue;
 
             address = EncodeDestination(output_data.destination);
 
-            // If we already have the maximum amount or size for this asset, skip it
-            if (setAssetMaxFound.count(output_data.assetName))
+            // If we already have the maximum amount or size for this token, skip it
+            if (setTokenMaxFound.count(output_data.tokenName))
                 continue;
 
             // Initialize the map vector is it doesn't exist yet
-            if (!mapAssetCoins.count(output_data.assetName)) {
+            if (!mapTokenCoins.count(output_data.tokenName)) {
                 std::vector<COutput> vOutput;
-                mapAssetCoins.insert(std::make_pair(output_data.assetName, vOutput));
+                mapTokenCoins.insert(std::make_pair(output_data.tokenName, vOutput));
             }
 
-            // Add the COutput to the map of available Asset Coins
-            mapAssetCoins.at(output_data.assetName).push_back(
+            // Add the COutput to the map of available Token Coins
+            mapTokenCoins.at(output_data.tokenName).push_back(
                     COutput(pcoin, i, nDepth, fSpendableIn, safeTx));
 
-            // Initialize the map of current asset totals
-            if (!mapAssetTotals.count(output_data.assetName))
-                mapAssetTotals[output_data.assetName] = 0;
+            // Initialize the map of current token totals
+            if (!mapTokenTotals.count(output_data.tokenName))
+                mapTokenTotals[output_data.tokenName] = 0;
 
-            // Update the map of totals depending the which type of asset tx we are looking at
-            mapAssetTotals[output_data.assetName] += output_data.nAmount;
+            // Update the map of totals depending the which type of token tx we are looking at
+            mapTokenTotals[output_data.tokenName] += output_data.nAmount;
 
-            // Checks the sum amount of all UTXO's, and adds to the set of assets that we found the max for
+            // Checks the sum amount of all UTXO's, and adds to the set of tokens that we found the max for
             if (nMinimumSumAmount != MAX_MONEY) {
-                if (mapAssetTotals[output_data.assetName] >= nMinimumSumAmount)
-                    setAssetMaxFound.insert(output_data.assetName);
+                if (mapTokenTotals[output_data.tokenName] >= nMinimumSumAmount)
+                    setTokenMaxFound.insert(output_data.tokenName);
             }
 
-            // Checks the maximum number of UTXO's, and addes to set of of asset that we found the max for
-            if (nMaximumCount > 0 && mapAssetCoins[output_data.assetName].size() >= nMaximumCount) {
-                setAssetMaxFound.insert(output_data.assetName);
+            // Checks the maximum number of UTXO's, and addes to set of of token that we found the max for
+            if (nMaximumCount > 0 && mapTokenCoins[output_data.tokenName].size() >= nMaximumCount) {
+                setTokenMaxFound.insert(output_data.tokenName);
             }
         }
 
-        if (fGetYAC && !isAssetScript) { // Looking for YAC Tx OutPoints Only
+        if (fGetYAC && !isTokenScript) { // Looking for YAC Tx OutPoints Only
             if (fYACLimitHit) // We hit our limit
                 continue;
 
@@ -1986,7 +1986,7 @@ static void ApproximateBestSubset(const std::vector<CInputCoin>& vValue, const C
     }
 }
 
-static void ApproximateBestAssetSubset(
+static void ApproximateBestTokenSubset(
     const std::vector<std::pair<CInputCoin, CAmount> >& vValue,
     const CAmount& nTotalLower, const CAmount& nTargetValue,
     std::vector<char>& vfBest, CAmount& nBest, int iterations = 1000)
@@ -2309,59 +2309,59 @@ bool CWallet::SelectCoinsSimple(int64_t nTargetValue, int64_t nMinValue, int64_t
     return true;
 }
 
-/** YAC_ASSET START */
-bool CWallet::SelectAssets(
+/** YAC_TOKEN START */
+bool CWallet::SelectTokens(
     int64_t nSpendTime,
-    const std::map<std::string, std::vector<COutput> >& mapAvailableAssets,
-    const std::map<std::string, CAmount>& mapAssetTargetValue,
+    const std::map<std::string, std::vector<COutput> >& mapAvailableTokens,
+    const std::map<std::string, CAmount>& mapTokenTargetValue,
     std::set<CInputCoin>& setCoinsRet,
     std::map<std::string, CAmount>& mapValueRet) const
 {
-    if (!AreAssetsDeployed())
+    if (!AreTokensDeployed())
         return false;
 
-    for (auto assetVector : mapAvailableAssets) {
+    for (auto tokenVector : mapAvailableTokens) {
         // Setup temporay variables
-        std::vector<COutput> vAssets(assetVector.second);
+        std::vector<COutput> vTokens(tokenVector.second);
 
         std::set<CInputCoin> tempCoinsRet;
         CAmount nTempAmountRet;
         CAmount nTempTargetValue;
-        std::string strAssetName = assetVector.first;
+        std::string strTokenName = tokenVector.first;
 
-        CAmount nValueFromPresetInputs = 0; // This is used with coincontrol, which assets doesn't support yet
+        CAmount nValueFromPresetInputs = 0; // This is used with coincontrol, which tokens doesn't support yet
 
-        // If we dont have a target value for this asset, don't select coins for it
-        if (!mapAssetTargetValue.count(strAssetName))
+        // If we dont have a target value for this token, don't select coins for it
+        if (!mapTokenTargetValue.count(strTokenName))
             continue;
 
         // If we dont have a target value greater than zero, don't select coins for it
-        if (mapAssetTargetValue.at(strAssetName) <= 0)
+        if (mapTokenTargetValue.at(strTokenName) <= 0)
             continue;
 
         // Add the starting value into the mapValueRet
-        if (!mapValueRet.count(strAssetName))
-            mapValueRet.insert(std::make_pair(strAssetName, 0));
+        if (!mapValueRet.count(strTokenName))
+            mapValueRet.insert(std::make_pair(strTokenName, 0));
 
         // assign our temporary variable
-        nTempAmountRet = mapValueRet.at(strAssetName);
-        nTempTargetValue = mapAssetTargetValue.at(strAssetName);
+        nTempAmountRet = mapValueRet.at(strTokenName);
+        nTempTargetValue = mapTokenTargetValue.at(strTokenName);
 
         bool res =
             nTempTargetValue <= nValueFromPresetInputs ||
-            SelectAssetsMinConf(nTempTargetValue - nValueFromPresetInputs,
-                                nSpendTime, 1, 6, strAssetName, vAssets,
+            SelectTokensMinConf(nTempTargetValue - nValueFromPresetInputs,
+                                nSpendTime, 1, 6, strTokenName, vTokens,
                                 tempCoinsRet, nTempAmountRet) ||
-            SelectAssetsMinConf(nTempTargetValue - nValueFromPresetInputs,
-                                nSpendTime, 1, 1, strAssetName, vAssets,
+            SelectTokensMinConf(nTempTargetValue - nValueFromPresetInputs,
+                                nSpendTime, 1, 1, strTokenName, vTokens,
                                 tempCoinsRet, nTempAmountRet) ||
-            SelectAssetsMinConf(nTempTargetValue - nValueFromPresetInputs,
-                                nSpendTime, 0, 1, strAssetName, vAssets,
+            SelectTokensMinConf(nTempTargetValue - nValueFromPresetInputs,
+                                nSpendTime, 0, 1, strTokenName, vTokens,
                                 tempCoinsRet, nTempAmountRet);
 
         if (res) {
             setCoinsRet.insert(tempCoinsRet.begin(), tempCoinsRet.end());
-            mapValueRet.at(strAssetName) = nTempAmountRet + nValueFromPresetInputs;
+            mapValueRet.at(strTokenName) = nTempAmountRet + nValueFromPresetInputs;
         } else {
             return false;
         }
@@ -2370,10 +2370,10 @@ bool CWallet::SelectAssets(
   return true;
 }
 
-bool CWallet::SelectAssetsMinConf(const CAmount& nTargetValue,
+bool CWallet::SelectTokensMinConf(const CAmount& nTargetValue,
                                   int64_t nSpendTime, int nConfMine,
                                   int nConfTheirs,
-                                  const std::string& strAssetName,
+                                  const std::string& strTokenName,
                                   std::vector<COutput> vCoins,
                                   std::set<CInputCoin>& setCoinsRet,
                                   CAmount& nValueRet) const
@@ -2410,33 +2410,33 @@ bool CWallet::SelectAssetsMinConf(const CAmount& nTargetValue,
 
     int nType = -1;
     bool fIsOwner = false;
-    if (!coin.txout.scriptPubKey.IsAssetScript(nType, fIsOwner)) {
+    if (!coin.txout.scriptPubKey.IsTokenScript(nType, fIsOwner)) {
         continue;
     }
 
     CAmount nTempAmount = 0;
-    if (nType == TX_NEW_ASSET && !fIsOwner) { // Root/Sub Asset
-        CNewAsset assetTemp;
+    if (nType == TX_NEW_TOKEN && !fIsOwner) { // Root/Sub Token
+        CNewToken tokenTemp;
         std::string address;
-        if (!AssetFromScript(coin.txout.scriptPubKey, assetTemp, address))
+        if (!TokenFromScript(coin.txout.scriptPubKey, tokenTemp, address))
             continue;
-        nTempAmount = assetTemp.nAmount;
-    } else if (nType == TX_TRANSFER_ASSET) { // Transfer Asset
-        CAssetTransfer transferTemp;
+        nTempAmount = tokenTemp.nAmount;
+    } else if (nType == TX_TRANSFER_TOKEN) { // Transfer Token
+        CTokenTransfer transferTemp;
         std::string address;
-        if (!TransferAssetFromScript(coin.txout.scriptPubKey, transferTemp, address))
+        if (!TransferTokenFromScript(coin.txout.scriptPubKey, transferTemp, address))
             continue;
         nTempAmount = transferTemp.nAmount;
-    } else if (nType == TX_NEW_ASSET && fIsOwner) { // Owner Asset
+    } else if (nType == TX_NEW_TOKEN && fIsOwner) { // Owner Token
         std::string ownerName;
         std::string address;
-        if (!OwnerAssetFromScript(coin.txout.scriptPubKey, ownerName, address))
+        if (!OwnerTokenFromScript(coin.txout.scriptPubKey, ownerName, address))
             continue;
-        nTempAmount = OWNER_ASSET_AMOUNT;
-    } else if (nType == TX_REISSUE_ASSET) { // Reissue Asset
-        CReissueAsset reissueTemp;
+        nTempAmount = OWNER_TOKEN_AMOUNT;
+    } else if (nType == TX_REISSUE_TOKEN) { // Reissue Token
+        CReissueToken reissueTemp;
         std::string address;
-        if (!ReissueAssetFromScript(coin.txout.scriptPubKey, reissueTemp, address))
+        if (!ReissueTokenFromScript(coin.txout.scriptPubKey, reissueTemp, address))
             continue;
         nTempAmount = reissueTemp.nAmount;
     } else {
@@ -2477,13 +2477,13 @@ bool CWallet::SelectAssetsMinConf(const CAmount& nTargetValue,
   }
 
   // Solve subset sum by stochastic approximation
-  std::sort(vValue.begin(), vValue.end(), CompareAssetValueOnly());
+  std::sort(vValue.begin(), vValue.end(), CompareTokenValueOnly());
   vector<char> vfBest;
   int64_t nBest;
 
-  ApproximateBestAssetSubset(vValue, nTotalLower, nTargetValue, vfBest, nBest, 1000);
+  ApproximateBestTokenSubset(vValue, nTotalLower, nTargetValue, vfBest, nBest, 1000);
   if (nBest != nTargetValue && nTotalLower >= nTargetValue + CENT)
-      ApproximateBestAssetSubset(vValue, nTotalLower, nTargetValue + CENT, vfBest, nBest, 1000);
+      ApproximateBestTokenSubset(vValue, nTotalLower, nTargetValue + CENT, vfBest, nBest, 1000);
 
   // If we have a bigger coin and (either the stochastic approximation didn't
   // find a good solution,
@@ -2503,93 +2503,93 @@ bool CWallet::SelectAssetsMinConf(const CAmount& nTargetValue,
 
     if (fDebug && GetBoolArg("-printpriority")) {
       //// debug print
-      printf("SelectAssets() best subset: ");
+      printf("SelectTokens() best subset: ");
       for (unsigned int i = 0; i < vValue.size(); i++)
         if (vfBest[i])
-          printf("%s : %s ", strAssetName,
+          printf("%s : %s ", strTokenName,
                  FormatMoney(vValue[i].second).c_str());
-      printf("total %s : %s\n", strAssetName, FormatMoney(nBest).c_str());
+      printf("total %s : %s\n", strTokenName, FormatMoney(nBest).c_str());
     }
   }
 
   return true;
 }
-/** YAC_ASSET END */
+/** YAC_TOKEN END */
 
-/** YAC_ASSET START */
-bool CWallet::CreateTransactionWithAssets(
+/** YAC_TOKEN START */
+bool CWallet::CreateTransactionWithTokens(
     const std::vector<CRecipient>& vecSend, CWalletTx& wtxNew,
     CReserveKey& reservekey, CAmount& nFeeRet, int& nChangePosInOut,
     std::string& strFailReason, const CCoinControl& coinControl,
-    const std::vector<CNewAsset> assets, const CTxDestination destination,
-    const AssetType& type)
+    const std::vector<CNewToken> tokens, const CTxDestination destination,
+    const TokenType& type)
 {
-  CReissueAsset reissueAsset;
+  CReissueToken reissueToken;
   /*
-   *    fNewAsset: true
-        assets: contains CNewAsset info
-        fTransferAsset: false
-        fReissueAsset: false
-        vecSend: contains fee lock address + owner asset address
+   *    fNewToken: true
+        tokens: contains CNewToken info
+        fTransferToken: false
+        fReissueToken: false
+        vecSend: contains fee lock address + owner token address
         coinControl.destChange: RVN change address
-        destination: address containing new asset
-        assetType: AssetType::ROOT, AssetType::SUB, AssetType::UNIQUE
+        destination: address containing new token
+        tokenType: TokenType::ROOT, TokenType::SUB, TokenType::UNIQUE
    */
   return CreateTransactionAll(vecSend, wtxNew, reservekey, nFeeRet,
                               nChangePosInOut, strFailReason, coinControl,
-                              NULL, true, true, assets, destination, false, false,
-                              reissueAsset, type);
+                              NULL, true, true, tokens, destination, false, false,
+                              reissueToken, type);
 }
 
-bool CWallet::CreateTransactionWithTransferAsset(
+bool CWallet::CreateTransactionWithTransferToken(
     const std::vector<CRecipient>& vecSend, CWalletTx& wtxNew,
     CReserveKey& reservekey, CAmount& nFeeRet, int& nChangePosInOut,
     std::string& strFailReason, const CCoinControl& coinControl)
 {
-  CNewAsset asset;
-  CReissueAsset reissueAsset;
+  CNewToken token;
+  CReissueToken reissueToken;
   CTxDestination destination;
-  AssetType assetType = AssetType::INVALID;
+  TokenType tokenType = TokenType::INVALID;
 /*
- *  vecSend: contains receiver's asset scriptPubKey
-    coinControl: contain RVN change address and asset change address
-    fNewAsset: false
-    assets: contains empty CNewAsset info
+ *  vecSend: contains receiver's token scriptPubKey
+    coinControl: contain RVN change address and token change address
+    fNewToken: false
+    tokens: contains empty CNewToken info
     destination: contains empty destination
-    fTransferAsset: true
-    fReissueAsset: false
-    reissueAsset: contains empty CReissueAsset info
-    assetType: AssetType::INVALID
+    fTransferToken: true
+    fReissueToken: false
+    reissueToken: contains empty CReissueToken info
+    tokenType: TokenType::INVALID
  */
   return CreateTransactionAll(vecSend, wtxNew, reservekey, nFeeRet,
                               nChangePosInOut, strFailReason, coinControl,
-                              NULL, true, false, asset, destination, true, false,
-                              reissueAsset, assetType);
+                              NULL, true, false, token, destination, true, false,
+                              reissueToken, tokenType);
 }
 
-bool CWallet::CreateTransactionWithReissueAsset(
+bool CWallet::CreateTransactionWithReissueToken(
     const std::vector<CRecipient>& vecSend, CWalletTx& wtxNew,
     CReserveKey& reservekey, CAmount& nFeeRet, int& nChangePosInOut,
     std::string& strFailReason, const CCoinControl& coinControl,
-    const CReissueAsset& reissueAsset, const CTxDestination destination)
+    const CReissueToken& reissueToken, const CTxDestination destination)
 {
-  CNewAsset asset;
-  AssetType assetType = AssetType::REISSUE;
+  CNewToken token;
+  TokenType tokenType = TokenType::REISSUE;
   /*
-   *    vecSend: contains scriptPubKey for ownership asset transfer and scriptPubKey for reissue fee lock
+   *    vecSend: contains scriptPubKey for ownership token transfer and scriptPubKey for reissue fee lock
         coinControl: contain RVN change address
-        fNewAsset: false
-        assets: contains empty CNewAsset info
-        destination: address containing reissued asset
-        fTransferAsset: false
-        fReissueAsset: true
-        reissueAsset: contains CReissueAsset info
-        assetType: AssetType::REISSUE
+        fNewToken: false
+        tokens: contains empty CNewToken info
+        destination: address containing reissued token
+        fTransferToken: false
+        fReissueToken: true
+        reissueToken: contains CReissueToken info
+        tokenType: TokenType::REISSUE
    */
   return CreateTransactionAll(vecSend, wtxNew, reservekey, nFeeRet,
                               nChangePosInOut, strFailReason, coinControl,
-                              NULL, true, false, asset, destination, false, true,
-                              reissueAsset, assetType);
+                              NULL, true, false, token, destination, false, true,
+                              reissueToken, tokenType);
 }
 
 bool CWallet::CreateNewChangeAddress(CReserveKey& reservekey, CKeyID& keyID, std::string& strFailReason)
@@ -2608,7 +2608,7 @@ bool CWallet::CreateNewChangeAddress(CReserveKey& reservekey, CKeyID& keyID, std
     keyID = vchPubKey.GetID();
     return true;
 }
-/** YAC_ASSET END */
+/** YAC_TOKEN END */
 
 bool CWallet::CreateTransaction(CScript scriptPubKey, ::int64_t nValue,
         CWalletTx &wtxNew, CReserveKey &reservekey, CAmount &nFeeRet,
@@ -2630,76 +2630,76 @@ bool CWallet::CreateTransaction(const std::vector<CRecipient> &vecSend,
         const CScript *fromScriptPubKey,
         bool useExpiredTimelockUTXO)
 {
-    CNewAsset asset;
-    CReissueAsset reissueAsset;
+    CNewToken token;
+    CReissueToken reissueToken;
     CTxDestination destination;
-    AssetType assetType = AssetType::INVALID;
-    return CreateTransactionAll(vecSend, wtxNew, reservekey, nFeeRet, nChangePosInOut, strFailReason, coinControl, fromScriptPubKey, useExpiredTimelockUTXO, false, asset, destination, false, false, reissueAsset, assetType);
+    TokenType tokenType = TokenType::INVALID;
+    return CreateTransactionAll(vecSend, wtxNew, reservekey, nFeeRet, nChangePosInOut, strFailReason, coinControl, fromScriptPubKey, useExpiredTimelockUTXO, false, token, destination, false, false, reissueToken, tokenType);
 }
 
 bool CWallet::CreateTransactionAll(
     const std::vector<CRecipient>& vecSend, CWalletTx& wtxNew,
     CReserveKey& reservekey, CAmount& nFeeRet, int& nChangePosInOut,
     std::string& strFailReason, const CCoinControl& coinControl,
-    const CScript* fromScriptPubKey, bool useExpiredTimelockUTXO, bool fNewAsset,
-    const CNewAsset& asset, const CTxDestination destination,
-    bool fTransferAsset, bool fReissueAsset,
-    const CReissueAsset& reissueAsset, const AssetType& assetType)
+    const CScript* fromScriptPubKey, bool useExpiredTimelockUTXO, bool fNewToken,
+    const CNewToken& token, const CTxDestination destination,
+    bool fTransferToken, bool fReissueToken,
+    const CReissueToken& reissueToken, const TokenType& tokenType)
 {
-    std::vector<CNewAsset> assets;
-    assets.push_back(asset);
+    std::vector<CNewToken> tokens;
+    tokens.push_back(token);
     return CreateTransactionAll(
         vecSend, wtxNew, reservekey, nFeeRet, nChangePosInOut, strFailReason,
-        coinControl, fromScriptPubKey, useExpiredTimelockUTXO, fNewAsset, assets, destination,
-        fTransferAsset, fReissueAsset, reissueAsset, assetType);
+        coinControl, fromScriptPubKey, useExpiredTimelockUTXO, fNewToken, tokens, destination,
+        fTransferToken, fReissueToken, reissueToken, tokenType);
 }
 
 bool CWallet::CreateTransactionAll(
     const std::vector<CRecipient>& vecSend, CWalletTx& wtxNew,
     CReserveKey& reservekey, CAmount& nFeeRet, int& nChangePosInOut,
     std::string& strFailReason, const CCoinControl& coinControl,
-    const CScript* fromScriptPubKey, bool useExpiredTimelockUTXO, bool fNewAsset,
-    const std::vector<CNewAsset> assets, const CTxDestination destination,
-    bool fTransferAsset, bool fReissueAsset,
-    const CReissueAsset& reissueAsset, const AssetType& assetType)
+    const CScript* fromScriptPubKey, bool useExpiredTimelockUTXO, bool fNewToken,
+    const std::vector<CNewToken> tokens, const CTxDestination destination,
+    bool fTransferToken, bool fReissueToken,
+    const CReissueToken& reissueToken, const TokenType& tokenType)
 {
-    /** YAC_ASSET START */
-    if (!AreAssetsDeployed() && (fTransferAsset || fNewAsset || fReissueAsset))
+    /** YAC_TOKEN START */
+    if (!AreTokensDeployed() && (fTransferToken || fNewToken || fReissueToken))
         return false;
 
-    if (fNewAsset && (assets.size() < 1 || !IsValidDestination(destination)))
-        return error("%s : Tried creating a new asset transaction and the asset was null or the destination was invalid", __func__);
+    if (fNewToken && (tokens.size() < 1 || !IsValidDestination(destination)))
+        return error("%s : Tried creating a new token transaction and the token was null or the destination was invalid", __func__);
 
-    if ((fNewAsset && fTransferAsset) || (fReissueAsset && fTransferAsset) || (fReissueAsset && fNewAsset))
-        return error("%s : Only one type of asset transaction allowed per transaction");
+    if ((fNewToken && fTransferToken) || (fReissueToken && fTransferToken) || (fReissueToken && fNewToken))
+        return error("%s : Only one type of token transaction allowed per transaction");
 
-    if (fReissueAsset && (reissueAsset.IsNull() || !IsValidDestination(destination)))
-        return error("%s : Tried reissuing an asset and the reissue data was null or the destination was invalid", __func__);
-    /** YAC_ASSET END */
+    if (fReissueToken && (reissueToken.IsNull() || !IsValidDestination(destination)))
+        return error("%s : Tried reissuing an token and the reissue data was null or the destination was invalid", __func__);
+    /** YAC_TOKEN END */
 
-    CAmount nValue = 0; // Contains YAC amount, not asset amount
-    std::map<std::string, CAmount> mapAssetValue; // Contains asset amount for each asset
+    CAmount nValue = 0; // Contains YAC amount, not token amount
+    std::map<std::string, CAmount> mapTokenValue; // Contains token amount for each token
     int nChangePosRequest = nChangePosInOut;
     unsigned int nSubtractFeeFromAmount = 0;
     for (const auto& recipient : vecSend)
     {
-        /** YAC_ASSET START */
-        if (fTransferAsset || fReissueAsset || assetType == AssetType::SUB || assetType == AssetType::UNIQUE) {
-            CAssetTransfer assetTransfer;
+        /** YAC_TOKEN START */
+        if (fTransferToken || fReissueToken || tokenType == TokenType::SUB || tokenType == TokenType::UNIQUE) {
+            CTokenTransfer tokenTransfer;
             std::string address;
-            if (TransferAssetFromScript(recipient.scriptPubKey, assetTransfer, address)) {
-                if (!mapAssetValue.count(assetTransfer.strName))
-                    mapAssetValue[assetTransfer.strName] = 0;
+            if (TransferTokenFromScript(recipient.scriptPubKey, tokenTransfer, address)) {
+                if (!mapTokenValue.count(tokenTransfer.strName))
+                    mapTokenValue[tokenTransfer.strName] = 0;
 
-                if (assetTransfer.nAmount <= 0) {
-                    strFailReason = _("Asset Transfer amounts must be greater than 0");
+                if (tokenTransfer.nAmount <= 0) {
+                    strFailReason = _("Token Transfer amounts must be greater than 0");
                     return false;
                 }
 
-                mapAssetValue[assetTransfer.strName] += assetTransfer.nAmount;
+                mapTokenValue[tokenTransfer.strName] += tokenTransfer.nAmount;
             }
         }
-        /** YAC_ASSET END */
+        /** YAC_TOKEN END */
 
         if (nValue < 0 || recipient.nAmount < 0)
         {
@@ -2724,26 +2724,26 @@ bool CWallet::CreateTransactionAll(
     unsigned int nBytes;
     {
         std::set<CInputCoin> setCoins;
-        std::set<CInputCoin> setAssets;
+        std::set<CInputCoin> setTokens;
         LOCK2(cs_main, cs_wallet);
         // txdb must be opened before the mapWallet lock
         CTxDB txdb("r");
         {
-            /** YAC_ASSET START */
+            /** YAC_TOKEN START */
             std::vector<COutput> vAvailableCoins;
-            std::map<std::string, std::vector<COutput> > mapAssetCoins;
+            std::map<std::string, std::vector<COutput> > mapTokenCoins;
 
-            if (fTransferAsset || fReissueAsset || assetType == AssetType::SUB || assetType == AssetType::UNIQUE)
-                AvailableCoinsWithAssets(vAvailableCoins, mapAssetCoins, true, &coinControl, fromScriptPubKey, useExpiredTimelockUTXO);
+            if (fTransferToken || fReissueToken || tokenType == TokenType::SUB || tokenType == TokenType::UNIQUE)
+                AvailableCoinsWithTokens(vAvailableCoins, mapTokenCoins, true, &coinControl, fromScriptPubKey, useExpiredTimelockUTXO);
             else
                 AvailableCoins(vAvailableCoins, true, &coinControl, fromScriptPubKey, useExpiredTimelockUTXO);
-            /** YAC_ASSET END */
+            /** YAC_TOKEN END */
 
             // Create change script that will be used if we need change
             // TODO: pass in scriptChange instead of reservekey so
             // change transaction isn't always pay-to-bitcoin-address
             CScript scriptChange;
-            CScript assetScriptChange;
+            CScript tokenScriptChange;
 
             // coin control: send change to custom address
             if (!boost::get<CNoDestination>(&coinControl.destChange))
@@ -2768,20 +2768,20 @@ bool CWallet::CreateTransactionAll(
                 scriptChange = GetScriptForDestination(keyID);
             }
 
-            /** YAC_ASSET START */
-            if (!boost::get<CNoDestination>(&coinControl.assetDestChange)) {
-                assetScriptChange = GetScriptForDestination(coinControl.assetDestChange);
+            /** YAC_TOKEN START */
+            if (!boost::get<CNoDestination>(&coinControl.tokenDestChange)) {
+                tokenScriptChange = GetScriptForDestination(coinControl.tokenDestChange);
             } else {
-                assetScriptChange = scriptChange;
+                tokenScriptChange = scriptChange;
             }
-            /** YAC_ASSET END */
+            /** YAC_TOKEN END */
 
             nFeeRet = nTransactionFee;
             CAmount nValueIn = 0;
             // Start with no fee and loop until there is enough fee
             while (true)
             {
-                std::map<std::string, CAmount> mapAssetsIn;
+                std::map<std::string, CAmount> mapTokensIn;
                 nChangePosInOut = nChangePosRequest;
                 wtxNew.vin.clear();
                 wtxNew.vout.clear();
@@ -2791,7 +2791,7 @@ bool CWallet::CreateTransactionAll(
                 if (nSubtractFeeFromAmount == 0)
                     nValueToSelect += nFeeRet;
 
-                // vouts to the payees (for both YAC and asset)
+                // vouts to the payees (for both YAC and token)
                 for (const auto& recipient : vecSend)
                 {
                     CTxOut txout(recipient.nAmount, recipient.scriptPubKey);
@@ -2806,43 +2806,43 @@ bool CWallet::CreateTransactionAll(
                     strFailReason = _("Insufficient funds");
                     return false;
                 }
-                /** YAC_ASSET START */
-                if (AreAssetsDeployed()) {
-                    setAssets.clear();
-                    mapAssetsIn.clear();
-                    if (!SelectAssets(wtxNew.nTime, mapAssetCoins, mapAssetValue, setAssets, mapAssetsIn)) {
-                        strFailReason = _("Insufficient asset funds");
+                /** YAC_TOKEN START */
+                if (AreTokensDeployed()) {
+                    setTokens.clear();
+                    mapTokensIn.clear();
+                    if (!SelectTokens(wtxNew.nTime, mapTokenCoins, mapTokenValue, setTokens, mapTokensIn)) {
+                        strFailReason = _("Insufficient token funds");
                         return false;
                     }
                 }
-                /** YAC_ASSET END */
+                /** YAC_TOKEN END */
 
                 const CAmount nChange = nValueIn - nValueToSelect;
 
-                /** YAC_ASSET START */
-                // asset vouts to ourself (for asset change)
-                if (AreAssetsDeployed()) {
-                    // Add the change for the assets
-                    std::map<std::string, CAmount> mapAssetChange;
-                    for (auto asset : mapAssetValue) {
-                        if (mapAssetsIn.count(asset.first))
-                            mapAssetChange.insert(
-                                    std::make_pair(asset.first, (mapAssetsIn.at(asset.first) - asset.second)));
+                /** YAC_TOKEN START */
+                // token vouts to ourself (for token change)
+                if (AreTokensDeployed()) {
+                    // Add the change for the tokens
+                    std::map<std::string, CAmount> mapTokenChange;
+                    for (auto token : mapTokenValue) {
+                        if (mapTokensIn.count(token.first))
+                            mapTokenChange.insert(
+                                    std::make_pair(token.first, (mapTokensIn.at(token.first) - token.second)));
                     }
 
-                    for (auto assetChange : mapAssetChange) {
-                        if (assetChange.second > 0) {
-                            CScript scriptAssetChange = assetScriptChange;
-                            CAssetTransfer assetTransfer(assetChange.first, assetChange.second);
+                    for (auto tokenChange : mapTokenChange) {
+                        if (tokenChange.second > 0) {
+                            CScript scriptTokenChange = tokenScriptChange;
+                            CTokenTransfer tokenTransfer(tokenChange.first, tokenChange.second);
 
-                            assetTransfer.ConstructTransaction(scriptAssetChange);
-                            CTxOut newAssetTxOut(0, scriptAssetChange);
+                            tokenTransfer.ConstructTransaction(scriptTokenChange);
+                            CTxOut newTokenTxOut(0, scriptTokenChange);
 
-                            wtxNew.vout.emplace_back(newAssetTxOut);
+                            wtxNew.vout.emplace_back(newTokenTxOut);
                         }
                     }
                 }
-                /** YAC_ASSET END */
+                /** YAC_TOKEN END */
 
                 if (nChange > 0)
                 {
@@ -2866,36 +2866,36 @@ bool CWallet::CreateTransactionAll(
                     nChangePosInOut = -1;
                 }
 
-                /** YAC_ASSET START */
-                if (AreAssetsDeployed()) {
-                    if (fNewAsset) {
-                        for (auto asset : assets) {
-                            // Create the owner token output for non-unique assets
-                            if (assetType != AssetType::UNIQUE) {
+                /** YAC_TOKEN START */
+                if (AreTokensDeployed()) {
+                    if (fNewToken) {
+                        for (auto token : tokens) {
+                            // Create the owner token output for non-unique tokens
+                            if (tokenType != TokenType::UNIQUE) {
                                 CScript ownerScript = GetScriptForDestination(destination);
-                                asset.ConstructOwnerTransaction(ownerScript);
+                                token.ConstructOwnerTransaction(ownerScript);
                                 CTxOut ownerTxOut(0, ownerScript);
                                 wtxNew.vout.push_back(ownerTxOut);
                             }
 
-                            // Create the asset transaction and push it back so it is the last CTxOut in the transaction
+                            // Create the token transaction and push it back so it is the last CTxOut in the transaction
                             CScript scriptPubKey = GetScriptForDestination(destination);
-                            asset.ConstructTransaction(scriptPubKey);
+                            token.ConstructTransaction(scriptPubKey);
                             CTxOut newTxOut(0, scriptPubKey);
                             wtxNew.vout.push_back(newTxOut);
                         }
-                    } else if (fReissueAsset) {
-                        // Create the asset transaction and push it back so it is the last CTxOut in the transaction
+                    } else if (fReissueToken) {
+                        // Create the token transaction and push it back so it is the last CTxOut in the transaction
                         CScript reissueScript = GetScriptForDestination(destination);
 
-                        // Create the scriptPubKeys for the reissue data, and that owner asset
-                        reissueAsset.ConstructTransaction(reissueScript);
+                        // Create the scriptPubKeys for the reissue data, and that owner token
+                        reissueToken.ConstructTransaction(reissueScript);
 
                         CTxOut reissueTxOut(0, reissueScript);
                         wtxNew.vout.push_back(reissueTxOut);
                     }
                 }
-                /** YAC_ASSET END */
+                /** YAC_TOKEN END */
 
                 // Fill vin
                 for (const auto& coin : setCoins)
@@ -2929,16 +2929,16 @@ bool CWallet::CreateTransactionAll(
                     wtxNew.vin.push_back(
                             CTxIn(coin.outpoint, CScript(), nSequenceIn));
                 }
-                /** YAC_ASSET START */
-                if (AreAssetsDeployed()) {
+                /** YAC_TOKEN START */
+                if (AreTokensDeployed()) {
                     unsigned int nSequenceIn = CTxIn::SEQUENCE_FINAL;
-                    for (const auto &asset : setAssets)
+                    for (const auto &token : setTokens)
                     {
                       wtxNew.vin.push_back(
-                          CTxIn(asset.outpoint, CScript(), nSequenceIn));
+                          CTxIn(token.outpoint, CScript(), nSequenceIn));
                     }
                 }
-                /** YAC_ASSET END */
+                /** YAC_TOKEN END */
 
                 // Sign
                 int nIn = 0;
@@ -2950,18 +2950,18 @@ bool CWallet::CreateTransactionAll(
                         return false;
                     }
                 }
-                /** YAC_ASSET START */
-                if (AreAssetsDeployed()) {
-                    for (const auto& asset : setAssets)
+                /** YAC_TOKEN START */
+                if (AreTokensDeployed()) {
+                    for (const auto& token : setTokens)
                     {
-                        if (!SignSignature(*this, asset.txout, wtxNew, nIn++))
+                        if (!SignSignature(*this, token.txout, wtxNew, nIn++))
                         {
-                            strFailReason = _("Signing asset transaction failed");
+                            strFailReason = _("Signing token transaction failed");
                             return false;
                         }
                     }
                 }
-                /** YAC_ASSET END */
+                /** YAC_TOKEN END */
 
                 // Limit size
                 unsigned int nBytes = ::GetSerializeSize(*(CTransaction*)&wtxNew, SER_NETWORK, PROTOCOL_VERSION);

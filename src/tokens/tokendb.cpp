@@ -7,50 +7,50 @@
 //#include <consensus/params.h>
 //#include <script/ismine.h>
 //#include <tinyformat.h>
-#include "assetdb.h"
-#include "assets.h"
+#include "tokendb.h"
+#include "tokens.h"
 #include "main.h"
 //#include "validation.h"
 
 #include <boost/thread.hpp>
 #include <memory>
 
-static const char ASSET_FLAG = 'A';
-static const char ASSET_ADDRESS_QUANTITY_FLAG = 'B';
-static const char ADDRESS_ASSET_QUANTITY_FLAG = 'C';
-static const char MY_ASSET_FLAG = 'M';
-static const char BLOCK_ASSET_UNDO_DATA = 'U';
+static const char TOKEN_FLAG = 'A';
+static const char TOKEN_ADDRESS_QUANTITY_FLAG = 'B';
+static const char ADDRESS_TOKEN_QUANTITY_FLAG = 'C';
+static const char MY_TOKEN_FLAG = 'M';
+static const char BLOCK_TOKEN_UNDO_DATA = 'U';
 static const char MEMPOOL_REISSUED_TX = 'Z';
 
 static size_t MAX_DATABASE_RESULTS = 50000;
 
-CAssetsDB::CAssetsDB(const char *pszMode) :
-        CDBWrapper(ASSET_DATA, pszMode) {
+CTokensDB::CTokensDB(const char *pszMode) :
+        CDBWrapper(TOKEN_DATA, pszMode) {
 }
 
-bool CAssetsDB::WriteAssetData(const CNewAsset &asset, const int nHeight, const uint256& blockHash)
+bool CTokensDB::WriteTokenData(const CNewToken &token, const int nHeight, const uint256& blockHash)
 {
-    CDatabasedAssetData data(asset, nHeight, blockHash);
-    return Write(std::make_pair(ASSET_FLAG, asset.strName), data);
+    CDatabasedTokenData data(token, nHeight, blockHash);
+    return Write(std::make_pair(TOKEN_FLAG, token.strName), data);
 }
 
-bool CAssetsDB::WriteAssetAddressQuantity(const std::string &assetName, const std::string &address, const CAmount &quantity)
+bool CTokensDB::WriteTokenAddressQuantity(const std::string &tokenName, const std::string &address, const CAmount &quantity)
 {
-    return Write(std::make_pair(ASSET_ADDRESS_QUANTITY_FLAG, std::make_pair(assetName, address)), quantity);
+    return Write(std::make_pair(TOKEN_ADDRESS_QUANTITY_FLAG, std::make_pair(tokenName, address)), quantity);
 }
 
-bool CAssetsDB::WriteAddressAssetQuantity(const std::string &address, const std::string &assetName, const CAmount& quantity) {
-    return Write(std::make_pair(ADDRESS_ASSET_QUANTITY_FLAG, std::make_pair(address, assetName)), quantity);
+bool CTokensDB::WriteAddressTokenQuantity(const std::string &address, const std::string &tokenName, const CAmount& quantity) {
+    return Write(std::make_pair(ADDRESS_TOKEN_QUANTITY_FLAG, std::make_pair(address, tokenName)), quantity);
 }
 
-bool CAssetsDB::ReadAssetData(const std::string& strName, CNewAsset& asset, int& nHeight, uint256& blockHash)
+bool CTokensDB::ReadTokenData(const std::string& strName, CNewToken& token, int& nHeight, uint256& blockHash)
 {
 
-    CDatabasedAssetData data;
-    bool ret =  Read(std::make_pair(ASSET_FLAG, strName), data);
+    CDatabasedTokenData data;
+    bool ret =  Read(std::make_pair(TOKEN_FLAG, strName), data);
 
     if (ret) {
-        asset = data.asset;
+        token = data.token;
         nHeight = data.nHeight;
         blockHash = data.blockHash;
     }
@@ -58,83 +58,83 @@ bool CAssetsDB::ReadAssetData(const std::string& strName, CNewAsset& asset, int&
     return ret;
 }
 
-bool CAssetsDB::ReadAssetAddressQuantity(const std::string& assetName, const std::string& address, CAmount& quantity)
+bool CTokensDB::ReadTokenAddressQuantity(const std::string& tokenName, const std::string& address, CAmount& quantity)
 {
-    return Read(std::make_pair(ASSET_ADDRESS_QUANTITY_FLAG, std::make_pair(assetName, address)), quantity);
+    return Read(std::make_pair(TOKEN_ADDRESS_QUANTITY_FLAG, std::make_pair(tokenName, address)), quantity);
 }
 
-bool CAssetsDB::ReadAddressAssetQuantity(const std::string &address, const std::string &assetName, CAmount& quantity) {
-    return Read(std::make_pair(ADDRESS_ASSET_QUANTITY_FLAG, std::make_pair(address, assetName)), quantity);
+bool CTokensDB::ReadAddressTokenQuantity(const std::string &address, const std::string &tokenName, CAmount& quantity) {
+    return Read(std::make_pair(ADDRESS_TOKEN_QUANTITY_FLAG, std::make_pair(address, tokenName)), quantity);
 }
 
-bool CAssetsDB::EraseAssetData(const std::string& assetName)
+bool CTokensDB::EraseTokenData(const std::string& tokenName)
 {
-    return Erase(std::make_pair(ASSET_FLAG, assetName));
+    return Erase(std::make_pair(TOKEN_FLAG, tokenName));
 }
 
-bool CAssetsDB::EraseAssetAddressQuantity(const std::string &assetName, const std::string &address) {
-    return Erase(std::make_pair(ASSET_ADDRESS_QUANTITY_FLAG, std::make_pair(assetName, address)));
+bool CTokensDB::EraseTokenAddressQuantity(const std::string &tokenName, const std::string &address) {
+    return Erase(std::make_pair(TOKEN_ADDRESS_QUANTITY_FLAG, std::make_pair(tokenName, address)));
 }
 
-bool CAssetsDB::EraseAddressAssetQuantity(const std::string &address, const std::string &assetName) {
-    return Erase(std::make_pair(ADDRESS_ASSET_QUANTITY_FLAG, std::make_pair(address, assetName)));
+bool CTokensDB::EraseAddressTokenQuantity(const std::string &address, const std::string &tokenName) {
+    return Erase(std::make_pair(ADDRESS_TOKEN_QUANTITY_FLAG, std::make_pair(address, tokenName)));
 }
 
-bool CAssetsDB::WriteBlockUndoAssetData(const uint256& blockhash, const std::vector<std::pair<std::string, CBlockAssetUndo> >& assetUndoData)
+bool CTokensDB::WriteBlockUndoTokenData(const uint256& blockhash, const std::vector<std::pair<std::string, CBlockTokenUndo> >& tokenUndoData)
 {
-    return Write(std::make_pair(BLOCK_ASSET_UNDO_DATA, blockhash), assetUndoData);
+    return Write(std::make_pair(BLOCK_TOKEN_UNDO_DATA, blockhash), tokenUndoData);
 }
 
-bool CAssetsDB::ReadBlockUndoAssetData(const uint256 &blockhash, std::vector<std::pair<std::string, CBlockAssetUndo> > &assetUndoData)
+bool CTokensDB::ReadBlockUndoTokenData(const uint256 &blockhash, std::vector<std::pair<std::string, CBlockTokenUndo> > &tokenUndoData)
 {
     // If it exists, return the read value.
-    if (Exists(std::make_pair(BLOCK_ASSET_UNDO_DATA, blockhash)))
-           return Read(std::make_pair(BLOCK_ASSET_UNDO_DATA, blockhash), assetUndoData);
+    if (Exists(std::make_pair(BLOCK_TOKEN_UNDO_DATA, blockhash)))
+           return Read(std::make_pair(BLOCK_TOKEN_UNDO_DATA, blockhash), tokenUndoData);
 
     // If it doesn't exist, we just return true because we don't want to fail just because it didn't exist in the db
     return true;
 }
 
-bool CAssetsDB::WriteReissuedMempoolState()
+bool CTokensDB::WriteReissuedMempoolState()
 {
-    return Write(MEMPOOL_REISSUED_TX, mapReissuedAssets);
+    return Write(MEMPOOL_REISSUED_TX, mapReissuedTokens);
 }
 
-bool CAssetsDB::ReadReissuedMempoolState()
+bool CTokensDB::ReadReissuedMempoolState()
 {
-    mapReissuedAssets.clear();
+    mapReissuedTokens.clear();
     mapReissuedTx.clear();
     // If it exists, return the read value.
-    bool rv = Read(MEMPOOL_REISSUED_TX, mapReissuedAssets);
+    bool rv = Read(MEMPOOL_REISSUED_TX, mapReissuedTokens);
     if (rv) {
-        for (auto pair : mapReissuedAssets)
+        for (auto pair : mapReissuedTokens)
             mapReissuedTx.insert(std::make_pair(pair.second, pair.first));
     }
     return rv;
 }
 
-bool CAssetsDB::LoadAssets()
+bool CTokensDB::LoadTokens()
 {
     std::unique_ptr<CDBIterator> pcursor(NewIterator());
 
-    pcursor->Seek(std::make_pair(ASSET_FLAG, std::string()));
+    pcursor->Seek(std::make_pair(TOKEN_FLAG, std::string()));
 
-    // Load assets
+    // Load tokens
     while (pcursor->Valid()) {
         boost::this_thread::interruption_point();
         std::pair<char, std::string> key;
-        if (pcursor->GetKey(key) && key.first == ASSET_FLAG) {
-            CDatabasedAssetData data;
+        if (pcursor->GetKey(key) && key.first == TOKEN_FLAG) {
+            CDatabasedTokenData data;
             if (pcursor->GetValue(data)) {
-                passetsCache->Put(data.asset.strName, data);
+                ptokensCache->Put(data.token.strName, data);
                 pcursor->Next();
 
                 // Loaded enough from database to have in memory.
                 // No need to load everything if it is just going to be removed from the cache
-                if (passetsCache->Size() == (passetsCache->MaxSize() / 2))
+                if (ptokensCache->Size() == (ptokensCache->MaxSize() / 2))
                     break;
             } else {
-                return error("%s: failed to read asset", __func__);
+                return error("%s: failed to read token", __func__);
             }
         } else {
             break;
@@ -142,20 +142,20 @@ bool CAssetsDB::LoadAssets()
     }
 
 
-    if (fAssetIndex) {
+    if (fTokenIndex) {
         std::unique_ptr<CDBIterator> pcursor3(NewIterator());
-        pcursor3->Seek(std::make_pair(ASSET_ADDRESS_QUANTITY_FLAG, std::make_pair(std::string(), std::string())));
+        pcursor3->Seek(std::make_pair(TOKEN_ADDRESS_QUANTITY_FLAG, std::make_pair(std::string(), std::string())));
 
-        // Load mapAssetAddressAmount
+        // Load mapTokenAddressAmount
         while (pcursor3->Valid()) {
             boost::this_thread::interruption_point();
-            std::pair<char, std::pair<std::string, std::string> > key; // <Asset Name, Address> -> Quantity
-            if (pcursor3->GetKey(key) && key.first == ASSET_ADDRESS_QUANTITY_FLAG) {
+            std::pair<char, std::pair<std::string, std::string> > key; // <Token Name, Address> -> Quantity
+            if (pcursor3->GetKey(key) && key.first == TOKEN_ADDRESS_QUANTITY_FLAG) {
                 CAmount value;
                 if (pcursor3->GetValue(value)) {
-                    passets->mapAssetsAddressAmount.insert(
+                    ptokens->mapTokensAddressAmount.insert(
                             std::make_pair(std::make_pair(key.second.first, key.second.second), value));
-                    if (passets->mapAssetsAddressAmount.size() > MAX_CACHE_ASSETS_SIZE)
+                    if (ptokens->mapTokensAddressAmount.size() > MAX_CACHE_TOKENS_SIZE)
                         break;
                     pcursor3->Next();
                 } else {
@@ -170,12 +170,12 @@ bool CAssetsDB::LoadAssets()
     return true;
 }
 
-bool CAssetsDB::AssetDir(std::vector<CDatabasedAssetData>& assets, const std::string filter, const size_t count, const long start)
+bool CTokensDB::TokenDir(std::vector<CDatabasedTokenData>& tokens, const std::string filter, const size_t count, const long start)
 {
-    FlushAssetToDisk();
+    FlushTokenToDisk();
 
     std::unique_ptr<CDBIterator> pcursor(NewIterator());
-    pcursor->Seek(std::make_pair(ASSET_FLAG, std::string()));
+    pcursor->Seek(std::make_pair(TOKEN_FLAG, std::string()));
 
     auto prefix = filter;
     bool wildcard = prefix.back() == '*';
@@ -193,7 +193,7 @@ bool CAssetsDB::AssetDir(std::vector<CDatabasedAssetData>& assets, const std::st
             boost::this_thread::interruption_point();
 
             std::pair<char, std::string> key;
-            if (pcursor->GetKey(key) && key.first == ASSET_FLAG) {
+            if (pcursor->GetKey(key) && key.first == TOKEN_FLAG) {
                 if (prefix == "" ||
                     (wildcard && key.second.find(prefix) == 0) ||
                     (!wildcard && key.second == prefix)) {
@@ -210,12 +210,12 @@ bool CAssetsDB::AssetDir(std::vector<CDatabasedAssetData>& assets, const std::st
     size_t loaded = 0;
     size_t offset = 0;
 
-    // Load assets
+    // Load tokens
     while (pcursor->Valid() && loaded < count) {
         boost::this_thread::interruption_point();
 
         std::pair<char, std::string> key;
-        if (pcursor->GetKey(key) && key.first == ASSET_FLAG) {
+        if (pcursor->GetKey(key) && key.first == TOKEN_FLAG) {
             if (prefix == "" ||
                     (wildcard && key.second.find(prefix) == 0) ||
                     (!wildcard && key.second == prefix)) {
@@ -223,12 +223,12 @@ bool CAssetsDB::AssetDir(std::vector<CDatabasedAssetData>& assets, const std::st
                     offset += 1;
                 }
                 else {
-                    CDatabasedAssetData data;
+                    CDatabasedTokenData data;
                     if (pcursor->GetValue(data)) {
-                        assets.push_back(data);
+                        tokens.push_back(data);
                         loaded += 1;
                     } else {
-                        return error("%s: failed to read asset", __func__);
+                        return error("%s: failed to read token", __func__);
                     }
                 }
             }
@@ -241,12 +241,12 @@ bool CAssetsDB::AssetDir(std::vector<CDatabasedAssetData>& assets, const std::st
     return true;
 }
 
-bool CAssetsDB::AddressDir(std::vector<std::pair<std::string, CAmount> >& vecAssetAmount, int& totalEntries, const bool& fGetTotal, const std::string& address, const size_t count, const long start)
+bool CTokensDB::AddressDir(std::vector<std::pair<std::string, CAmount> >& vecTokenAmount, int& totalEntries, const bool& fGetTotal, const std::string& address, const size_t count, const long start)
 {
-    FlushAssetToDisk();
+    FlushTokenToDisk();
 
     std::unique_ptr<CDBIterator> pcursor(NewIterator());
-    pcursor->Seek(std::make_pair(ADDRESS_ASSET_QUANTITY_FLAG, std::make_pair(address, std::string())));
+    pcursor->Seek(std::make_pair(ADDRESS_TOKEN_QUANTITY_FLAG, std::make_pair(address, std::string())));
 
     if (fGetTotal) {
         totalEntries = 0;
@@ -254,7 +254,7 @@ bool CAssetsDB::AddressDir(std::vector<std::pair<std::string, CAmount> >& vecAss
             boost::this_thread::interruption_point();
 
             std::pair<char, std::pair<std::string, std::string> > key;
-            if (pcursor->GetKey(key) && key.first == ADDRESS_ASSET_QUANTITY_FLAG && key.second.first == address) {
+            if (pcursor->GetKey(key) && key.first == ADDRESS_TOKEN_QUANTITY_FLAG && key.second.first == address) {
                 totalEntries++;
             }
             pcursor->Next();
@@ -273,7 +273,7 @@ bool CAssetsDB::AddressDir(std::vector<std::pair<std::string, CAmount> >& vecAss
             boost::this_thread::interruption_point();
 
             std::pair<char, std::pair<std::string, std::string> > key;
-            if (pcursor->GetKey(key) && key.first == ADDRESS_ASSET_QUANTITY_FLAG && key.second.first == address) {
+            if (pcursor->GetKey(key) && key.first == ADDRESS_TOKEN_QUANTITY_FLAG && key.second.first == address) {
                 table_size += 1;
             }
             pcursor->Next();
@@ -286,22 +286,22 @@ bool CAssetsDB::AddressDir(std::vector<std::pair<std::string, CAmount> >& vecAss
     size_t loaded = 0;
     size_t offset = 0;
 
-    // Load assets
+    // Load tokens
     while (pcursor->Valid() && loaded < count && loaded < MAX_DATABASE_RESULTS) {
         boost::this_thread::interruption_point();
 
         std::pair<char, std::pair<std::string, std::string> > key;
-        if (pcursor->GetKey(key) && key.first == ADDRESS_ASSET_QUANTITY_FLAG && key.second.first == address) {
+        if (pcursor->GetKey(key) && key.first == ADDRESS_TOKEN_QUANTITY_FLAG && key.second.first == address) {
                 if (offset < skip) {
                     offset += 1;
                 }
                 else {
                     CAmount amount;
                     if (pcursor->GetValue(amount)) {
-                        vecAssetAmount.emplace_back(std::make_pair(key.second.second, amount));
+                        vecTokenAmount.emplace_back(std::make_pair(key.second.second, amount));
                         loaded += 1;
                     } else {
-                        return error("%s: failed to Address Asset Quanity", __func__);
+                        return error("%s: failed to Address Token Quanity", __func__);
                     }
                 }
             pcursor->Next();
@@ -313,13 +313,13 @@ bool CAssetsDB::AddressDir(std::vector<std::pair<std::string, CAmount> >& vecAss
     return true;
 }
 
-// Can get to total count of addresses that belong to a certain asset_name, or get you the list of all address that belong to a certain asset_name
-bool CAssetsDB::AssetAddressDir(std::vector<std::pair<std::string, CAmount> >& vecAddressAmount, int& totalEntries, const bool& fGetTotal, const std::string& assetName, const size_t count, const long start)
+// Can get to total count of addresses that belong to a certain token_name, or get you the list of all address that belong to a certain token_name
+bool CTokensDB::TokenAddressDir(std::vector<std::pair<std::string, CAmount> >& vecAddressAmount, int& totalEntries, const bool& fGetTotal, const std::string& tokenName, const size_t count, const long start)
 {
-    FlushAssetToDisk();
+    FlushTokenToDisk();
 
     std::unique_ptr<CDBIterator> pcursor(NewIterator());
-    pcursor->Seek(std::make_pair(ASSET_ADDRESS_QUANTITY_FLAG, std::make_pair(assetName, std::string())));
+    pcursor->Seek(std::make_pair(TOKEN_ADDRESS_QUANTITY_FLAG, std::make_pair(tokenName, std::string())));
 
     if (fGetTotal) {
         totalEntries = 0;
@@ -327,7 +327,7 @@ bool CAssetsDB::AssetAddressDir(std::vector<std::pair<std::string, CAmount> >& v
             boost::this_thread::interruption_point();
 
             std::pair<char, std::pair<std::string, std::string> > key;
-            if (pcursor->GetKey(key) && key.first == ASSET_ADDRESS_QUANTITY_FLAG && key.second.first == assetName) {
+            if (pcursor->GetKey(key) && key.first == TOKEN_ADDRESS_QUANTITY_FLAG && key.second.first == tokenName) {
                 totalEntries += 1;
             }
             pcursor->Next();
@@ -346,7 +346,7 @@ bool CAssetsDB::AssetAddressDir(std::vector<std::pair<std::string, CAmount> >& v
             boost::this_thread::interruption_point();
 
             std::pair<char, std::pair<std::string, std::string> > key;
-            if (pcursor->GetKey(key) && key.first == ASSET_ADDRESS_QUANTITY_FLAG && key.second.first == assetName) {
+            if (pcursor->GetKey(key) && key.first == TOKEN_ADDRESS_QUANTITY_FLAG && key.second.first == tokenName) {
                 table_size += 1;
             }
             pcursor->Next();
@@ -358,12 +358,12 @@ bool CAssetsDB::AssetAddressDir(std::vector<std::pair<std::string, CAmount> >& v
     size_t loaded = 0;
     size_t offset = 0;
 
-    // Load assets
+    // Load tokens
     while (pcursor->Valid() && loaded < count && loaded < MAX_DATABASE_RESULTS) {
         boost::this_thread::interruption_point();
 
         std::pair<char, std::pair<std::string, std::string> > key;
-        if (pcursor->GetKey(key) && key.first == ASSET_ADDRESS_QUANTITY_FLAG && key.second.first == assetName) {
+        if (pcursor->GetKey(key) && key.first == TOKEN_ADDRESS_QUANTITY_FLAG && key.second.first == tokenName) {
             if (offset < skip) {
                 offset += 1;
             }
@@ -373,7 +373,7 @@ bool CAssetsDB::AssetAddressDir(std::vector<std::pair<std::string, CAmount> >& v
                     vecAddressAmount.emplace_back(std::make_pair(key.second.second, amount));
                     loaded += 1;
                 } else {
-                    return error("%s: failed to Asset Address Quanity", __func__);
+                    return error("%s: failed to Token Address Quanity", __func__);
                 }
             }
             pcursor->Next();
@@ -385,7 +385,7 @@ bool CAssetsDB::AssetAddressDir(std::vector<std::pair<std::string, CAmount> >& v
     return true;
 }
 
-bool CAssetsDB::AssetDir(std::vector<CDatabasedAssetData>& assets)
+bool CTokensDB::TokenDir(std::vector<CDatabasedTokenData>& tokens)
 {
-    return CAssetsDB::AssetDir(assets, "*", MAX_SIZE, 0);
+    return CTokensDB::TokenDir(tokens, "*", MAX_SIZE, 0);
 }

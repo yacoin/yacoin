@@ -46,7 +46,7 @@ BOOST_SUFFIX?=-mgw48-mt-sd-1_55
 
 INCLUDEPATHS= \
 -I"$(CURDIR)" \
--I"$(CURDIR)/assets" \
+-I"$(CURDIR)/tokens" \
 -I"$(CURDIR)/primitives" \
 -I"$(CURDIR)/scrypt-jane" \
 -I"$(CURDIR)/script" \
@@ -216,9 +216,9 @@ HEADERS = $(wildcard *.h)
 OBJS= \
 obj/alert.o \
 obj/addrman.o \
-obj/assettypes.o \
-obj/assetdb.o \
-obj/assets.o \
+obj/tokentypes.o \
+obj/tokendb.o \
+obj/tokens.o \
 obj/base58.o \
 obj/bitcoinrpc.o \
 obj/block.o \
@@ -243,7 +243,7 @@ obj/price.o \
 obj/protocol.o \
 obj/random_nonce.o \
 obj/rpcblockchain.o \
-obj/rpcassets.o \
+obj/rpctokens.o \
 obj/rpcdump.o \
 obj/rpcmining.o \
 obj/rpcmisc.o \
@@ -306,13 +306,13 @@ obj/block.o: primitives/block.cpp
 obj/transaction.o: primitives/transaction.cpp
 	$(CXX) -c -frandom-seed=$@ $(CFLAGS) $(INCLUDEPATHS) -o $@ $<
 
-obj/assettypes.o: assets/assettypes.cpp
+obj/tokentypes.o: tokens/tokentypes.cpp
 	$(CXX) -c -frandom-seed=$@ $(CFLAGS) $(INCLUDEPATHS) -o $@ $<
 
-obj/assetdb.o: assets/assetdb.cpp
+obj/tokendb.o: tokens/tokendb.cpp
 	$(CXX) -c -frandom-seed=$@ $(CFLAGS) $(INCLUDEPATHS) -o $@ $<
 
-obj/assets.o: assets/assets.cpp
+obj/tokens.o: tokens/tokens.cpp
 	$(CXX) -c -frandom-seed=$@ $(CFLAGS) $(INCLUDEPATHS) -o $@ $<
 
 obj/scrypt-jane.o: scrypt-jane/scrypt-jane.c

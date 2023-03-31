@@ -52,8 +52,8 @@ public:
         return out.IsNull();
     }
 
-    bool IsAsset() const {
-        return out.scriptPubKey.IsAssetScript();
+    bool IsToken() const {
+        return out.scriptPubKey.IsTokenScript();
     }
 
     size_t DynamicMemoryUsage() const {

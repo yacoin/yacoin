@@ -280,11 +280,11 @@ enum txnouttype {
     TX_CLTV_P2PKH,
     TX_CSV_P2PKH,
     TX_NULL_DATA,
-    /** YAC_ASSET START */
-    TX_NEW_ASSET,
-    TX_REISSUE_ASSET,
-    TX_TRANSFER_ASSET,
-    /** YAC_ASSET END */
+    /** YAC_TOKEN START */
+    TX_NEW_TOKEN,
+    TX_REISSUE_TOKEN,
+    TX_TRANSFER_TOKEN,
+    /** YAC_TOKEN END */
 };
 
 const char* GetTxnOutputType(txnouttype t);
@@ -419,7 +419,7 @@ enum opcodetype
     OP_NOP3 = 0xb2,
     OP_CHECKSEQUENCEVERIFY = OP_NOP3,
     OP_NOP4 = 0xb3,
-    OP_YAC_ASSET = OP_NOP4,
+    OP_YAC_TOKEN = OP_NOP4,
     OP_NOP5 = 0xb4,
     OP_NOP6 = 0xb5,
     OP_NOP7 = 0xb6,
@@ -752,16 +752,16 @@ public:
     bool IsPayToPublicKeyHash() const;
     bool IsPayToScriptHash() const;
 
-    /** YAC_ASSET START */
-    bool IsAssetScript(int& nType, bool& fIsOwner, int& nStartingIndex) const;
-    bool IsAssetScript(int& nType, bool& fIsOwner) const;
-    bool IsAssetScript() const;
-    bool IsNewAsset() const;
-    bool IsOwnerAsset() const;
-    bool IsReissueAsset() const;
-    bool IsTransferAsset() const;
-    bool IsAsset() const;
-    /** YAC_ASSET END */
+    /** YAC_TOKEN START */
+    bool IsTokenScript(int& nType, bool& fIsOwner, int& nStartingIndex) const;
+    bool IsTokenScript(int& nType, bool& fIsOwner) const;
+    bool IsTokenScript() const;
+    bool IsNewToken() const;
+    bool IsOwnerToken() const;
+    bool IsReissueToken() const;
+    bool IsTransferToken() const;
+    bool IsToken() const;
+    /** YAC_TOKEN END */
 
     // Called by CTransaction::IsStandard and P2SH VerifyScript (which makes it consensus-critical).
     bool IsPushOnly() const

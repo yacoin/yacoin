@@ -399,7 +399,7 @@ std::string HelpMessage()
         "  -dns                   " + _("Allow DNS lookups for -addnode, -seednode and -connect") + "\n" +
         "  -maxconnections=<n>    " + _("Maintain at most <n> connections to peers (default: 125)") + "\n" +
         "  -addnode=<ip>          " + _("Add a node to connect to and attempt to keep the connection open") + "\n" +
-        "  -assetindex            " + _("Keep an index of assets. Requires a -reindex.") + "\n" +
+        "  -tokenindex            " + _("Keep an index of tokens. Requires a -reindex.") + "\n" +
         "  -addressindex          " + _("Maintain a full address index, used to query for the balance, txids and unspent outputs for addresses.") + "\n" +
         "  -connect=<ip>          " + _("Connect only to the specified node(s)") + "\n" +
         "  -seednode=<ip>         " + _("Connect to a node to retrieve peer addresses, and disconnect") + "\n" +
@@ -565,10 +565,10 @@ bool AppInit2()
     fStoreBlockHashToDb = GetBoolArg("-storeblockhash", true);
     fReindex = GetBoolArg("-reindex", false);
     fUseMemoryLog = GetBoolArg("-memorylog", true);
-    // YAC_ASSET START
-    fAssetIndex = GetBoolArg("-assetindex", false);
+    // YAC_TOKEN START
+    fTokenIndex = GetBoolArg("-tokenindex", false);
     fAddressIndex = GetBoolArg("-addressindex", false);
-    // YAC_ASSET END
+    // YAC_TOKEN END
     nMinerSleep = (unsigned int)(GetArg("-minersleep", nOneHundredMilliseconds));
 
     HEADERS_DOWNLOAD_TIMEOUT_BASE = GetArg("-initSyncDownloadTimeout", 10 * 60) * 1000000;
@@ -1243,7 +1243,7 @@ bool AppInit2()
 
     nMainnetNewLogicBlockNumber = GetArg("-testnetNewLogicBlockNumber", 1890000);
     nTestNetNewLogicBlockNumber = GetArg("-testnetNewLogicBlockNumber", 0);
-    nAssetSupportBlockNumber = GetArg("-assetSupportBlockNumber", 1920000);
+    nTokenSupportBlockNumber = GetArg("-tokenSupportBlockNumber", 1920000);
     printf("Param nMainnetNewLogicBlockNumber = %d\n",nMainnetNewLogicBlockNumber);
     printf("Param testnetNewLogicBlockNumber = %d\n",nTestNetNewLogicBlockNumber);
 
@@ -1288,30 +1288,30 @@ bool AppInit2()
         }
     }
 
-    /** YAC_ASSET START */
+    /** YAC_TOKEN START */
     {
-        // Basic assets
-        delete passets;
-        delete passetsdb;
-        delete passetsCache;
+        // Basic tokens
+        delete ptokens;
+        delete ptokensdb;
+        delete ptokensCache;
 
-        // Basic assets
-        passetsdb = new CAssetsDB("cr+");
-        passets = new CAssetsCache();
-        passetsCache = new CLRUCache<std::string, CDatabasedAssetData>(MAX_CACHE_ASSETS_SIZE);
+        // Basic tokens
+        ptokensdb = new CTokensDB("cr+");
+        ptokens = new CTokensCache();
+        ptokensCache = new CLRUCache<std::string, CDatabasedTokenData>(MAX_CACHE_TOKENS_SIZE);
 
-        // Need to load assets before we verify the database
-        if (!passetsdb->LoadAssets()) {
-            return InitError("Failed to load Assets Database");
+        // Need to load tokens before we verify the database
+        if (!ptokensdb->LoadTokens()) {
+            return InitError("Failed to load Tokens Database");
         }
 
-        if (!passetsdb->ReadReissuedMempoolState())
+        if (!ptokensdb->ReadReissuedMempoolState())
             printf("Database failed to load last Reissued Mempool State. Will have to start from empty state\n");
 
-        printf("Successfully loaded assets from database.\nCache of assets size: %d\n",
-                  passetsCache->Size());
+        printf("Successfully loaded tokens from database.\nCache of tokens size: %d\n",
+                  ptokensCache->Size());
     }
-    /** YAC_ASSET END */
+    /** YAC_TOKEN END */
 
     // as LoadBlockIndex can take several minutes, it's possible the user
     // requested to kill bitcoin-qt during the last operation. If so, exit.

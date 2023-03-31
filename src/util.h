@@ -189,7 +189,7 @@ extern ::int32_t
     nTestNetNewLogicBlockNumber,
 	nMainnetNewLogicBlockNumber,
     nYac20BlockNumberTime;
-extern ::int32_t nAssetSupportBlockNumber;
+extern ::int32_t nTokenSupportBlockNumber;
 extern ::uint32_t
     nDifficultyInterval,
     nEpochInterval;

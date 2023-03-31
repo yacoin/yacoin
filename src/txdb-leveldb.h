@@ -26,13 +26,13 @@ public:
     bool AddTxIndex(const CTransaction& tx, const CDiskTxPos& pos, int nHeight);
     bool EraseTxIndex(const CTransaction& tx);
     bool UpdateAddressUnspentIndex(const std::vector<std::pair<CAddressUnspentKey, CAddressUnspentValue > >&vect);
-    bool ReadAddressUnspentIndex(uint160 addressHash, int type, std::string assetName,
+    bool ReadAddressUnspentIndex(uint160 addressHash, int type, std::string tokenName,
                                  std::vector<std::pair<CAddressUnspentKey, CAddressUnspentValue> > &vect);
     bool ReadAddressUnspentIndex(uint160 addressHash, int type,
                                  std::vector<std::pair<CAddressUnspentKey, CAddressUnspentValue> > &vect);
     bool WriteAddressIndex(const std::vector<std::pair<CAddressIndexKey, CAmount> > &vect);
     bool EraseAddressIndex(const std::vector<std::pair<CAddressIndexKey, CAmount> > &vect);
-    bool ReadAddressIndex(uint160 addressHash, int type, std::string assetName,
+    bool ReadAddressIndex(uint160 addressHash, int type, std::string tokenName,
                           std::vector<std::pair<CAddressIndexKey, CAmount> > &addressIndex,
                           int start = 0, int end = 0);
     bool ReadAddressIndex(uint160 addressHash, int type,

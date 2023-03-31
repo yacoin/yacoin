@@ -133,27 +133,27 @@ void RPCTypeCheck(const Object& o,
     return nAmount;
 }
 
-std::string AssetValueFromAmount(const CAmount& amount, const std::string asset_name)
+std::string TokenValueFromAmount(const CAmount& amount, const std::string token_name)
 {
 
-    auto currentActiveAssetCache = GetCurrentAssetCache();
-    if (!currentActiveAssetCache)
-        throw JSONRPCError(RPC_INTERNAL_ERROR, "Asset cache isn't available.");
+    auto currentActiveTokenCache = GetCurrentTokenCache();
+    if (!currentActiveTokenCache)
+        throw JSONRPCError(RPC_INTERNAL_ERROR, "Token cache isn't available.");
 
     uint8_t units = OWNER_UNITS;
-    if (!IsAssetNameAnOwner(asset_name)) {
-        CNewAsset assetData;
-        if (!currentActiveAssetCache->GetAssetMetaDataIfExists(asset_name, assetData))
+    if (!IsTokenNameAnOwner(token_name)) {
+        CNewToken tokenData;
+        if (!currentActiveTokenCache->GetTokenMetaDataIfExists(token_name, tokenData))
             units = MAX_UNIT;
-            //throw JSONRPCError(RPC_INTERNAL_ERROR, "Couldn't load asset from cache: " + asset_name);
+            //throw JSONRPCError(RPC_INTERNAL_ERROR, "Couldn't load token from cache: " + token_name);
         else
-            units = assetData.units;
+            units = tokenData.units;
     }
 
-    return AssetValueFromAmountString(amount, units);
+    return TokenValueFromAmountString(amount, units);
 }
 
-std::string AssetValueFromAmountString(const CAmount& amount, const int8_t units)
+std::string TokenValueFromAmountString(const CAmount& amount, const int8_t units)
 {
     bool sign = amount < 0;
     int64_t n_abs = (sign ? -amount : amount);
@@ -1336,20 +1336,20 @@ static const CRPCCommand vRPCCommands[] =
     { "resendtx",               &resendtx,               false,  true  },
     { "makekeypair",            &makekeypair,            false,  true  },
     { "sendalert",              &sendalert,              false,  false },
-    /** YAC_ASSET START */
+    /** YAC_TOKEN START */
     { "issue",                  &issue,                  false,  false },
     { "transfer",               &transfer,               false,  false },
     { "transferfromaddress",    &transferfromaddress,    false,  false },
     { "reissue",                &reissue,                false,  false },
-    { "listmyassets",           &listmyassets,           false,  false },
-    { "listassets",             &listassets,             false,  false },
-    { "listaddressesbyasset",   &listaddressesbyasset,   false,  false },
-    { "listassetbalancesbyaddress",   &listassetbalancesbyaddress,   false,  false },
+    { "listmytokens",           &listmytokens,           false,  false },
+    { "listtokens",             &listtokens,             false,  false },
+    { "listaddressesbytoken",   &listaddressesbytoken,   false,  false },
+    { "listtokenbalancesbyaddress",   &listtokenbalancesbyaddress,   false,  false },
     { "getaddressbalance",      &getaddressbalance,      false,  false },
     { "getaddressdeltas",       &getaddressdeltas,       false,  false },
     { "getaddressutxos",        &getaddressutxos,        false,  false },
     { "getaddresstxids",        &getaddresstxids,        false,  false }
-    /** YAC_ASSET END */
+    /** YAC_TOKEN END */
 };
 
 CRPCTable::CRPCTable()
@@ -1457,7 +1457,7 @@ Array RPCConvertValues(std::string &strMethod, const std::vector<std::string> &s
     if (strMethod == "importaddress"          && n > 2) ConvertTo<bool>(params[2]);
     if (strMethod == "generatetoaddress"      && n > 2) ConvertTo<int>(params[0]);
     if (strMethod == "generatetoaddress"      && n > 2) ConvertTo<int>(params[2]);
-    /** YAC_ASSET START */
+    /** YAC_TOKEN START */
     if (strMethod == "issue"               && n > 1) ConvertTo<double>(params[1]); // qty
     if (strMethod == "issue"               && n > 4) ConvertTo<boost::int64_t>(params[4]); // units
     if (strMethod == "issue"               && n > 5) ConvertTo<bool>(params[5]); // reissuable
@@ -1467,26 +1467,26 @@ Array RPCConvertValues(std::string &strMethod, const std::vector<std::string> &s
     if (strMethod == "reissue"             && n > 1) ConvertTo<double>(params[1]); // qty
     if (strMethod == "reissue"             && n > 4) ConvertTo<bool>(params[4]); // reissuable
     if (strMethod == "reissue"             && n > 5) ConvertTo<boost::int64_t>(params[5]); // new_units
-    if (strMethod == "listmyassets"        && n > 1) ConvertTo<bool>(params[1]); // verbose
-    if (strMethod == "listmyassets"        && n > 2) ConvertTo<boost::int64_t>(params[2]); // count
-    if (strMethod == "listmyassets"        && n > 3) ConvertTo<boost::int64_t>(params[3]); // start
-    if (strMethod == "listmyassets"        && n > 4) ConvertTo<boost::int64_t>(params[4]); // confs
-    if (strMethod == "listassets"          && n > 1) ConvertTo<bool>(params[1]); // verbose
-    if (strMethod == "listassets"          && n > 2) ConvertTo<boost::int64_t>(params[2]); // count
-    if (strMethod == "listassets"          && n > 3) ConvertTo<boost::int64_t>(params[3]); // start
-    if (strMethod == "listaddressesbyasset"       && n > 1) ConvertTo<bool>(params[1]); // onlytotal
-    if (strMethod == "listaddressesbyasset"       && n > 2) ConvertTo<boost::int64_t>(params[2]); // count
-    if (strMethod == "listaddressesbyasset"       && n > 3) ConvertTo<boost::int64_t>(params[3]); // start
-    if (strMethod == "listassetbalancesbyaddress" && n > 1) ConvertTo<bool>(params[1]); // onlytotal
-    if (strMethod == "listassetbalancesbyaddress" && n > 2) ConvertTo<boost::int64_t>(params[2]); // count
-    if (strMethod == "listassetbalancesbyaddress" && n > 3) ConvertTo<boost::int64_t>(params[3]); // start
+    if (strMethod == "listmytokens"        && n > 1) ConvertTo<bool>(params[1]); // verbose
+    if (strMethod == "listmytokens"        && n > 2) ConvertTo<boost::int64_t>(params[2]); // count
+    if (strMethod == "listmytokens"        && n > 3) ConvertTo<boost::int64_t>(params[3]); // start
+    if (strMethod == "listmytokens"        && n > 4) ConvertTo<boost::int64_t>(params[4]); // confs
+    if (strMethod == "listtokens"          && n > 1) ConvertTo<bool>(params[1]); // verbose
+    if (strMethod == "listtokens"          && n > 2) ConvertTo<boost::int64_t>(params[2]); // count
+    if (strMethod == "listtokens"          && n > 3) ConvertTo<boost::int64_t>(params[3]); // start
+    if (strMethod == "listaddressesbytoken"       && n > 1) ConvertTo<bool>(params[1]); // onlytotal
+    if (strMethod == "listaddressesbytoken"       && n > 2) ConvertTo<boost::int64_t>(params[2]); // count
+    if (strMethod == "listaddressesbytoken"       && n > 3) ConvertTo<boost::int64_t>(params[3]); // start
+    if (strMethod == "listtokenbalancesbyaddress" && n > 1) ConvertTo<bool>(params[1]); // onlytotal
+    if (strMethod == "listtokenbalancesbyaddress" && n > 2) ConvertTo<boost::int64_t>(params[2]); // count
+    if (strMethod == "listtokenbalancesbyaddress" && n > 3) ConvertTo<boost::int64_t>(params[3]); // start
     if (strMethod == "getaddressbalance"   && n > 0) ConvertTo<Object>(params[0]); // addresses
-    if (strMethod == "getaddressbalance"   && n > 1) ConvertTo<bool>(params[1]); // includeAssets
+    if (strMethod == "getaddressbalance"   && n > 1) ConvertTo<bool>(params[1]); // includeTokens
     if (strMethod == "getaddressdeltas"    && n > 0) ConvertTo<Object>(params[0]); // addresses
     if (strMethod == "getaddressutxos"     && n > 0) ConvertTo<Object>(params[0]); // addresses
     if (strMethod == "getaddresstxids"     && n > 0) ConvertTo<Object>(params[0]); // addresses
-    if (strMethod == "getaddresstxids"     && n > 1) ConvertTo<bool>(params[1]); // includeAssets
-    /** YAC_ASSET END */
+    if (strMethod == "getaddresstxids"     && n > 1) ConvertTo<bool>(params[1]); // includeTokens
+    /** YAC_TOKEN END */
 
     return params;
 }

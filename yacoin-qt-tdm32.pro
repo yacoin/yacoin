@@ -279,9 +279,9 @@ SOURCES += src/qt/bitcoin.cpp src/qt/bitcoingui.cpp \
     src/db.cpp \
     src/dbwrapper.cpp \
     src/walletdb.cpp \
-    src/assets/assettypes.cpp \
-    src/assets/assetdb.cpp \
-    src/assets/assets.cpp \
+    src/tokens/tokentypes.cpp \
+    src/tokens/tokendb.cpp \
+    src/tokens/tokens.cpp \
     src/primitives/transaction.cpp \
     src/primitives/block.cpp \
     src/qt/clientmodel.cpp \
@@ -299,7 +299,7 @@ SOURCES += src/qt/bitcoin.cpp src/qt/bitcoingui.cpp \
     src/qt/transactionview.cpp \
     src/qt/walletmodel.cpp \
     src/bitcoinrpc.cpp \
-    src/rpcassets.cpp \
+    src/rpctokens.cpp \
     src/rpcdump.cpp \
     src/rpcnet.cpp \
     src/rpcmining.cpp \

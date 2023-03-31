@@ -65,57 +65,57 @@ using std::multimap;
 using std::deque;
 
 //
-// GLOBAL VARIABLES USED FOR ASSET MANAGEMENT SYSTEM
+// GLOBAL VARIABLES USED FOR TOKEN MANAGEMENT SYSTEM
 //
-CAssetsDB *passetsdb = nullptr;
-CAssetsCache *passets = nullptr;
-CLRUCache<std::string, CDatabasedAssetData> *passetsCache = nullptr;
-bool fAssetIndex = false;
+CTokensDB *ptokensdb = nullptr;
+CTokensCache *ptokens = nullptr;
+CLRUCache<std::string, CDatabasedTokenData> *ptokensCache = nullptr;
+bool fTokenIndex = false;
 bool fAddressIndex = false;
 //
-// END OF GLOBAL VARIABLES USED FOR ASSET MANAGEMENT SYSTEM
+// END OF GLOBAL VARIABLES USED FOR TOKEN MANAGEMENT SYSTEM
 //
 
 //
-// FUNCTIONS USED FOR ASSET MANAGEMENT SYSTEM
+// FUNCTIONS USED FOR TOKEN MANAGEMENT SYSTEM
 //
 /** Flush all state, indexes and buffers to disk. */
-bool FlushAssetToDisk()
+bool FlushTokenToDisk()
 {
-    // Flush the assetstate
-    if (AreAssetsDeployed()) {
-        // Flush the assetstate
-        auto currentActiveAssetCache = GetCurrentAssetCache();
-        if (currentActiveAssetCache) {
-            if (!currentActiveAssetCache->DumpCacheToDatabase())
-                return error("FlushAssetToDisk(): Failed to write to asset database");
+    // Flush the tokenstate
+    if (AreTokensDeployed()) {
+        // Flush the tokenstate
+        auto currentActiveTokenCache = GetCurrentTokenCache();
+        if (currentActiveTokenCache) {
+            if (!currentActiveTokenCache->DumpCacheToDatabase())
+                return error("FlushTokenToDisk(): Failed to write to token database");
         }
     }
 
     // Write the reissue mempool data to database
-    if (passetsdb)
-        passetsdb->WriteReissuedMempoolState();
+    if (ptokensdb)
+        ptokensdb->WriteReissuedMempoolState();
 }
 
-bool AreAssetsDeployed()
+bool AreTokensDeployed()
 {
-    if (chainActive.Height() != -1 && chainActive.Genesis() && chainActive.Height() >= nAssetSupportBlockNumber)
+    if (chainActive.Height() != -1 && chainActive.Genesis() && chainActive.Height() >= nTokenSupportBlockNumber)
     {
         return true;
     }
     return false;
 }
 
-CAssetsCache* GetCurrentAssetCache()
+CTokensCache* GetCurrentTokenCache()
 {
-    return passets;
+    return ptokens;
 }
 
-bool CheckTxAssets(const CTransaction &tx, CValidationState &state,
-        MapPrevTx inputs, CAssetsCache *assetCache, bool fCheckMempool,
-        std::vector<std::pair<std::string, uint256>> &vPairReissueAssets)
+bool CheckTxTokens(const CTransaction &tx, CValidationState &state,
+        MapPrevTx inputs, CTokensCache *tokenCache, bool fCheckMempool,
+        std::vector<std::pair<std::string, uint256>> &vPairReissueTokens)
 {
-    // Create map that stores the amount of an asset transaction input. Used to verify no assets are burned
+    // Create map that stores the amount of an token transaction input. Used to verify no tokens are burned
     std::map<std::string, CAmount> totalInputs;
     std::map<std::string, std::string> mapAddresses;
 
@@ -129,26 +129,26 @@ bool CheckTxAssets(const CTransaction &tx, CValidationState &state,
 
         if (!txindex.vSpent[prevout.COutPointGet_n()].IsNull())
             return state.Invalid(
-                    error("CTransaction::CheckTxAssets() : %s prev tx already used at %s",
+                    error("CTransaction::CheckTxTokens() : %s prev tx already used at %s",
                           tx.GetHash().ToString().substr(0, 10).c_str(),
                           txindex.vSpent[prevout.COutPointGet_n()].ToString().c_str()));
 
-        if (txPrevOut.scriptPubKey.IsAssetScript())
+        if (txPrevOut.scriptPubKey.IsTokenScript())
         {
-            CAssetOutputEntry data;
-            if (!GetAssetData(txPrevOut.scriptPubKey, data))
-                return state.DoS(100, error("bad-txns-failed-to-get-asset-from-script"));
+            CTokenOutputEntry data;
+            if (!GetTokenData(txPrevOut.scriptPubKey, data))
+                return state.DoS(100, error("bad-txns-failed-to-get-token-from-script"));
 
-            // Add to the total value of assets in the inputs
-            if (totalInputs.count(data.assetName))
-                totalInputs.at(data.assetName) += data.nAmount;
+            // Add to the total value of tokens in the inputs
+            if (totalInputs.count(data.tokenName))
+                totalInputs.at(data.tokenName) += data.nAmount;
             else
-                totalInputs.insert(std::make_pair(data.assetName, data.nAmount));
+                totalInputs.insert(std::make_pair(data.tokenName, data.nAmount));
         }
     }
 
-    // Create map that stores the amount of an asset transaction output. Used to
-    // verify no assets are burned
+    // Create map that stores the amount of an token transaction output. Used to
+    // verify no tokens are burned
     std::map<std::string, CAmount> totalOutputs;
     int index = 0;
     int64_t currentTime = GetTime();
@@ -157,108 +157,108 @@ bool CheckTxAssets(const CTransaction &tx, CValidationState &state,
     for (const auto &txout : tx.vout)
     {
         i++;
-        bool fIsAsset = false;
+        bool fIsToken = false;
         int nType = 0;
         bool fIsOwner = false;
-        if (txout.scriptPubKey.IsAssetScript(nType, fIsOwner))
-            fIsAsset = true;
+        if (txout.scriptPubKey.IsTokenScript(nType, fIsOwner))
+            fIsToken = true;
 
-        if (assetCache)
+        if (tokenCache)
         {
-            if (fIsAsset && !AreAssetsDeployed())
-                return state.DoS(100, error("bad-txns-is-asset-and-asset-not-active"));
+            if (fIsToken && !AreTokensDeployed())
+                return state.DoS(100, error("bad-txns-is-token-and-token-not-active"));
         }
 
-        if (nType == TX_TRANSFER_ASSET)
+        if (nType == TX_TRANSFER_TOKEN)
         {
-            CAssetTransfer transfer;
+            CTokenTransfer transfer;
             std::string address = "";
-            if (!TransferAssetFromScript(txout.scriptPubKey, transfer, address))
-                return state.DoS(100, error("bad-tx-asset-transfer-bad-deserialize"));
+            if (!TransferTokenFromScript(txout.scriptPubKey, transfer, address))
+                return state.DoS(100, error("bad-tx-token-transfer-bad-deserialize"));
 
-            if (!ContextualCheckTransferAsset(assetCache, transfer, address, strError))
+            if (!ContextualCheckTransferToken(tokenCache, transfer, address, strError))
                 return state.DoS(100, error(strError.c_str()));
 
-            // Add to the total value of assets in the outputs
+            // Add to the total value of tokens in the outputs
             if (totalOutputs.count(transfer.strName))
                 totalOutputs.at(transfer.strName) += transfer.nAmount;
             else
                 totalOutputs.insert(std::make_pair(transfer.strName, transfer.nAmount));
 
-            if (IsAssetNameAnOwner(transfer.strName))
+            if (IsTokenNameAnOwner(transfer.strName))
             {
-                if (transfer.nAmount != OWNER_ASSET_AMOUNT)
+                if (transfer.nAmount != OWNER_TOKEN_AMOUNT)
                     return state.DoS(100, error("bad-txns-transfer-owner-amount-was-not-1"));
             }
             else
             {
-                // For all other types of assets, make sure they are sending the right
+                // For all other types of tokens, make sure they are sending the right
                 // type of units
-                CNewAsset asset;
-                if (!assetCache->GetAssetMetaDataIfExists(transfer.strName, asset))
-                    return state.DoS(100, error("bad-txns-transfer-asset-not-exist"));
+                CNewToken token;
+                if (!tokenCache->GetTokenMetaDataIfExists(transfer.strName, token))
+                    return state.DoS(100, error("bad-txns-transfer-token-not-exist"));
 
-                if (asset.strName != transfer.strName)
-                    return state.DoS(100, error("bad-txns-asset-database-corrupted"));
+                if (token.strName != transfer.strName)
+                    return state.DoS(100, error("bad-txns-token-database-corrupted"));
 
-                if (!CheckAmountWithUnits(transfer.nAmount, asset.units))
-                    return state.DoS(100, error("bad-txns-transfer-asset-amount-not-match-units"));
+                if (!CheckAmountWithUnits(transfer.nAmount, token.units))
+                    return state.DoS(100, error("bad-txns-transfer-token-amount-not-match-units"));
             }
         }
-        else if (nType == TX_REISSUE_ASSET)
+        else if (nType == TX_REISSUE_TOKEN)
         {
-            CReissueAsset reissue;
+            CReissueToken reissue;
             std::string address;
-            if (!ReissueAssetFromScript(txout.scriptPubKey, reissue, address))
-                return state.DoS(100, error("bad-tx-asset-reissue-bad-deserialize"));
+            if (!ReissueTokenFromScript(txout.scriptPubKey, reissue, address))
+                return state.DoS(100, error("bad-tx-token-reissue-bad-deserialize"));
 
-            if (mapReissuedAssets.count(reissue.strName))
+            if (mapReissuedTokens.count(reissue.strName))
             {
-                if (mapReissuedAssets.at(reissue.strName) != tx.GetHash())
+                if (mapReissuedTokens.at(reissue.strName) != tx.GetHash())
                     return state.DoS(100, error("bad-tx-reissue-chaining-not-allowed"));
             }
             else
             {
-                vPairReissueAssets.emplace_back(std::make_pair(reissue.strName, tx.GetHash()));
+                vPairReissueTokens.emplace_back(std::make_pair(reissue.strName, tx.GetHash()));
             }
         }
         index++;
     }
 
-    if (assetCache)
+    if (tokenCache)
     {
-        if (tx.IsNewAsset())
+        if (tx.IsNewToken())
         {
-            // Get the asset type
-            CNewAsset asset;
+            // Get the token type
+            CNewToken token;
             std::string address;
-            if (!AssetFromScript(tx.vout[tx.vout.size() - 1].scriptPubKey, asset, address)) {
-                error("%s : Failed to get new asset from transaction: %s", __func__, tx.GetHash().GetHex());
+            if (!TokenFromScript(tx.vout[tx.vout.size() - 1].scriptPubKey, token, address)) {
+                error("%s : Failed to get new token from transaction: %s", __func__, tx.GetHash().GetHex());
                 return state.DoS(100, error("bad-txns-issue-serialzation-failed"));
             }
 
-            AssetType assetType;
-            IsAssetNameValid(asset.strName, assetType);
+            TokenType tokenType;
+            IsTokenNameValid(token.strName, tokenType);
 
-            if (!ContextualCheckNewAsset(assetCache, asset, strError, fCheckMempool))
+            if (!ContextualCheckNewToken(tokenCache, token, strError, fCheckMempool))
                 return state.DoS(100, error(strError.c_str()));
 
         }
-        else if (tx.IsReissueAsset())
+        else if (tx.IsReissueToken())
         {
-            CReissueAsset reissue_asset;
+            CReissueToken reissue_token;
             std::string address;
-            if (!ReissueAssetFromScript(tx.vout[tx.vout.size() - 1].scriptPubKey, reissue_asset, address))
+            if (!ReissueTokenFromScript(tx.vout[tx.vout.size() - 1].scriptPubKey, reissue_token, address))
             {
-                error("%s : Failed to get new asset from transaction: %s", __func__, tx.GetHash().GetHex());
+                error("%s : Failed to get new token from transaction: %s", __func__, tx.GetHash().GetHex());
                 return state.DoS(100, error("bad-txns-reissue-serialzation-failed"));
             }
-            if (!ContextualCheckReissueAsset(assetCache, reissue_asset, strError, tx))
+            if (!ContextualCheckReissueToken(tokenCache, reissue_token, strError, tx))
                 return state.DoS(100, error("bad-txns-reissue-contextual-"));
         }
-        else if (tx.IsNewUniqueAsset())
+        else if (tx.IsNewUniqueToken())
         {
-            if (!ContextualCheckUniqueAssetTx(assetCache, strError, tx))
+            if (!ContextualCheckUniqueTokenTx(tokenCache, strError, tx))
                 return state.DoS(100, error("bad-txns-issue-unique-contextual-"));
         }
         else
@@ -267,18 +267,18 @@ bool CheckTxAssets(const CTransaction &tx, CValidationState &state,
             {
                 int nType;
                 bool _isOwner;
-                if (out.scriptPubKey.IsAssetScript(nType, _isOwner))
+                if (out.scriptPubKey.IsTokenScript(nType, _isOwner))
                 {
-                    if (nType != TX_TRANSFER_ASSET)
+                    if (nType != TX_TRANSFER_TOKEN)
                     {
-                        return state.DoS(100, error("bad-txns-bad-asset-transaction"));
+                        return state.DoS(100, error("bad-txns-bad-token-transaction"));
                     }
                 }
                 else
                 {
-                    if (out.scriptPubKey.Find(OP_YAC_ASSET))
+                    if (out.scriptPubKey.Find(OP_YAC_TOKEN))
                     {
-                        return state.DoS(100, error("bad-txns-bad-asset-script"));
+                        return state.DoS(100, error("bad-txns-bad-token-script"));
                     }
                 }
             }
@@ -291,14 +291,14 @@ bool CheckTxAssets(const CTransaction &tx, CValidationState &state,
         {
             std::string errorMsg;
             errorMsg =
-                    strprintf("Bad Transaction - Trying to create outpoint for asset that you don't have: %s", outValue.first);
+                    strprintf("Bad Transaction - Trying to create outpoint for token that you don't have: %s", outValue.first);
             return state.DoS(100, error("bad-tx-inputs-outputs-mismatch "));
         }
 
         if (totalInputs.at(outValue.first) != outValue.second)
         {
             std::string errorMsg;
-            errorMsg = strprintf("Bad Transaction - Assets would be burnt %s", outValue.first);
+            errorMsg = strprintf("Bad Transaction - Tokens would be burnt %s", outValue.first);
             return state.DoS(100, error("bad-tx-inputs-outputs-mismatch "));
         }
     }
@@ -306,80 +306,80 @@ bool CheckTxAssets(const CTransaction &tx, CValidationState &state,
     // Check the input size and the output size
     if (totalOutputs.size() != totalInputs.size())
     {
-        return state.DoS(100, error("bad-tx-asset-inputs-size-does-not-match-outputs-size"));
+        return state.DoS(100, error("bad-tx-token-inputs-size-does-not-match-outputs-size"));
     }
     return true;
 }
 
-void UpdateAssetInfo(const CTransaction& tx, MapPrevTx& prevInputs, int nHeight, uint256 blockHash, CAssetsCache* assetsCache, std::pair<std::string, CBlockAssetUndo>* undoAssetData)
+void UpdateTokenInfo(const CTransaction& tx, MapPrevTx& prevInputs, int nHeight, uint256 blockHash, CTokensCache* tokensCache, std::pair<std::string, CBlockTokenUndo>* undoTokenData)
 {
-    // Iterate through tx inputs and update asset info
+    // Iterate through tx inputs and update token info
     if (!tx.IsCoinBase()) {
         for (const CTxIn &txin : tx.vin) {
             const COutPoint&
                 prevout = txin.prevout;
             const CTransaction
                 & txPrev = prevInputs[prevout.COutPointGetHash()].second;
-            UpdateAssetInfoFromTxInputs(prevout,txPrev.vout[prevout.COutPointGet_n()], assetsCache);
+            UpdateTokenInfoFromTxInputs(prevout,txPrev.vout[prevout.COutPointGet_n()], tokensCache);
         }
     }
 
-    // Update asset info from Tx outputs
-    UpdateAssetInfoFromTxOutputs(tx, nHeight, blockHash, assetsCache, undoAssetData);
+    // Update token info from Tx outputs
+    UpdateTokenInfoFromTxOutputs(tx, nHeight, blockHash, tokensCache, undoTokenData);
 }
 
-void UpdateAssetInfoFromTxInputs(const COutPoint& outpoint, const CTxOut& txOut, CAssetsCache* assetsCache)
+void UpdateTokenInfoFromTxInputs(const COutPoint& outpoint, const CTxOut& txOut, CTokensCache* tokensCache)
 {
-    if (AreAssetsDeployed()) {
-        if (assetsCache) {
-            if (!assetsCache->TrySpendCoin(outpoint, txOut)) {
-                error("%s : Failed to try and spend the asset. COutPoint : %s", __func__, outpoint.ToString());
+    if (AreTokensDeployed()) {
+        if (tokensCache) {
+            if (!tokensCache->TrySpendCoin(outpoint, txOut)) {
+                error("%s : Failed to try and spend the token. COutPoint : %s", __func__, outpoint.ToString());
             }
         }
     }
 }
 
-void UpdateAssetInfoFromTxOutputs(const CTransaction& tx, int nHeight, uint256 blockHash, CAssetsCache* assetsCache, std::pair<std::string, CBlockAssetUndo>* undoAssetData)
+void UpdateTokenInfoFromTxOutputs(const CTransaction& tx, int nHeight, uint256 blockHash, CTokensCache* tokensCache, std::pair<std::string, CBlockTokenUndo>* undoTokenData)
 {
     bool fCoinbase = tx.IsCoinBase();
     const uint256& txid = tx.GetHash();
 
-    if (AreAssetsDeployed()) {
-        if (assetsCache) {
-            if (tx.IsNewAsset()) { // This works are all new root assets, sub asset, and restricted assets
-                CNewAsset asset;
+    if (AreTokensDeployed()) {
+        if (tokensCache) {
+            if (tx.IsNewToken()) { // This works are all new root tokens, sub token, and restricted tokens
+                CNewToken token;
                 std::string strAddress;
-                AssetFromTransaction(tx, asset, strAddress);
+                TokenFromTransaction(tx, token, strAddress);
 
                 std::string ownerName;
                 std::string ownerAddress;
                 OwnerFromTransaction(tx, ownerName, ownerAddress);
 
-                // Add the new asset to cache
-                if (!assetsCache->AddNewAsset(asset, strAddress, nHeight, blockHash))
-                    error("%s : Failed at adding a new asset to our cache. asset: %s", __func__,
-                          asset.strName);
+                // Add the new token to cache
+                if (!tokensCache->AddNewToken(token, strAddress, nHeight, blockHash))
+                    error("%s : Failed at adding a new token to our cache. token: %s", __func__,
+                          token.strName);
 
-                // Add the owner asset to cache
-                if (!assetsCache->AddOwnerAsset(ownerName, ownerAddress))
-                    error("%s : Failed at adding a new asset to our cache. asset: %s", __func__,
-                          asset.strName);
+                // Add the owner token to cache
+                if (!tokensCache->AddOwnerToken(ownerName, ownerAddress))
+                    error("%s : Failed at adding a new token to our cache. token: %s", __func__,
+                          token.strName);
 
-            } else if (tx.IsReissueAsset()) {
-                CReissueAsset reissue;
+            } else if (tx.IsReissueToken()) {
+                CReissueToken reissue;
                 std::string strAddress;
-                ReissueAssetFromTransaction(tx, reissue, strAddress);
+                ReissueTokenFromTransaction(tx, reissue, strAddress);
 
                 int reissueIndex = tx.vout.size() - 1;
 
-                // Get the asset before we change it
-                CNewAsset asset;
-                if (!assetsCache->GetAssetMetaDataIfExists(reissue.strName, asset))
-                    error("%s: Failed to get the original asset that is getting reissued. Asset Name : %s",
+                // Get the token before we change it
+                CNewToken token;
+                if (!tokensCache->GetTokenMetaDataIfExists(reissue.strName, token))
+                    error("%s: Failed to get the original token that is getting reissued. Token Name : %s",
                           __func__, reissue.strName);
 
-                if (!assetsCache->AddReissueAsset(reissue, strAddress, COutPoint(txid, reissueIndex)))
-                    error("%s: Failed to reissue an asset. Asset Name : %s", __func__, reissue.strName);
+                if (!tokensCache->AddReissueToken(reissue, strAddress, COutPoint(txid, reissueIndex)))
+                    error("%s: Failed to reissue an token. Token Name : %s", __func__, reissue.strName);
 
                 // Set the old IPFSHash for the blockundo
                 bool fIPFSChanged = !reissue.strIPFSHash.empty();
@@ -387,23 +387,23 @@ void UpdateAssetInfoFromTxOutputs(const CTransaction& tx, int nHeight, uint256 b
 
                 // If any of the following items were changed by reissuing, we need to database the old values so it can be undone correctly
                 if (fIPFSChanged || fUnitsChanged) {
-                    undoAssetData->first = reissue.strName; // Asset Name
-                    undoAssetData->second = CBlockAssetUndo {fIPFSChanged, fUnitsChanged, asset.strIPFSHash, asset.units}; // ipfschanged, unitchanged, Old Assets IPFSHash, old units
+                    undoTokenData->first = reissue.strName; // Token Name
+                    undoTokenData->second = CBlockTokenUndo {fIPFSChanged, fUnitsChanged, token.strIPFSHash, token.units}; // ipfschanged, unitchanged, Old Tokens IPFSHash, old units
                 }
-            } else if (tx.IsNewUniqueAsset()) {
+            } else if (tx.IsNewUniqueToken()) {
                 for (int n = 0; n < (int)tx.vout.size(); n++) {
                     auto out = tx.vout[n];
 
-                    CNewAsset asset;
+                    CNewToken token;
                     std::string strAddress;
 
-                    if (IsScriptNewUniqueAsset(out.scriptPubKey)) {
-                        AssetFromScript(out.scriptPubKey, asset, strAddress);
+                    if (IsScriptNewUniqueToken(out.scriptPubKey)) {
+                        TokenFromScript(out.scriptPubKey, token, strAddress);
 
-                        // Add the new asset to cache
-                        if (!assetsCache->AddNewAsset(asset, strAddress, nHeight, blockHash))
-                            error("%s : Failed at adding a new asset to our cache. asset: %s", __func__,
-                                  asset.strName);
+                        // Add the new token to cache
+                        if (!tokensCache->AddNewToken(token, strAddress, nHeight, blockHash))
+                            error("%s : Failed at adding a new token to our cache. token: %s", __func__,
+                                  token.strName);
                     }
                 }
             }
@@ -411,21 +411,21 @@ void UpdateAssetInfoFromTxOutputs(const CTransaction& tx, int nHeight, uint256 b
     }
 
     for (size_t i = 0; i < tx.vout.size(); ++i) {
-        if (AreAssetsDeployed()) {
-            if (assetsCache) {
-                CAssetOutputEntry assetData;
-                if (GetAssetData(tx.vout[i].scriptPubKey, assetData)) {
+        if (AreTokensDeployed()) {
+            if (tokensCache) {
+                CTokenOutputEntry tokenData;
+                if (GetTokenData(tx.vout[i].scriptPubKey, tokenData)) {
 
-                    // If this is a transfer asset, and the amount is greater than zero
-                    // We want to make sure it is added to the asset addresses database if (fAssetIndex == true)
-                    if (assetData.type == TX_TRANSFER_ASSET && assetData.nAmount > 0) {
-                        // Create the objects needed from the assetData
-                        CAssetTransfer assetTransfer(assetData.assetName, assetData.nAmount);
-                        std::string address = EncodeDestination(assetData.destination);
+                    // If this is a transfer token, and the amount is greater than zero
+                    // We want to make sure it is added to the token addresses database if (fTokenIndex == true)
+                    if (tokenData.type == TX_TRANSFER_TOKEN && tokenData.nAmount > 0) {
+                        // Create the objects needed from the tokenData
+                        CTokenTransfer tokenTransfer(tokenData.tokenName, tokenData.nAmount);
+                        std::string address = EncodeDestination(tokenData.destination);
 
-                        // Add the transfer asset data to the asset cache
-                        if (!assetsCache->AddTransferAsset(assetTransfer, address, COutPoint(txid, i), tx.vout[i]))
-                            error("%s : ERROR - Failed to add transfer asset CTxOut: %s\n", __func__,
+                        // Add the transfer token data to the token cache
+                        if (!tokensCache->AddTransferToken(tokenTransfer, address, COutPoint(txid, i), tx.vout[i]))
+                            error("%s : ERROR - Failed to add transfer token CTxOut: %s\n", __func__,
                                       tx.vout[i].ToString());
                     }
                 }
@@ -447,26 +447,26 @@ bool GetAddressIndex(uint160 addressHash, int type,
     return true;
 }
 
-bool GetAddressIndex(uint160 addressHash, int type, std::string assetName,
+bool GetAddressIndex(uint160 addressHash, int type, std::string tokenName,
                      std::vector<std::pair<CAddressIndexKey, CAmount> > &addressIndex, int start, int end)
 {
     if (!fAddressIndex)
         return error("address index not enabled");
 
     CTxDB txdb;
-    if (!txdb.ReadAddressIndex(addressHash, type, assetName, addressIndex, start, end))
+    if (!txdb.ReadAddressIndex(addressHash, type, tokenName, addressIndex, start, end))
         return error("unable to get txids for address");
 
     return true;
 }
-bool GetAddressUnspent(uint160 addressHash, int type, std::string assetName,
+bool GetAddressUnspent(uint160 addressHash, int type, std::string tokenName,
                        std::vector<std::pair<CAddressUnspentKey, CAddressUnspentValue> > &unspentOutputs)
 {
     if (!fAddressIndex)
         return error("address index not enabled");
 
     CTxDB txdb;
-    if (!txdb.ReadAddressUnspentIndex(addressHash, type, assetName, unspentOutputs))
+    if (!txdb.ReadAddressUnspentIndex(addressHash, type, tokenName, unspentOutputs))
         return error("unable to get txids for address");
 
     return true;
@@ -485,7 +485,7 @@ bool GetAddressUnspent(uint160 addressHash, int type,
     return true;
 }
 //
-// END OF FUNCTIONS USED FOR ASSET MANAGEMENT SYSTEM
+// END OF FUNCTIONS USED FOR TOKEN MANAGEMENT SYSTEM
 //
 
 const ::int64_t 
@@ -1379,9 +1379,9 @@ bool CTxMemPool::accept(CValidationState &state, CTxDB& txdb, CTransaction &tx, 
     if (pfMissingInputs)
         *pfMissingInputs = false;
 
-    /** YAC_ASSET START */
-    std::vector<std::pair<std::string, uint256>> vReissueAssets;
-    /** YAC_ASSET END */
+    /** YAC_TOKEN START */
+    std::vector<std::pair<std::string, uint256>> vReissueTokens;
+    /** YAC_TOKEN END */
 
     if (tx.nVersion == CTransaction::CURRENT_VERSION_of_Tx_for_yac_old && isHardforkHappened())
         return error("CTxMemPool::accept() : Not accept transaction with old version");
@@ -1491,20 +1491,20 @@ bool CTxMemPool::accept(CValidationState &state, CTxDB& txdb, CTransaction &tx, 
                          hash.ToString().c_str(),
                          nFees, txMinFee);
 
-        /** YAC_ASSET START */
-        if (!AreAssetsDeployed()) {
+        /** YAC_TOKEN START */
+        if (!AreTokensDeployed()) {
             for (auto out : tx.vout) {
-                if (out.scriptPubKey.IsAssetScript())
-                    return state.DoS(100, error("bad-txns-contained-asset-when-not-active"));
+                if (out.scriptPubKey.IsTokenScript())
+                    return state.DoS(100, error("bad-txns-contained-token-when-not-active"));
             }
         }
 
-        if (AreAssetsDeployed()) {
-            if (!CheckTxAssets(tx, state, mapInputs, GetCurrentAssetCache(), true, vReissueAssets))
-                return error("%s: CheckTxAssets: %s, %s", __func__, tx.GetHash().ToString(),
+        if (AreTokensDeployed()) {
+            if (!CheckTxTokens(tx, state, mapInputs, GetCurrentTokenCache(), true, vReissueTokens))
+                return error("%s: CheckTxTokens: %s, %s", __func__, tx.GetHash().ToString(),
                              FormatStateMessage(state));
         }
-        /** YAC_ASSET END */
+        /** YAC_TOKEN END */
 
         // Check against previous transactions
         // This is done last to help prevent CPU exhaustion denial-of-service attacks.
@@ -1532,7 +1532,7 @@ bool CTxMemPool::accept(CValidationState &state, CTxDB& txdb, CTransaction &tx, 
         if (ptxOld)
         {
             printf("CTxMemPool::accept() : replacing tx %s with new version\n", ptxOld->GetHash().ToString().c_str());
-            ConnectedBlockAssetData connectedBlockData;
+            ConnectedBlockTokenData connectedBlockData;
             remove(*ptxOld);
         }
         addUnchecked(hash, tx);
@@ -1543,25 +1543,25 @@ bool CTxMemPool::accept(CValidationState &state, CTxDB& txdb, CTransaction &tx, 
 //        pool.addAddressIndex(entry, view);
 //    }
 
-    /** YAC_ASSET START */
-    for (auto out : vReissueAssets) {
-        mapReissuedAssets.insert(out);
+    /** YAC_TOKEN START */
+    for (auto out : vReissueTokens) {
+        mapReissuedTokens.insert(out);
         mapReissuedTx.insert(std::make_pair(out.second, out.first));
     }
-    if (AreAssetsDeployed()) {
+    if (AreTokensDeployed()) {
         for (auto out : tx.vout) {
-            if (out.scriptPubKey.IsAssetScript()) {
-                CAssetOutputEntry data;
-                if (!GetAssetData(out.scriptPubKey, data))
+            if (out.scriptPubKey.IsTokenScript()) {
+                CTokenOutputEntry data;
+                if (!GetTokenData(out.scriptPubKey, data))
                     continue;
-                if (data.type == TX_NEW_ASSET && !IsAssetNameAnOwner(data.assetName)) {
-                    mapAssetToHash[data.assetName] = hash;
-                    mapHashToAsset[hash] = data.assetName;
+                if (data.type == TX_NEW_TOKEN && !IsTokenNameAnOwner(data.tokenName)) {
+                    mapTokenToHash[data.tokenName] = hash;
+                    mapHashToToken[hash] = data.tokenName;
                 }
             }
         }
     }
-    /** YAC_ASSET END */
+    /** YAC_TOKEN END */
 
     ///// are we sure this is ok when loading transactions or restoring block txes
     // If updated, erase old tx from wallet
@@ -1605,37 +1605,37 @@ void CTxMemPool::removeUnchecked(const CTransaction& tx, const uint256& hash)
     mapTx.erase(hash);
     nTransactionsUpdated++;
 
-    /** YAC_ASSET START */
+    /** YAC_TOKEN START */
     // If the transaction being removed from the mempool is locking other reissues. Free them
     if (mapReissuedTx.count(hash)) {
-        if (mapReissuedAssets.count(mapReissuedTx.at(hash))) {
-            mapReissuedAssets.erase(mapReissuedTx.at((hash)));
+        if (mapReissuedTokens.count(mapReissuedTx.at(hash))) {
+            mapReissuedTokens.erase(mapReissuedTx.at((hash)));
             mapReissuedTx.erase(hash);
         }
     }
 
-    // Erase from the asset mempool maps if they match txid
-    if (mapHashToAsset.count(hash)) {
-        mapAssetToHash.erase(mapHashToAsset.at(hash));
-        mapHashToAsset.erase(hash);
+    // Erase from the token mempool maps if they match txid
+    if (mapHashToToken.count(hash)) {
+        mapTokenToHash.erase(mapHashToToken.at(hash));
+        mapHashToToken.erase(hash);
     }
-    /** YAC_ASSET END */
+    /** YAC_TOKEN END */
 }
 
 void CTxMemPool::remove(const CTransaction& tx)
 {
-    ConnectedBlockAssetData connectedBlockData;
+    ConnectedBlockTokenData connectedBlockData;
     std::vector<CTransaction> vtx = {tx};
     remove(vtx, connectedBlockData);
 }
 
 void CTxMemPool::remove(const std::vector<CTransaction>& vtx)
 {
-    ConnectedBlockAssetData connectedBlockData;
+    ConnectedBlockTokenData connectedBlockData;
     remove(vtx, connectedBlockData);
 }
 
-void CTxMemPool::remove(const std::vector<CTransaction>& vtx, ConnectedBlockAssetData& connectedBlockData)
+void CTxMemPool::remove(const std::vector<CTransaction>& vtx, ConnectedBlockTokenData& connectedBlockData)
 {
     // Remove transaction from memory pool
     for(const CTransaction& tx : vtx)
@@ -1648,18 +1648,18 @@ void CTxMemPool::remove(const std::vector<CTransaction>& vtx, ConnectedBlockAsse
         }
     }
 
-    /** YAC_ASSET START */
-    // Remove newly added asset issue transactions from the mempool if they haven't been removed already    std::vector<CTransaction> trans;
-    for (auto it : connectedBlockData.newAssetsToAdd) {
-        if (mapAssetToHash.count(it.asset.strName)) {
-            const uint256& hash = mapAssetToHash.at(it.asset.strName);
+    /** YAC_TOKEN START */
+    // Remove newly added token issue transactions from the mempool if they haven't been removed already    std::vector<CTransaction> trans;
+    for (auto it : connectedBlockData.newTokensToAdd) {
+        if (mapTokenToHash.count(it.token.strName)) {
+            const uint256& hash = mapTokenToHash.at(it.token.strName);
             auto itMapTx = mapTx.find(hash);
             if (itMapTx != mapTx.end()) {
                 removeUnchecked(itMapTx->second, hash);
             }
         }
     }
-    /** YAC_ASSET END */
+    /** YAC_TOKEN END */
 }
 
 void CTxMemPool::clear()
@@ -2852,16 +2852,16 @@ bool static DisconnectTip(CValidationState &state, CTxDB& txdb) {
     // Read block from disk.
     CBlock block;
     {
-        CAssetsCache assetCache;
+        CTokensCache tokenCache;
         if (!block.ReadFromDisk(pindexDelete))
             return state.Abort(_("DisconnectTip() : ReadFromDisk for disconnect failed"));
-        if (!block.DisconnectBlock(state, txdb, pindexDelete, &assetCache))
+        if (!block.DisconnectBlock(state, txdb, pindexDelete, &tokenCache))
             return error("DisconnectTip() : DisconnectBlock %s failed", pindexDelete->GetBlockHash().ToString().substr(0,20).c_str());
         // Write the chain state to disk, if necessary.
         if (!WriteChainState(txdb, pindexDelete->pprev))
             return false;
-        bool assetsFlushed = assetCache.Flush();
-        assert(assetsFlushed);
+        bool tokensFlushed = tokenCache.Flush();
+        assert(tokensFlushed);
     }
 
     printf("DisconnectTip, disconnect block (height: %d, hash: %s)\n", pindexDelete->nHeight, block.GetHash().GetHex());
@@ -2904,55 +2904,55 @@ bool static ConnectTip(CValidationState &state, CTxDB& txdb, CBlockIndex *pindex
         if (!block.ReadFromDisk(pindexNew))
             return state.Abort(_("ConnectTip() : ReadFromDisk for connect failed"));
 
-        /** YAC_ASSET START */
-        // Initialize sets used from removing asset entries from the mempool
-        ConnectedBlockAssetData assetDataFromBlock;
+        /** YAC_TOKEN START */
+        // Initialize sets used from removing token entries from the mempool
+        ConnectedBlockTokenData tokenDataFromBlock;
 
-        // Create the empty asset cache, that will be sent into the connect block
-        // All new data will be added to the cache, and will be flushed back into passets after a successful
+        // Create the empty token cache, that will be sent into the connect block
+        // All new data will be added to the cache, and will be flushed back into ptokens after a successful
         // Connect Block cycle
-        CAssetsCache assetCache;
-        /** YAC_ASSET END */
+        CTokensCache tokenCache;
+        /** YAC_TOKEN END */
 
         // Apply the block atomically to the chain state.
         CInv inv(MSG_BLOCK, hash);
-        if (!block.ConnectBlock(state, txdb, pindexNew, &assetCache)) {
+        if (!block.ConnectBlock(state, txdb, pindexNew, &tokenCache)) {
             if (state.IsInvalid())
                 InvalidBlockFound(state, txdb, pindexNew);
             return error("ConnectTip() : ConnectBlock %s failed", pindexNew->GetBlockHash().ToString().substr(0,20).c_str());
         }
         mapBlockSource.erase(inv.hash);
 
-        /** YAC_ASSET START */
-        // Get the newly created assets, from the connectblock assetCache so we can remove the correct assets from the mempool
-        assetDataFromBlock = {assetCache.setNewAssetsToAdd};
+        /** YAC_TOKEN START */
+        // Get the newly created tokens, from the connectblock tokenCache so we can remove the correct tokens from the mempool
+        tokenDataFromBlock = {tokenCache.setNewTokensToAdd};
 
         // Remove all tx hashes, that were marked as reissued script from the mapReissuedTx.
-        // Without this check, you wouldn't be able to reissue for those assets again, as this maps block it
+        // Without this check, you wouldn't be able to reissue for those tokens again, as this maps block it
         for (const auto& tx : block.vtx) {
             const uint256& txHash = tx.GetHash();
             if (mapReissuedTx.count(txHash))
             {
-                mapReissuedAssets.erase(mapReissuedTx.at(txHash));
+                mapReissuedTokens.erase(mapReissuedTx.at(txHash));
                 mapReissuedTx.erase(txHash);
             }
         }
 
-        // Flush asset to global asset cache passets
-        bool assetFlushed = assetCache.Flush();
-        assert(assetFlushed);
-        /** YAC_ASSET END */
+        // Flush token to global token cache ptokens
+        bool tokenFlushed = tokenCache.Flush();
+        assert(tokenFlushed);
+        /** YAC_TOKEN END */
 
         // Write the chain state to disk, if necessary.
         if (!WriteChainState(txdb, pindexNew))
             return false;
 
-        // Flush asset data to disk
-        if (!FlushAssetToDisk())
+        // Flush token data to disk
+        if (!FlushTokenToDisk())
             return false;
 
         // Remove conflicting transactions from the mempool.
-        mempool.remove(block.vtx, assetDataFromBlock);
+        mempool.remove(block.vtx, tokenDataFromBlock);
 
         // Connect longer branch, SPECIFIC FOR YACOIN
         if (pindexNew->pprev)

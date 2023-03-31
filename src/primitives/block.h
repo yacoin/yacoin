@@ -7,7 +7,7 @@
 #ifndef YACOIN_PRIMITIVES_BLOCK_H
 #define YACOIN_PRIMITIVES_BLOCK_H
 
-#include "assets/assets.h"
+#include "tokens/tokens.h"
 #include "primitives/transaction.h"
 #include "serialize.h"
 #include "uint256.h"
@@ -41,9 +41,9 @@ extern std::map<uint256, uint256> mapProofOfStake;
 FILE* AppendBlockFile(unsigned int& nFileRet);
 bool IsInitialBlockDownload();
 
-struct ConnectedBlockAssetData
+struct ConnectedBlockTokenData
 {
-    std::set<CAssetCacheNewAsset> newAssetsToAdd;
+    std::set<CTokenCacheNewToken> newTokensToAdd;
 };
 
 /** Nodes collect new transactions into a block, hash them into a hash tree,
@@ -489,10 +489,10 @@ public:
 
     bool DisconnectBlock(CValidationState& state, CTxDB& txdb,
                          CBlockIndex* pindex,
-                         CAssetsCache* assetsCache,
+                         CTokensCache* tokensCache,
                          bool ignoreAddressIndex = false);
     bool ConnectBlock(CValidationState& state, CTxDB& txdb, CBlockIndex* pindex,
-                      CAssetsCache* assetsCache, bool fJustCheck = false,
+                      CTokensCache* tokensCache, bool fJustCheck = false,
                       bool ignoreAddressIndex = false);
     bool ReadFromDisk(const CBlockIndex* pindex, bool fReadTransactions=true, bool fCheckHeader = true);
     bool ReadFromDisk(unsigned int nFile, unsigned int nBlockPos,

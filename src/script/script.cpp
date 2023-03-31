@@ -19,7 +19,7 @@
  #include "main.h"
 #endif
 
-#include "assets/assets.h"
+#include "tokens/tokens.h"
 
 using namespace boost;
 
@@ -112,9 +112,9 @@ const char* GetTxnOutputType(txnouttype t)
     case TX_CLTV_P2PKH: return "CLTV_P2PKH_timelock";
     case TX_CSV_P2PKH: return "CSV_P2PKH_timelock";
     /** RVN START */
-    case TX_NEW_ASSET: return ASSET_NEW_STRING;
-    case TX_TRANSFER_ASSET: return ASSET_TRANSFER_STRING;
-    case TX_REISSUE_ASSET: return ASSET_REISSUE_STRING;
+    case TX_NEW_TOKEN: return TOKEN_NEW_STRING;
+    case TX_TRANSFER_TOKEN: return TOKEN_TRANSFER_STRING;
+    case TX_REISSUE_TOKEN: return TOKEN_REISSUE_STRING;
     /** RVN END */
     }
     return NULL;
@@ -244,7 +244,7 @@ const char* GetOpName(opcodetype opcode)
     case OP_NOP1                   : return "OP_NOP1";
     case OP_CHECKLOCKTIMEVERIFY    : return "OP_CHECKLOCKTIMEVERIFY";
     case OP_CHECKSEQUENCEVERIFY    : return "OP_CHECKSEQUENCEVERIFY";
-    case OP_YAC_ASSET              : return "OP_YAC_ASSET";
+    case OP_YAC_TOKEN              : return "OP_YAC_TOKEN";
     case OP_NOP5                   : return "OP_NOP5";
     case OP_NOP6                   : return "OP_NOP6";
     case OP_NOP7                   : return "OP_NOP7";
@@ -508,7 +508,7 @@ bool EvalScript(
 
                     break;
                 }
-                case OP_YAC_ASSET:
+                case OP_YAC_TOKEN:
                     break;
                 case OP_NOP1: case OP_NOP5:
                 case OP_NOP6: case OP_NOP7: case OP_NOP8: case OP_NOP9: case OP_NOP10:
@@ -1602,17 +1602,17 @@ bool Solver(
         return true;
     }
 
-    /** YAC_ASSET START */
+    /** YAC_TOKEN START */
     int nType = 0;
     bool fIsOwner = false;
-    if (scriptPubKey.IsAssetScript(nType, fIsOwner)) {
-        // It is  OP_DUP OP_HASH160 20 <Hash160_public_key> OP_EQUALVERIFY OP_CHECKSIG OP_YAC_ASSET <asset_data> OP_DROP
+    if (scriptPubKey.IsTokenScript(nType, fIsOwner)) {
+        // It is  OP_DUP OP_HASH160 20 <Hash160_public_key> OP_EQUALVERIFY OP_CHECKSIG OP_YAC_TOKEN <token_data> OP_DROP
         typeRet = (txnouttype)nType;
         std::vector<unsigned char> hashBytes(scriptPubKey.begin()+3, scriptPubKey.begin()+23);
         vSolutionsRet.push_back(hashBytes);
         return true;
     }
-    /** YAC_ASSET END */
+    /** YAC_TOKEN END */
 
     // Scan templates
     const CScript& script1 = scriptPubKey;
@@ -1800,9 +1800,9 @@ bool Solver(
     case TX_CSV_P2SH:
         keyID = CPubKey(vSolutions[0]).GetID();
         return Sign1(keyID, keystore, hash, nHashType, scriptSigRet);
-    case TX_NEW_ASSET:
-    case TX_REISSUE_ASSET:
-    case TX_TRANSFER_ASSET:
+    case TX_NEW_TOKEN:
+    case TX_REISSUE_TOKEN:
+    case TX_TRANSFER_TOKEN:
     case TX_CLTV_P2PKH:
     case TX_CSV_P2PKH:
     case TX_PUBKEYHASH:
@@ -1838,9 +1838,9 @@ int ScriptSigArgsExpected(txnouttype t, const std::vector<std::vector<unsigned c
     case TX_CSV_P2SH:
     case TX_PUBKEY:
         return 1;
-    case TX_NEW_ASSET:
-    case TX_REISSUE_ASSET:
-    case TX_TRANSFER_ASSET:
+    case TX_NEW_TOKEN:
+    case TX_REISSUE_TOKEN:
+    case TX_TRANSFER_TOKEN:
     case TX_CLTV_P2PKH:
     case TX_CSV_P2PKH:
     case TX_PUBKEYHASH:
@@ -2022,19 +2022,19 @@ isminetype IsMine(const CKeyStore &keystore, const CScript& scriptPubKey)
             return MINE_SPENDABLE;
         break;
     }
-    /** YAC_ASSET START */
-    case TX_NEW_ASSET:
-    case TX_TRANSFER_ASSET:
-    case TX_REISSUE_ASSET:
+    /** YAC_TOKEN START */
+    case TX_NEW_TOKEN:
+    case TX_TRANSFER_TOKEN:
+    case TX_REISSUE_TOKEN:
     {
-        if (!AreAssetsDeployed())
+        if (!AreTokensDeployed())
             return MINE_NO;
         keyID = CKeyID(uint160(vSolutions[0]));
         if (keystore.HaveKey(keyID))
             return MINE_SPENDABLE;
         break;
     }
-    /** YAC_ASSET END*/
+    /** YAC_TOKEN END*/
     }
 
     if (keystore.HaveWatchOnly(scriptPubKey))
@@ -2063,12 +2063,12 @@ bool ExtractDestination(const CScript& scriptPubKey, CTxDestination& addressRet)
     {
         addressRet = CScriptID(uint160(vSolutions[0]));
         return true;
-    /** YAC_ASSET START */
-    } else if (whichType == TX_NEW_ASSET || whichType == TX_REISSUE_ASSET || whichType == TX_TRANSFER_ASSET) {
+    /** YAC_TOKEN START */
+    } else if (whichType == TX_NEW_TOKEN || whichType == TX_REISSUE_TOKEN || whichType == TX_TRANSFER_TOKEN) {
         addressRet = CKeyID(uint160(vSolutions[0]));
         return true;
     }
-     /** YAC_ASSET END */
+     /** YAC_TOKEN END */
     // Multisig txns have more than one address...
     return false;
 }
@@ -2461,25 +2461,25 @@ bool CScript::IsPayToScriptHash() const
             this->at(22) == OP_EQUAL);
 }
 
-/** YAC_ASSET START */
-bool CScript::IsAssetScript() const
+/** YAC_TOKEN START */
+bool CScript::IsTokenScript() const
 {
     int nType = 0;
     bool isOwner = false;
     int start = 0;
-    return IsAssetScript(nType, isOwner, start);
+    return IsTokenScript(nType, isOwner, start);
 }
 
-bool CScript::IsAssetScript(int& nType, bool& isOwner) const
+bool CScript::IsTokenScript(int& nType, bool& isOwner) const
 {
     int start = 0;
-    return IsAssetScript(nType, isOwner, start);
+    return IsTokenScript(nType, isOwner, start);
 }
 
-bool CScript::IsAssetScript(int& nType, bool& fIsOwner, int& nStartingIndex) const
+bool CScript::IsTokenScript(int& nType, bool& fIsOwner, int& nStartingIndex) const
 {
     if (this->size() > 31) {
-        if ((*this)[25] == OP_YAC_ASSET) { // OP_YAC_ASSET is always in the 25 index of the script if it exists
+        if ((*this)[25] == OP_YAC_TOKEN) { // OP_YAC_TOKEN is always in the 25 index of the script if it exists
             int index = -1;
             if ((*this)[27] == YAC_Y) { // Check to see if YAC starts at 27 ( this->size() < 105)
                 if ((*this)[28] == YAC_A)
@@ -2493,20 +2493,20 @@ bool CScript::IsAssetScript(int& nType, bool& fIsOwner, int& nStartingIndex) con
             }
 
             if (index > 0) {
-                nStartingIndex = index + 1; // Set the index where the asset data begins. Use to serialize the asset data into asset objects
-                if ((*this)[index] == YAC_T) { // Transfer first anticipating more transfers than other assets operations
-                    nType = TX_TRANSFER_ASSET;
+                nStartingIndex = index + 1; // Set the index where the token data begins. Use to serialize the token data into token objects
+                if ((*this)[index] == YAC_T) { // Transfer first anticipating more transfers than other tokens operations
+                    nType = TX_TRANSFER_TOKEN;
                     return true;
                 } else if ((*this)[index] == YAC_Q && this->size() > 39) {
-                    nType = TX_NEW_ASSET;
+                    nType = TX_NEW_TOKEN;
                     fIsOwner = false;
                     return true;
                 } else if ((*this)[index] == YAC_O) {
-                    nType = TX_NEW_ASSET;
+                    nType = TX_NEW_TOKEN;
                     fIsOwner = true;
                     return true;
                 } else if ((*this)[index] == YAC_R) {
-                    nType = TX_REISSUE_ASSET;
+                    nType = TX_REISSUE_TOKEN;
                     return true;
                 }
             }
@@ -2516,47 +2516,47 @@ bool CScript::IsAssetScript(int& nType, bool& fIsOwner, int& nStartingIndex) con
 }
 
 
-bool CScript::IsNewAsset() const
+bool CScript::IsNewToken() const
 {
 
     int nType = 0;
     bool fIsOwner = false;
-    if (IsAssetScript(nType, fIsOwner))
-        return !fIsOwner && nType == TX_NEW_ASSET;
+    if (IsTokenScript(nType, fIsOwner))
+        return !fIsOwner && nType == TX_NEW_TOKEN;
 
     return false;
 }
 
-bool CScript::IsOwnerAsset() const
+bool CScript::IsOwnerToken() const
 {
     int nType = 0;
     bool fIsOwner = false;
-    if (IsAssetScript(nType, fIsOwner))
-        return fIsOwner && nType == TX_NEW_ASSET;
+    if (IsTokenScript(nType, fIsOwner))
+        return fIsOwner && nType == TX_NEW_TOKEN;
 
     return false;
 }
 
-bool CScript::IsReissueAsset() const
+bool CScript::IsReissueToken() const
 {
     int nType = 0;
     bool fIsOwner = false;
-    if (IsAssetScript(nType, fIsOwner))
-        return nType == TX_REISSUE_ASSET;
+    if (IsTokenScript(nType, fIsOwner))
+        return nType == TX_REISSUE_TOKEN;
 
     return false;
 }
 
-bool CScript::IsTransferAsset() const
+bool CScript::IsTransferToken() const
 {
     int nType = 0;
     bool fIsOwner = false;
-    if (IsAssetScript(nType, fIsOwner))
-        return nType == TX_TRANSFER_ASSET;
+    if (IsTokenScript(nType, fIsOwner))
+        return nType == TX_TRANSFER_TOKEN;
 
     return false;
 }
-/** YAC_ASSET END */
+/** YAC_TOKEN END */
 
 bool CScript::HasCanonicalPushes() const
 {

@@ -61,9 +61,9 @@ yacoind-scrypt-jane.o: scrypt-jane/scrypt-jane.c
 	gcc -c $(xCXXFLAGS_SCRYPT_JANE) -MMD -o $@ $<
 
 libyacoin_common_a_SOURCES= \
-    assets/assettypes.cpp \
-    assets/assetdb.cpp \
-    assets/assets.cpp \
+    tokens/tokentypes.cpp \
+    tokens/tokendb.cpp \
+    tokens/tokens.cpp \
     primitives/transaction.cpp \
     primitives/block.cpp \
     dbwrapper.cpp \
@@ -89,7 +89,7 @@ libyacoin_common_a_SOURCES= \
     bitcoinrpc.cpp \
     price.cpp \
     random_nonce.cpp \
-    rpcassets.cpp \
+    rpctokens.cpp \
     rpcdump.cpp \
     rpcnet.cpp \
     rpcmining.cpp \

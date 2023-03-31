@@ -3,8 +3,8 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-#ifndef YACOIN_NEWASSET_H
-#define YACOIN_NEWASSET_H
+#ifndef YACOIN_NEWTOKEN_H
+#define YACOIN_NEWTOKEN_H
 
 #include <string>
 #include <sstream>
@@ -17,9 +17,9 @@
 #define MAX_UNIT 6
 #define MIN_UNIT 0
 
-class CAssetsCache;
+class CTokensCache;
 
-enum class AssetType
+enum class TokenType
 {
     ROOT = 0,
     SUB = 1,
@@ -30,15 +30,15 @@ enum class AssetType
     INVALID = 6
 };
 
-int IntFromAssetType(AssetType type);
-AssetType AssetTypeFromInt(int nType);
+int IntFromTokenType(TokenType type);
+TokenType TokenTypeFromInt(int nType);
 
 const char IPFS_SHA2_256 = 0x12;
 const char TXID_NOTIFIER = 0x54;
 const char IPFS_SHA2_256_LEN = 0x20;
 
 template <typename Stream, typename Operation>
-bool ReadWriteAssetHash(Stream &s, Operation ser_action, std::string &strIPFSHash, int nType, int nVersion)
+bool ReadWriteTokenHash(Stream &s, Operation ser_action, std::string &strIPFSHash, int nType, int nVersion)
 {
     // assuming 34-byte IPFS SHA2-256 decoded hash (0x12, 0x20, 32 more bytes)
     if (ser_action.ForRead())
@@ -76,7 +76,7 @@ bool ReadWriteAssetHash(Stream &s, Operation ser_action, std::string &strIPFSHas
     return false;
 };
 
-class CNewAsset
+class CNewToken
 {
 public:
     std::string strName; // MAX 31 Bytes
@@ -86,16 +86,16 @@ public:
     int8_t nHasIPFS;     // 1 Byte
     std::string strIPFSHash; // MAX 40 Bytes
 
-    CNewAsset()
+    CNewToken()
     {
         SetNull();
     }
 
-    CNewAsset(const std::string& strName, const CAmount& nAmount, const int& units, const int& nReissuable, const int& nHasIPFS, const std::string& strIPFSHash);
-    CNewAsset(const std::string& strName, const CAmount& nAmount);
+    CNewToken(const std::string& strName, const CAmount& nAmount, const int& units, const int& nReissuable, const int& nHasIPFS, const std::string& strIPFSHash);
+    CNewToken(const std::string& strName, const CAmount& nAmount);
 
-    CNewAsset(const CNewAsset& asset);
-    CNewAsset& operator=(const CNewAsset& asset);
+    CNewToken(const CNewToken& token);
+    CNewToken& operator=(const CNewToken& token);
 
     void SetNull()
     {
@@ -125,33 +125,33 @@ public:
         READWRITE(nReissuable);
         READWRITE(nHasIPFS);
         if (nHasIPFS == 1) {
-            ReadWriteAssetHash(s, ser_action, strIPFSHash, nType, nVersion);
+            ReadWriteTokenHash(s, ser_action, strIPFSHash, nType, nVersion);
         }
     }
 };
 
-class AssetComparator
+class TokenComparator
 {
 public:
-    bool operator()(const CNewAsset& s1, const CNewAsset& s2) const
+    bool operator()(const CNewToken& s1, const CNewToken& s2) const
     {
         return s1.strName < s2.strName;
     }
 };
 
-class CDatabasedAssetData
+class CDatabasedTokenData
 {
 public:
-    CNewAsset asset;
+    CNewToken token;
     int nHeight;
     uint256 blockHash;
 
-    CDatabasedAssetData(const CNewAsset& asset, const int& nHeight, const uint256& blockHash);
-    CDatabasedAssetData();
+    CDatabasedTokenData(const CNewToken& token, const int& nHeight, const uint256& blockHash);
+    CDatabasedTokenData();
 
     void SetNull()
     {
-        asset.SetNull();
+        token.SetNull();
         nHeight = -1;
         blockHash = uint256();
     }
@@ -162,23 +162,23 @@ public:
     inline void SerializationOp(Stream& s, Operation ser_action, int nType, int nVersion)
     {
         unsigned int nSerSize = 0;
-        READWRITE(asset);
+        READWRITE(token);
         READWRITE(nHeight);
         READWRITE(blockHash);
     }
 };
 
-class CAssetTransfer
+class CTokenTransfer
 {
 public:
     std::string strName;
     CAmount nAmount;
 
-    CAssetTransfer()
+    CTokenTransfer()
     {
         SetNull();
     }
-    CAssetTransfer(const std::string& strAssetName, const CAmount& nAmount);
+    CTokenTransfer(const std::string& strTokenName, const CAmount& nAmount);
 
     void SetNull()
     {
@@ -199,7 +199,7 @@ public:
     void ConstructTransaction(CScript& script) const;
 };
 
-class CReissueAsset
+class CReissueToken
 {
 public:
     std::string strName;
@@ -208,7 +208,7 @@ public:
     int8_t nReissuable;
     std::string strIPFSHash;
 
-    CReissueAsset()
+    CReissueToken()
     {
         SetNull();
     }
@@ -232,46 +232,46 @@ public:
         READWRITE(nAmount);
         READWRITE(nUnits);
         READWRITE(nReissuable);
-        ReadWriteAssetHash(s, ser_action, strIPFSHash, nType, nVersion);
+        ReadWriteTokenHash(s, ser_action, strIPFSHash, nType, nVersion);
     }
 
-    CReissueAsset(const std::string& strAssetName, const CAmount& nAmount, const int& nUnits, const int& nReissuable, const std::string& strIPFSHash);
+    CReissueToken(const std::string& strTokenName, const CAmount& nAmount, const int& nUnits, const int& nReissuable, const std::string& strIPFSHash);
     void ConstructTransaction(CScript& script) const;
     bool IsNull() const;
 };
 
 /** THESE ARE ONLY TO BE USED WHEN ADDING THINGS TO THE CACHE DURING CONNECT AND DISCONNECT BLOCK */
-struct CAssetCacheNewAsset
+struct CTokenCacheNewToken
 {
-    CNewAsset asset;
+    CNewToken token;
     std::string address;
     uint256 blockHash;
     int blockHeight;
 
-    CAssetCacheNewAsset(const CNewAsset& asset, const std::string& address, const int& blockHeight, const uint256& blockHash)
+    CTokenCacheNewToken(const CNewToken& token, const std::string& address, const int& blockHeight, const uint256& blockHash)
     {
-        this->asset = asset;
+        this->token = token;
         this->address = address;
         this->blockHash = blockHash;
         this->blockHeight = blockHeight;
     }
 
-    bool operator<(const CAssetCacheNewAsset& rhs) const
+    bool operator<(const CTokenCacheNewToken& rhs) const
     {
-        return asset.strName < rhs.asset.strName;
+        return token.strName < rhs.token.strName;
     }
 };
 
-struct CAssetCacheReissueAsset
+struct CTokenCacheReissueToken
 {
-    CReissueAsset reissue;
+    CReissueToken reissue;
     std::string address;
     COutPoint out;
     uint256 blockHash;
     int blockHeight;
 
 
-    CAssetCacheReissueAsset(const CReissueAsset& reissue, const std::string& address, const COutPoint& out, const int& blockHeight, const uint256& blockHash)
+    CTokenCacheReissueToken(const CReissueToken& reissue, const std::string& address, const COutPoint& out, const int& blockHeight, const uint256& blockHash)
     {
         this->reissue = reissue;
         this->address = address;
@@ -280,73 +280,73 @@ struct CAssetCacheReissueAsset
         this->blockHeight = blockHeight;
     }
 
-    bool operator<(const CAssetCacheReissueAsset& rhs) const
+    bool operator<(const CTokenCacheReissueToken& rhs) const
     {
         return out < rhs.out;
     }
 
 };
 
-struct CAssetCacheNewTransfer
+struct CTokenCacheNewTransfer
 {
-    CAssetTransfer transfer;
+    CTokenTransfer transfer;
     std::string address;
     COutPoint out;
 
-    CAssetCacheNewTransfer(const CAssetTransfer& transfer, const std::string& address, const COutPoint& out)
+    CTokenCacheNewTransfer(const CTokenTransfer& transfer, const std::string& address, const COutPoint& out)
     {
         this->transfer = transfer;
         this->address = address;
         this->out = out;
     }
 
-    bool operator<(const CAssetCacheNewTransfer& rhs ) const
+    bool operator<(const CTokenCacheNewTransfer& rhs ) const
     {
         return out < rhs.out;
     }
 };
 
-struct CAssetCacheNewOwner
+struct CTokenCacheNewOwner
 {
-    std::string assetName;
+    std::string tokenName;
     std::string address;
 
-    CAssetCacheNewOwner(const std::string& assetName, const std::string& address)
+    CTokenCacheNewOwner(const std::string& tokenName, const std::string& address)
     {
-        this->assetName = assetName;
+        this->tokenName = tokenName;
         this->address = address;
     }
 
-    bool operator<(const CAssetCacheNewOwner& rhs) const
+    bool operator<(const CTokenCacheNewOwner& rhs) const
     {
 
-        return assetName < rhs.assetName;
+        return tokenName < rhs.tokenName;
     }
 };
 
-struct CAssetCacheUndoAssetAmount
+struct CTokenCacheUndoTokenAmount
 {
-    std::string assetName;
+    std::string tokenName;
     std::string address;
     CAmount nAmount;
 
-    CAssetCacheUndoAssetAmount(const std::string& assetName, const std::string& address, const CAmount& nAmount)
+    CTokenCacheUndoTokenAmount(const std::string& tokenName, const std::string& address, const CAmount& nAmount)
     {
-        this->assetName = assetName;
+        this->tokenName = tokenName;
         this->address = address;
         this->nAmount = nAmount;
     }
 };
 
-struct CAssetCacheSpendAsset
+struct CTokenCacheSpendToken
 {
-    std::string assetName;
+    std::string tokenName;
     std::string address;
     CAmount nAmount;
 
-    CAssetCacheSpendAsset(const std::string& assetName, const std::string& address, const CAmount& nAmount)
+    CTokenCacheSpendToken(const std::string& tokenName, const std::string& address, const CAmount& nAmount)
     {
-        this->assetName = assetName;
+        this->tokenName = tokenName;
         this->address = address;
         this->nAmount = nAmount;
     }
@@ -470,4 +470,4 @@ private:
     size_t maxSize;
 };
 
-#endif //YACOIN_NEWASSET_H
+#endif //YACOIN_NEWTOKEN_H

@@ -7,17 +7,17 @@ class CCoinControl
 public:
     //! Custom change destination, if not set an address is generated
     CTxDestination destChange;
-    //! If set, all asset change will be sent to this address, if not destChange will be used
-    CTxDestination assetDestChange;
+    //! If set, all token change will be sent to this address, if not destChange will be used
+    CTxDestination tokenDestChange;
     //! If false, allows unselected inputs, but requires all selected inputs be used
     bool fAllowOtherInputs;
     //! Includes watch only addresses which match the ISMINE_WATCH_SOLVABLE criteria
     bool fAllowWatchOnly;
 
-    /** YAC_ASSET START */
-    //! Name of the asset that is selected, used when sending assets with coincontrol
-    std::string strAssetSelected;
-    /** YAC_ASSET END */
+    /** YAC_TOKEN START */
+    //! Name of the token that is selected, used when sending tokens with coincontrol
+    std::string strTokenSelected;
+    /** YAC_TOKEN END */
 
     CCoinControl()
     {
@@ -27,12 +27,12 @@ public:
     void SetNull()
     {
         destChange = CNoDestination();
-        assetDestChange = CNoDestination();
+        tokenDestChange = CNoDestination();
         fAllowOtherInputs = false;
         fAllowWatchOnly = false;
-        strAssetSelected = "";
+        strTokenSelected = "";
         setSelected.clear();
-        setAssetsSelected.clear();
+        setTokensSelected.clear();
     }
 
     bool HasSelected() const
@@ -40,9 +40,9 @@ public:
         return (setSelected.size() > 0);
     }
 
-    bool HasAssetSelected() const
+    bool HasTokenSelected() const
     {
-        return (setAssetsSelected.size() > 0);
+        return (setTokensSelected.size() > 0);
     }
 
     bool IsSelected(const uint256& hash, unsigned int n) const
@@ -51,9 +51,9 @@ public:
         return (setSelected.count(outpt) > 0);
     }
 
-    bool IsAssetSelected(const COutPoint& output) const
+    bool IsTokenSelected(const COutPoint& output) const
     {
-        return (setAssetsSelected.count(output) > 0);
+        return (setTokensSelected.count(output) > 0);
     }
 
     void Select(COutPoint& output)
@@ -61,30 +61,30 @@ public:
         setSelected.insert(output);
     }
 
-    void SelectAsset(const COutPoint& output)
+    void SelectToken(const COutPoint& output)
     {
-        setAssetsSelected.insert(output);
+        setTokensSelected.insert(output);
     }
 
     void UnSelect(const COutPoint& output)
     {
         setSelected.erase(output);
         if (!setSelected.size())
-            strAssetSelected = "";
+            strTokenSelected = "";
     }
 
-    void UnSelectAsset(const COutPoint& output)
+    void UnSelectToken(const COutPoint& output)
     {
-        setAssetsSelected.erase(output);
+        setTokensSelected.erase(output);
         if (!setSelected.size())
-            strAssetSelected = "";
+            strTokenSelected = "";
     }
 
     void UnSelectAll()
     {
         setSelected.clear();
-        strAssetSelected = "";
-        setAssetsSelected.clear();
+        strTokenSelected = "";
+        setTokensSelected.clear();
     }
 
     void ListSelected(std::vector<COutPoint>& vOutpoints) const
@@ -92,14 +92,14 @@ public:
         vOutpoints.assign(setSelected.begin(), setSelected.end());
     }
 
-    void ListSelectedAssets(std::vector<COutPoint>& vOutpoints) const
+    void ListSelectedTokens(std::vector<COutPoint>& vOutpoints) const
     {
-        vOutpoints.assign(setAssetsSelected.begin(), setAssetsSelected.end());
+        vOutpoints.assign(setTokensSelected.begin(), setTokensSelected.end());
     }
 
 private:
     std::set<COutPoint> setSelected;
-    std::set<COutPoint> setAssetsSelected;
+    std::set<COutPoint> setTokensSelected;
 
 };
 

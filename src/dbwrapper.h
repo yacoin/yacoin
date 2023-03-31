@@ -24,7 +24,7 @@ class CDBIterator;
 enum DatabaseType
 {
     BLOCK_INDEX,   // Contains all information about CBlockIndex, CTxIndex, BlockHash, HashBestChain,
-    ASSET_DATA,     // Contains asset-related data
+    TOKEN_DATA,     // Contains token-related data
 	DB_TYPE_MAX
 };
 // Class that provides access to a LevelDB. Note that this class is frequently

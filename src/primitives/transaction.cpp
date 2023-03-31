@@ -4,7 +4,7 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-#include "assets/assets.h"
+#include "tokens/tokens.h"
 #include "primitives/transaction.h"
 #include "txdb.h"
 #include "wallet.h"
@@ -157,7 +157,7 @@ bool CTransaction::IsStandard(std::string& strReason) const
         }
         if (whichType == TX_NULL_DATA)
             nDataOut++;
-        else if (txout.nValue == 0 && !txout.scriptPubKey.IsAssetScript())
+        else if (txout.nValue == 0 && !txout.scriptPubKey.IsTokenScript())
         {
             strReason = "txout-value=0";
             return false;
@@ -289,9 +289,9 @@ bool CTransaction::CheckTransaction(CValidationState &state) const
     ::int64_t
         nValueOut = 0;
 
-    /** YAC_ASSET START */
-    std::set<std::string> setAssetTransferNames;
-    /** YAC_ASSET END */
+    /** YAC_TOKEN START */
+    std::set<std::string> setTokenTransferNames;
+    /** YAC_TOKEN END */
 
     // Check transaction output
     for (unsigned int i = 0; i < vout.size(); ++i)
@@ -310,60 +310,60 @@ bool CTransaction::CheckTransaction(CValidationState &state) const
         if (!MoneyRange(nValueOut))
             return state.DoS(100, error("CTransaction::CheckTransaction() : txout total out of range"));
 
-        /** YAC_ASSET START */
-        bool isAsset = false;
+        /** YAC_TOKEN START */
+        bool isToken = false;
         int nType;
         bool fIsOwner;
-        if (txout.scriptPubKey.IsAssetScript(nType, fIsOwner))
-            isAsset = true;
+        if (txout.scriptPubKey.IsTokenScript(nType, fIsOwner))
+            isToken = true;
 
-        // Check for transfers that don't meet the assets units only if the assetCache is not null
-        if (isAsset) {
+        // Check for transfers that don't meet the tokens units only if the tokenCache is not null
+        if (isToken) {
             // Get the transfer transaction data from the scriptPubKey
-            if (nType == TX_TRANSFER_ASSET) {
-                CAssetTransfer transfer;
+            if (nType == TX_TRANSFER_TOKEN) {
+                CTokenTransfer transfer;
                 std::string address;
-                if (!TransferAssetFromScript(txout.scriptPubKey, transfer, address))
-                    return state.DoS(100, error("bad-txns-transfer-asset-bad-deserialize"));
+                if (!TransferTokenFromScript(txout.scriptPubKey, transfer, address))
+                    return state.DoS(100, error("bad-txns-transfer-token-bad-deserialize"));
 
-                // insert into set, so that later on we can check asset null data transactions
-                setAssetTransferNames.insert(transfer.strName);
+                // insert into set, so that later on we can check token null data transactions
+                setTokenTransferNames.insert(transfer.strName);
 
-                // Check asset name validity and get type
-                AssetType assetType;
-                if (!IsAssetNameValid(transfer.strName, assetType)) {
-                    return state.DoS(100, error("bad-txns-transfer-asset-name-invalid"));
+                // Check token name validity and get type
+                TokenType tokenType;
+                if (!IsTokenNameValid(transfer.strName, tokenType)) {
+                    return state.DoS(100, error("bad-txns-transfer-token-name-invalid"));
                 }
 
-                // If the transfer is an ownership asset. Check to make sure that it is OWNER_ASSET_AMOUNT
-                if (IsAssetNameAnOwner(transfer.strName)) {
-                    if (transfer.nAmount != OWNER_ASSET_AMOUNT)
+                // If the transfer is an ownership token. Check to make sure that it is OWNER_TOKEN_AMOUNT
+                if (IsTokenNameAnOwner(transfer.strName)) {
+                    if (transfer.nAmount != OWNER_TOKEN_AMOUNT)
                         return state.DoS(100, error("bad-txns-transfer-owner-amount-was-not-1"));
                 }
 
-                // If the transfer is a unique asset. Check to make sure that it is UNIQUE_ASSET_AMOUNT
-                if (assetType == AssetType::UNIQUE) {
-                    if (transfer.nAmount != UNIQUE_ASSET_AMOUNT)
+                // If the transfer is a unique token. Check to make sure that it is UNIQUE_TOKEN_AMOUNT
+                if (tokenType == TokenType::UNIQUE) {
+                    if (transfer.nAmount != UNIQUE_TOKEN_AMOUNT)
                         return state.DoS(100, error("bad-txns-transfer-unique-amount-was-not-1"));
                 }
 
                 // Specific check and error message to go with to make sure the amount is 0
                 if (txout.nValue != 0)
-                    return state.DoS(100, error("bad-txns-asset-transfer-amount-isn't-zero"));
-            } else if (nType == TX_NEW_ASSET) {
+                    return state.DoS(100, error("bad-txns-token-transfer-amount-isn't-zero"));
+            } else if (nType == TX_NEW_TOKEN) {
                 // Specific check and error message to go with to make sure the amount is 0
                 if (txout.nValue != 0)
-                    return state.DoS(100, error("bad-txns-asset-issued-amount-isn't-zero"));
-            } else if (nType == TX_REISSUE_ASSET) {
+                    return state.DoS(100, error("bad-txns-token-issued-amount-isn't-zero"));
+            } else if (nType == TX_REISSUE_TOKEN) {
                 // Specific check and error message to go with to make sure the amount is 0
                 if (txout.nValue != 0) {
-                    return state.DoS(0, error("bad-txns-asset-reissued-amount-isn't-zero"));
+                    return state.DoS(0, error("bad-txns-token-reissued-amount-isn't-zero"));
                 }
             } else {
-                return state.DoS(0, error("bad-asset-type-not-any-of-the-main-three"));
+                return state.DoS(0, error("bad-token-type-not-any-of-the-main-three"));
             }
         }
-        /** YAC_ASSET END */
+        /** YAC_TOKEN END */
     }
 
     // Check for duplicate inputs
@@ -382,8 +382,8 @@ bool CTransaction::CheckTransaction(CValidationState &state) const
         if (vin[0].scriptSig.size() < 2 || vin[0].scriptSig.size() > 100)
             return state.DoS(100, error("CTransaction::CheckTransaction() : coinbase script size is invalid"));
         for (auto cbVout : vout) {
-            if (cbVout.scriptPubKey.IsAssetScript()) {
-                return state.DoS(0, error("%s: coinbase contains asset transaction", __func__));
+            if (cbVout.scriptPubKey.IsTokenScript()) {
+                return state.DoS(0, error("%s: coinbase contains token transaction", __func__));
             }
         }
     }
@@ -394,87 +394,87 @@ bool CTransaction::CheckTransaction(CValidationState &state) const
                 return state.DoS(10, error("CTransaction::CheckTransaction() : prevout is null"));
     }
 
-    /* YAC_ASSET START */
-    if (IsNewAsset()) {
-        /** Verify the reissue assets data */
+    /* YAC_TOKEN START */
+    if (IsNewToken()) {
+        /** Verify the reissue tokens data */
         std::string strError = "";
-        if(!VerifyNewAsset(strError))
+        if(!VerifyNewToken(strError))
             return state.DoS(100, error(strError.c_str()));
 
-        CNewAsset asset;
+        CNewToken token;
         std::string strAddress;
-        if (!AssetFromTransaction(*this, asset, strAddress))
-            return state.DoS(100, error("bad-txns-issue-asset-from-transaction"));
+        if (!TokenFromTransaction(*this, token, strAddress))
+            return state.DoS(100, error("bad-txns-issue-token-from-transaction"));
 
-        // Validate the new assets information
-        if (!IsNewOwnerTxValid(*this, asset.strName, strAddress, strError))
+        // Validate the new tokens information
+        if (!IsNewOwnerTxValid(*this, token.strName, strAddress, strError))
             return state.DoS(100, error(strError.c_str()));
 
-        if(!CheckNewAsset(asset, strError))
+        if(!CheckNewToken(token, strError))
             return state.DoS(100, error(strError.c_str()));
 
-    } else if (IsReissueAsset()) {
+    } else if (IsReissueToken()) {
 
-        /** Verify the reissue assets data */
+        /** Verify the reissue tokens data */
         std::string strError;
-        if (!VerifyReissueAsset(strError))
+        if (!VerifyReissueToken(strError))
             return state.DoS(100, error(strError.c_str()));
 
-        CReissueAsset reissue;
+        CReissueToken reissue;
         std::string strAddress;
-        if (!ReissueAssetFromTransaction(*this, reissue, strAddress))
-            return state.DoS(100, error("bad-txns-reissue-asset"));
+        if (!ReissueTokenFromTransaction(*this, reissue, strAddress))
+            return state.DoS(100, error("bad-txns-reissue-token"));
 
-        if (!CheckReissueAsset(reissue, strError))
+        if (!CheckReissueToken(reissue, strError))
             return state.DoS(100, error(strError.c_str()));
 
-        // Get the assetType
-        AssetType type;
-        IsAssetNameValid(reissue.strName, type);
+        // Get the tokenType
+        TokenType type;
+        IsTokenNameValid(reissue.strName, type);
 
-    } else if (IsNewUniqueAsset()) {
+    } else if (IsNewUniqueToken()) {
 
-        /** Verify the unique assets data */
+        /** Verify the unique tokens data */
         std::string strError = "";
-        if (!VerifyNewUniqueAsset(strError)) {
+        if (!VerifyNewUniqueToken(strError)) {
             return state.DoS(100, error(strError.c_str()));
         }
 
 
         for (auto out : vout)
         {
-            if (IsScriptNewUniqueAsset(out.scriptPubKey))
+            if (IsScriptNewUniqueToken(out.scriptPubKey))
             {
-                CNewAsset asset;
+                CNewToken token;
                 std::string strAddress;
-                if (!AssetFromScript(out.scriptPubKey, asset, strAddress))
-                    return state.DoS(100, error("bad-txns-check-transaction-issue-unique-asset-serialization"));
+                if (!TokenFromScript(out.scriptPubKey, token, strAddress))
+                    return state.DoS(100, error("bad-txns-check-transaction-issue-unique-token-serialization"));
 
-                if (!CheckNewAsset(asset, strError))
+                if (!CheckNewToken(token, strError))
                     return state.DoS(100, error(strError.c_str()));
             }
         }
     }
     else {
-        // Fail if transaction contains any non-transfer asset scripts and hasn't conformed to one of the
-        // above transaction types.  Also fail if it contains OP_YAC_ASSET opcode but wasn't a valid script.
+        // Fail if transaction contains any non-transfer token scripts and hasn't conformed to one of the
+        // above transaction types.  Also fail if it contains OP_YAC_TOKEN opcode but wasn't a valid script.
         for (auto out : vout) {
             int nType;
             bool _isOwner;
-            if (out.scriptPubKey.IsAssetScript(nType, _isOwner)) {
-                if (nType != TX_TRANSFER_ASSET) {
-                    return state.DoS(100, error("bad-txns-bad-asset-transaction"));
+            if (out.scriptPubKey.IsTokenScript(nType, _isOwner)) {
+                if (nType != TX_TRANSFER_TOKEN) {
+                    return state.DoS(100, error("bad-txns-bad-token-transaction"));
                 }
             } else {
-                if (out.scriptPubKey.Find(OP_YAC_ASSET)) {
-                    if (out.scriptPubKey[0] != OP_YAC_ASSET) {
-                        return state.DoS(100, error("bad-txns-op-yac-asset-not-in-right-script-location"));
+                if (out.scriptPubKey.Find(OP_YAC_TOKEN)) {
+                    if (out.scriptPubKey[0] != OP_YAC_TOKEN) {
+                        return state.DoS(100, error("bad-txns-op-yac-token-not-in-right-script-location"));
                     }
                 }
             }
         }
     }
-    /* YAC_ASSET END */
+    /* YAC_TOKEN END */
 
     return true;
 }

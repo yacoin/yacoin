@@ -46,7 +46,7 @@ struct ErrorReport {
         LengthToLarge = 3,
         InvalidSubExpressionFormula = 4,
         InvalidSyntax = 5,
-        AssetDoesntExist = 6,
+        TokenDoesntExist = 6,
         FailedToVerifyAgainstAddress = 7,
         EmptySubExpression = 8,
         UnknownOperator = 9,

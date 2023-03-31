@@ -550,14 +550,14 @@ public:
     bool AcceptToMemoryPool(CValidationState &state, CTxDB& txdb, bool fCheckInputs=true, bool* pfMissingInputs=NULL);
     bool GetCoinAge(CTxDB& txdb, ::uint64_t& nCoinAge) const;  // ppcoin: get transaction coin age
 
-    /** YAC_ASSET START */
-    bool IsNewAsset() const;
-    bool VerifyNewAsset(std::string& strError) const;
-    bool IsNewUniqueAsset() const;
-    bool VerifyNewUniqueAsset(std::string& strError) const;
-    bool IsReissueAsset() const;
-    bool VerifyReissueAsset(std::string& strError) const;
-    /** YAC_ASSET END */
+    /** YAC_TOKEN START */
+    bool IsNewToken() const;
+    bool VerifyNewToken(std::string& strError) const;
+    bool IsNewUniqueToken() const;
+    bool VerifyNewUniqueToken(std::string& strError) const;
+    bool IsReissueToken() const;
+    bool VerifyReissueToken(std::string& strError) const;
+    /** YAC_TOKEN END */
 
 protected:
     const CTxOut& GetOutputFor(const CTxIn& input, const MapPrevTx& inputs) const;
