@@ -967,12 +967,7 @@ bool CBlock::ConnectBlock(CValidationState &state, CTxDB& txdb, CBlockIndex* pin
                 for (size_t j = 0; j < tx.vin.size(); j++)
                 {
                     const CTxIn& input = tx.vin[j];
-                    CTransaction txPrev;
-                    uint256 hashBlock = 0;
-                    if (!GetTransaction(input.prevout.COutPointGetHash(), txPrev, hashBlock))
-                    {
-                        return error("ConnectBlock(): can't find previous tx (hash: %s)", input.prevout.COutPointGetHash().GetHex());
-                    }
+                    CTransaction &txPrev = mapInputs[input.prevout.COutPointGetHash()].second;
                     const CTxOut &prevout = txPrev.vout[input.prevout.COutPointGet_n()];
                     uint160 hashBytes;
                     int addressType = 0;
