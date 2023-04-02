@@ -56,7 +56,9 @@ unsigned int nNodeLifespan;
 unsigned int nMinerSleep;
 bool fUseFastIndex;
 bool fStoreBlockHashToDb;
-bool fReindex;
+bool fReindexOnlyHeaderSync;
+bool fReindexBlockIndex;
+bool fReindexToken;
 bool fUseFastStakeMiner;
 bool fUseMemoryLog;
 enum Checkpoints::CPMode CheckpointsMode;
@@ -399,7 +401,7 @@ std::string HelpMessage()
         "  -dns                   " + _("Allow DNS lookups for -addnode, -seednode and -connect") + "\n" +
         "  -maxconnections=<n>    " + _("Maintain at most <n> connections to peers (default: 125)") + "\n" +
         "  -addnode=<ip>          " + _("Add a node to connect to and attempt to keep the connection open") + "\n" +
-        "  -tokenindex            " + _("Keep an index of tokens. Requires a -reindex.") + "\n" +
+        "  -tokenindex            " + _("Keep an index of tokens. Requires a -reindex-token.") + "\n" +
         "  -addressindex          " + _("Maintain a full address index, used to query for the balance, txids and unspent outputs for addresses.") + "\n" +
         "  -connect=<ip>          " + _("Connect only to the specified node(s)") + "\n" +
         "  -seednode=<ip>         " + _("Connect to a node to retrieve peer addresses, and disconnect") + "\n" +
@@ -415,7 +417,9 @@ std::string HelpMessage()
         "  -bantime=<n>           " + _("Number of seconds to keep misbehaving peers from reconnecting (default: 86400)") + "\n" +
         "  -maxreceivebuffer=<n>  " + _("Maximum per-connection receive buffer, <n>*1000 bytes (default: 5000)") + "\n" +
         "  -maxsendbuffer=<n>     " + _("Maximum per-connection send buffer, <n>*1000 bytes (default: 1000)") + "\n" +
-        "  -reindex               " + _("Reindex the old database before the header-sync version") + "\n" +
+        "  -reindex-onlyheadersync          " + _("Upgrade block index to have new field `nstatus`, it just takes a few minutes") + "\n" +
+        "  -reindex-blockindex              " + _("Rebuild block index and transaction index from the blk*.dat files on disk, it takes very long time (around 1 day)") + "\n" +
+        "  -reindex-token                   " + _("Rebuild token index from the blk*.dat files on disk, it just takes a few minutes") + "\n" +
         "  -initSyncDownloadTimeout=<n>     " + _("Headers/block download timeout in seconds (default: 600)") + "\n" +
         "  -initSyncMaximumBlocksInDownloadPerPeer=<n>     " + _("Maximum number of blocks being downloaded at a time from one peer (default: 500)") + "\n" +
         "  -initSyncBlockDownloadWindow=<n>     " + _("Block download windows (default: initSyncMaximumBlocksInDownloadPerPeer * 64)") + "\n" +
@@ -563,7 +567,9 @@ bool AppInit2()
     nNodeLifespan = (unsigned int)(GetArg("-addrlifespan", 7));
     fUseFastIndex = GetBoolArg("-fastindex", true);
     fStoreBlockHashToDb = GetBoolArg("-storeblockhash", true);
-    fReindex = GetBoolArg("-reindex", false);
+    fReindexOnlyHeaderSync = GetBoolArg("-reindex-onlyheadersync", false);
+    fReindexBlockIndex = GetBoolArg("-reindex-blockindex", false);
+    fReindexToken = GetBoolArg("-reindex-token", false);
     fUseMemoryLog = GetBoolArg("-memorylog", true);
     // YAC_TOKEN START
     fTokenIndex = GetBoolArg("-tokenindex", false);

@@ -1528,7 +1528,7 @@ bool CTokensCache::DumpCacheToDatabase()
             // Save the new transfers by updating the quantity in the database
             for (auto newTransfer : setNewTransferTokensToAdd) {
                 auto pair = std::make_pair(newTransfer.transfer.strName, newTransfer.address);
-                // During init and reindex it disconnects and verifies blocks, can create a state where vNewTransfer will contain transfers that have already been spent. So if they aren't in the map, we can skip them.
+                // During init and reindex-token it disconnects and verifies blocks, can create a state where vNewTransfer will contain transfers that have already been spent. So if they aren't in the map, we can skip them.
                 if (mapTokensAddressAmount.count(pair)) {
                     if (!ptokensdb->WriteTokenAddressQuantity(newTransfer.transfer.strName, newTransfer.address,
                                                               mapTokensAddressAmount.at(pair))) {
@@ -1990,8 +1990,8 @@ bool IsScriptTransferToken(const CScript& scriptPubKey, int& nStartingIndex)
 //! Returns a boolean on if the token exists
 bool CTokensCache::CheckIfTokenExists(const std::string& name, bool fForceDuplicateCheck)
 {
-    // If we are reindexing, we don't know if an token exists when accepting blocks
-    if (fReindex) {
+    // If we are reindexing tokens, we don't know if an token exists when accepting blocks
+    if (fReindexToken) {
         return true;
     }
 

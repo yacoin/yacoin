@@ -538,7 +538,7 @@ bool CTxDB::LoadBlockIndex()
         pindexNew->nStatus = diskindex.nStatus;
         pindexNew->blockHash = blockHash;
 
-        if (fReindex)
+        if (fReindexOnlyHeaderSync)
         {
             if ((pindexNew->nHeight == 0) || (pindexNew->nFile != 0 && pindexNew->nBlockPos != 0))
             {
@@ -711,9 +711,9 @@ bool CTxDB::LoadBlockIndex()
                  , CBigNum( bnMaximumTarget ).getuint256().ToString().substr(0,16).c_str()
                 );
 
-    if (fReindex)
+    if (fReindexOnlyHeaderSync)
     {
-        fReindex = false;
+        fReindexOnlyHeaderSync = false;
         CBlockIndex* chainTip = chainActive.Tip();
         while (chainTip != NULL)
         {
@@ -722,18 +722,18 @@ bool CTxDB::LoadBlockIndex()
         }
 
         map<uint256, CBlockIndex *>::iterator it;
-        int numberOfReindexBlock = 0;
+        int numberOfReindexOnlyHeaderSyncBlock = 0;
         for (it = mapBlockIndex.begin(); it != mapBlockIndex.end(); it++)
         {
             CBlockIndex* pindexCurrent = (*it).second;
             WriteBlockIndex(CDiskBlockIndex(pindexCurrent));
             mapHash.insert(make_pair(pindexCurrent->GetSHA256Hash(), (*it).first));
-            numberOfReindexBlock++;
+            numberOfReindexOnlyHeaderSyncBlock++;
         }
-        printf("CTxDB::LoadBlockIndex(), fReindex = 1, "
-               "numberOfReindexBlock = %d\n",
-               fReindex,
-               numberOfReindexBlock);
+        printf("CTxDB::LoadBlockIndex(), fReindexOnlyHeaderSync = 1, "
+               "numberOfReindexOnlyHeaderSyncBlock = %d\n",
+               fReindexOnlyHeaderSync,
+               numberOfReindexOnlyHeaderSyncBlock);
 
     }
     else

@@ -778,7 +778,7 @@ Value listtokens(const Array& params, bool fHelp)
 Value listaddressesbytoken(const Array& params, bool fHelp)
 {
     if (!fTokenIndex) {
-        return "_This rpc call is not functional unless -tokenindex is enabled. To enable, please run the wallet with -tokenindex, this will require a reindex to occur";
+        return "_This rpc call is not functional unless -tokenindex is enabled. To enable, please run the wallet with -tokenindex, this will require a reindex-token to occur";
     }
 
     if (fHelp || !AreTokensDeployed() || params.size() > 4 || params.size() < 1)
@@ -848,7 +848,7 @@ Value listaddressesbytoken(const Array& params, bool fHelp)
 Value listtokenbalancesbyaddress(const Array& params, bool fHelp)
 {
     if (!fTokenIndex) {
-        return "_This rpc call is not functional unless -tokenindex is enabled. To enable, please run the wallet with -tokenindex, this will require a reindex to occur";
+        return "_This rpc call is not functional unless -tokenindex is enabled. To enable, please run the wallet with -tokenindex, this will require a reindex-token to occur";
     }
 
     if (fHelp || !AreTokensDeployed() || params.size() > 4 || params.size() < 1)

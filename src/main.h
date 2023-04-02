@@ -202,7 +202,9 @@ extern ::uint32_t nMinEase; // minimum ease corresponds to highest difficulty
 extern ::int64_t nTransactionFee;
 extern ::int64_t nMinimumInputValue;
 extern bool fUseFastIndex;
-extern bool fReindex;
+extern bool fReindexOnlyHeaderSync;
+extern bool fReindexBlockIndex;
+extern bool fReindexToken;
 extern int nScriptCheckThreads;
 extern int nHashCalcThreads;
 extern const uint256 entropyStore[38];
@@ -1013,7 +1015,7 @@ public:
         READWRITE(nBits);
         READWRITE(nNonce);
         READWRITE(blockHash);
-        if (!fReindex)
+        if (!fReindexOnlyHeaderSync)
         {
             READWRITE(nStatus);
         }
