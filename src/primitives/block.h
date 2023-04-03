@@ -15,6 +15,7 @@
 #include "checkqueue.h"
 
 class CWallet;
+struct CDiskBlockPos;
 
 // block version header
 static const int
@@ -499,7 +500,7 @@ public:
             bool fReadTransactions = true, bool fCheckHeader = true);
     bool ReceivedBlockTransactions(CValidationState &state, unsigned int nFile, unsigned int nBlockPos, CBlockIndex *pindexNew);
     bool CheckBlock(CValidationState& state, bool fCheckPOW=true, bool fCheckMerkleRoot=true, bool fCheckSig=true) const;
-    bool AcceptBlock(CValidationState &state, CBlockIndex **ppindex);
+    bool AcceptBlock(CValidationState &state, CBlockIndex **ppindex, CDiskBlockPos* dbp = NULL);
     bool GetCoinAge(::uint64_t& nCoinAge) const; // ppcoin: calculate total coin age spent in block
     bool SignBlock044(const CKeyStore& keystore);
     bool SignBlock(CWallet& keystore);
@@ -540,6 +541,41 @@ public:
     {
         return vHave.empty();
     }
+};
+
+struct CDiskBlockPos
+{
+    int nFile;
+    unsigned int nPos;
+
+    ADD_SERIALIZE_METHODS;
+
+    template <typename Stream, typename Operation>
+    inline void SerializationOp(Stream& s, Operation ser_action, int nType, int nVersion) {
+        unsigned int nSerSize = 0;
+        READWRITE(nFile);
+        READWRITE(nPos);
+    }
+
+    CDiskBlockPos() {
+        SetNull();
+    }
+
+    CDiskBlockPos(int nFileIn, unsigned int nPosIn) {
+        nFile = nFileIn;
+        nPos = nPosIn;
+    }
+
+    friend bool operator==(const CDiskBlockPos &a, const CDiskBlockPos &b) {
+        return (a.nFile == b.nFile && a.nPos == b.nPos);
+    }
+
+    friend bool operator!=(const CDiskBlockPos &a, const CDiskBlockPos &b) {
+        return !(a == b);
+    }
+
+    void SetNull() { nFile = -1; nPos = 0; }
+    bool IsNull() const { return (nFile == -1); }
 };
 
 #endif // YACOIN_PRIMITIVES_BLOCK_H

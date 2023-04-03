@@ -46,7 +46,7 @@ public:
      * @param[in] dbType      Database type, it is used to decide location in the filesystem where leveldb data will be stored.
      * @param[in] pszMode  	  Read/write mode
      */
-	CDBWrapper(DatabaseType dbType, const char* pszMode="r+");
+	CDBWrapper(DatabaseType dbType, const char* pszMode="r+", bool fWipe=false);
     ~CDBWrapper() {
         // Note that this is not the same as Close() because it deletes only
         // data scoped to this TxDB object.

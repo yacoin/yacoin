@@ -38,8 +38,8 @@ static const char DB_ADDRESSUNSPENTINDEX = 'u';
 
 // CDB subclasses are created and destroyed VERY OFTEN. That's why
 // we shouldn't treat this as a free operations.
-CTxDB::CTxDB(const char *pszMode) :
-		CDBWrapper(BLOCK_INDEX, pszMode) {
+CTxDB::CTxDB(const char *pszMode, bool fWipe) :
+		CDBWrapper(BLOCK_INDEX, pszMode, fWipe) {
 }
 
 bool CTxDB::ReadTxIndex(uint256 hash, CTxIndex &txindex)
@@ -332,6 +332,55 @@ static CBlockIndex *InsertBlockIndex(uint256 hash)
     pindexNew->phashBlock = &((*mi).first);
 
     return pindexNew;
+}
+
+bool CTxDB::BuildMapHash()
+{
+    // The block index is an in-memory structure that maps hashes to on-disk
+    // locations where the contents of the block can be found. Here, we scan it
+    // out of the DB and into mapBlockIndex.
+    leveldb::Iterator
+        *iterator = pdb->NewIterator(leveldb::ReadOptions());
+
+    // Seek to start key.
+    CDataStream ssStartKey(SER_DISK, CLIENT_VERSION);
+    ssStartKey << make_pair(string("blockindex"), uint256(0));
+    iterator->Seek(ssStartKey.str());
+    // Now read each entry.
+    while (iterator->Valid())
+    {
+        // Unpack keys and values.
+        CDataStream ssKey(SER_DISK, CLIENT_VERSION);
+        ssKey.write(iterator->key().data(), iterator->key().size());
+
+        CDataStream ssValue(SER_DISK, CLIENT_VERSION);
+        ssValue.write(iterator->value().data(), iterator->value().size());
+
+        string strType;
+        ssKey >> strType;
+
+        // Did we reach the end of the data to read?
+        if (fRequestShutdown || strType != "blockindex")
+            break;
+
+        CDiskBlockIndex diskindex;
+        ssValue >> diskindex;
+
+        uint256 blockHash = diskindex.GetBlockHash();  // the slow poke!
+        if (0 == blockHash)
+        {
+            if (fPrintToConsole)
+                (void)printf(
+                    "Error? at nHeight=%d"
+                    "\n"
+                    "",
+                    diskindex.nHeight);
+            continue; //?
+        }
+        mapHash.insert(make_pair( diskindex.GetSHA256Hash(), blockHash));
+        iterator->Next();
+    }
+    delete iterator;
 }
 
 bool CTxDB::LoadBlockIndex()
@@ -670,6 +719,13 @@ bool CTxDB::LoadBlockIndex()
     }
     delete iterator;
 
+    printf("CTxDB::LoadBlockIndex(), fStoreBlockHashToDb = %d, "
+           "newStoredBlock = %d, "
+           "alreadyStoredBlock = %d\n",
+           fStoreBlockHashToDb,
+           newStoredBlock,
+           alreadyStoredBlock);
+
     // Load hashBestChain pointer to end of best chain
     if (!ReadHashBestChain(hashBestChain))
     {
@@ -734,7 +790,6 @@ bool CTxDB::LoadBlockIndex()
                "numberOfReindexOnlyHeaderSyncBlock = %d\n",
                fReindexOnlyHeaderSync,
                numberOfReindexOnlyHeaderSyncBlock);
-
     }
     else
     {
@@ -746,12 +801,6 @@ bool CTxDB::LoadBlockIndex()
         }
     }
 
-    printf("CTxDB::LoadBlockIndex(), fStoreBlockHashToDb = %d, "
-           "newStoredBlock = %d, "
-           "alreadyStoredBlock = %d\n",
-           fStoreBlockHashToDb,
-           newStoredBlock,
-           alreadyStoredBlock);
     // Calculate current block reward
     map<uint256, CBlockIndex *>::iterator mi = mapBlockIndex.find(bestEpochIntervalHash);
     if (mi != mapBlockIndex.end())

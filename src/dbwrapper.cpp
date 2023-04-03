@@ -59,25 +59,16 @@ void init_blockindex(DatabaseType dbType, leveldb::Options &options, bool fRemov
 
     if (fRemoveOld)
     {
-        filesystem::remove_all(directory); // remove directory
-        unsigned int nFile = 1;
-
-        while (true)
-        {
-            filesystem::path strBlockFile = GetDataDir() / strprintf("blk%04u.dat", nFile);
-
-            // Break if no such file
-            if (!filesystem::exists(strBlockFile))
-                break;
-
-            filesystem::remove(strBlockFile);
-
-            nFile++;
+        printf("REMOVE LevelDB in %s\n", directory.string().c_str());
+        system::error_code ec;
+        filesystem::remove_all(directory, ec); // remove directory
+        if (ec) {
+            printf("FAILED to remove LevelDB in %s (%s)\n", directory.string().c_str(), ec.message().c_str());
         }
     }
 
     filesystem::create_directory(directory);
-    printf("Opening LevelDB in %s\n", directory.string().c_str());
+    printf("OPENING LevelDB in %s\n", directory.string().c_str());
     leveldb::Status status = leveldb::DB::Open(options, directory.string(), &txdb[dbType]);
     if (!status.ok())
     {
@@ -87,7 +78,7 @@ void init_blockindex(DatabaseType dbType, leveldb::Options &options, bool fRemov
 
 // CDB subclasses are created and destroyed VERY OFTEN. That's why
 // we shouldn't treat this as a free operations.
-CDBWrapper::CDBWrapper(DatabaseType dbType, const char *pszMode)
+CDBWrapper::CDBWrapper(DatabaseType dbType, const char *pszMode, bool fWipe)
 {
     Yassert(pszMode);
     activeBatch = NULL;
@@ -106,7 +97,7 @@ CDBWrapper::CDBWrapper(DatabaseType dbType, const char *pszMode)
     options.create_if_missing = fCreate;
     options.filter_policy = leveldb::NewBloomFilterPolicy(10);
 
-    init_blockindex(dbType, options); // Init directory
+    init_blockindex(dbType, options, fWipe); // Init directory
     pdb = txdb[mDbType];
 
     if (Exists(string("version")))

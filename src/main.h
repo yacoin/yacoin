@@ -40,6 +40,7 @@
 #include "amount.h"
 #include <list>
 #include <map>
+#include <boost/filesystem.hpp>
 
 class CWallet;
 class CBlock;
@@ -95,6 +96,8 @@ bool GetAddressUnspent(uint160 addressHash, int type, std::string tokenName,
                        std::vector<std::pair<CAddressUnspentKey, CAddressUnspentValue> > &unspentOutputs);
 bool GetAddressUnspent(uint160 addressHash, int type,
                        std::vector<std::pair<CAddressUnspentKey, CAddressUnspentValue> > &unspentOutputs);
+/** Translation to a filesystem path */
+boost::filesystem::path GetBlockPosFilename(const CDiskBlockPos &pos, const char *prefix);
 //
 // END OF FUNCTIONS USED FOR TOKEN MANAGEMENT SYSTEM
 //
@@ -332,7 +335,7 @@ void SyncWithWallets(const CTransaction& tx, const CBlock* pblock = NULL, bool f
 void RegisterNodeSignals(CNodeSignals& nodeSignals);
 /** Unregister a network node */
 void UnregisterNodeSignals(CNodeSignals& nodeSignals);
-bool ProcessBlock(CValidationState &state, CNode* pfrom, CBlock* pblock);
+bool ProcessBlock(CValidationState &state, CNode* pfrom, CBlock* pblock, CDiskBlockPos *dbp = NULL);
 bool CheckDiskSpace(::uint64_t nAdditionalBytes=0);
 
 void UnloadBlockIndex();
@@ -341,7 +344,8 @@ void PrintBlockTree();
 CBlockIndex* FindBlockByHeight(int nHeight);
 bool ProcessMessages(CNode* pfrom);
 bool SendMessages(CNode* pto, bool fSendTrickle);
-bool LoadExternalBlockFile(FILE* fileIn);
+/** Import blocks from an external file */
+bool LoadExternalBlockFile(FILE* fileIn, CDiskBlockPos *dbp = NULL);
 
 // Run an instance of the script checking thread
 void ThreadScriptCheck(void* parg);
@@ -1037,6 +1041,13 @@ public:
         const_cast<CDiskBlockIndex*>(this)->blockHash = block.GetHash();
 
         return blockHash;
+    }
+
+    uint256 GetSHA256Hash() const
+    {
+        CBlockHeader blockHeader = GetBlockHeader();
+        blockHeader.hashPrevBlock = hashPrev;
+        return blockHeader.GetSHA256Hash();
     }
 
     std::string ToString() const

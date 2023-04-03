@@ -1423,42 +1423,42 @@ public:
     }
 };
 
-/** Wrapper around a FILE* that implements a ring buffer to
- *  deserialize from. It guarantees the ability to rewind
- *  a given number of bytes. */
+/** Non-refcounted RAII wrapper around a FILE* that implements a ring buffer to
+ *  deserialize from. It guarantees the ability to rewind a given number of bytes.
+ *
+ *  Will automatically close the file when it goes out of scope if not null.
+ *  If you need to close the file early, use file.fclose() instead of fclose(file).
+ */
 class CBufferedFile
 {
 private:
-    FILE *src;          // source file
-    ::uint64_t nSrcPos;     // how many bytes have been read from source
-    ::uint64_t nReadPos;    // how many bytes have been read from this
-    ::uint64_t nReadLimit;  // up to which position we're allowed to read
-    ::uint64_t nRewind;     // how many bytes we guarantee to rewind
+    // Disallow copies
+    CBufferedFile(const CBufferedFile&);
+    CBufferedFile& operator=(const CBufferedFile&);
+
+    int nType;
+    int nVersion;
+
+    FILE *src;            // source file
+    uint64_t nSrcPos;     // how many bytes have been read from source
+    uint64_t nReadPos;    // how many bytes have been read from this
+    uint64_t nReadLimit;  // up to which position we're allowed to read
+    uint64_t nRewind;     // how many bytes we guarantee to rewind
     std::vector<char> vchBuf; // the buffer
 
-    short state;
-    short exceptmask;
-
 protected:
-    void setstate(short bits, const char *psz) {
-        state |= bits;
-        if (state & exceptmask)
-            throw std::ios_base::failure(psz);
-    }
-
     // read data from the source to fill the buffer
     bool Fill() {
-        unsigned int pos = (unsigned int)(nSrcPos % vchBuf.size());
-        unsigned int readNow = (unsigned int)(vchBuf.size() - pos);
-        unsigned int nAvail = (unsigned int)(vchBuf.size() - (nSrcPos - nReadPos) - nRewind);
+        unsigned int pos = nSrcPos % vchBuf.size();
+        unsigned int readNow = vchBuf.size() - pos;
+        unsigned int nAvail = vchBuf.size() - (nSrcPos - nReadPos) - nRewind;
         if (nAvail < readNow)
             readNow = nAvail;
         if (readNow == 0)
             return false;
         size_t read = fread((void*)&vchBuf[pos], 1, readNow, src);
         if (read == 0) {
-            setstate(std::ios_base::failbit, feof(src) ? "CBufferedFile::Fill : end of file" : "CBufferedFile::Fill : fread failed");
-            return false;
+            throw std::ios_base::failure(feof(src) ? "CBufferedFile::Fill : end of file" : "CBufferedFile::Fill : fread failed");
         } else {
             nSrcPos += read;
             return true;
@@ -1466,17 +1466,25 @@ protected:
     }
 
 public:
-    int nType;
-    int nVersion;
-
-    CBufferedFile(FILE *fileIn, ::uint64_t nBufSize, ::uint64_t nRewindIn, int nTypeIn, int nVersionIn) :
-        src(fileIn), nSrcPos(0), nReadPos(0), nReadLimit((::uint64_t)(-1)), nRewind(nRewindIn), vchBuf(nBufSize, 0),
-        state(0), exceptmask(std::ios_base::badbit | std::ios_base::failbit), nType(nTypeIn), nVersion(nVersionIn) {
+    CBufferedFile(FILE *fileIn, uint64_t nBufSize, uint64_t nRewindIn, int nTypeIn, int nVersionIn) :
+        nSrcPos(0), nReadPos(0), nReadLimit((uint64_t)(-1)), nRewind(nRewindIn), vchBuf(nBufSize, 0)
+    {
+        src = fileIn;
+        nType = nTypeIn;
+        nVersion = nVersionIn;
     }
 
-    // check whether no error occurred
-    bool good() const {
-        return state == 0;
+    ~CBufferedFile()
+    {
+        fclose();
+    }
+
+    void fclose()
+    {
+        if (src) {
+            ::fclose(src);
+            src = NULL;
+        }
     }
 
     // check whether we're at the end of the source file
@@ -1493,7 +1501,7 @@ public:
         while (nSize > 0) {
             if (nReadPos == nSrcPos)
                 Fill();
-            unsigned int pos = (unsigned int)(nReadPos % vchBuf.size());
+            unsigned int pos = nReadPos % vchBuf.size();
             size_t nNow = nSize;
             if (nNow + pos > vchBuf.size())
                 nNow = vchBuf.size() - pos;
@@ -1508,12 +1516,12 @@ public:
     }
 
     // return the current reading position
-    ::uint64_t GetPos() {
+    uint64_t GetPos() {
         return nReadPos;
     }
 
     // rewind to a given reading position
-    bool SetPos(::uint64_t nPos) {
+    bool SetPos(uint64_t nPos) {
         nReadPos = nPos;
         if (nReadPos + nRewind < nSrcPos) {
             nReadPos = nSrcPos - nRewind;
@@ -1526,22 +1534,21 @@ public:
         }
     }
 
-    bool Seek(::uint64_t nPos) {
-        long nLongPos = (long)nPos;
-        if (nPos != (::uint64_t)nLongPos)
+    bool Seek(uint64_t nPos) {
+        long nLongPos = nPos;
+        if (nPos != (uint64_t)nLongPos)
             return false;
         if (fseek(src, nLongPos, SEEK_SET))
             return false;
         nLongPos = ftell(src);
         nSrcPos = nLongPos;
         nReadPos = nLongPos;
-        state = 0;
         return true;
     }
 
     // prevent reading beyond a certain position
     // no argument removes the limit
-    bool SetLimit(::uint64_t nPos = (::uint64_t)(-1)) {
+    bool SetLimit(uint64_t nPos = (uint64_t)(-1)) {
         if (nPos < nReadPos)
             return false;
         nReadLimit = nPos;

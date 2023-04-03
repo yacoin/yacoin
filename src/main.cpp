@@ -484,6 +484,10 @@ bool GetAddressUnspent(uint160 addressHash, int type,
 
     return true;
 }
+boost::filesystem::path GetBlockPosFilename(const CDiskBlockPos &pos, const char *prefix)
+{
+    return GetDataDir() / strprintf("%s%04u.dat", prefix, pos.nFile);
+}
 //
 // END OF FUNCTIONS USED FOR TOKEN MANAGEMENT SYSTEM
 //
@@ -691,7 +695,7 @@ int64_t BLOCK_DOWNLOAD_TIMEOUT_BASE = HEADERS_DOWNLOAD_TIMEOUT_BASE; // 10 minut
 std::string FormatStateMessage(const CValidationState &state)
 {
     return strprintf("%s (code %i)",
-        state.GetRejectReason(),
+        state.GetRejectReason().c_str(),
         state.GetRejectCode());
 }
 
@@ -2864,7 +2868,7 @@ bool static DisconnectTip(CValidationState &state, CTxDB& txdb) {
         assert(tokensFlushed);
     }
 
-    printf("DisconnectTip, disconnect block (height: %d, hash: %s)\n", pindexDelete->nHeight, block.GetHash().GetHex());
+    printf("DisconnectTip, disconnect block (height: %d, hash: %s)\n", pindexDelete->nHeight, block.GetHash().GetHex().c_str());
     // Ressurect mempool transactions from the disconnected block.
     BOOST_FOREACH(CTransaction &tx, block.vtx) {
         // ignore validation errors in resurrected transactions
@@ -3333,7 +3337,7 @@ void CBlockIndex::BuildSkip()
         pskip = pprev->GetAncestor(GetSkipHeight(nHeight));
 }
 
-bool ProcessBlock(CValidationState &state, CNode* pfrom, CBlock* pblock)
+bool ProcessBlock(CValidationState &state, CNode* pfrom, CBlock* pblock, CDiskBlockPos *dbp)
 {
     // Preliminary checks
     bool checked = pblock->CheckBlock(state, true, true, (pblock->nTime > Checkpoints::GetLastCheckpointTime()));
@@ -3366,7 +3370,7 @@ bool ProcessBlock(CValidationState &state, CNode* pfrom, CBlock* pblock)
 
         // Store to disk
         CBlockIndex *pindex = NULL;
-        bool ret = pblock->AcceptBlock(state, &pindex);
+        bool ret = pblock->AcceptBlock(state, &pindex, dbp);
         if (pindex && pfrom) {
             mapBlockSource[pindex->GetBlockHash()] = pfrom->GetId();
         }
@@ -3772,82 +3776,199 @@ void PrintBlockTree()
     }
 }
 
-bool LoadExternalBlockFile(FILE* fileIn)
+//bool LoadExternalBlockFile(FILE* fileIn)
+//{
+//    ::int64_t nStart = GetTimeMillis();
+//
+//    int nLoaded = 0;
+//    {
+//        LOCK(cs_main);
+//        try
+//        {
+//            CAutoFile blkdat(fileIn, SER_DISK, CLIENT_VERSION);
+//            unsigned int nPos = 0;
+//            while (
+//                  //(nPos != (unsigned int)-1) &&
+//                    (nPos != UINT_MAX) &&
+//                    blkdat.good() &&
+//                    !fRequestShutdown
+//                  )
+//            {
+//              //unsigned char pchData[65536];   // is there anything special about this #??
+//                unsigned char pchData[ (int)1 << 16 ];
+//                do
+//                {
+//                    (void)fseek(blkdat, nPos, SEEK_SET);    // who cares if it fails!  What silly code!!
+//                    int
+//                        nRead = fread(pchData, 1, sizeof(pchData), blkdat);
+//                    if (nRead <= 8)
+//                    {
+//                        nPos = UINT_MAX;
+//                        break;
+//                    }
+//                    void
+//                        * nFind = memchr(
+//                                         pchData,
+//                                         pchMessageStart[ 0 ],
+//                                         nRead + 1 - sizeof( pchMessageStart )
+//                                        );
+//                    if (nFind)
+//                    {
+//                        if (memcmp(nFind, pchMessageStart, sizeof(pchMessageStart))==0)
+//                        {
+//                            nPos += ((unsigned char*)nFind - pchData) + sizeof(pchMessageStart);
+//                            break;
+//                        }
+//                        nPos += ((unsigned char*)nFind - pchData) + 1;
+//                    }
+//                    else
+//                        nPos += sizeof(pchData) - sizeof(pchMessageStart) + 1;
+//                }
+//                while(!fRequestShutdown);
+//                if (nPos == UINT_MAX)
+//                    break;
+//                (void)fseek(blkdat, nPos, SEEK_SET);  // again, what seek error!
+//                unsigned int nSize;
+//                blkdat >> nSize;
+//                if (
+//                    (nSize > 0) && (nSize <= GetMaxSize(MAX_BLOCK_SIZE))
+//                   )
+//                {
+//                    CBlock block;
+//                    blkdat >> block;
+//                    CValidationState state;
+//                    if (ProcessBlock(state, NULL,&block))
+//                    {
+//                        nLoaded++;
+//                        nPos += 4 + nSize;
+//                    }
+//                }
+//            }
+//        }
+//        catch (std::exception &e)
+//        {
+//            printf("%s() : Deserialize or I/O error caught during load\n",
+//                   BOOST_CURRENT_FUNCTION);
+//        }
+//    }
+//    printf("Loaded %i blocks from external file in %" PRId64 "ms\n", nLoaded, GetTimeMillis() - nStart);
+//    return nLoaded > 0;
+//}
+
+bool LoadExternalBlockFile(FILE* fileIn, CDiskBlockPos *dbp)
 {
-    ::int64_t nStart = GetTimeMillis();
+    // Map of disk positions for blocks with unknown parent (only used for reindex)
+    static std::multimap<uint256, CDiskBlockPos> mapBlocksUnknownParent;
+    int64_t nStart = GetTimeMillis();
 
     int nLoaded = 0;
-    {
-        LOCK(cs_main);
-        try 
-        {
-            CAutoFile blkdat(fileIn, SER_DISK, CLIENT_VERSION);
-            unsigned int nPos = 0;
-            while (
-                  //(nPos != (unsigned int)-1) && 
-                    (nPos != UINT_MAX) && 
-                    blkdat.good() && 
-                    !fRequestShutdown
-                  )
-            {
-              //unsigned char pchData[65536];   // is there anything special about this #??
-                unsigned char pchData[ (int)1 << 16 ];   
-                do 
-                {
-                    (void)fseek(blkdat, nPos, SEEK_SET);    // who cares if it fails!  What silly code!!
-                    int 
-                        nRead = fread(pchData, 1, sizeof(pchData), blkdat);
-                    if (nRead <= 8)
-                    {
-                        nPos = UINT_MAX;
-                        break;
-                    }
-                    void
-                        * nFind = memchr(
-                                         pchData, 
-                                         pchMessageStart[ 0 ], 
-                                         nRead + 1 - sizeof( pchMessageStart )
-                                        );
-                    if (nFind)
-                    {
-                        if (memcmp(nFind, pchMessageStart, sizeof(pchMessageStart))==0)
-                        {
-                            nPos += ((unsigned char*)nFind - pchData) + sizeof(pchMessageStart);
-                            break;
-                        }
-                        nPos += ((unsigned char*)nFind - pchData) + 1;
-                    }
-                    else
-                        nPos += sizeof(pchData) - sizeof(pchMessageStart) + 1;
-                } 
-                while(!fRequestShutdown);
-                if (nPos == UINT_MAX)
-                    break;
-                (void)fseek(blkdat, nPos, SEEK_SET);  // again, what seek error!
-                unsigned int nSize;
+    try {
+        // This takes over fileIn and calls fclose() on it in the CBufferedFile destructor
+        CBufferedFile blkdat(fileIn, 2*GetMaxSize(MAX_BLOCK_SIZE), GetMaxSize(MAX_BLOCK_SIZE)+8, SER_DISK, CLIENT_VERSION);
+        uint64_t nRewind = blkdat.GetPos();
+        while (!blkdat.eof()) {
+            blkdat.SetPos(nRewind);
+            nRewind++; // start one byte further next time, in case of failure
+            blkdat.SetLimit(); // remove former limit
+            unsigned int nSize = 0;
+            try {
+                // locate a header
+                unsigned char buf[CMessageHeader::MESSAGE_START_SIZE];
+                blkdat.FindByte(pchMessageStart[0]);
+                nRewind = blkdat.GetPos()+1;
+                blkdat >> FLATDATA(buf);
+                if (memcmp(buf, pchMessageStart, CMessageHeader::MESSAGE_START_SIZE))
+                    continue;
+                // read size
                 blkdat >> nSize;
-                if (
-                    (nSize > 0) && (nSize <= GetMaxSize(MAX_BLOCK_SIZE))
-                   )
+                if (nSize < 80 || nSize > GetMaxSize(MAX_BLOCK_SIZE))
                 {
-                    CBlock block;
-                    blkdat >> block;
+                    continue;
+                }
+            } catch (const std::exception &) {
+                // no valid block header found; don't complain
+                break;
+            }
+            try {
+                // read block
+                uint64_t nBlockPos = blkdat.GetPos();
+                if (dbp)
+                    dbp->nPos = nBlockPos;
+                blkdat.SetLimit(nBlockPos + nSize);
+                blkdat.SetPos(nBlockPos);
+                CBlock block;
+                blkdat >> block;
+                nRewind = blkdat.GetPos();
+
+                // SHA256 doesn't cost much cpu usage to calculate
+                uint256 hash;
+                uint256 sha256HashBlock = block.GetSHA256Hash();
+                map<uint256, uint256>::iterator mi = mapHash.find(sha256HashBlock);
+                if (mi != mapHash.end())
+                {
+                    hash = (*mi).second;
+                    block.blockHash = hash;
+                }
+                else
+                {
+                    hash = block.GetHash();
+                    mapHash.insert(make_pair(sha256HashBlock, hash));
+                }
+
+                // detect out of order blocks, and store them for later
+                if (hash != (!fTestNet ? hashGenesisBlock : hashGenesisBlockTestNet) && mapBlockIndex.find(block.hashPrevBlock) == mapBlockIndex.end()) {
+                    printf("reindex", "%s: Out of order block %s, parent %s not known\n", __func__, hash.ToString().c_str(),
+                            block.hashPrevBlock.ToString().c_str());
+                    if (dbp)
+                        mapBlocksUnknownParent.insert(std::make_pair(block.hashPrevBlock, *dbp));
+                    continue;
+                }
+
+                // process in case the block isn't known yet
+                if (mapBlockIndex.count(hash) == 0 || (mapBlockIndex[hash]->nStatus & BLOCK_HAVE_DATA) == 0) {
                     CValidationState state;
-                    if (ProcessBlock(state, NULL,&block))
-                    {
+                    if (ProcessBlock(state, NULL, &block, dbp))
                         nLoaded++;
-                        nPos += 4 + nSize;
+                    if (state.IsError())
+                        break;
+                } else if (hash != (!fTestNet ? hashGenesisBlock : hashGenesisBlockTestNet) && mapBlockIndex[hash]->nHeight % 1000 == 0) {
+                    printf("Block Import: already had block %s at height %d\n", hash.ToString().c_str(), mapBlockIndex[hash]->nHeight);
+                }
+
+                // Recursively process earlier encountered successors of this block
+                deque<uint256> queue;
+                queue.push_back(hash);
+                while (!queue.empty()) {
+                    uint256 head = queue.front();
+                    queue.pop_front();
+                    std::pair<std::multimap<uint256, CDiskBlockPos>::iterator, std::multimap<uint256, CDiskBlockPos>::iterator> range = mapBlocksUnknownParent.equal_range(head);
+                    while (range.first != range.second) {
+                        std::multimap<uint256, CDiskBlockPos>::iterator it = range.first;
+                        CBlock block;
+                        if (block.ReadFromDisk(it->second.nFile, it->second.nPos))
+                        {
+                            printf("%s: Processing out of order child %s of %s\n", __func__, block.GetHash().ToString().c_str(),
+                                    head.ToString().c_str());
+                            CValidationState dummy;
+                            if (ProcessBlock(dummy, NULL, &block, &it->second))
+                            {
+                                nLoaded++;
+                                queue.push_back(block.GetHash());
+                            }
+                        }
+                        range.first++;
+                        mapBlocksUnknownParent.erase(it);
                     }
                 }
+            } catch (std::exception &e) {
+                printf("%s : Deserialize or I/O error - %s", __func__, e.what());
             }
         }
-        catch (std::exception &e) 
-        {
-            printf("%s() : Deserialize or I/O error caught during load\n",
-                   BOOST_CURRENT_FUNCTION);
-        }
+    } catch(std::runtime_error &e) {
+        AbortNode(std::string("System error: ") + e.what());
     }
-    printf("Loaded %i blocks from external file in %" PRId64 "ms\n", nLoaded, GetTimeMillis() - nStart);
+    if (nLoaded > 0)
+        printf("Loaded %i blocks from external file in %dms\n", nLoaded, GetTimeMillis() - nStart);
     return nLoaded > 0;
 }
 

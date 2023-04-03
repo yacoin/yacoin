@@ -24,8 +24,8 @@ static const char MEMPOOL_REISSUED_TX = 'Z';
 
 static size_t MAX_DATABASE_RESULTS = 50000;
 
-CTokensDB::CTokensDB(const char *pszMode) :
-        CDBWrapper(TOKEN_DATA, pszMode) {
+CTokensDB::CTokensDB(const char *pszMode, bool fWipe) :
+        CDBWrapper(TOKEN_DATA, pszMode, fWipe) {
 }
 
 bool CTokensDB::WriteTokenData(const CNewToken &token, const int nHeight, const uint256& blockHash)

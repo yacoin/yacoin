@@ -18,7 +18,7 @@
 class CTxDB: public CDBWrapper
 {
 public:
-    CTxDB(const char* pszMode="r+");
+    CTxDB(const char* pszMode="r+", bool fWipe=false);
     ~CTxDB() {}
 
     bool ReadTxIndex(uint256 hash, CTxIndex& txindex);
@@ -57,6 +57,7 @@ public:
     bool ReadModifierUpgradeTime(unsigned int& nUpgradeTime);
     bool WriteModifierUpgradeTime(const unsigned int& nUpgradeTime);
     bool LoadBlockIndex();
+    bool BuildMapHash();
 };
 
 #endif

@@ -360,7 +360,7 @@ bool CBlock::CheckBlock(CValidationState &state, bool fCheckPOW, bool fCheckMerk
     return true;
 }
 
-bool CBlock::AcceptBlock(CValidationState &state, CBlockIndex **ppindex)
+bool CBlock::AcceptBlock(CValidationState &state, CBlockIndex **ppindex, CDiskBlockPos* dbp)
 {
     // // Check for duplicate
     // uint256 hash = GetHash();
@@ -453,8 +453,14 @@ bool CBlock::AcceptBlock(CValidationState &state, CBlockIndex **ppindex)
 
     unsigned int nFile = -1;
     unsigned int nBlockPos = 0;
-    if (!WriteToDisk(nFile, nBlockPos))
+    // Only write block to disk if we aren't in reindex phase
+    if (dbp == NULL && !WriteToDisk(nFile, nBlockPos))
         return state.Abort("AcceptBlock () : WriteToDisk failed");
+    if (dbp != NULL)
+    {
+        nFile = dbp->nFile;
+        nBlockPos = dbp->nPos;
+    }
     if (!ReceivedBlockTransactions(state, nFile, nBlockPos, pindex))
         return error("AcceptBlock () : ReceivedBlockTransactions failed");
 

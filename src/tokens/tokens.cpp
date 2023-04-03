@@ -1990,11 +1990,6 @@ bool IsScriptTransferToken(const CScript& scriptPubKey, int& nStartingIndex)
 //! Returns a boolean on if the token exists
 bool CTokensCache::CheckIfTokenExists(const std::string& name, bool fForceDuplicateCheck)
 {
-    // If we are reindexing tokens, we don't know if an token exists when accepting blocks
-    if (fReindexToken) {
-        return true;
-    }
-
     // Create objects that will be used to check the dirty cache
     CNewToken token;
     token.strName = name;

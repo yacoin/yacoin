@@ -41,7 +41,7 @@ struct CBlockTokenUndo
 class CTokensDB : public CDBWrapper
 {
 public:
-    explicit CTokensDB(const char* pszMode="r+");
+    explicit CTokensDB(const char* pszMode="r+", bool fWipe=false);
 
     CTokensDB(const CTokensDB&) = delete;
     CTokensDB& operator=(const CTokensDB&) = delete;
