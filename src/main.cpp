@@ -4970,6 +4970,12 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
         MeasureTime processBlock;
         CValidationState state;
         ProcessBlock(state, pfrom, &block);
+        int nDoS = 0;
+        if (state.IsInvalid(nDoS))
+        {
+            if (nDoS > 0)
+                Misbehaving(pfrom->GetId(), nDoS);
+        }
         processBlock.mEnd.stamp();
 
         printf("Process block message, total time for ProcessBlock = %lu us\n",
