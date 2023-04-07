@@ -925,7 +925,9 @@ bool CBlock::ConnectBlock(CValidationState &state, CTxDB& txdb, CBlockIndex* pin
             if (!AreTokensDeployed()) {
                 for (auto out : tx.vout)
                     if (out.scriptPubKey.IsTokenScript())
-                        return state.DoS(100, error("%s : Received Block with tx that contained an token when tokens wasn't active", __func__));
+                    {
+                        printf("WARNING: Received Block with tx that contained an token when tokens wasn't active\n");
+                    }
             }
 
             if (AreTokensDeployed()) {

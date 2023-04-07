@@ -166,7 +166,10 @@ bool CheckTxTokens(const CTransaction &tx, CValidationState &state,
         if (tokenCache)
         {
             if (fIsToken && !AreTokensDeployed())
-                return state.DoS(100, error("bad-txns-is-token-and-token-not-active"));
+            {
+                printf("WARNING: bad-txns-is-token-and-token-not-active\n");
+                continue;
+            }
         }
 
         if (nType == TX_TRANSFER_TOKEN)
@@ -1499,7 +1502,7 @@ bool CTxMemPool::accept(CValidationState &state, CTxDB& txdb, CTransaction &tx, 
         if (!AreTokensDeployed()) {
             for (auto out : tx.vout) {
                 if (out.scriptPubKey.IsTokenScript())
-                    return state.DoS(100, error("bad-txns-contained-token-when-not-active"));
+                    printf("WARNING: bad-txns-contained-token-when-not-active\n");
             }
         }
 
