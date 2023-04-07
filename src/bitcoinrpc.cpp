@@ -1527,8 +1527,16 @@ int CommandLineRPC(int argc, char *argv[])
             if (error.type() != null_type)
             {
                 // Error
-                strPrint = "error: " + write_string(error, false);
+
                 int code = find_value(error.get_obj(), "code").get_int();
+                if (code == RPC_HELP_USAGE)
+                {
+                    strPrint = "RPC command help usage\n" + find_value(error.get_obj(), "message").get_str();
+                }
+                else
+                {
+                    strPrint = "error: " + write_string(error, false);
+                }
                 nRet = abs(code);
             }
             else

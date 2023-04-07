@@ -51,20 +51,20 @@ void safe_advance(Iter& curr, const Iter& end, Incr n)
 Value issue(const Array& params, bool fHelp)
 {
     if (fHelp || !AreTokensDeployed() || params.size() < 1 || params.size() > 8)
-        throw runtime_error(
-            "issue \"token_name\" qty \"( to_address )\" \"( change_address )\" ( units ) ( reissuable ) ( has_ipfs ) \"( ipfs_hash )\"\n"
+        throw JSONRPCError(RPC_HELP_USAGE,
+            "issue <token_name> [qty] [to_address] [change_address] [units] [reissuable] [has_ipfs] [ipfs_hash]\n"
             + TokenActivationWarning() +
-            "\nIssue an token, subtoken or unique token.\n"
+            "\nIssue a YA-token, Sub-token or Unique-token.\n"
             "Token name must not conflict with any existing token.\n"
             "Unit as the number of decimals precision for the token (0 for whole units (\"1\"), 6 for max precision (\"1.000000\")\n"
             "Reissuable is true/false for whether additional units can be issued by the original issuer.\n"
-            "If issuing a unique token these values are required (and will be defaulted to): qty=1, units=0, reissuable=false.\n"
+            "If issuing a Unique-token these values are required (and will be defaulted to): qty=1, units=0, reissuable=false.\n"
 
             "\nArguments:\n"
             "1. \"token_name\"            (string, required) a unique name\n"
             "2. \"qty\"                   (numeric, optional, default=1) the number of units to be issued\n"
             "3. \"to_address\"            (string), optional, default=\"\"), address token will be sent to, if it is empty, address will be generated for you\n"
-            "4. \"change_address\"        (string), optional, default=\"\"), address the yac change will be sent to, if it is empty, change address will be generated for you\n"
+            "4. \"change_address\"        (string), optional, default=\"\"), address the YAC change will be sent to, if it is empty, change address will be generated for you\n"
             "5. \"units\"                 (integer, optional, default=0, min=0, max=6), the number of decimals precision for the token (0 for whole units (\"1\"), 6 for max precision (\"1.000000\")\n"
             "6. \"reissuable\"            (boolean, optional, default=true (false for unique tokens)), whether future reissuance is allowed\n"
             "7. \"has_ipfs\"              (boolean, optional, default=false), whether ipfs hash is going to be added to the token\n"
@@ -74,13 +74,13 @@ Value issue(const Array& params, bool fHelp)
             "\"txid\"                     (string) The transaction id\n"
 
             "\nExamples:\n"
-            + HelpExampleCli("issue", "\"TOKEN_NAME\" 1000")
-            + HelpExampleCli("issue", "\"TOKEN_NAME\" 1000 \"myaddress\"")
-            + HelpExampleCli("issue", "\"TOKEN_NAME\" 1000 \"myaddress\" \"changeaddress\" 4")
-            + HelpExampleCli("issue", "\"TOKEN_NAME\" 1000 \"myaddress\" \"changeaddress\" 2 true")
-            + HelpExampleCli("issue", "\"TOKEN_NAME\" 1000 \"myaddress\" \"changeaddress\" 6 false true QmTqu3Lk3gmTsQVtjU7rYYM37EAW4xNmbuEAp2Mjr4AV7E")
-            + HelpExampleCli("issue", "\"TOKEN_NAME/SUB_TOKEN\" 1000 \"myaddress\" \"changeaddress\" 2 true")
-            + HelpExampleCli("issue", "\"TOKEN_NAME#uniquetag\"")
+            + HelpExampleCli("issue", "\"YATOKEN_NAME\" 1000")
+            + HelpExampleCli("issue", "\"YATOKEN_NAME\" 1000 \"myaddress\"")
+            + HelpExampleCli("issue", "\"YATOKEN_NAME\" 1000 \"myaddress\" \"changeaddress\" 4")
+            + HelpExampleCli("issue", "\"YATOKEN_NAME\" 1000 \"myaddress\" \"changeaddress\" 2 true")
+            + HelpExampleCli("issue", "\"YATOKEN_NAME\" 1000 \"myaddress\" \"changeaddress\" 6 false true QmTqu3Lk3gmTsQVtjU7rYYM37EAW4xNmbuEAp2Mjr4AV7E")
+            + HelpExampleCli("issue", "\"YATOKEN_NAME/SUB_TOKEN\" 1000 \"myaddress\" \"changeaddress\" 2 true")
+            + HelpExampleCli("issue", "\"YATOKEN_NAME#UNIQUE_TOKEN\"")
         );
 
     if (pwalletMain->IsLocked())
@@ -196,8 +196,8 @@ Value issue(const Array& params, bool fHelp)
 Value transfer(const Array& params, bool fHelp)
 {
     if (fHelp || !AreTokensDeployed() || params.size() < 3 || params.size() > 5)
-        throw std::runtime_error(
-                "transfer \"token_name\" qty \"to_address\" \"change_address\" \"token_change_address\"\n"
+        throw JSONRPCError(RPC_HELP_USAGE,
+                "transfer <token_name> [qty] <to_address> [change_address] [token_change_address]\n"
                 + TokenActivationWarning() +
                 "\nTransfers a quantity of an owned token to a given address"
 
@@ -209,10 +209,7 @@ Value transfer(const Array& params, bool fHelp)
                 "5. \"token_change_address\"     (string, optional, default = \"\") the transactions Token change will be sent to this address\n"
 
                 "\nResult:\n"
-                "txid"
-                "[ \n"
-                "txid\n"
-                "]\n"
+                "\"txid\"                     (string) The transaction id\n"
 
                 "\nExamples:\n"
                 + HelpExampleCli("transfer", "\"TOKEN_NAME\" 20 \"address\"")
@@ -280,8 +277,8 @@ Value transfer(const Array& params, bool fHelp)
 Value transferfromaddress(const Array& params, bool fHelp)
 {
     if (fHelp || !AreTokensDeployed() || params.size() < 4 || params.size() > 6)
-        throw std::runtime_error(
-                "transferfromaddress \"token_name\" \"from_address\" qty \"to_address\" \"yac_change_address\" \"token_change_address\"\n"
+        throw JSONRPCError(RPC_HELP_USAGE,
+                "transferfromaddress <token_name> <from_address> <qty> <to_address> [yac_change_address] [token_change_address]\n"
                 + TokenActivationWarning() +
                 "\nTransfer a quantity of an owned token in a specific address to a given address"
 
@@ -391,8 +388,8 @@ Value transferfromaddress(const Array& params, bool fHelp)
 Value reissue(const Array& params, bool fHelp)
 {
     if (fHelp || !AreTokensDeployed() || params.size() > 7 || params.size() < 3)
-        throw std::runtime_error(
-                "reissue \"token_name\" qty \"to_address\" \"change_address\" ( reissuable ) ( new_units) \"( new_ipfs )\" \n"
+        throw JSONRPCError(RPC_HELP_USAGE,
+                "reissue <token_name> <qty> <to_address> [change_address] [reissuable] [new_unit] [new_ipfs] \n"
                 + TokenActivationWarning() +
                 "\nReissues a quantity of an token to an owned address if you own the Owner Token"
                 "\nCan change the reissuable flag during reissuance"
@@ -477,8 +474,8 @@ Value reissue(const Array& params, bool fHelp)
 Value listmytokens(const Array& params, bool fHelp)
 {
     if (fHelp || !AreTokensDeployed() || params.size() > 5)
-        throw std::runtime_error(
-                "listmytokens \"( token )\" ( verbose ) ( count ) ( start ) (confs) \n"
+        throw JSONRPCError(RPC_HELP_USAGE,
+                "listmytokens [token] [verbose] [count] [start] (confs) \n"
                 + TokenActivationWarning() +
                 "\nReturns a list of all token that are owned by this wallet\n"
 
@@ -505,10 +502,13 @@ Value listmytokens(const Array& params, bool fHelp)
                 "          {\n"
                 "            \"txid\": txid,\n"
                 "            \"vout\": vout,\n"
+                "            \"address\": \"address\",\n"
+                "            \"account\": \"account\",\n"
                 "            \"amount\": amount\n"
                 "          }\n"
                 "          {...}, {...}\n"
-                "        ]\n"
+                "        ],\n"
+                "      \"token_type\": token_type,\n"
                 "    }\n"
                 "}\n"
                 "{...}, {...}\n"
@@ -664,10 +664,10 @@ Value listmytokens(const Array& params, bool fHelp)
 Value listtokens(const Array& params, bool fHelp)
 {
     if (fHelp || !AreTokensDeployed() || params.size() > 4)
-        throw std::runtime_error(
-                "listtokens \"( token )\" ( verbose ) ( count ) ( start )\n"
+        throw JSONRPCError(RPC_HELP_USAGE,
+                "listtokens [token] [verbose] [count] [start]\n"
                 + TokenActivationWarning() +
-                "\nReturns a list of all tokens\n"
+                "\nReturns a list of all tokens in the blockchain\n"
                 "\nThis could be a slow/expensive operation as it reads from the database\n"
 
                 "\nArguments:\n"
@@ -686,11 +686,13 @@ Value listtokens(const Array& params, bool fHelp)
                 "{\n"
                 "  (token_name):\n"
                 "    {\n"
+                "      name: (token_name),\n"
+                "      token_type: (token_type),\n"
                 "      amount: (number),\n"
                 "      units: (number),\n"
                 "      reissuable: (number),\n"
                 "      has_ipfs: (number),\n"
-                "      ipfs_hash: (hash) (only if has_ipfs = 1 and data is a ipfs hash)\n"
+                "      blockhash: (hash),\n"
                 "      ipfs_hash: (hash) (only if has_ipfs = 1 and data is a txid hash)\n"
                 "    },\n"
                 "  {...}, {...}\n"
@@ -778,12 +780,16 @@ Value listtokens(const Array& params, bool fHelp)
 Value listaddressesbytoken(const Array& params, bool fHelp)
 {
     if (!fTokenIndex) {
-        return "_This rpc call is not functional unless -tokenindex is enabled. To enable, please run the wallet with -tokenindex, this will require a reindex-token to occur";
+      return "_This rpc call is not functional unless -tokenindex is enabled "
+             "in yacoin.conf. If you haven't enabled it before, in the first "
+             "time you enable it, you need to enable -reindex-token option as "
+             "well because yacoind need to build token index from the blk*.dat "
+             "files on disk";
     }
 
     if (fHelp || !AreTokensDeployed() || params.size() > 4 || params.size() < 1)
-        throw std::runtime_error(
-                "listaddressesbytoken \"token_name\" (onlytotal) (count) (start)\n"
+        throw JSONRPCError(RPC_HELP_USAGE,
+                "listaddressesbytoken <token_name> [onlytotal] [count] [start]\n"
                 + TokenActivationWarning() +
                 "\nReturns a list of all address that own the given token (with balances)"
                 "\nOr returns the total size of how many address own the given token"
@@ -848,12 +854,16 @@ Value listaddressesbytoken(const Array& params, bool fHelp)
 Value listtokenbalancesbyaddress(const Array& params, bool fHelp)
 {
     if (!fTokenIndex) {
-        return "_This rpc call is not functional unless -tokenindex is enabled. To enable, please run the wallet with -tokenindex, this will require a reindex-token to occur";
+        return "_This rpc call is not functional unless -tokenindex is enabled "
+               "in yacoin.conf. If you haven't enabled it before, in the first "
+               "time you enable it, you need to enable -reindex-token option as "
+               "well because yacoind need to build token index from the blk*.dat "
+               "files on disk";
     }
 
     if (fHelp || !AreTokensDeployed() || params.size() > 4 || params.size() < 1)
-        throw std::runtime_error(
-            "listtokenbalancesbyaddress \"address\" (onlytotal) (count) (start)\n"
+        throw JSONRPCError(RPC_HELP_USAGE,
+            "listtokenbalancesbyaddress <address> [onlytotal] [count] [start]\n"
             + TokenActivationWarning() +
             "\nReturns a list of all token balances for an address.\n"
 

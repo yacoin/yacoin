@@ -83,10 +83,18 @@ bool heightSort(std::pair<CAddressUnspentKey, CAddressUnspentValue> a,
 
 Value getaddressbalance(const Array& params, bool fHelp)
 {
-    if (fHelp || params.size() > 2)
-        throw std::runtime_error(
+    if (!fAddressIndex) {
+      return "_This rpc call is not functional unless -addressindex is enabled "
+             "in yacoin.conf. If you haven't enabled it before, in the first "
+             "time you enable it, you need to enable -reindex-token option as "
+             "well because yacoind need to build token index from the blk*.dat "
+             "files on disk";
+    }
+
+    if (fHelp || params.size() != 1)
+        throw JSONRPCError(RPC_HELP_USAGE,
             "getaddressbalance\n"
-            "\nReturns the balance for an address(es) (requires addressindex to be enabled).\n"
+            "\nReturns the balance for an address(es) (requires -addressindex to be enabled).\n"
             "\nArguments:\n"
             "{\n"
             "  \"addresses:\"\n"
@@ -199,8 +207,16 @@ Value getaddressbalance(const Array& params, bool fHelp)
 
 Value getaddressdeltas(const Array& params, bool fHelp)
 {
+    if (!fAddressIndex) {
+      return "_This rpc call is not functional unless -addressindex is enabled "
+             "in yacoin.conf. If you haven't enabled it before, in the first "
+             "time you enable it, you need to enable -reindex-token option as "
+             "well because yacoind need to build token index from the blk*.dat "
+             "files on disk";
+    }
+
     if (fHelp || params.size() != 1 || params[0].type() != obj_type)
-        throw std::runtime_error(
+        throw JSONRPCError(RPC_HELP_USAGE,
             "getaddressdeltas\n"
             "\nReturns all changes for an address (requires addressindex to be enabled).\n"
             "\nArguments:\n"
@@ -335,8 +351,16 @@ Value getaddressdeltas(const Array& params, bool fHelp)
 
 Value getaddressutxos(const Array& params, bool fHelp)
 {
+    if (!fAddressIndex) {
+      return "_This rpc call is not functional unless -addressindex is enabled "
+             "in yacoin.conf. If you haven't enabled it before, in the first "
+             "time you enable it, you need to enable -reindex-token option as "
+             "well because yacoind need to build token index from the blk*.dat "
+             "files on disk";
+    }
+
     if (fHelp || params.size() != 1 || params[0].type() != obj_type)
-        throw std::runtime_error(
+        throw JSONRPCError(RPC_HELP_USAGE,
             "getaddressutxos\n"
             "\nReturns all unspent outputs for an address (requires addressindex to be enabled).\n"
             "\nArguments:\n"
@@ -445,8 +469,16 @@ Value getaddressutxos(const Array& params, bool fHelp)
 
 Value getaddresstxids(const Array& params, bool fHelp)
 {
-    if (fHelp || params.size() > 2)
-        throw std::runtime_error(
+    if (!fAddressIndex) {
+      return "_This rpc call is not functional unless -addressindex is enabled "
+             "in yacoin.conf. If you haven't enabled it before, in the first "
+             "time you enable it, you need to enable -reindex-token option as "
+             "well because yacoind need to build token index from the blk*.dat "
+             "files on disk";
+    }
+
+    if (fHelp || params.size() != 1)
+        throw JSONRPCError(RPC_HELP_USAGE,
             "getaddresstxids\n"
             "\nReturns the txids for an address(es) (requires addressindex to be enabled).\n"
             "\nArguments:\n"
