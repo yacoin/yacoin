@@ -40,7 +40,9 @@
 ::int64_t
     nUpTimeStart = 0;
 bool fNewerOpenSSL = false; // for key.cpp's benefit
-
+static const ::uint32_t mainnetNewLogicBlockNumber = 1890000;
+static const ::uint32_t testnetNewLogicBlockNumber = 0;
+static const ::uint32_t tokenSupportBlockNumber = 1920000;
 
 using namespace boost;
 
@@ -1235,9 +1237,9 @@ bool AppInit2()
     }
     printf("Param fReindexOnlyHeaderSync = %d, fReindexBlockIndex = %d, fReindexToken = %d\n", fReindexOnlyHeaderSync, fReindexBlockIndex, fReindexToken);
 
-    nMainnetNewLogicBlockNumber = GetArg("-testnetNewLogicBlockNumber", 1890000);
-    nTestNetNewLogicBlockNumber = GetArg("-testnetNewLogicBlockNumber", 0);
-    nTokenSupportBlockNumber = GetArg("-tokenSupportBlockNumber", 1920000);
+    nMainnetNewLogicBlockNumber = GetArg("-testnetNewLogicBlockNumber", mainnetNewLogicBlockNumber);
+    nTestNetNewLogicBlockNumber = GetArg("-testnetNewLogicBlockNumber", testnetNewLogicBlockNumber);
+    nTokenSupportBlockNumber = GetArg("-tokenSupportBlockNumber", tokenSupportBlockNumber);
     printf("Param nMainnetNewLogicBlockNumber = %d\n",nMainnetNewLogicBlockNumber);
     printf("Param testnetNewLogicBlockNumber = %d\n",nTestNetNewLogicBlockNumber);
 
