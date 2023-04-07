@@ -2531,7 +2531,7 @@ bool CWallet::CreateTransactionWithTokens(
         fTransferToken: false
         fReissueToken: false
         vecSend: contains fee lock address + owner token address
-        coinControl.destChange: RVN change address
+        coinControl.destChange: YAC change address
         destination: address containing new token
         tokenType: ETokenType::YATOKEN, ETokenType::SUB, ETokenType::UNIQUE
    */
@@ -2552,7 +2552,7 @@ bool CWallet::CreateTransactionWithTransferToken(
   ETokenType tokenType = ETokenType::INVALID;
 /*
  *  vecSend: contains receiver's token scriptPubKey
-    coinControl: contain RVN change address and token change address
+    coinControl: contain YAC change address and token change address
     fNewToken: false
     tokens: contains empty CNewToken info
     destination: contains empty destination
@@ -2577,7 +2577,7 @@ bool CWallet::CreateTransactionWithReissueToken(
   ETokenType tokenType = ETokenType::REISSUE;
   /*
    *    vecSend: contains scriptPubKey for ownership token transfer and scriptPubKey for reissue fee lock
-        coinControl: contain RVN change address
+        coinControl: contain YAC change address
         fNewToken: false
         tokens: contains empty CNewToken info
         destination: address containing reissued token

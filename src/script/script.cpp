@@ -111,11 +111,11 @@ const char* GetTxnOutputType(txnouttype t)
     case TX_CSV_P2SH: return "CSV_P2SH_timelock";
     case TX_CLTV_P2PKH: return "CLTV_P2PKH_timelock";
     case TX_CSV_P2PKH: return "CSV_P2PKH_timelock";
-    /** RVN START */
+    /** YAC START */
     case TX_NEW_TOKEN: return TOKEN_NEW_STRING;
     case TX_TRANSFER_TOKEN: return TOKEN_TRANSFER_STRING;
     case TX_REISSUE_TOKEN: return TOKEN_REISSUE_STRING;
-    /** RVN END */
+    /** YAC END */
     }
     return NULL;
 }

@@ -660,16 +660,16 @@ bool CTransaction::VerifyNewUniqueToken(std::string& strError) const
     }
 
     // check for lock outpoint (must account for each new token)
-    bool fBurnOutpointFound = false;
+    bool fTimelockOutpointFound = false;
     for (auto out : vout) {
         if (CheckIssueLockTx(out, ETokenType::UNIQUE, tokenOutpointCount)) {
-            fBurnOutpointFound = true;
+            fTimelockOutpointFound = true;
             break;
         }
     }
 
-    if (!fBurnOutpointFound) {
-        strError = "bad-txns-issue-unique-token-burn-outpoints-not-found";
+    if (!fTimelockOutpointFound) {
+        strError = "bad-txns-issue-unique-token-timelock-outpoints-not-found";
         return false;
     }
 
@@ -758,7 +758,7 @@ bool CTransaction::VerifyNewToken(std::string& strError) const {
     }
 
     if (!fFoundIssueLockTx) {
-        strError = "bad-txns-issue-burn-not-found";
+        strError = "bad-txns-issue-timelock-not-found";
         return false;
     }
 
@@ -855,16 +855,16 @@ bool CTransaction::VerifyReissueToken(std::string& strError) const
     }
 
     // Check for the Lock CTxOut in one of the vouts
-    bool fFoundReissueBurnTx = false;
+    bool fFoundReissueTimelockTx = false;
     for (auto out : vout) {
         if (CheckReissueLockTx(out)) {
-            fFoundReissueBurnTx = true;
+            fFoundReissueTimelockTx = true;
             break;
         }
     }
 
-    if (!fFoundReissueBurnTx) {
-        strError = "bad-txns-reissue-burn-outpoint-not-found";
+    if (!fFoundReissueTimelockTx) {
+        strError = "bad-txns-reissue-timelock-outpoint-not-found";
         return false;
     }
 
@@ -2219,7 +2219,7 @@ bool CheckIssueLockTx(const CTxOut& txOut, const ETokenType& type, const int num
     CAmount lockAmount = GetLockAmount(type);
     uint32_t expectedLockDuration = GetLockDuration(type);
 
-    // If issuing multiple (unique) tokens need to burn for each
+    // If issuing multiple (unique) tokens need to timelock for each
     lockAmount *= numberIssued;
 
     // Check if script satisfies the lock amount
@@ -2787,7 +2787,7 @@ bool CreateTransferTokenTransaction(CWallet* pwallet, const CCoinControl& coinCo
 
     // Create and send the transaction
     /*
-     *  coinControl: contain RVN change address and token change address
+     *  coinControl: contain YAC change address and token change address
         vTransfers: contains receiver's address and token transfer info
      */
     if (!pwallet->CreateTransactionWithTransferToken(vecSend, wtxNew, reservekey, nFeeRequired, nChangePosRet, strTxError, coinControl)) {

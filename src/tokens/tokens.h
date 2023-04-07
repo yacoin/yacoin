@@ -299,7 +299,7 @@ bool TokenFromScript(const CScript& scriptPubKey, CNewToken& token, std::string&
 bool OwnerTokenFromScript(const CScript& scriptPubKey, std::string& tokenName, std::string& strAddress);
 bool ReissueTokenFromScript(const CScript& scriptPubKey, CReissueToken& reissue, std::string& strAddress);
 
-//! Check to make sure the script contains the burn transaction
+//! Check to make sure the script contains the timelock transaction
 bool CheckIssueLockTx(const CTxOut& txOut, const ETokenType& type, const int numberIssued);
 bool CheckIssueLockTx(const CTxOut& txOut, const ETokenType& type);
 
@@ -308,10 +308,10 @@ bool CheckIssueLockTx(const CTxOut& txOut, const ETokenType& type);
 bool CheckReissueLockTx(const CTxOut& txOut);
 
 //! issue token scripts to make sure script meets the standards
-bool CheckIssueDataTx(const CTxOut& txOut); // OP_YACOIN_TOKEN RVNQ (That is a Q as in Que not an O)
-bool CheckOwnerDataTx(const CTxOut& txOut);// OP_YACOIN_TOKEN RVNO
-bool CheckReissueDataTx(const CTxOut& txOut);// OP_YACOIN_TOKEN RVNR
-bool CheckTransferOwnerTx(const CTxOut& txOut);// OP_YACOIN_TOKEN RVNT
+bool CheckIssueDataTx(const CTxOut& txOut); // OP_YACOIN_TOKEN YACQ (That is a Q as in Que not an O)
+bool CheckOwnerDataTx(const CTxOut& txOut);// OP_YACOIN_TOKEN YACO
+bool CheckReissueDataTx(const CTxOut& txOut);// OP_YACOIN_TOKEN YACR
+bool CheckTransferOwnerTx(const CTxOut& txOut);// OP_YACOIN_TOKEN YACT
 
 //! Check the Encoded hash and make sure it is either an IPFS hash or a OIP hash
 bool CheckEncoded(const std::string& hash, std::string& strError);

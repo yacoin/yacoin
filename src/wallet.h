@@ -216,7 +216,7 @@ public:
 
     /**
      * Helper function that calls AvailableCoinsAll, used to receive all coins,
-     * Tokens and RVN
+     * Tokens and YAC
      */
     void AvailableCoinsWithTokens(
         std::vector<COutput>& vCoins,
