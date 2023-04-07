@@ -534,6 +534,7 @@ bool CBlock::DisconnectBlock(CValidationState& state, CTxDB& txdb,
                              CBlockIndex* pindex, CTokensCache* tokensCache,
                              bool ignoreAddressIndex)
 {
+    printf("CBlock::DisconnectBlock, disconnect block (height: %d, hash: %s)\n", pindex->nHeight, GetHash().GetHex().c_str());
     /** YAC_TOKEN START */
     std::vector<std::pair<std::string, CBlockTokenUndo> > vUndoData;
     if (!ptokensdb->ReadBlockUndoTokenData(this->GetHash(), vUndoData)) {
@@ -576,7 +577,11 @@ bool CBlock::DisconnectBlock(CValidationState& state, CTxDB& txdb,
 
                 } else if (out.scriptPubKey.IsPayToPublicKey()) {
                     uint160 hashBytes(Hash160(out.scriptPubKey.begin()+1, out.scriptPubKey.end()-1));
+
+                    // undo receiving activity
                     addressIndex.push_back(std::make_pair(CAddressIndexKey(1, hashBytes, pindex->nHeight, i, hash, k, false), out.nValue));
+
+                    // undo unspent index
                     addressUnspentIndex.push_back(std::make_pair(CAddressUnspentKey(1, hashBytes, hash, k), CAddressUnspentValue()));
                 } else {
                     /** YAC_TOKEN START */
@@ -762,7 +767,11 @@ bool CBlock::DisconnectBlock(CValidationState& state, CTxDB& txdb,
 
                     } else if (prevTxOut.scriptPubKey.IsPayToPublicKey()) {
                         uint160 hashBytes(Hash160(prevTxOut.scriptPubKey.begin()+1, prevTxOut.scriptPubKey.end()-1));
-                        addressIndex.push_back(std::make_pair(CAddressIndexKey(1, hashBytes, pindex->nHeight, i, hash, j, false), prevTxOut.nValue));
+
+                        // undo spending activity
+                        addressIndex.push_back(std::make_pair(CAddressIndexKey(1, hashBytes, pindex->nHeight, i, hash, j, true), prevTxOut.nValue * -1));
+
+                        // restore unspent index
                         addressUnspentIndex.push_back(std::make_pair(CAddressUnspentKey(1, hashBytes, hash, j), CAddressUnspentValue()));
                     } else {
                         if (AreTokensDeployed()) {
@@ -801,7 +810,6 @@ bool CBlock::DisconnectBlock(CValidationState& state, CTxDB& txdb,
         txdb.EraseTxIndex(tx);
     }
 
-
     if (!ignoreAddressIndex && fAddressIndex) {
         if (!txdb.EraseAddressIndex(addressIndex)) {
             return error("Failed to delete address index");
@@ -835,6 +843,7 @@ bool CBlock::DisconnectBlock(CValidationState& state, CTxDB& txdb,
 
 bool CBlock::ConnectBlock(CValidationState &state, CTxDB& txdb, CBlockIndex* pindex, CTokensCache* tokensCache, bool fJustCheck, bool ignoreAddressIndex)
 {
+    printf("CBlock::ConnectBlock, connect block (height: %d, hash: %s)\n", pindex->nHeight, GetHash().GetHex().c_str());
     // Check it again in case a previous version let a bad block in, but skip BlockSig checking
     if (!CheckBlock(state, !fJustCheck, !fJustCheck, false))
         return false;
@@ -1086,9 +1095,13 @@ bool CBlock::ConnectBlock(CValidationState &state, CTxDB& txdb, CBlockIndex* pin
 
                 } else if (out.scriptPubKey.IsPayToPublicKey()) {
                     uint160 hashBytes(Hash160(out.scriptPubKey.begin() + 1, out.scriptPubKey.end() - 1));
+
+                    // record receiving activity
                     addressIndex.push_back(
                             std::make_pair(CAddressIndexKey(1, hashBytes, pindex->nHeight, i, hashTx, k, false),
                                            out.nValue));
+
+                    // record unspent output
                     addressUnspentIndex.push_back(std::make_pair(CAddressUnspentKey(1, hashBytes, hashTx, k),
                                                                  CAddressUnspentValue(out.nValue, out.scriptPubKey,
                                                                                       pindex->nHeight)));
