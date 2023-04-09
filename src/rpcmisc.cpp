@@ -266,6 +266,7 @@ Value getaddressdeltas(const Array& params, bool fHelp)
             throw JSONRPCError(RPC_INVALID_PARAMETER, "Tokens aren't active.  tokenName can't be specified.");
         tokenName = tokenNameParam.get_str();
     }
+    tokenName = capitalizeTokenName(tokenName);
 
     int start = 0;
     int end = 0;
@@ -406,6 +407,7 @@ Value getaddressutxos(const Array& params, bool fHelp)
             tokenName = tokenNameParam.get_str();
         }
     }
+    tokenName = capitalizeTokenName(tokenName);
 
     std::vector<std::pair<uint160, int> > addresses;
 

@@ -277,6 +277,9 @@ bool IsTokenNameAnOwner(const std::string& name);
 
 bool IsTokenNameAYatoken(const std::string& name);
 
+//! Function to capitalize YA-token name and sub-portion
+std::string capitalizeTokenName(const std::string& rawTokenName);
+
 //! Get the yatoken name of an token
 std::string GetParentName(const std::string& name); // Gets the parent name of a subtoken TEST/TESTSUB would return TEST
 

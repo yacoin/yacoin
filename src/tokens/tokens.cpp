@@ -241,6 +241,31 @@ bool IsTypeCheckNameValid(const ETokenType type, const std::string& name, std::s
     }
 }
 
+std::string capitalizeTokenName(const std::string& rawTokenName)
+{
+    std::string capitalizeTokenName = rawTokenName;
+    if (std::regex_match(rawTokenName, UNIQUE_INDICATOR))
+    {
+        std::vector<std::string> parts;
+        boost::split(parts, rawTokenName, boost::is_any_of(UNIQUE_TAG_DELIMITER));
+        boost::to_upper(parts.front());
+        capitalizeTokenName = "";
+        for (int i = 0; i < parts.size(); i++)
+        {
+            if (i > 0)
+            {
+                capitalizeTokenName += UNIQUE_TAG_DELIMITER;
+            }
+            capitalizeTokenName += parts[i];
+        }
+    }
+    else
+    {
+        boost::to_upper(capitalizeTokenName);
+    }
+    return capitalizeTokenName;
+}
+
 std::string GetParentName(const std::string& name)
 {
     ETokenType type;

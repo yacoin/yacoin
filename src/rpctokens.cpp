@@ -86,7 +86,8 @@ Value issue(const Array& params, bool fHelp)
         throw JSONRPCError(RPC_WALLET_UNLOCK_NEEDED, "Error: Please enter the wallet passphrase with walletpassphrase first.");
 
     // Check token name and infer tokenType
-    std::string tokenName = params[0].get_str();
+    std::string tokenName = capitalizeTokenName(params[0].get_str());
+
     ETokenType tokenType;
     std::string tokenError = "";
     if (!IsTokenNameValid(tokenName, tokenType, tokenError)) {
@@ -224,7 +225,7 @@ Value transfer(const Array& params, bool fHelp)
     if (pwalletMain->IsLocked())
         throw JSONRPCError(RPC_WALLET_UNLOCK_NEEDED, "Error: Please enter the wallet passphrase with walletpassphrase first.");
 
-    std::string token_name = params[0].get_str();
+    std::string token_name = capitalizeTokenName(params[0].get_str());
 
     CAmount nAmount = AmountFromValue(params[1]);
 
@@ -309,7 +310,7 @@ Value transferfromaddress(const Array& params, bool fHelp)
     if (pwalletMain->IsLocked())
         throw JSONRPCError(RPC_WALLET_UNLOCK_NEEDED, "Error: Please enter the wallet passphrase with walletpassphrase first.");
 
-    std::string token_name = params[0].get_str();
+    std::string token_name = capitalizeTokenName(params[0].get_str());
 
     std::string from_address = params[1].get_str();
 
@@ -421,7 +422,7 @@ Value reissue(const Array& params, bool fHelp)
         throw JSONRPCError(RPC_WALLET_UNLOCK_NEEDED, "Error: Please enter the wallet passphrase with walletpassphrase first.");
 
     // Get that paramaters
-    std::string token_name = params[0].get_str();
+    std::string token_name = capitalizeTokenName(params[0].get_str());
     CAmount nAmount = AmountFromValue(params[1]);
 
     // reissueable
@@ -567,6 +568,8 @@ Value listmytokens(const Array& params, bool fHelp)
 
     if (filter == "")
         filter = "*";
+
+    filter = capitalizeTokenName(filter);
 
     bool verbose = false;
     if (params.size() > 1)
@@ -752,6 +755,8 @@ Value listtokens(const Array& params, bool fHelp)
     if (filter == "")
         filter = "*";
 
+    filter = capitalizeTokenName(filter);
+
     bool verbose = false;
     if (params.size() > 1)
         verbose = params[1].get_bool();
@@ -850,7 +855,7 @@ Value listaddressesbytoken(const Array& params, bool fHelp)
                 + HelpExampleCli("listaddressesbytoken", "\"TOKEN_NAME\"")
         );
 
-    std::string token_name = params[0].get_str();
+    std::string token_name = capitalizeTokenName(params[0].get_str());
     bool fOnlyTotal = false;
     if (params.size() > 1)
         fOnlyTotal = params[1].get_bool();
