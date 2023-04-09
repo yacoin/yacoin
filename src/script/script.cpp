@@ -2049,12 +2049,12 @@ bool ExtractDestination(const CScript& scriptPubKey, CTxDestination& addressRet)
     if (!Solver(scriptPubKey, whichType, vSolutions))
         return false;
 
-    if (whichType == TX_PUBKEY)
+    if (whichType == TX_PUBKEY || whichType == TX_CLTV_P2SH || whichType == TX_CSV_P2SH)
     {
         addressRet = CPubKey(vSolutions[0]).GetID();
         return true;
     }
-    else if (whichType == TX_PUBKEYHASH)
+    else if (whichType == TX_PUBKEYHASH || whichType == TX_CLTV_P2PKH || whichType == TX_CSV_P2PKH)
     {
         addressRet = CKeyID(uint160(vSolutions[0]));
         return true;
