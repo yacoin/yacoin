@@ -1459,13 +1459,13 @@ Array RPCConvertValues(std::string &strMethod, const std::vector<std::string> &s
     if (strMethod == "generatetoaddress"      && n > 2) ConvertTo<int>(params[2]);
     /** YAC_TOKEN START */
     if (strMethod == "issue"               && n > 1) ConvertTo<double>(params[1]); // qty
-    if (strMethod == "issue"               && n > 4) ConvertTo<boost::int64_t>(params[4]); // units
-    if (strMethod == "issue"               && n > 5) ConvertTo<bool>(params[5]); // reissuable
-    if (strMethod == "issue"               && n > 6) ConvertTo<bool>(params[6]); // has_ipfs
+    if (strMethod == "issue"               && n > 2) ConvertTo<boost::int64_t>(params[2]); // units
+    if (strMethod == "issue"               && n > 3) ConvertTo<bool>(params[3]); // reissuable
+    if (strMethod == "issue"               && n > 4) ConvertTo<bool>(params[4]); // has_ipfs
     if (strMethod == "transfer"            && n > 1) ConvertTo<double>(params[1]); // qty
     if (strMethod == "transferfromaddress" && n > 2) ConvertTo<double>(params[2]); // qty
     if (strMethod == "reissue"             && n > 1) ConvertTo<double>(params[1]); // qty
-    if (strMethod == "reissue"             && n > 4) ConvertTo<bool>(params[4]); // reissuable
+    if (strMethod == "reissue"             && n > 2) ConvertTo<bool>(params[2]); // reissuable
     if (strMethod == "reissue"             && n > 5) ConvertTo<boost::int64_t>(params[5]); // new_units
     if (strMethod == "listmytokens"        && n > 1) ConvertTo<bool>(params[1]); // verbose
     if (strMethod == "listmytokens"        && n > 2) ConvertTo<boost::int64_t>(params[2]); // count

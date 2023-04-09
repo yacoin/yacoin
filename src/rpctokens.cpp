@@ -52,7 +52,7 @@ Value issue(const Array& params, bool fHelp)
 {
     if (fHelp || !AreTokensDeployed() || params.size() < 1 || params.size() > 8)
         throw JSONRPCError(RPC_HELP_USAGE,
-            "issue <token_name> [qty] [to_address] [change_address] [units] [reissuable] [has_ipfs] [ipfs_hash]\n"
+            "issue <token_name> [qty] [units] [reissuable] [has_ipfs] [ipfs_hash] [to_address] [change_address]\n"
             + TokenActivationWarning() +
             "\nIssue a YA-token, Sub-token or Unique-token.\n"
             "Token name must not conflict with any existing token.\n"
@@ -63,23 +63,22 @@ Value issue(const Array& params, bool fHelp)
             "\nArguments:\n"
             "1. \"token_name\"            (string, required) a unique name\n"
             "2. \"qty\"                   (numeric, optional, default=1) the number of units to be issued\n"
-            "3. \"to_address\"            (string), optional, default=\"\"), address token will be sent to, if it is empty, address will be generated for you\n"
-            "4. \"change_address\"        (string), optional, default=\"\"), address the YAC change will be sent to, if it is empty, change address will be generated for you\n"
-            "5. \"units\"                 (integer, optional, default=0, min=0, max=6), the number of decimals precision for the token (0 for whole units (\"1\"), 6 for max precision (\"1.000000\")\n"
-            "6. \"reissuable\"            (boolean, optional, default=true (false for unique tokens)), whether future reissuance is allowed\n"
-            "7. \"has_ipfs\"              (boolean, optional, default=false), whether ipfs hash is going to be added to the token\n"
-            "8. \"ipfs_hash\"             (string, optional but required if has_ipfs = 1), an ipfs hash or a txid hash once RIP5 is activated\n"
+            "3. \"units\"                 (integer, optional, default=0, min=0, max=6), the number of decimals precision for the token (0 for whole units (\"1\"), 6 for max precision (\"1.000000\")\n"
+            "4. \"reissuable\"            (boolean, optional, default=true (false for unique tokens)), whether future reissuance is allowed\n"
+            "5. \"has_ipfs\"              (boolean, optional, default=false), whether ipfs hash is going to be added to the token\n"
+            "6. \"ipfs_hash\"             (string, optional but required if has_ipfs = 1), an ipfs hash or a txid hash once RIP5 is activated\n"
+            "7. \"to_address\"            (string), optional, default=\"\"), address token will be sent to, if it is empty, address will be generated for you\n"
+            "8. \"change_address\"        (string), optional, default=\"\"), address the YAC change will be sent to, if it is empty, change address will be generated for you\n"
 
             "\nResult:\n"
             "\"txid\"                     (string) The transaction id\n"
 
             "\nExamples:\n"
             + HelpExampleCli("issue", "\"YATOKEN_NAME\" 1000")
-            + HelpExampleCli("issue", "\"YATOKEN_NAME\" 1000 \"myaddress\"")
-            + HelpExampleCli("issue", "\"YATOKEN_NAME\" 1000 \"myaddress\" \"changeaddress\" 4")
-            + HelpExampleCli("issue", "\"YATOKEN_NAME\" 1000 \"myaddress\" \"changeaddress\" 2 true")
-            + HelpExampleCli("issue", "\"YATOKEN_NAME\" 1000 \"myaddress\" \"changeaddress\" 6 false true QmTqu3Lk3gmTsQVtjU7rYYM37EAW4xNmbuEAp2Mjr4AV7E")
-            + HelpExampleCli("issue", "\"YATOKEN_NAME/SUB_TOKEN\" 1000 \"myaddress\" \"changeaddress\" 2 true")
+            + HelpExampleCli("issue", "\"YATOKEN_NAME\" 1000 4")
+            + HelpExampleCli("issue", "\"YATOKEN_NAME\" 1000 2 true")
+            + HelpExampleCli("issue", "\"YATOKEN_NAME\" 1000 6 false true QmTqu3Lk3gmTsQVtjU7rYYM37EAW4xNmbuEAp2Mjr4AV7E \"myaddress\" \"changeaddress\"")
+            + HelpExampleCli("issue", "\"YATOKEN_NAME/SUB_TOKEN\" 1000 2 true")
             + HelpExampleCli("issue", "\"YATOKEN_NAME#UNIQUE_TOKEN\"")
         );
 
@@ -99,13 +98,40 @@ Value issue(const Array& params, bool fHelp)
         throw JSONRPCError(RPC_INVALID_PARAMETER, std::string("Unsupported token type: ") + ETokenTypeToString(tokenType));
     }
 
+    // qty
     CAmount nAmount = COIN;
     if (params.size() > 1)
         nAmount = AmountFromValue(params[1]);
 
-    std::string address = "";
+    // units
+    int units = 0;
     if (params.size() > 2)
-        address = params[2].get_str();
+        units = params[2].get_int();
+
+    // reissuable
+    bool reissuable = tokenType != ETokenType::UNIQUE;
+    if (params.size() > 3)
+        reissuable = params[3].get_bool();
+
+    // has_ipfs
+    bool has_ipfs = false;
+    if (params.size() > 4)
+        has_ipfs = params[4].get_bool();
+
+    // Check the ipfs
+    std::string ipfs_hash = "";
+    if (params.size() > 5 && has_ipfs) {
+        ipfs_hash = params[5].get_str();
+        if (ipfs_hash.length() != 46)
+            throw JSONRPCError(RPC_INVALID_PARAMS, std::string("Invalid IPFS hash (must be 46 characters)"));
+        if (ipfs_hash.substr(0,2) != "Qm")
+            throw JSONRPCError(RPC_INVALID_PARAMS, std::string("Invalid IPFS hash (doesn't start with 'Qm')"));
+    }
+
+    // to_address
+    std::string address = "";
+    if (params.size() > 6)
+        address = params[6].get_str();
 
     if (!address.empty()) {
         CTxDestination destination = DecodeDestination(address);
@@ -132,9 +158,10 @@ Value issue(const Array& params, bool fHelp)
         address = EncodeDestination(keyID);
     }
 
+    // change_address
     std::string change_address = "";
-    if (params.size() > 3) {
-        change_address = params[3].get_str();
+    if (params.size() > 7) {
+        change_address = params[7].get_str();
         if (!change_address.empty()) {
             CTxDestination destination = DecodeDestination(change_address);
             if (!IsValidDestination(destination)) {
@@ -142,28 +169,6 @@ Value issue(const Array& params, bool fHelp)
                                    std::string("Invalid Change Address: Invalid Yacoin address: ") + change_address);
             }
         }
-    }
-
-    int units = 0;
-    if (params.size() > 4)
-        units = params[4].get_int();
-
-    bool reissuable = tokenType != ETokenType::UNIQUE;
-    if (params.size() > 5)
-        reissuable = params[5].get_bool();
-
-    bool has_ipfs = false;
-    if (params.size() > 6)
-        has_ipfs = params[6].get_bool();
-
-    // Check the ipfs
-    std::string ipfs_hash = "";
-    if (params.size() > 7 && has_ipfs) {
-        ipfs_hash = params[7].get_str();
-        if (ipfs_hash.length() != 46)
-            throw JSONRPCError(RPC_INVALID_PARAMS, std::string("Invalid IPFS hash (must be 46 characters)"));
-        if (ipfs_hash.substr(0,2) != "Qm")
-            throw JSONRPCError(RPC_INVALID_PARAMS, std::string("Invalid IPFS hash (doesn't start with 'Qm')"));
     }
 
     // check for required unique token params
@@ -387,9 +392,9 @@ Value transferfromaddress(const Array& params, bool fHelp)
 
 Value reissue(const Array& params, bool fHelp)
 {
-    if (fHelp || !AreTokensDeployed() || params.size() > 7 || params.size() < 3)
+    if (fHelp || !AreTokensDeployed() || params.size() > 7 || params.size() < 2)
         throw JSONRPCError(RPC_HELP_USAGE,
-                "reissue <token_name> <qty> <to_address> [change_address] [reissuable] [new_unit] [new_ipfs] \n"
+                "reissue <token_name> <qty> [reissuable] [to_address] [change_address] [new_unit] [new_ipfs]\n"
                 + TokenActivationWarning() +
                 "\nReissues a quantity of an token to an owned address if you own the Owner Token"
                 "\nCan change the reissuable flag during reissuance"
@@ -398,9 +403,9 @@ Value reissue(const Array& params, bool fHelp)
                 "\nArguments:\n"
                 "1. \"token_name\"               (string, required) name of token that is being reissued\n"
                 "2. \"qty\"                      (numeric, required) number of tokens to reissue\n"
-                "3. \"to_address\"               (string, required) address to send the token to\n"
-                "4. \"change_address\"           (string, optional) address that the change of the transaction will be sent to\n"
-                "5. \"reissuable\"               (boolean, optional, default=true), whether future reissuance is allowed\n"
+                "3. \"reissuable\"               (boolean, optional, default=true), whether future reissuance is allowed\n"
+                "4. \"to_address\"               (string, optional) address to send the token to\n"
+                "5. \"change_address\"           (string, optional) address that the change of the transaction will be sent to\n"
                 "6. \"new_units\"                (numeric, optional, default=-1), the new units that will be associated with the token\n"
                 "7. \"new_ipfs\"                 (string, optional, default=\"\"), whether to update the current ipfs hash or txid once RIP5 is active\n"
 
@@ -408,8 +413,8 @@ Value reissue(const Array& params, bool fHelp)
                 "\"txid\"                     (string) The transaction id\n"
 
                 "\nExamples:\n"
-                + HelpExampleCli("reissue", "\"TOKEN_NAME\" 20 \"address\"")
-                + HelpExampleRpc("reissue", "\"TOKEN_NAME\" 20 \"address\" \"change_address\" \"true\" 6 \"Qmd286K6pohQcTKYqnS1YhWrCiS4gz7Xi34sdwMe9USZ7u\"")
+                + HelpExampleCli("reissue", "\"TOKEN_NAME\" 20")
+                + HelpExampleRpc("reissue", "\"TOKEN_NAME\" 20 \"true\" \"address\" \"change_address\" 6 \"Qmd286K6pohQcTKYqnS1YhWrCiS4gz7Xi34sdwMe9USZ7u\"")
         );
 
     if (pwalletMain->IsLocked())
@@ -418,22 +423,55 @@ Value reissue(const Array& params, bool fHelp)
     // Get that paramaters
     std::string token_name = params[0].get_str();
     CAmount nAmount = AmountFromValue(params[1]);
-    std::string address = params[2].get_str();
 
-    std::string changeAddress =  "";
-    if (params.size() > 3)
-        changeAddress = params[3].get_str();
-
+    // reissueable
     bool reissuable = true;
-    if (params.size() > 4) {
-        reissuable = params[4].get_bool();
+    if (params.size() > 2) {
+        reissuable = params[2].get_bool();
     }
 
+    // to_address
+    std::string address = "";
+    if (params.size() > 3)
+        address = params[3].get_str();
+
+    if (!address.empty()) {
+        CTxDestination destination = DecodeDestination(address);
+        if (!IsValidDestination(destination)) {
+            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, std::string("Invalid Yacoin address: ") + address);
+        }
+    } else {
+        // Create a new address
+        std::string strAccount;
+
+        if (!pwalletMain->IsLocked()) {
+            pwalletMain->TopUpKeyPool();
+        }
+
+        // Generate a new key that is added to wallet
+        CPubKey newKey;
+        if (!pwalletMain->GetKeyFromPool(newKey)) {
+            throw JSONRPCError(RPC_WALLET_KEYPOOL_RAN_OUT, "Error: Keypool ran out, please call keypoolrefill first");
+        }
+        CKeyID keyID = newKey.GetID();
+
+        pwalletMain->SetAddressBookName(keyID, strAccount);
+
+        address = EncodeDestination(keyID);
+    }
+
+    // change_address
+    std::string changeAddress =  "";
+    if (params.size() > 4)
+        changeAddress = params[4].get_str();
+
+    // new_units
     int newUnits = -1;
     if (params.size() > 5) {
         newUnits = params[5].get_int();
     }
 
+    // new_ipfs
     std::string newipfs = "";
     if (params.size() > 6) {
         newipfs = params[6].get_str();
