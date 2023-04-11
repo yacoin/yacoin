@@ -1247,7 +1247,7 @@ bool CTransaction::CheckTransaction(CValidationState &state) const
     BOOST_FOREACH(const CTxIn& txin, vin)
     {
         if (vInOutPoints.count(txin.prevout))
-            return false;
+            return state.DoS(100, error("CheckTransaction() : duplicate inputs"));
         vInOutPoints.insert(txin.prevout);
     }
 
@@ -2560,7 +2560,7 @@ bool CTransaction::FetchInputs(CValidationState &state, CTxDB& txdb, const map<u
             fFound = txdb.ReadTxIndex(prevout.COutPointGetHash(), txindex);
         }
         if (!fFound && (fBlock || fMiner))
-            return fMiner ? false : error("FetchInputs() : %s prev tx %s index entry not found", GetHash().ToString().substr(0,10).c_str(),  prevout.COutPointGetHash().ToString().substr(0,10).c_str());
+            return fMiner ? false : state.Invalid(error("FetchInputs() : %s prev tx %s index entry not found", GetHash().ToString().substr(0,10).c_str(),  prevout.COutPointGetHash().ToString().substr(0,10).c_str()));
 
         // Read txPrev
         CTransaction& txPrev = inputsRet[prevout.COutPointGetHash()].second;
@@ -2570,7 +2570,7 @@ bool CTransaction::FetchInputs(CValidationState &state, CTxDB& txdb, const map<u
             {
                 LOCK(mempool.cs);
                 if (!mempool.exists(prevout.COutPointGetHash()))
-                    return error("FetchInputs() : %s mempool Tx prev not found %s", GetHash().ToString().substr(0,10).c_str(),  prevout.COutPointGetHash().ToString().substr(0,10).c_str());
+                    return state.Invalid(error("FetchInputs() : %s mempool Tx prev not found %s", GetHash().ToString().substr(0,10).c_str(),  prevout.COutPointGetHash().ToString().substr(0,10).c_str()));
                 txPrev = mempool.lookup(prevout.COutPointGetHash());
             }
             if (!fFound)
@@ -2580,7 +2580,7 @@ bool CTransaction::FetchInputs(CValidationState &state, CTxDB& txdb, const map<u
         {
             // Get prev tx from disk
             if (!txPrev.ReadFromDisk(txindex.pos))
-                return error("FetchInputs() : %s ReadFromDisk prev tx %s failed", GetHash().ToString().substr(0,10).c_str(),  prevout.COutPointGetHash().ToString().substr(0,10).c_str());
+                return state.Invalid(error("FetchInputs() : %s ReadFromDisk prev tx %s failed", GetHash().ToString().substr(0,10).c_str(),  prevout.COutPointGetHash().ToString().substr(0,10).c_str()));
         }
     }
 
@@ -2768,11 +2768,12 @@ bool CTransaction::ConnectInputs(CValidationState &state,
                         (pindex->nBlockPos == txindex.pos.Get_CDiskTxPos_nBlockPos()) && 
                         (pindex->nFile == txindex.pos.Get_CDiskTxPos_nFile())
                        )    // what does this test actually test for??
-                        return error(
+                        return state.Invalid(
+                                error(
                                      "ConnectInputs() : tried to spend %s at depth %d", 
                                      txPrev.IsCoinBase()? "coinbase": "coinstake", 
                                      pindexBlock->nHeight - pindex->nHeight + coinbaseMaturityOffset
-                                    );
+                                    ));
             }
 
             // ppcoin: check transaction timestamp
@@ -2806,7 +2807,7 @@ bool CTransaction::ConnectInputs(CValidationState &state,
             // This doesn't trigger the DoS code on purpose; if it did, it would make it easier
             // for an attacker to attempt to split the network.
             if (!txindex.vSpent[prevout.COutPointGet_n()].IsNull())
-                return fMiner ? false : error("ConnectInputs() : %s prev tx already used at %s", GetHash().ToString().substr(0,10).c_str(), txindex.vSpent[prevout.COutPointGet_n()].ToString().c_str());
+                return fMiner ? false : state.Invalid(error("ConnectInputs() : %s prev tx already used at %s", GetHash().ToString().substr(0,10).c_str(), txindex.vSpent[prevout.COutPointGet_n()].ToString().c_str()));
 
             // Skip ECDSA signature verification when connecting blocks (fBlock=true)
             // before the last blockchain checkpoint. This is safe because block merkle hashes are
@@ -2827,7 +2828,7 @@ bool CTransaction::ConnectInputs(CValidationState &state,
                         // Don't trigger DoS code in case of STRICT_FLAGS caused failure.
                         CScriptCheck check(txPrev, *this, i, flags & ~STRICT_FLAGS, 0);
                         if (check())
-                            return error("ConnectInputs() : %s strict VerifySignature failed", GetHash().ToString().substr(0,10).c_str());
+                            return state.Invalid(error("ConnectInputs() : %s strict VerifySignature failed", GetHash().ToString().substr(0,10).c_str()));
                     }
                     return state.DoS(100,error("ConnectInputs() : %s VerifySignature failed", GetHash().ToString().substr(0,10).c_str()));
                 }
@@ -2849,10 +2850,10 @@ bool CTransaction::ConnectInputs(CValidationState &state,
             ::uint64_t 
                 nCoinAge;
             if (!GetCoinAge(txdb, nCoinAge))
-                return error(
+                return state.DoS(100, error(
                             "ConnectInputs() : %s unable to get coin age for coinstake", 
                             GetHash().ToString().substr(0,10).c_str()
-                            );
+                            ));
 
             unsigned int 
                 nTxSize = (nTime > VALIDATION_SWITCH_TIME || fTestNet) ? 
@@ -3046,7 +3047,9 @@ bool CBlock::ConnectBlock(CValidationState &state, CTxDB& txdb, CBlockIndex* pin
             if (txdb.ReadTxIndex(hashTx, txindexOld)) {
                 BOOST_FOREACH(CDiskTxPos &pos, txindexOld.vSpent)
                     if (pos.IsNull())
-                        return false;
+                    {
+                        return state.DoS(100, error("ConnectBlock() : tried to overwrite transaction"));
+                    }
             }
         }
 
@@ -3144,19 +3147,17 @@ bool CBlock::ConnectBlock(CValidationState &state, CTxDB& txdb, CBlockIndex* pin
         return state.DoS(100, false);     // a direct ban
     }
 
-    if (IsProofOfWork())
-    {
-        ::int64_t nBlockReward = GetProofOfWorkReward(nBits, nFees);
+	if (IsProofOfWork()) {
+		::int64_t nBlockReward = GetProofOfWorkReward(nBits, nFees);
 
-        // Check coinbase reward
-        if (vtx[0].GetValueOut() > nBlockReward)
-            return error(
-                        "CheckBlock () : coinbase reward exceeded "
-                        "(actual=%" PRId64 " vs calculated=%" PRId64 ")",
-                        vtx[0].GetValueOut(),
-                        nBlockReward
-                        );
-    }
+		// Check coinbase reward
+		if (vtx[0].GetValueOut() > nBlockReward) {
+			return state.DoS(100,
+					error("CheckBlock () : coinbase reward exceeded "
+							"(actual=%" PRId64 " vs calculated=%" PRId64 ")",
+							vtx[0].GetValueOut(), nBlockReward));
+		}
+	}
 //_____________________ 
 
     // track money supply and mint amount info
@@ -3904,6 +3905,9 @@ bool CBlockHeader::AcceptBlockHeader(CValidationState &state,
     if (mi == mapBlockIndex.end())
         return state.DoS(10, error("AcceptBlockHeader () : prev block not found"));
     CBlockIndex* pindexPrev = (*mi).second;
+
+    if (pindexPrev->nStatus & BLOCK_FAILED_MASK)
+        return state.DoS(100, error("AcceptBlockHeader () : prev block invalid"));
     int nHeight = pindexPrev->nHeight+1;
 
     // Check proof-of-work or proof-of-stake
@@ -4280,7 +4284,7 @@ bool CBlock::AcceptBlock(CValidationState &state, CBlockIndex **ppindex)
 
     if (!CheckBlock(state))
     {
-        if (state.Invalid() && !state.CorruptionPossible())
+        if (state.IsInvalid() && !state.CorruptionPossible())
         {
             pindex->nStatus |= BLOCK_FAILED_VALID;
         }
@@ -4346,11 +4350,15 @@ bool CBlock::AcceptBlock(CValidationState &state, CBlockIndex **ppindex)
 
     // Write block to history file
     if (!CheckDiskSpace(::GetSerializeSize(*this, SER_DISK, CLIENT_VERSION)))
+    {
+        state.Error();
         return error("AcceptBlock () : out of disk space");
+    }
+
     unsigned int nFile = -1;
     unsigned int nBlockPos = 0;
     if (!WriteToDisk(nFile, nBlockPos))
-        return error("AcceptBlock () : WriteToDisk failed");
+        return state.Abort("AcceptBlock () : WriteToDisk failed");
     if (!ReceivedBlockTransactions(state, nFile, nBlockPos, pindex))
         return error("AcceptBlock () : ReceivedBlockTransactions failed");
 
@@ -5505,6 +5513,29 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
         }
 
         pfrom->fSuccessfullyConnected = true;
+
+        // Send hash of transactions in mempool to the connected node
+        {
+            std::vector<uint256>
+                vtxid;
+
+            mempool.queryHashes(vtxid);
+
+            vector<CInv>
+                vInv;
+
+            for (unsigned int i = 0; i < vtxid.size(); ++i)
+            {
+                CInv
+                    inv(MSG_TX, vtxid[i]);
+
+                vInv.push_back(inv);
+                if (i == (MAX_INV_SZ - 1))
+                        break;
+            }
+            if (vInv.size() > 0)
+                pfrom->PushMessage("inv", vInv);
+        }
 
         printf("receive version message: version %d, blocks=%d, us=%s, them=%s, peer=%s\n", 
                 pfrom->nVersion, 
