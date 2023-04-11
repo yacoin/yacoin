@@ -42,7 +42,7 @@
 bool fNewerOpenSSL = false; // for key.cpp's benefit
 static const ::uint32_t mainnetNewLogicBlockNumber = 1890000;
 static const ::uint32_t testnetNewLogicBlockNumber = 0;
-static const ::uint32_t tokenSupportBlockNumber = 1920000;
+static const ::uint32_t tokenSupportBlockNumber = 1911210;
 
 using namespace boost;
 
