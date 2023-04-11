@@ -76,10 +76,10 @@ class TokenTest(BitcoinTestFramework):
 
         self.log.info("Waiting for 1 confirmation after issue...")
         self.mine_blocks(0, 1)
-        self.log.info("Checking that 50 YAC is locked...")
+        self.log.info("Checking that 10 YAC is locked...")
         balance_0 = int(n0.getbalance())
         available_balance_0 = int(n0.getavailablebalance())
-        assert balance_0 - 50 == available_balance_0
+        assert balance_0 - 10 == available_balance_0
         self.log.info("Try sending all balance...")
         assert_raises_rpc_error(
             -4,
@@ -318,10 +318,10 @@ class TokenTest(BitcoinTestFramework):
 
         self.log.info("Waiting for 1 confirmation after issue Unique-token...")
         self.mine_blocks(0, 1)
-        self.log.info("Checking that 10 YAC is locked...")
+        self.log.info("Checking that 20 YAC is locked...")
         balance_0 = int(n0.getbalance())
         available_balance_0 = int(n0.getavailablebalance())
-        assert balance_0 - 10 == available_balance_0
+        assert balance_0 - 20 == available_balance_0
         self.log.info("Try sending all balance...")
         assert_raises_rpc_error(
             -4,
