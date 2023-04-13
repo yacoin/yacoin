@@ -607,6 +607,8 @@ Value getreceivedbyaddress(const Array& params, bool fHelp)
     if (!IsMine(*pwalletMain,scriptPubKey))
         return (double)0.0;
 
+    CTxDestination dest = address.Get();
+
     // Minimum confirmations
     int nMinDepth = 1;
     if (params.size() > 1)
@@ -620,10 +622,15 @@ Value getreceivedbyaddress(const Array& params, bool fHelp)
         if (wtx.IsCoinBase() || wtx.IsCoinStake() || !wtx.IsFinal())
             continue;
 
-        BOOST_FOREACH(const CTxOut& txout, wtx.vout)
-            if (txout.scriptPubKey == scriptPubKey)
+        for (const auto& txout : wtx.vout)
+        {
+            CTxDestination addressRet;
+            if (ExtractDestination(txout.scriptPubKey, addressRet) && addressRet == dest)
+            {
                 if (wtx.GetDepthInMainChain() >= nMinDepth)
                     nAmount += txout.nValue;
+            }
+        }
     }
 
     return  ValueFromAmount(nAmount);
