@@ -91,7 +91,7 @@ Value getaddressbalance(const Array& params, bool fHelp)
              "files on disk";
     }
 
-    if (fHelp || params.size() != 1)
+    if (fHelp || params.size() > 2 || params[0].type() != obj_type)
         throw JSONRPCError(RPC_HELP_USAGE,
             "getaddressbalance\n"
             "\nReturns the balance for an address(es) (requires -addressindex to be enabled).\n"
@@ -479,7 +479,7 @@ Value getaddresstxids(const Array& params, bool fHelp)
              "files on disk";
     }
 
-    if (fHelp || params.size() != 1)
+    if (fHelp || params.size() > 2 || params[0].type() != obj_type)
         throw JSONRPCError(RPC_HELP_USAGE,
             "getaddresstxids\n"
             "\nReturns the txids for an address(es) (requires addressindex to be enabled).\n"
