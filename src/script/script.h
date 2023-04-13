@@ -751,6 +751,7 @@ public:
     bool IsPayToPublicKey() const;
     bool IsPayToPublicKeyHash() const;
     bool IsPayToScriptHash() const;
+    bool IsP2PKHTimelock(std::vector<unsigned char>& addressRet) const;
 
     /** YAC_TOKEN START */
     bool IsTokenScript(int& nType, bool& fIsOwner, int& nStartingIndex) const;
