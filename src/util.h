@@ -38,11 +38,11 @@
 #ifndef BITCOIN_NETBASE_H
  #include "netbase.h" // for AddTimeData
 #endif
+#include "amount.h"
+#include "tinyformat.h"
 
-static const ::int64_t COIN = 1000000;
 //THEREFORE
 const int COINdecimalPower = 16;     // i.e. log10( COIN )
-static const ::int64_t CENT = 10000;
 
 #define BEGIN(a)            ((char*)&(a))
 #define END(a)              ((char*)&((&(a))[1]))
@@ -185,10 +185,11 @@ extern bool
     fNoListen,
     fLogTimestamps,
     fReopenDebugLog;
-extern ::int32_t 
+extern ::int32_t
     nTestNetNewLogicBlockNumber,
 	nMainnetNewLogicBlockNumber,
     nYac20BlockNumberTime;
+extern ::int32_t nTokenSupportBlockNumber;
 extern ::uint32_t
     nDifficultyInterval,
     nEpochInterval;
@@ -220,9 +221,6 @@ std::string ATTR_WARN_PRINTF(1,3) real_strprintf(const char *format, int dummy, 
 std::string real_strprintf(const std::string &format, int dummy, ...);
 #define strprintf(format, ...) real_strprintf(format, 0, __VA_ARGS__)
 std::string vstrprintf(const char *format, va_list ap);
-
-bool ATTR_WARN_PRINTF(1,2) error(const char *format, ...);
-
 /* Redefine printf so that it directs output to debug.log
  *
  * Do this *after* defining the other printf-like functions, because otherwise the
@@ -230,6 +228,14 @@ bool ATTR_WARN_PRINTF(1,2) error(const char *format, ...);
  * which confuses gcc.
  */
 #define printf OutputDebugStringF
+
+template<typename... Args>
+bool error(const char *fmt, const Args &... args)
+{
+    std::string str = tfm::format(fmt, args...);
+    printf("ERROR: %s\n", str.c_str());
+    return false;
+}
 
 extern unsigned long long getTotalSystemMemory( void );
 void LogException(std::exception* pex, const char* pszThread);
@@ -365,7 +371,8 @@ std::string HexStr(const T itbegin, const T itend, bool fSpaces=false)
     return rv;
 }
 
-inline std::string HexStr(const std::vector<unsigned char>& vch, bool fSpaces=false)
+template<typename T>
+inline std::string HexStr(const T& vch, bool fSpaces=false)
 {
     return HexStr(vch.begin(), vch.end(), fSpaces);
 }

@@ -13,6 +13,7 @@
 #include <limits>
 #include <cstring>
 #include <cstdio>
+#include <compat/endian.h>
 
 #ifndef Q_MOC_RUN
 #include <boost/type_traits/is_fundamental.hpp>
@@ -56,6 +57,100 @@ inline T& REF(const T& val)
     return const_cast<T&>(val);
 }
 
+/**
+ * Used to acquire a non-const pointer "this" to generate bodies
+ * of const serialization operations from a template
+ */
+template<typename T>
+inline T* NCONST_PTR(const T* val)
+{
+    return const_cast<T*>(val);
+}
+
+
+/*
+ * Lowest-level serialization and conversion.
+ * @note Sizes of these types are verified in the tests
+ */
+template<typename Stream> inline void ser_writedata8(Stream &s, uint8_t obj)
+{
+    s.write((char*)&obj, 1);
+}
+template<typename Stream> inline void ser_writedata16(Stream &s, uint16_t obj)
+{
+    obj = htole16(obj);
+    s.write((char*)&obj, 2);
+}
+template<typename Stream> inline void ser_writedata32(Stream &s, uint32_t obj)
+{
+    obj = htole32(obj);
+    s.write((char*)&obj, 4);
+}
+template<typename Stream> inline void ser_writedata32be(Stream &s, uint32_t obj)
+{
+    obj = htobe32(obj);
+    s.write((char*)&obj, 4);
+}
+template<typename Stream> inline void ser_writedata64(Stream &s, uint64_t obj)
+{
+    obj = htole64(obj);
+    s.write((char*)&obj, 8);
+}
+template<typename Stream> inline uint8_t ser_readdata8(Stream &s)
+{
+    uint8_t obj;
+    s.read((char*)&obj, 1);
+    return obj;
+}
+template<typename Stream> inline uint16_t ser_readdata16(Stream &s)
+{
+    uint16_t obj;
+    s.read((char*)&obj, 2);
+    return le16toh(obj);
+}
+template<typename Stream> inline uint32_t ser_readdata32(Stream &s)
+{
+    uint32_t obj;
+    s.read((char*)&obj, 4);
+    return le32toh(obj);
+}
+template<typename Stream> inline uint32_t ser_readdata32be(Stream &s)
+{
+    uint32_t obj;
+    s.read((char*)&obj, 4);
+    return be32toh(obj);
+}
+template<typename Stream> inline uint64_t ser_readdata64(Stream &s)
+{
+    uint64_t obj;
+    s.read((char*)&obj, 8);
+    return le64toh(obj);
+}
+inline uint64_t ser_double_to_uint64(double x)
+{
+    union { double x; uint64_t y; } tmp;
+    tmp.x = x;
+    return tmp.y;
+}
+inline uint32_t ser_float_to_uint32(float x)
+{
+    union { float x; uint32_t y; } tmp;
+    tmp.x = x;
+    return tmp.y;
+}
+inline double ser_uint64_to_double(uint64_t y)
+{
+    union { double x; uint64_t y; } tmp;
+    tmp.y = y;
+    return tmp.x;
+}
+inline float ser_uint32_to_float(uint32_t y)
+{
+    union { float x; uint32_t y; } tmp;
+    tmp.y = y;
+    return tmp.x;
+}
+
 /////////////////////////////////////////////////////////////////
 //
 // Templates for serializing to anything that looks like a stream,
@@ -74,6 +169,22 @@ enum
 	 SER_BLOCKHEADERONLY = (1 << 17),
 
 };
+
+/**
+ * Implement three methods for serializable objects. These are actually wrappers over
+ * "SerializationOp" template, which implements the body of each class' serialization
+ * code. Adding "ADD_SERIALIZE_METHODS" in the body of the class causes these wrappers to be
+ * added as members.
+ */
+#define ADD_SERIALIZE_METHODS                                         \
+    template<typename Stream>                                         \
+    void Serialize(Stream& s, int nType, int nVersion) const {        \
+        NCONST_PTR(this)->SerializationOp(s, CSerActionSerialize(), nType, nVersion);  \
+    }                                                                 \
+    template<typename Stream>                                         \
+    void Unserialize(Stream& s, int nType, int nVersion) {            \
+        SerializationOp(s, CSerActionUnserialize(), nType, nVersion);                  \
+    }
 
 #ifdef _MSC_VER
 #define IMPLEMENT_SERIALIZE(statements)    \
@@ -818,9 +929,15 @@ void Unserialize(Stream& is, std::set<K, Pred, A>& m, int nType, int nVersion)
 //
 // Support for IMPLEMENT_SERIALIZE and READWRITE macro
 //
-class CSerActionGetSerializeSize { };
-class CSerActionSerialize { };
-class CSerActionUnserialize { };
+struct CSerActionSerialize
+{
+    constexpr bool ForRead() const { return false; }
+};
+struct CSerActionUnserialize
+{
+    constexpr bool ForRead() const { return true; }
+};
+struct CSerActionGetSerializeSize { };
 
 template<typename Stream, typename T>
 inline unsigned int SerReadWrite(Stream& s, const T& obj, int nType, int nVersion, CSerActionGetSerializeSize ser_action)
@@ -967,6 +1084,8 @@ public:
     void clear()                                     { vch.clear(); nReadPos = 0; }
     iterator insert(iterator it, const char& x=char()) { return vch.insert(it, x); }
     void insert(iterator it, size_type n, const char& x) { vch.insert(it, n, x); }
+    value_type* data()                               { return vch.data() + nReadPos; }
+    const value_type* data() const                   { return vch.data() + nReadPos; }
 
 #ifdef _MSC_VER
     void insert(iterator it, const_iterator first, const_iterator last)
@@ -1304,42 +1423,42 @@ public:
     }
 };
 
-/** Wrapper around a FILE* that implements a ring buffer to
- *  deserialize from. It guarantees the ability to rewind
- *  a given number of bytes. */
+/** Non-refcounted RAII wrapper around a FILE* that implements a ring buffer to
+ *  deserialize from. It guarantees the ability to rewind a given number of bytes.
+ *
+ *  Will automatically close the file when it goes out of scope if not null.
+ *  If you need to close the file early, use file.fclose() instead of fclose(file).
+ */
 class CBufferedFile
 {
 private:
-    FILE *src;          // source file
-    ::uint64_t nSrcPos;     // how many bytes have been read from source
-    ::uint64_t nReadPos;    // how many bytes have been read from this
-    ::uint64_t nReadLimit;  // up to which position we're allowed to read
-    ::uint64_t nRewind;     // how many bytes we guarantee to rewind
+    // Disallow copies
+    CBufferedFile(const CBufferedFile&);
+    CBufferedFile& operator=(const CBufferedFile&);
+
+    int nType;
+    int nVersion;
+
+    FILE *src;            // source file
+    uint64_t nSrcPos;     // how many bytes have been read from source
+    uint64_t nReadPos;    // how many bytes have been read from this
+    uint64_t nReadLimit;  // up to which position we're allowed to read
+    uint64_t nRewind;     // how many bytes we guarantee to rewind
     std::vector<char> vchBuf; // the buffer
 
-    short state;
-    short exceptmask;
-
 protected:
-    void setstate(short bits, const char *psz) {
-        state |= bits;
-        if (state & exceptmask)
-            throw std::ios_base::failure(psz);
-    }
-
     // read data from the source to fill the buffer
     bool Fill() {
-        unsigned int pos = (unsigned int)(nSrcPos % vchBuf.size());
-        unsigned int readNow = (unsigned int)(vchBuf.size() - pos);
-        unsigned int nAvail = (unsigned int)(vchBuf.size() - (nSrcPos - nReadPos) - nRewind);
+        unsigned int pos = nSrcPos % vchBuf.size();
+        unsigned int readNow = vchBuf.size() - pos;
+        unsigned int nAvail = vchBuf.size() - (nSrcPos - nReadPos) - nRewind;
         if (nAvail < readNow)
             readNow = nAvail;
         if (readNow == 0)
             return false;
         size_t read = fread((void*)&vchBuf[pos], 1, readNow, src);
         if (read == 0) {
-            setstate(std::ios_base::failbit, feof(src) ? "CBufferedFile::Fill : end of file" : "CBufferedFile::Fill : fread failed");
-            return false;
+            throw std::ios_base::failure(feof(src) ? "CBufferedFile::Fill : end of file" : "CBufferedFile::Fill : fread failed");
         } else {
             nSrcPos += read;
             return true;
@@ -1347,17 +1466,25 @@ protected:
     }
 
 public:
-    int nType;
-    int nVersion;
-
-    CBufferedFile(FILE *fileIn, ::uint64_t nBufSize, ::uint64_t nRewindIn, int nTypeIn, int nVersionIn) :
-        src(fileIn), nSrcPos(0), nReadPos(0), nReadLimit((::uint64_t)(-1)), nRewind(nRewindIn), vchBuf(nBufSize, 0),
-        state(0), exceptmask(std::ios_base::badbit | std::ios_base::failbit), nType(nTypeIn), nVersion(nVersionIn) {
+    CBufferedFile(FILE *fileIn, uint64_t nBufSize, uint64_t nRewindIn, int nTypeIn, int nVersionIn) :
+        nSrcPos(0), nReadPos(0), nReadLimit((uint64_t)(-1)), nRewind(nRewindIn), vchBuf(nBufSize, 0)
+    {
+        src = fileIn;
+        nType = nTypeIn;
+        nVersion = nVersionIn;
     }
 
-    // check whether no error occurred
-    bool good() const {
-        return state == 0;
+    ~CBufferedFile()
+    {
+        fclose();
+    }
+
+    void fclose()
+    {
+        if (src) {
+            ::fclose(src);
+            src = NULL;
+        }
     }
 
     // check whether we're at the end of the source file
@@ -1374,7 +1501,7 @@ public:
         while (nSize > 0) {
             if (nReadPos == nSrcPos)
                 Fill();
-            unsigned int pos = (unsigned int)(nReadPos % vchBuf.size());
+            unsigned int pos = nReadPos % vchBuf.size();
             size_t nNow = nSize;
             if (nNow + pos > vchBuf.size())
                 nNow = vchBuf.size() - pos;
@@ -1389,12 +1516,12 @@ public:
     }
 
     // return the current reading position
-    ::uint64_t GetPos() {
+    uint64_t GetPos() {
         return nReadPos;
     }
 
     // rewind to a given reading position
-    bool SetPos(::uint64_t nPos) {
+    bool SetPos(uint64_t nPos) {
         nReadPos = nPos;
         if (nReadPos + nRewind < nSrcPos) {
             nReadPos = nSrcPos - nRewind;
@@ -1407,22 +1534,21 @@ public:
         }
     }
 
-    bool Seek(::uint64_t nPos) {
-        long nLongPos = (long)nPos;
-        if (nPos != (::uint64_t)nLongPos)
+    bool Seek(uint64_t nPos) {
+        long nLongPos = nPos;
+        if (nPos != (uint64_t)nLongPos)
             return false;
         if (fseek(src, nLongPos, SEEK_SET))
             return false;
         nLongPos = ftell(src);
         nSrcPos = nLongPos;
         nReadPos = nLongPos;
-        state = 0;
         return true;
     }
 
     // prevent reading beyond a certain position
     // no argument removes the limit
-    bool SetLimit(::uint64_t nPos = (::uint64_t)(-1)) {
+    bool SetLimit(uint64_t nPos = (uint64_t)(-1)) {
         if (nPos < nReadPos)
             return false;
         nReadLimit = nPos;

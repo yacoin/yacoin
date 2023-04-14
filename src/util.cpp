@@ -92,6 +92,7 @@ bool fDebugNet = false;
 bool fTestNetNewLogic = false;
 ::int32_t nTestNetNewLogicBlockNumber;
 ::int32_t nMainnetNewLogicBlockNumber;
+::int32_t nTokenSupportBlockNumber;
 unsigned char MAXIMUM_YAC1DOT0_N_FACTOR;
 ::int32_t nYac20BlockNumberTime = 0;
 ::int64_t nYac10HardforkTime = 1619048730;
@@ -420,17 +421,6 @@ string real_strprintf(const std::string &format, int dummy, ...)
     va_end(arg_ptr);
     return str;
 }
-
-bool error(const char *format, ...)
-{
-    va_list arg_ptr;
-    va_start(arg_ptr, format);
-    std::string str = vstrprintf(format, arg_ptr);
-    va_end(arg_ptr);
-    printf("ERROR: %s\n", str.c_str());
-    return false;
-}
-
 
 void ParseString(const string& str, char c, vector<string>& v)
 {

@@ -27,6 +27,21 @@ protected:
     unsigned int pn[WIDTH];
 public:
 
+    bool IsNull() const
+    {
+        for (int i = 0; i < WIDTH; i++)
+            if (pn[i] != 0)
+                return false;
+        return true;
+    }
+
+    void SetNull()
+    {
+        memset(pn, 0, sizeof(pn));
+    }
+
+    inline int Compare(const base_uint& other) const { return memcmp(pn, other.pn, sizeof(pn)); }
+
     bool operator!() const
     {
         for (int i = 0; i < WIDTH; i++)

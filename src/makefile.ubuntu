@@ -126,6 +126,7 @@ xCXXFLAGS_SCRYPT_JANE=-O3 -msse2 -pthread -Wall -Wextra -Wformat -Wformat-securi
 xLDFLAGS=$(LDHARDENING) $(LDFLAGS)
 
 OBJS= \
+    obj/dbwrapper.o \
     obj/txdb-leveldb.o \
     obj/alert.o \
     obj/version.o \

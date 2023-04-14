@@ -32,6 +32,29 @@ def assert_approx(v, vexp, vspan=0.00001):
     if v > vexp + vspan:
         raise AssertionError("%s > [%s..%s]" % (str(v), str(vexp - vspan), str(vexp + vspan)))
 
+def assert_contains(val, arr):
+    if not (val in arr):
+        raise AssertionError("val %s not in arr" % val)
+
+
+def assert_does_not_contain(val, arr):
+    if val in arr:
+        raise AssertionError("val %s is in arr" % val)
+
+
+def assert_contains_pair(key, val, dict_data):
+    if not (key in dict_data and val == dict_data[key]):
+        raise AssertionError("k/v pair (%s,%s) not in dict" % (key, val))
+
+
+def assert_contains_key(key, dict_data):
+    if key not in dict_data:
+        raise AssertionError("key %s is not in dict" % key)
+
+def assert_does_not_contain_key(key, dict_data):
+    if key in dict_data:
+        raise AssertionError("key %s is in dict" % key)
+
 def assert_fee_amount(fee, tx_size, fee_per_kB):
     """Assert the fee was in range"""
     target_fee = round(tx_size * fee_per_kB / 1000, 8)

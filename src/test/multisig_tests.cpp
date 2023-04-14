@@ -11,7 +11,7 @@
 
 #include "keystore.h"
 #include "main.h"
-#include "script.h"
+#include "script/script.h"
 #include "wallet.h"
 
 using namespace std;

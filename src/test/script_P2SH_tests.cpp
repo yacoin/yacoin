@@ -6,12 +6,12 @@
 #include <boost/foreach.hpp>
 
 #include "../main.h"
-#include "../script.h"
+#include "../script/script.h"
 #include "../wallet.h"
 
 using namespace std;
 
-// Test routines internal to script.cpp:
+// Test routines internal to script/script.cpp:
 extern uint256 SignatureHash(CScript scriptCode, const CTransaction& txTo, unsigned int nIn, int nHashType);
 // extern bool VerifyScript(const CScript& scriptSig, const CScript& scriptPubKey, const CTransaction& txTo, unsigned int nIn,
 //                          bool fValidatePayToScriptHash, int nHashType);

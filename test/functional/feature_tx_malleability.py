@@ -151,7 +151,7 @@ class TXMalleability_Test(BitcoinTestFramework):
         assert(transaction_raw != transaction_raw_modified)
 
         # check that original transaction id not available on node 1
-        assert_raises_rpc_error(-1, 'unknown!?', self.nodes[1].gettransaction, txid_original)
+        assert_raises_rpc_error(-5, 'No information available about transaction', self.nodes[1].gettransaction, txid_original)
         # send transaction
         txid_modified = self.nodes[1].sendrawtransaction(transaction_raw_modified)
         self.log.info('Modified transaction ID: '+str(txid_original))
