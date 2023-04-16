@@ -46,7 +46,10 @@ BOOST_SUFFIX?=-mgw48-mt-sd-1_55
 
 INCLUDEPATHS= \
 -I"$(CURDIR)" \
+-I"$(CURDIR)/tokens" \
+-I"$(CURDIR)/primitives" \
 -I"$(CURDIR)/scrypt-jane" \
+-I"$(CURDIR)/script" \
 -I"$(CURDIR)/obj" \
 -I'./leveldb/include' \
 -I'./leveldb/helpers' \
@@ -128,6 +131,7 @@ CFLAGS= \
 -Wformat \
 -Wformat-security \
 -Wno-unused-parameter \
+-std=gnu++11 \
 $(DEBUGFLAGS) \
 $(DEFS)
 
@@ -212,7 +216,12 @@ HEADERS = $(wildcard *.h)
 OBJS= \
 obj/alert.o \
 obj/addrman.o \
+obj/tokentypes.o \
+obj/tokendb.o \
+obj/tokens.o \
+obj/base58.o \
 obj/bitcoinrpc.o \
+obj/block.o \
 obj/checkpoints.o \
 obj/crypter.o \
 obj/db.o \
@@ -223,6 +232,7 @@ obj/json_spirit_value.o \
 obj/kernel.o \
 obj/key.o \
 obj/keystore.o \
+obj/LibBoolEE.o \
 obj/main.o \
 obj/miner.o \
 obj/net.o \
@@ -233,8 +243,10 @@ obj/price.o \
 obj/protocol.o \
 obj/random_nonce.o \
 obj/rpcblockchain.o \
+obj/rpctokens.o \
 obj/rpcdump.o \
 obj/rpcmining.o \
+obj/rpcmisc.o \
 obj/rpcnet.o \
 obj/rpcrawtransaction.o \
 obj/rpcwallet.o \
@@ -247,7 +259,9 @@ obj/scrypt-generic.o \
 obj/scrypt-jane.o \
 obj/stun.o \
 obj/sync.o \
+obj/transaction.o \
 obj/txdb-bdb.o \
+obj/dbwrapper.o \
 obj/txdb-leveldb.o \
 obj/util.o \
 obj/version.o \
@@ -282,6 +296,24 @@ endif
 ######################
 #.genjane:
 #	touch .genjane; gcc -c -O3 -DSCRYPT_CHACHA -DSCRYPT_KECCAK512 -DSCRYPT_CHOOSE_COMPILETIME -o obj/scrypt-jane.o scrypt-jane/scrypt-jane.c
+
+obj/script.o: script/script.cpp
+	$(CXX) -c -frandom-seed=$@ $(CFLAGS) $(INCLUDEPATHS) -o $@ $<
+
+obj/block.o: primitives/block.cpp
+	$(CXX) -c -frandom-seed=$@ $(CFLAGS) $(INCLUDEPATHS) -o $@ $<
+
+obj/transaction.o: primitives/transaction.cpp
+	$(CXX) -c -frandom-seed=$@ $(CFLAGS) $(INCLUDEPATHS) -o $@ $<
+
+obj/tokentypes.o: tokens/tokentypes.cpp
+	$(CXX) -c -frandom-seed=$@ $(CFLAGS) $(INCLUDEPATHS) -o $@ $<
+
+obj/tokendb.o: tokens/tokendb.cpp
+	$(CXX) -c -frandom-seed=$@ $(CFLAGS) $(INCLUDEPATHS) -o $@ $<
+
+obj/tokens.o: tokens/tokens.cpp
+	$(CXX) -c -frandom-seed=$@ $(CFLAGS) $(INCLUDEPATHS) -o $@ $<
 
 obj/scrypt-jane.o: scrypt-jane/scrypt-jane.c
 	$(CXX) -c -frandom-seed=$@ $(CFLAGS) $(INCLUDEPATHS) -MMD -o $@ $<

@@ -5,7 +5,7 @@
 
 #include "main.h"
 #include "wallet.h"
-#include "script.h"
+#include "script/script.h"
 
 using namespace std;
 using namespace json_spirit;

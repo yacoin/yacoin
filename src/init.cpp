@@ -40,7 +40,9 @@
 ::int64_t
     nUpTimeStart = 0;
 bool fNewerOpenSSL = false; // for key.cpp's benefit
-
+static const ::uint32_t mainnetNewLogicBlockNumber = 1890000;
+static const ::uint32_t testnetNewLogicBlockNumber = 0;
+static const ::uint32_t tokenSupportBlockNumber = 1911210;
 
 using namespace boost;
 
@@ -56,7 +58,9 @@ unsigned int nNodeLifespan;
 unsigned int nMinerSleep;
 bool fUseFastIndex;
 bool fStoreBlockHashToDb;
-bool fReindex;
+bool fReindexOnlyHeaderSync;
+bool fReindexBlockIndex;
+bool fReindexToken;
 bool fUseFastStakeMiner;
 bool fUseMemoryLog;
 enum Checkpoints::CPMode CheckpointsMode;
@@ -139,11 +143,10 @@ void Shutdown(void* parg)
         boost::filesystem::remove(GetPidFile());
     }
 #endif
-        UnregisterWallet(pwalletMain);
+        CloseWallets();
         if (fDebug)
             if (fPrintToConsole)
                 printf("wallet unregistered\n");
-        delete pwalletMain;
         NewThread(ExitTimeout, NULL);
         if (fDebug)
             if (fPrintToConsole)
@@ -400,6 +403,8 @@ std::string HelpMessage()
         "  -dns                   " + _("Allow DNS lookups for -addnode, -seednode and -connect") + "\n" +
         "  -maxconnections=<n>    " + _("Maintain at most <n> connections to peers (default: 125)") + "\n" +
         "  -addnode=<ip>          " + _("Add a node to connect to and attempt to keep the connection open") + "\n" +
+        "  -tokenindex            " + _("Keep an index of tokens. Requires a -reindex-token.") + "\n" +
+        "  -addressindex          " + _("Maintain a full address index, used to query for the balance, txids and unspent outputs for addresses. Require a -reindex-token or -reindex-blockindex") + "\n" +
         "  -connect=<ip>          " + _("Connect only to the specified node(s)") + "\n" +
         "  -seednode=<ip>         " + _("Connect to a node to retrieve peer addresses, and disconnect") + "\n" +
         "  -externalip=<ip>       " + _("Specify your own public address") + "\n" +
@@ -414,7 +419,9 @@ std::string HelpMessage()
         "  -bantime=<n>           " + _("Number of seconds to keep misbehaving peers from reconnecting (default: 86400)") + "\n" +
         "  -maxreceivebuffer=<n>  " + _("Maximum per-connection receive buffer, <n>*1000 bytes (default: 5000)") + "\n" +
         "  -maxsendbuffer=<n>     " + _("Maximum per-connection send buffer, <n>*1000 bytes (default: 1000)") + "\n" +
-        "  -reindex               " + _("Reindex the old database before the header-sync version") + "\n" +
+        "  -reindex-onlyheadersync          " + _("Upgrade block index to have new field `nstatus`, it just takes a few minutes") + "\n" +
+        "  -reindex-blockindex              " + _("Rebuild block index and transaction index from the blk*.dat files on disk, it takes very long time (around 24->48 hours)") + "\n" +
+        "  -reindex-token                   " + _("Rebuild token index from the blk*.dat files on disk, it takes around 6->9 hours") + "\n" +
         "  -initSyncDownloadTimeout=<n>     " + _("Headers/block download timeout in seconds (default: 600)") + "\n" +
         "  -initSyncMaximumBlocksInDownloadPerPeer=<n>     " + _("Maximum number of blocks being downloaded at a time from one peer (default: 500)") + "\n" +
         "  -initSyncBlockDownloadWindow=<n>     " + _("Block download windows (default: initSyncMaximumBlocksInDownloadPerPeer * 64)") + "\n" +
@@ -562,8 +569,11 @@ bool AppInit2()
     nNodeLifespan = (unsigned int)(GetArg("-addrlifespan", 7));
     fUseFastIndex = GetBoolArg("-fastindex", true);
     fStoreBlockHashToDb = GetBoolArg("-storeblockhash", true);
-    fReindex = GetBoolArg("-reindex", false);
     fUseMemoryLog = GetBoolArg("-memorylog", true);
+    // YAC_TOKEN START
+    fTokenIndex = GetBoolArg("-tokenindex", false);
+    fAddressIndex = GetBoolArg("-addressindex", false);
+    // YAC_TOKEN END
     nMinerSleep = (unsigned int)(GetArg("-minersleep", nOneHundredMilliseconds));
 
     HEADERS_DOWNLOAD_TIMEOUT_BASE = GetArg("-initSyncDownloadTimeout", 10 * 60) * 1000000;
@@ -1219,6 +1229,20 @@ bool AppInit2()
     }
     // ********************************************************* Step 8 was Step 7: load blockchain
 
+    fReindexOnlyHeaderSync = GetBoolArg("-reindex-onlyheadersync", false);
+    fReindexBlockIndex = GetBoolArg("-reindex-blockindex", false);
+    if (!fReindexBlockIndex)
+    {
+        fReindexToken = GetBoolArg("-reindex-token", false);
+    }
+    printf("Param fReindexOnlyHeaderSync = %d, fReindexBlockIndex = %d, fReindexToken = %d\n", fReindexOnlyHeaderSync, fReindexBlockIndex, fReindexToken);
+
+    nMainnetNewLogicBlockNumber = GetArg("-testnetNewLogicBlockNumber", mainnetNewLogicBlockNumber);
+    nTestNetNewLogicBlockNumber = GetArg("-testnetNewLogicBlockNumber", testnetNewLogicBlockNumber);
+    nTokenSupportBlockNumber = GetArg("-tokenSupportBlockNumber", tokenSupportBlockNumber);
+    printf("Param nMainnetNewLogicBlockNumber = %d\n",nMainnetNewLogicBlockNumber);
+    printf("Param testnetNewLogicBlockNumber = %d\n",nTestNetNewLogicBlockNumber);
+
     if (!bitdb.Open(GetDataDir()))
     {
         string msg = strprintf(_("Error initializing database environment %s!"
@@ -1235,17 +1259,13 @@ bool AppInit2()
         return false;
     }
 
-
-    nMainnetNewLogicBlockNumber = GetArg("-testnetNewLogicBlockNumber", 1890000);
-    nTestNetNewLogicBlockNumber = GetArg("-testnetNewLogicBlockNumber", 0);
-    printf("Param nMainnetNewLogicBlockNumber = %d\n",nMainnetNewLogicBlockNumber);
-    printf("Param testnetNewLogicBlockNumber = %d\n",nTestNetNewLogicBlockNumber);
-
     MAXIMUM_YAC1DOT0_N_FACTOR = GetArg("-nFactorAtHardfork", 21);
     printf("Param nFactorAtHardfork = %d\n", MAXIMUM_YAC1DOT0_N_FACTOR);
 
-    printf("Loading block index...\n");
+    std::string additionalInfo = fReindexBlockIndex ? "(reindex block index)" : fReindexToken ? "(reindex token)" : "";
+    printf("Loading block index %s ...\n", additionalInfo.c_str());
     bool fLoaded = false;
+    bool fReindex = fReindexBlockIndex || fReindexToken;
     while (!fLoaded) 
     {
         std::string 
@@ -1260,12 +1280,55 @@ bool AppInit2()
             {
                 UnloadBlockIndex();
 
-                if (!LoadBlockIndex()) 
+                /** YAC_TOKEN START */
+                {
+                    // Basic tokens
+                    delete ptokens;
+                    delete ptokensdb;
+                    delete ptokensCache;
+
+                    // Basic tokens
+                    ptokensdb = new CTokensDB("cr+", fReindex);
+                    ptokens = new CTokensCache();
+                    ptokensCache = new CLRUCache<std::string, CDatabasedTokenData>(MAX_CACHE_TOKENS_SIZE);
+
+                    // Need to load tokens before we verify the database
+                    if (!ptokensdb->LoadTokens()) {
+                        return InitError("Failed to load Tokens Database");
+                    }
+
+                    if (!ptokensdb->ReadReissuedMempoolState())
+                        printf("Database failed to load last Reissued Mempool State. Will have to start from empty state\n");
+
+                    printf("Successfully loaded tokens from database.\nCache of tokens size: %d\n",
+                              ptokensCache->Size());
+                }
+                /** YAC_TOKEN END */
+
+                // Don't build map hash for fReindexBlockIndex
+                if (fReindexToken)
+                {
+                    {
+                        CTxDB txdb;
+                        txdb.BuildMapHash();
+                        txdb.Close();
+                    }
+
+                }
+                if (fReindex)
+                {
+                    // Wipe the database
+                    CTxDB txdb("cr+", fReindex);
+                    fReindexToken = false;
+                    fReindexBlockIndex = false;
+                }
+
+                if (!LoadBlockIndex())
                 {
                     strLoadError = _("Error loading block database");
                     break;
                 }
-            } 
+            }
             catch(std::exception &e) 
             {
                 (void)e;
@@ -1278,6 +1341,7 @@ bool AppInit2()
 
         if (!fLoaded) 
         {   // TODO: suggest reindex here
+            strLoadError += ".\nPlease restart with -reindex-onlyheadersync (takes a few minutes) or -reindex-token (takes around 6->9 hours) or -reindex-blockindex (takes very long time, around 24->48 hours) to recover.";
             return InitError(strLoadError);
         }
     }
@@ -1388,6 +1452,24 @@ bool AppInit2()
     }
 
     // ********************************************************* Step 9: import blocks
+
+    // Reindex
+    if (fReindex) {
+        int nFile = 1;
+        while (true) {
+            CDiskBlockPos pos(nFile, 0);
+            if (!boost::filesystem::exists(GetBlockPosFilename(pos, "blk")))
+                break; // No block files left to reindex
+            FILE *file = OpenBlockFile(pos.nFile, pos.nPos, "rb");
+            if (!file)
+                break; // This error is logged in OpenBlockFile
+            printf("Reindexing block file blk%04u.dat...\n", (unsigned int)nFile);
+            LoadExternalBlockFile(file, &pos);
+            nFile++;
+        }
+        fReindex = false;
+        printf("Reindexing finished\n");
+    }
 
     if (mapArgs.count("-loadblock"))
     {

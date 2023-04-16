@@ -12,12 +12,14 @@
 #include <boost/tuple/tuple.hpp>
 
 #ifndef H_BITCOIN_SCRIPT
- #include "script.h"
+ #include "script/script.h"
 #endif
 
 #ifndef BITCOIN_MAIN_H
  #include "main.h"
 #endif
+
+#include "tokens/tokens.h"
 
 using namespace boost;
 
@@ -105,6 +107,15 @@ const char* GetTxnOutputType(txnouttype t)
     case TX_SCRIPTHASH: return "scripthash";
     case TX_MULTISIG: return "multisig";
     case TX_NULL_DATA: return "nulldata";
+    case TX_CLTV_P2SH: return "CLTV_P2SH_timelock";
+    case TX_CSV_P2SH: return "CSV_P2SH_timelock";
+    case TX_CLTV_P2PKH: return "CLTV_P2PKH_timelock";
+    case TX_CSV_P2PKH: return "CSV_P2PKH_timelock";
+    /** YAC START */
+    case TX_NEW_TOKEN: return TOKEN_NEW_STRING;
+    case TX_TRANSFER_TOKEN: return TOKEN_TRANSFER_STRING;
+    case TX_REISSUE_TOKEN: return TOKEN_REISSUE_STRING;
+    /** YAC END */
     }
     return NULL;
 }
@@ -233,7 +244,7 @@ const char* GetOpName(opcodetype opcode)
     case OP_NOP1                   : return "OP_NOP1";
     case OP_CHECKLOCKTIMEVERIFY    : return "OP_CHECKLOCKTIMEVERIFY";
     case OP_CHECKSEQUENCEVERIFY    : return "OP_CHECKSEQUENCEVERIFY";
-    case OP_NOP4                   : return "OP_NOP4";
+    case OP_YAC_TOKEN              : return "OP_YAC_TOKEN";
     case OP_NOP5                   : return "OP_NOP5";
     case OP_NOP6                   : return "OP_NOP6";
     case OP_NOP7                   : return "OP_NOP7";
@@ -497,7 +508,9 @@ bool EvalScript(
 
                     break;
                 }
-                case OP_NOP1: case OP_NOP4: case OP_NOP5:
+                case OP_YAC_TOKEN:
+                    break;
+                case OP_NOP1: case OP_NOP5:
                 case OP_NOP6: case OP_NOP7: case OP_NOP8: case OP_NOP9: case OP_NOP10:
                 break;
 
@@ -1561,11 +1574,17 @@ bool Solver(
         // Sender provides N pubkeys, receivers provides M signatures
         mTemplates.insert(make_pair(TX_MULTISIG, CScript() << OP_SMALLINTEGER << OP_PUBKEYS << OP_SMALLINTEGER << OP_CHECKMULTISIG));
 
-        // CLTV transaction, sender provides hash of pubkey, receiver provides redeemscript and signature
-        mTemplates.insert(make_pair(TX_CLTV, CScript() << OP_SMALLDATA << OP_NOP2 << OP_DROP << OP_PUBKEYS << OP_CHECKSIG));
+        // CLTV-P2SH transaction, sender provides pubkey, receiver provides redeemscript and signature
+        mTemplates.insert(make_pair(TX_CLTV_P2SH, CScript() << OP_SMALLDATA << OP_NOP2 << OP_DROP << OP_PUBKEYS << OP_CHECKSIG));
 
-        // CSV transaction, sender provides hash of pubkey, receiver provides redeemscript and signature
-        mTemplates.insert(make_pair(TX_CSV, CScript() << OP_SMALLDATA << OP_NOP3 << OP_DROP << OP_PUBKEYS << OP_CHECKSIG));
+        // CSV-P2SH transaction, sender provides pubkey, receiver provides redeemscript and signature
+        mTemplates.insert(make_pair(TX_CSV_P2SH, CScript() << OP_SMALLDATA << OP_NOP3 << OP_DROP << OP_PUBKEYS << OP_CHECKSIG));
+
+        // CLTV-P2PKH transaction, sender provides hash of pubkey, receiver provides signature and pubkey
+        mTemplates.insert(make_pair(TX_CLTV_P2PKH, CScript() << OP_SMALLDATA << OP_NOP2 << OP_DROP << OP_DUP << OP_HASH160 << OP_PUBKEYHASH << OP_EQUALVERIFY << OP_CHECKSIG));
+
+        // CSV-P2PKH transaction, sender provides hash of pubkey, receiver provides signature and pubkey
+        mTemplates.insert(make_pair(TX_CSV_P2PKH, CScript() << OP_SMALLDATA << OP_NOP3 << OP_DROP << OP_DUP << OP_HASH160 << OP_PUBKEYHASH << OP_EQUALVERIFY << OP_CHECKSIG));
 
         if (!fUseOld044Rules)
         {   // Empty, provably prunable, data-carrying output
@@ -1583,9 +1602,21 @@ bool Solver(
         return true;
     }
 
+    /** YAC_TOKEN START */
+    int nType = 0;
+    bool fIsOwner = false;
+    if (scriptPubKey.IsTokenScript(nType, fIsOwner)) {
+        // It is  OP_DUP OP_HASH160 20 <Hash160_public_key> OP_EQUALVERIFY OP_CHECKSIG OP_YAC_TOKEN <token_data> OP_DROP
+        typeRet = (txnouttype)nType;
+        std::vector<unsigned char> hashBytes(scriptPubKey.begin()+3, scriptPubKey.begin()+23);
+        vSolutionsRet.push_back(hashBytes);
+        return true;
+    }
+    /** YAC_TOKEN END */
+
     // Scan templates
     const CScript& script1 = scriptPubKey;
-    BOOST_FOREACH(const PAIRTYPE(txnouttype, CScript)& tplate, mTemplates)
+    for (const std::pair<txnouttype, CScript>& tplate : mTemplates)
     {
         const CScript& script2 = tplate.second;
         vSolutionsRet.clear();
@@ -1611,8 +1642,8 @@ bool Solver(
                         //typeRet = TX_NONSTANDARD;
                         return false;
                     }
-//#endif                    
-#endif                    
+//#endif
+#endif
                     // Additional checks for TX_MULTISIG:
                     unsigned char m = vSolutionsRet.front()[0];
                     unsigned char n = vSolutionsRet.back()[0];
@@ -1765,10 +1796,15 @@ bool Solver(
     case TX_NULL_DATA:  // this is not in 0.4.4 code
         return false;
     case TX_PUBKEY:
-    case TX_CLTV:
-    case TX_CSV:
+    case TX_CLTV_P2SH:
+    case TX_CSV_P2SH:
         keyID = CPubKey(vSolutions[0]).GetID();
         return Sign1(keyID, keystore, hash, nHashType, scriptSigRet);
+    case TX_NEW_TOKEN:
+    case TX_REISSUE_TOKEN:
+    case TX_TRANSFER_TOKEN:
+    case TX_CLTV_P2PKH:
+    case TX_CSV_P2PKH:
     case TX_PUBKEYHASH:
         keyID = CKeyID(uint160(vSolutions[0]));
         if (!Sign1(keyID, keystore, hash, nHashType, scriptSigRet))
@@ -1798,10 +1834,15 @@ int ScriptSigArgsExpected(txnouttype t, const std::vector<std::vector<unsigned c
         return -1;
     case TX_NULL_DATA:
         return 1;
-    case TX_CLTV:
-    case TX_CSV:
+    case TX_CLTV_P2SH:
+    case TX_CSV_P2SH:
     case TX_PUBKEY:
         return 1;
+    case TX_NEW_TOKEN:
+    case TX_REISSUE_TOKEN:
+    case TX_TRANSFER_TOKEN:
+    case TX_CLTV_P2PKH:
+    case TX_CSV_P2PKH:
     case TX_PUBKEYHASH:
         return 2;
     case TX_MULTISIG:
@@ -1872,8 +1913,8 @@ isminetype IsMine(const CKeyStore &keystore, const CTxDestination& dest)
     return IsMine(keystore, script);
 }
 
-bool IsSpendableCltvUTXO(const CKeyStore &keystore,
-		const CScript &scriptPubKey)
+bool IsSpendableTimelockUTXO(const CKeyStore &keystore,
+		const CScript &scriptPubKey, txnouttype& retType, uint32_t& retLockDur)
 {
 	vector<valtype> vSolutions;
 	txnouttype whichType;
@@ -1889,57 +1930,43 @@ bool IsSpendableCltvUTXO(const CKeyStore &keystore,
 		CScript subscript;
 		if (keystore.GetCScript(scriptID, subscript))
 		{
-			return IsSpendableCltvUTXO(keystore, subscript);
+			return IsSpendableTimelockUTXO(keystore, subscript, retType, retLockDur);
 		}
 		break;
 	}
-	case TX_CLTV:
+	case TX_CLTV_P2SH:
+	case TX_CSV_P2SH:
 	{
 		CKeyID keyID = CPubKey(vSolutions[0]).GetID();
+		retType = whichType;
+	    if (!ExtractLockDuration(scriptPubKey, retLockDur))
+	    {
+	        printf("IsSpendableTimelockUTXO(), Can't get lock duration from scriptPubKey\n");
+	    }
 		if (keystore.HaveKey(keyID))
 		{
 			return true;
 		}
 		break;
 	}
-	}
-
-	return false;
-}
-
-bool IsSpendableCsvUTXO(const CKeyStore &keystore,
-        const CScript &scriptPubKey)
-{
-    vector<valtype> vSolutions;
-    txnouttype whichType;
-    if (!Solver(scriptPubKey, whichType, vSolutions)) {
-        return false;
-    }
-
-    switch (whichType)
+    case TX_CLTV_P2PKH:
+    case TX_CSV_P2PKH:
     {
-    case TX_SCRIPTHASH:
-    {
-        CScriptID scriptID = CScriptID(uint160(vSolutions[0]));
-        CScript subscript;
-        if (keystore.GetCScript(scriptID, subscript))
+        CKeyID keyID = CKeyID(uint160(vSolutions[0]));
+        retType = whichType;
+        if (!ExtractLockDuration(scriptPubKey, retLockDur))
         {
-            return IsSpendableCsvUTXO(keystore, subscript);
+            printf("IsSpendableTimelockUTXO(), Can't get lock duration from scriptPubKey\n");
         }
-        break;
-    }
-    case TX_CSV:
-    {
-        CKeyID keyID = CPubKey(vSolutions[0]).GetID();
         if (keystore.HaveKey(keyID))
         {
             return true;
         }
         break;
     }
-    }
+	}
 
-    return false;
+	return false;
 }
 
 isminetype IsMine(const CKeyStore &keystore, const CScript& scriptPubKey)
@@ -1958,11 +1985,15 @@ isminetype IsMine(const CKeyStore &keystore, const CScript& scriptPubKey)
     case TX_NONSTANDARD:
     case TX_NULL_DATA:
         break;
+    case TX_CLTV_P2SH:
+    case TX_CSV_P2SH:
     case TX_PUBKEY:
         keyID = CPubKey(vSolutions[0]).GetID();
         if (keystore.HaveKey(keyID))
             return MINE_SPENDABLE;
         break;
+    case TX_CLTV_P2PKH:
+    case TX_CSV_P2PKH:
     case TX_PUBKEYHASH:
         keyID = CKeyID(uint160(vSolutions[0]));
         if (keystore.HaveKey(keyID))
@@ -1991,16 +2022,19 @@ isminetype IsMine(const CKeyStore &keystore, const CScript& scriptPubKey)
             return MINE_SPENDABLE;
         break;
     }
-    case TX_CLTV:
-    case TX_CSV:
+    /** YAC_TOKEN START */
+    case TX_NEW_TOKEN:
+    case TX_TRANSFER_TOKEN:
+    case TX_REISSUE_TOKEN:
     {
-       keyID = CPubKey(vSolutions[0]).GetID();
+        if (!AreTokensDeployed())
+            return MINE_NO;
+        keyID = CKeyID(uint160(vSolutions[0]));
         if (keystore.HaveKey(keyID))
-        {
             return MINE_SPENDABLE;
-        }
         break;
     }
+    /** YAC_TOKEN END*/
     }
 
     if (keystore.HaveWatchOnly(scriptPubKey))
@@ -2015,12 +2049,12 @@ bool ExtractDestination(const CScript& scriptPubKey, CTxDestination& addressRet)
     if (!Solver(scriptPubKey, whichType, vSolutions))
         return false;
 
-    if (whichType == TX_PUBKEY)
+    if (whichType == TX_PUBKEY || whichType == TX_CLTV_P2SH || whichType == TX_CSV_P2SH)
     {
         addressRet = CPubKey(vSolutions[0]).GetID();
         return true;
     }
-    else if (whichType == TX_PUBKEYHASH)
+    else if (whichType == TX_PUBKEYHASH || whichType == TX_CLTV_P2PKH || whichType == TX_CSV_P2PKH)
     {
         addressRet = CKeyID(uint160(vSolutions[0]));
         return true;
@@ -2029,9 +2063,64 @@ bool ExtractDestination(const CScript& scriptPubKey, CTxDestination& addressRet)
     {
         addressRet = CScriptID(uint160(vSolutions[0]));
         return true;
+    /** YAC_TOKEN START */
+    } else if (whichType == TX_NEW_TOKEN || whichType == TX_REISSUE_TOKEN || whichType == TX_TRANSFER_TOKEN) {
+        addressRet = CKeyID(uint160(vSolutions[0]));
+        return true;
     }
+     /** YAC_TOKEN END */
     // Multisig txns have more than one address...
     return false;
+}
+
+bool ExtractLockDuration(const CScript& scriptPubKey, uint32_t& lockDuration)
+{
+    // Scan information from scriptPubKey to get lock duration
+    CScript::const_iterator pc = scriptPubKey.begin();
+    opcodetype opcode;
+    vector<unsigned char> vch;
+    if (!scriptPubKey.GetOp(pc, opcode, vch))
+    {
+        return false;
+    }
+
+    lockDuration = CScriptNum(vch).getuint();
+    return true;
+}
+
+bool ExtractDestinations(const CScript& scriptPubKey, txnouttype& typeRet, vector<CTxDestination>& addressRet, int& nRequiredRet)
+{
+    addressRet.clear();
+    typeRet = TX_NONSTANDARD;
+    vector<valtype> vSolutions;
+    if (!Solver(scriptPubKey, typeRet, vSolutions))
+        return false;
+    if (typeRet == TX_NULL_DATA)
+        return true;
+
+    if (typeRet == TX_MULTISIG)
+    {
+        nRequiredRet = vSolutions.front()[0];
+        for (unsigned int i = 1; i < vSolutions.size()-1; i++)
+        {
+            CTxDestination address = CPubKey(vSolutions[i]).GetID();
+            addressRet.push_back(address);
+        }
+    }
+    else
+    {
+        nRequiredRet = 1;
+        CTxDestination address;
+        if (!ExtractDestination(scriptPubKey, address))
+           return false;
+        addressRet.push_back(address);
+    }
+
+    return true;
+}
+
+bool IsValidDestination(const CTxDestination& dest) {
+    return dest.which() != 0;
 }
 
 class CAffectedKeysVisitor : public boost::static_visitor<void> {
@@ -2069,37 +2158,6 @@ public:
 
 void ExtractAffectedKeys(const CKeyStore &keystore, const CScript& scriptPubKey, std::vector<CKeyID> &vKeys) {
     CAffectedKeysVisitor(keystore, vKeys).Process(scriptPubKey);
-}
-
-bool ExtractDestinations(const CScript& scriptPubKey, txnouttype& typeRet, vector<CTxDestination>& addressRet, int& nRequiredRet)
-{
-    addressRet.clear();
-    typeRet = TX_NONSTANDARD;
-    vector<valtype> vSolutions;
-    if (!Solver(scriptPubKey, typeRet, vSolutions))
-        return false;
-    if (typeRet == TX_NULL_DATA)
-        return true;
-
-    if (typeRet == TX_MULTISIG)
-    {
-        nRequiredRet = vSolutions.front()[0];
-        for (unsigned int i = 1; i < vSolutions.size()-1; i++)
-        {
-            CTxDestination address = CPubKey(vSolutions[i]).GetID();
-            addressRet.push_back(address);
-        }
-    }
-    else
-    {
-        nRequiredRet = 1;
-        CTxDestination address;
-        if (!ExtractDestination(scriptPubKey, address))
-           return false;
-        addressRet.push_back(address);
-    }
-
-    return true;
 }
 
 bool VerifyScript(const CScript& scriptSig, const CScript& scriptPubKey, const CTransaction& txTo, unsigned int nIn,
@@ -2161,6 +2219,8 @@ bool SignSignature(const CKeyStore &keystore, const CScript& fromPubKey, CTransa
         // Solver returns the subscript that need to be evaluated;
         // the final scriptSig is the signatures from that
         // and then the serialized subscript:
+        // Important note: Until this step, we only have the redeemscript stored in txin.scriptSig. We still need signature for the public key
+        // specified in the redeemscript. Below steps do that for us.
         CScript subscript = txin.scriptSig;
 
         // Recompute txn hash using subscript in place of scriptPubKey:
@@ -2170,7 +2230,7 @@ bool SignSignature(const CKeyStore &keystore, const CScript& fromPubKey, CTransa
         bool fSolved =
             Solver(keystore, subscript, hash2, nHashType, txin.scriptSig, subType) && subType != TX_SCRIPTHASH; // IMPORTANT HERE
         // Append serialized subscript whether or not it is completely signed:
-        txin.scriptSig << static_cast<valtype>(subscript);
+        txin.scriptSig << static_cast<valtype>(subscript); // append redeemscript to scriptSig
         if (!fSolved) return false;
     }
 
@@ -2187,6 +2247,11 @@ bool SignSignature(const CKeyStore &keystore, const CTransaction& txFrom, CTrans
     const CTxOut& txout = txFrom.vout[txin.prevout.COutPointGet_n()]; // Get UTXO
 
     return SignSignature(keystore, txout.scriptPubKey, txTo, nIn, nHashType);
+}
+
+bool SignSignature(const CKeyStore &keystore, const CTxOut& txOutFrom, CTransaction& txTo, unsigned int nIn, int nHashType)
+{
+    return SignSignature(keystore, txOutFrom.scriptPubKey, txTo, nIn, nHashType);
 }
 
 static CScript PushAll(const vector<valtype>& values)
@@ -2360,6 +2425,33 @@ unsigned int CScript::GetSigOpCount(const CScript& scriptSig) const
     return subscript.GetSigOpCount(true);
 }
 
+bool CScript::IsPayToPublicKey() const
+{
+    // Test for pay-to-pubkey CScript with both
+    // compressed or uncompressed pubkey
+    if (this->size() == 35) {
+        return ((*this)[1] == 0x02 || (*this)[1] == 0x03) &&
+                (*this)[34] == OP_CHECKSIG;
+    }
+    if (this->size() == 67) {
+        return (*this)[1] == 0x04 &&
+                (*this)[66] == OP_CHECKSIG;
+
+    }
+    return false;
+}
+
+bool CScript::IsPayToPublicKeyHash() const
+{
+    // Extra-fast test for pay-to-pubkey-hash CScripts:
+    return (this->size() == 25 &&
+        (*this)[0] == OP_DUP &&
+        (*this)[1] == OP_HASH160 &&
+        (*this)[2] == 0x14 &&
+        (*this)[23] == OP_EQUALVERIFY &&
+        (*this)[24] == OP_CHECKSIG);
+}
+
 bool CScript::IsPayToScriptHash() const
 {
     // Extra-fast test for pay-to-script-hash CScripts:
@@ -2368,6 +2460,103 @@ bool CScript::IsPayToScriptHash() const
             this->at(1) == 0x14 &&
             this->at(22) == OP_EQUAL);
 }
+
+/** YAC_TOKEN START */
+bool CScript::IsTokenScript() const
+{
+    int nType = 0;
+    bool isOwner = false;
+    int start = 0;
+    return IsTokenScript(nType, isOwner, start);
+}
+
+bool CScript::IsTokenScript(int& nType, bool& isOwner) const
+{
+    int start = 0;
+    return IsTokenScript(nType, isOwner, start);
+}
+
+bool CScript::IsTokenScript(int& nType, bool& fIsOwner, int& nStartingIndex) const
+{
+    if (this->size() > 31) {
+        if ((*this)[25] == OP_YAC_TOKEN) { // OP_YAC_TOKEN is always in the 25 index of the script if it exists
+            int index = -1;
+            if ((*this)[27] == YAC_Y) { // Check to see if YAC starts at 27 ( this->size() < 105)
+                if ((*this)[28] == YAC_A)
+                    if ((*this)[29] == YAC_C)
+                        index = 30;
+            } else {
+                if ((*this)[28] == YAC_Y) // Check to see if YAC starts at 28 ( this->size() >= 105)
+                    if ((*this)[29] == YAC_A)
+                        if ((*this)[30] == YAC_C)
+                            index = 31;
+            }
+
+            if (index > 0) {
+                nStartingIndex = index + 1; // Set the index where the token data begins. Use to serialize the token data into token objects
+                if ((*this)[index] == YAC_T) { // Transfer first anticipating more transfers than other tokens operations
+                    nType = TX_TRANSFER_TOKEN;
+                    return true;
+                } else if ((*this)[index] == YAC_Q && this->size() > 39) {
+                    nType = TX_NEW_TOKEN;
+                    fIsOwner = false;
+                    return true;
+                } else if ((*this)[index] == YAC_O) {
+                    nType = TX_NEW_TOKEN;
+                    fIsOwner = true;
+                    return true;
+                } else if ((*this)[index] == YAC_R) {
+                    nType = TX_REISSUE_TOKEN;
+                    return true;
+                }
+            }
+        }
+    }
+    return false;
+}
+
+
+bool CScript::IsNewToken() const
+{
+
+    int nType = 0;
+    bool fIsOwner = false;
+    if (IsTokenScript(nType, fIsOwner))
+        return !fIsOwner && nType == TX_NEW_TOKEN;
+
+    return false;
+}
+
+bool CScript::IsOwnerToken() const
+{
+    int nType = 0;
+    bool fIsOwner = false;
+    if (IsTokenScript(nType, fIsOwner))
+        return fIsOwner && nType == TX_NEW_TOKEN;
+
+    return false;
+}
+
+bool CScript::IsReissueToken() const
+{
+    int nType = 0;
+    bool fIsOwner = false;
+    if (IsTokenScript(nType, fIsOwner))
+        return nType == TX_REISSUE_TOKEN;
+
+    return false;
+}
+
+bool CScript::IsTransferToken() const
+{
+    int nType = 0;
+    bool fIsOwner = false;
+    if (IsTokenScript(nType, fIsOwner))
+        return nType == TX_TRANSFER_TOKEN;
+
+    return false;
+}
+/** YAC_TOKEN END */
 
 bool CScript::HasCanonicalPushes() const
 {
@@ -2436,7 +2625,7 @@ void CScript::SetMultisig(int nRequired, const std::vector<CKey>& keys)
     *this << EncodeOP_N((int)(keys.size())) << OP_CHECKMULTISIG;
 }
 
-void CScript::SetCltv(int nLockTime, const CPubKey& pubKey)
+void CScript::SetCltvP2SH(uint32_t nLockTime, const CPubKey& pubKey)
 {
     this->clear();
 
@@ -2445,7 +2634,16 @@ void CScript::SetCltv(int nLockTime, const CPubKey& pubKey)
 	*this << pubKey << OP_CHECKSIG;
 }
 
-void CScript::SetCsv(::uint32_t nSequence, const CPubKey& pubKey)
+void CScript::SetCltvP2PKH(uint32_t nLockTime, const CKeyID &keyID)
+{
+    this->clear();
+
+    *this << (CScriptNum)nLockTime;
+    *this << OP_CHECKLOCKTIMEVERIFY << OP_DROP;
+    *this  << OP_DUP << OP_HASH160 << keyID << OP_EQUALVERIFY << OP_CHECKSIG;
+}
+
+void CScript::SetCsvP2SH(::uint32_t nSequence, const CPubKey& pubKey)
 {
     this->clear();
 
@@ -2453,6 +2651,24 @@ void CScript::SetCsv(::uint32_t nSequence, const CPubKey& pubKey)
     *this << OP_CHECKSEQUENCEVERIFY << OP_DROP;
     *this << pubKey << OP_CHECKSIG;
 }
+
+void CScript::SetCsvP2PKH(::uint32_t nSequence, const CKeyID &keyID)
+{
+    this->clear();
+
+    *this << (CScriptNum)nSequence;
+    *this << OP_CHECKSEQUENCEVERIFY << OP_DROP;
+    *this  << OP_DUP << OP_HASH160 << keyID << OP_EQUALVERIFY << OP_CHECKSIG;
+}
+
+CScript GetScriptForDestination(const CTxDestination& dest)
+{
+    CScript script;
+
+    boost::apply_visitor(CScriptVisitor(&script), dest);
+    return script;
+}
+
 #ifdef _MSC_VER
     #include "msvc_warnings.pop.h"
 #endif

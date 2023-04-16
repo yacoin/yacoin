@@ -38,37 +38,61 @@ enum HTTPStatusCode
 // Bitcoin RPC error codes
 enum RPCErrorCode
 {
-    // Standard JSON-RPC 2.0 errors
+    //! Standard JSON-RPC 2.0 errors
+    // RPC_INVALID_REQUEST is internally mapped to HTTP_BAD_REQUEST (400).
+    // It should not be used for application-layer errors.
     RPC_INVALID_REQUEST  = -32600,
+    // RPC_METHOD_NOT_FOUND is internally mapped to HTTP_NOT_FOUND (404).
+    // It should not be used for application-layer errors.
     RPC_METHOD_NOT_FOUND = -32601,
     RPC_INVALID_PARAMS   = -32602,
+    // RPC_INTERNAL_ERROR should only be used for genuine errors in yacoind
+    // (for example datadir corruption).
     RPC_INTERNAL_ERROR   = -32603,
     RPC_PARSE_ERROR      = -32700,
 
-    // General application defined errors
-    RPC_MISC_ERROR                  = -1,  // std::exception thrown in command handling
-    RPC_FORBIDDEN_BY_SAFE_MODE      = -2,  // Server is in safe mode, and command is not allowed in safe mode
-    RPC_TYPE_ERROR                  = -3,  // Unexpected type was passed as parameter
-    RPC_INVALID_ADDRESS_OR_KEY      = -5,  // Invalid address or key
-    RPC_OUT_OF_MEMORY               = -7,  // Ran out of memory during operation
-    RPC_INVALID_PARAMETER           = -8,  // Invalid, missing or duplicate parameter
-    RPC_DATABASE_ERROR              = -20, // Database error
-    RPC_DESERIALIZATION_ERROR       = -22, // Error parsing or validating structure in raw format
+    //! General application defined errors
+    RPC_MISC_ERROR                  = -1,  //!< std::exception thrown in command handling
+    RPC_FORBIDDEN_BY_SAFE_MODE      = -2,  //!< Server is in safe mode, and command is not allowed in safe mode
+    RPC_TYPE_ERROR                  = -3,  //!< Unexpected type was passed as parameter
+    RPC_INVALID_ADDRESS_OR_KEY      = -5,  //!< Invalid address or key
+    RPC_OUT_OF_MEMORY               = -7,  //!< Ran out of memory during operation
+    RPC_INVALID_PARAMETER           = -8,  //!< Invalid, missing or duplicate parameter
+    RPC_DATABASE_ERROR              = -20, //!< Database error
+    RPC_DESERIALIZATION_ERROR       = -22, //!< Error parsing or validating structure in raw format
+    RPC_VERIFY_ERROR                = -25, //!< General error during transaction or block submission
+    RPC_VERIFY_REJECTED             = -26, //!< Transaction or block was rejected by network rules
+    RPC_VERIFY_ALREADY_IN_CHAIN     = -27, //!< Transaction already in chain
+    RPC_IN_WARMUP                   = -28, //!< Client still warming up
+    RPC_METHOD_DEPRECATED           = -32, //!< RPC method is deprecated
+    RPC_HELP_USAGE                  = -33, //!< Show help usage
 
-    // P2P client errors
-    RPC_CLIENT_NOT_CONNECTED        = -9,  // Bitcoin is not connected
-    RPC_CLIENT_IN_INITIAL_DOWNLOAD  = -10, // Still downloading initial blocks
+    //! Aliases for backward compatibility
+    RPC_TRANSACTION_ERROR           = RPC_VERIFY_ERROR,
+    RPC_TRANSACTION_REJECTED        = RPC_VERIFY_REJECTED,
+    RPC_TRANSACTION_ALREADY_IN_CHAIN= RPC_VERIFY_ALREADY_IN_CHAIN,
 
-    // Wallet errors
-    RPC_WALLET_ERROR                = -4,  // Unspecified problem with wallet (key not found etc.)
-    RPC_WALLET_INSUFFICIENT_FUNDS   = -6,  // Not enough funds in wallet or account
-    RPC_WALLET_INVALID_ACCOUNT_NAME = -11, // Invalid account name
-    RPC_WALLET_KEYPOOL_RAN_OUT      = -12, // Keypool ran out, call keypoolrefill first
-    RPC_WALLET_UNLOCK_NEEDED        = -13, // Enter the wallet passphrase with walletpassphrase first
-    RPC_WALLET_PASSPHRASE_INCORRECT = -14, // The wallet passphrase entered was incorrect
-    RPC_WALLET_WRONG_ENC_STATE      = -15, // Command given in wrong wallet encryption state (encrypting an encrypted wallet etc.)
-    RPC_WALLET_ENCRYPTION_FAILED    = -16, // Failed to encrypt the wallet
-    RPC_WALLET_ALREADY_UNLOCKED     = -17, // Wallet is already unlocked
+    //! P2P client errors
+    RPC_CLIENT_NOT_CONNECTED        = -9,  //!< Yacoind is not connected
+    RPC_CLIENT_IN_INITIAL_DOWNLOAD  = -10, //!< Still downloading initial blocks
+    RPC_CLIENT_NODE_ALREADY_ADDED   = -23, //!< Node is already added
+    RPC_CLIENT_NODE_NOT_ADDED       = -24, //!< Node has not been added before
+    RPC_CLIENT_NODE_NOT_CONNECTED   = -29, //!< Node to disconnect not found in connected nodes
+    RPC_CLIENT_INVALID_IP_OR_SUBNET = -30, //!< Invalid IP/Subnet
+    RPC_CLIENT_P2P_DISABLED         = -31, //!< No valid connection manager instance found
+
+    //! Wallet errors
+    RPC_WALLET_ERROR                = -4,  //!< Unspecified problem with wallet (key not found etc.)
+    RPC_WALLET_INSUFFICIENT_FUNDS   = -6,  //!< Not enough funds in wallet or account
+    RPC_WALLET_INVALID_ACCOUNT_NAME = -11, //!< Invalid account name
+    RPC_WALLET_KEYPOOL_RAN_OUT      = -12, //!< Keypool ran out, call keypoolrefill first
+    RPC_WALLET_UNLOCK_NEEDED        = -13, //!< Enter the wallet passphrase with walletpassphrase first
+    RPC_WALLET_PASSPHRASE_INCORRECT = -14, //!< The wallet passphrase entered was incorrect
+    RPC_WALLET_WRONG_ENC_STATE      = -15, //!< Command given in wrong wallet encryption state (encrypting an encrypted wallet etc.)
+    RPC_WALLET_ENCRYPTION_FAILED    = -16, //!< Failed to encrypt the wallet
+    RPC_WALLET_ALREADY_UNLOCKED     = -17, //!< Wallet is already unlocked
+    RPC_WALLET_NOT_FOUND            = -18, //!< Invalid wallet specified
+    RPC_WALLET_NOT_SPECIFIED        = -19, //!< No wallet specified (error when there are multiple wallets loaded)
 };
 
 json_spirit::Object JSONRPCError(int code, const std::string& message);
@@ -131,6 +155,8 @@ extern const CRPCTable tableRPC;
 extern int64_t nWalletUnlockTime;
 extern int64_t AmountFromValue(const json_spirit::Value& value);
 extern json_spirit::Value ValueFromAmount(int64_t amount);
+extern std::string TokenValueFromAmount(const CAmount& amount, const std::string token_name);
+extern std::string TokenValueFromAmountString(const CAmount& amount, const int8_t units);
 extern double GetDifficulty(const CBlockIndex* blockindex = NULL);
 
 extern double GetPoWMHashPS();
@@ -139,6 +165,10 @@ extern double GetPoSKernelPS();
 extern std::string HexBits(unsigned int nBits);
 extern std::string HelpRequiringPassphrase();
 extern void EnsureWalletIsUnlocked();
+
+// Helper functions
+extern std::string HelpExampleCli(const std::string& methodname, const std::string& args);
+extern std::string HelpExampleRpc(const std::string& methodname, const std::string& args);
 
 //
 // Utilities: convert hex-encoded Values
@@ -185,6 +215,7 @@ extern json_spirit::Value verifymessage(const json_spirit::Array& params, bool f
 extern json_spirit::Value getreceivedbyaddress(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value getreceivedbyaccount(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value getbalance(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value getavailablebalance(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value movecmd(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value sendfrom(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value sendmany(const json_spirit::Array& params, bool fHelp);
@@ -245,5 +276,18 @@ extern json_spirit::Value getblocktimes(const json_spirit::Array& params, bool f
 extern json_spirit::Value getcheckpoint(const json_spirit::Array& params, bool fHelp);
 
 extern json_spirit::Value generatetoaddress(const json_spirit::Array& params, bool fHelp);
-
+/** YAC_TOKEN START */
+extern json_spirit::Value issue(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value transfer(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value transferfromaddress(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value reissue(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value listmytokens(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value listtokens(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value listaddressesbytoken(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value listtokenbalancesbyaddress(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value getaddressbalance(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value getaddressdeltas(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value getaddressutxos(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value getaddresstxids(const json_spirit::Array& params, bool fHelp);
+/** YAC_TOKEN END */
 #endif

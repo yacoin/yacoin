@@ -230,62 +230,8 @@ CBlock* CreateNewBlock(CWallet* pwallet, bool fProofOfStake)
 
     if (fProofOfStake)  // attempt to find a coinstake
     {
-        pblock->nBits = GetNextTargetRequired(pindexPrev, true);
-
-        CTransaction 
-            txCoinStake;    // uses real time
-
-        ::int64_t 
-            nSearchTime = (::int64_t)txCoinStake.nTime; // search to current time
-
-        if (
-            (nSearchTime > nLastCoinStakeSearchTime)
-           )  
-        {
-            CKey 
-                key;
-
-            bool
-                fCreatedCoinStake;
-            if(
-                fUseOld044Rules
-              )
-            {
-                fCreatedCoinStake = pwallet->CreateCoinStake(
-                                                             *pwallet, 
-                                                             pblock->nBits,
-                                                             nSearchTime-nLastCoinStakeSearchTime, 
-                                                             txCoinStake
-                                                            );
-            }
-            else    // new rules are in play
-            {
-                fCreatedCoinStake = pwallet->CreateCoinStake(
-                                                            *pwallet, 
-                                                             pblock->nBits,
-                                                             nSearchTime-nLastCoinStakeSearchTime, 
-                                                             txCoinStake,
-                                                             key
-                                                            );
-            }
-            if( fCreatedCoinStake )
-            {
-                if (
-                    txCoinStake.nTime >= max(
-                                             pindexPrev->GetMedianTimePast()+1, 
-                                             pindexPrev->GetBlockTime() - nMaxClockDrift
-                                            )
-                   )
-                {   // make sure coinstake would meet timestamp protocol
-                    // as it would be the same as the block timestamp
-                    pblock->vtx[0].vout[0].SetEmpty();
-                    pblock->vtx[0].nTime = txCoinStake.nTime;
-                    pblock->vtx.push_back(txCoinStake);
-                }
-            }
-            nLastCoinStakeSearchInterval = nSearchTime - nLastCoinStakeSearchTime;
-            nLastCoinStakeSearchTime = nSearchTime;
-        }
+        // Yacoin 1.0.0 doesn't support POS anymore
+        return NULL;
     }
 /**********************/
 

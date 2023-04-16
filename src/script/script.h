@@ -13,10 +13,13 @@
 #ifndef BITCOIN_KEYSTORE_H
  #include "keystore.h"
 #endif
+#include "prevector.h"
 
 typedef std::vector< ::uint8_t> valtype;
+typedef prevector<28, unsigned char> CScriptBase;
 
 class CTransaction;
+class CTxOut;
 
 static const unsigned int MAX_SCRIPT_ELEMENT_SIZE = 520; // bytes
 
@@ -130,6 +133,15 @@ public:
             return std::numeric_limits<int>::max();
         else if (m_value < std::numeric_limits<int>::min())
             return std::numeric_limits<int>::min();
+        return m_value;
+    }
+
+    uint32_t getuint() const
+    {
+        if (m_value > std::numeric_limits<uint32_t>::max())
+            return std::numeric_limits<uint32_t>::max();
+        else if (m_value < std::numeric_limits<uint32_t>::min())
+            return std::numeric_limits<uint32_t>::min();
         return m_value;
     }
 
@@ -256,17 +268,23 @@ static const unsigned int SOFT_FLAGS = STRICT_FLAGS & ~STRICT_FORMAT_FLAGS;
 /** Used as the flags parameter to sequence and nLocktime checks in non-consensus code. */
 static const unsigned int STANDARD_LOCKTIME_VERIFY_FLAGS = LOCKTIME_VERIFY_SEQUENCE;
 
-enum txnouttype
-{
+enum txnouttype {
     TX_NONSTANDARD,
     // 'standard' transaction types:
     TX_PUBKEY,
     TX_PUBKEYHASH,
     TX_SCRIPTHASH,
     TX_MULTISIG,
-	TX_CLTV,
-	TX_CSV,
+    TX_CLTV_P2SH,
+    TX_CSV_P2SH,
+    TX_CLTV_P2PKH,
+    TX_CSV_P2PKH,
     TX_NULL_DATA,
+    /** YAC_TOKEN START */
+    TX_NEW_TOKEN,
+    TX_REISSUE_TOKEN,
+    TX_TRANSFER_TOKEN,
+    /** YAC_TOKEN END */
 };
 
 const char* GetTxnOutputType(txnouttype t);
@@ -401,6 +419,7 @@ enum opcodetype
     OP_NOP3 = 0xb2,
     OP_CHECKSEQUENCEVERIFY = OP_NOP3,
     OP_NOP4 = 0xb3,
+    OP_YAC_TOKEN = OP_NOP4,
     OP_NOP5 = 0xb4,
     OP_NOP6 = 0xb5,
     OP_NOP7 = 0xb6,
@@ -440,6 +459,12 @@ inline std::string StackString(const std::vector<std::vector<unsigned char> >& v
         str += ValueString(vch);
     }
     return str;
+}
+
+template <typename T>
+std::vector<unsigned char> ToByteVector(const T& in)
+{
+    return std::vector<unsigned char>(in.begin(), in.end());
 }
 
 /** Serialized script, used inside transaction inputs and outputs */
@@ -723,7 +748,20 @@ public:
     // pay-to-script-hash transactions:
     unsigned int GetSigOpCount(const CScript& scriptSig) const;
 
+    bool IsPayToPublicKey() const;
+    bool IsPayToPublicKeyHash() const;
     bool IsPayToScriptHash() const;
+
+    /** YAC_TOKEN START */
+    bool IsTokenScript(int& nType, bool& fIsOwner, int& nStartingIndex) const;
+    bool IsTokenScript(int& nType, bool& fIsOwner) const;
+    bool IsTokenScript() const;
+    bool IsNewToken() const;
+    bool IsOwnerToken() const;
+    bool IsReissueToken() const;
+    bool IsTransferToken() const;
+    bool IsToken() const;
+    /** YAC_TOKEN END */
 
     // Called by CTransaction::IsStandard and P2SH VerifyScript (which makes it consensus-critical).
     bool IsPushOnly() const
@@ -745,8 +783,10 @@ public:
 
     void SetDestination(const CTxDestination& address);
     void SetMultisig(int nRequired, const std::vector<CKey>& keys);
-    void SetCltv(int nLockTime, const CPubKey& pubKey);
-    void SetCsv(::uint32_t nSequence, const CPubKey& pubKey);
+    void SetCltvP2SH(uint32_t nLockTime, const CPubKey& pubKey);
+    void SetCltvP2PKH(uint32_t nLockTime, const CKeyID &keyID);
+    void SetCsvP2SH(::uint32_t nSequence, const CPubKey& pubKey);
+    void SetCsvP2PKH(::uint32_t nSequence, const CKeyID &keyID);
 
     void PrintHex() const
     {
@@ -797,17 +837,20 @@ int ScriptSigArgsExpected(txnouttype t, const std::vector<std::vector<unsigned c
 bool IsStandard(const CScript& scriptPubKey, txnouttype& whichType);
 isminetype IsMine(const CKeyStore& keystore, const CScript& scriptPubKey);
 isminetype IsMine(const CKeyStore& keystore, const CTxDestination& dest);
-bool IsSpendableCltvUTXO(const CKeyStore &keystore, const CScript& scriptPubKey);
-bool IsSpendableCsvUTXO(const CKeyStore &keystore, const CScript& scriptPubKey);
+bool IsSpendableTimelockUTXO(const CKeyStore &keystore, const CScript& scriptPubKey, txnouttype& retType, uint32_t& retLockDur);
 void ExtractAffectedKeys(const CKeyStore &keystore, const CScript& scriptPubKey, std::vector<CKeyID> &vKeys);
 bool ExtractDestination(const CScript& scriptPubKey, CTxDestination& addressRet);
+bool ExtractLockDuration(const CScript& scriptPubKey, uint32_t& lockDuration);
 bool ExtractDestinations(const CScript& scriptPubKey, txnouttype& typeRet, std::vector<CTxDestination>& addressRet, int& nRequiredRet);
+/** Check whether a CTxDestination is a CNoDestination. */
+bool IsValidDestination(const CTxDestination& dest);
 bool SignSignature(const CKeyStore& keystore, const CScript& fromPubKey, CTransaction& txTo, unsigned int nIn, int nHashType=SIGHASH_ALL);
 bool SignSignature(const CKeyStore& keystore, const CTransaction& txFrom, CTransaction& txTo, unsigned int nIn, int nHashType=SIGHASH_ALL);
+bool SignSignature(const CKeyStore &keystore, const CTxOut& txOutFrom, CTransaction& txTo, unsigned int nIn, int nHashType=SIGHASH_ALL);
 bool VerifyScript(const CScript& scriptSig, const CScript& scriptPubKey, const CTransaction& txTo, unsigned int nIn, unsigned int flags, int nHashType);
+CScript GetScriptForDestination(const CTxDestination& dest);
 
 // Given two sets of signatures for scriptPubKey, possibly with OP_0 placeholders,
 // combine them intelligently and return the result.
 CScript CombineSignatures(CScript scriptPubKey, const CTransaction& txTo, unsigned int nIn, const CScript& scriptSig1, const CScript& scriptSig2);
-
 #endif

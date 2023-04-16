@@ -28,6 +28,7 @@ extern bool fConfChange;
 class CAccountingEntry;
 class CWalletTx;
 class CReserveKey;
+class CInputCoin;
 class COutput;
 class CCoinControl;
 
@@ -86,6 +87,13 @@ public:
     )
 };
 
+struct CRecipient
+{
+    CScript scriptPubKey;
+    CAmount nAmount;
+    bool fSubtractFeeFromAmount;
+};
+
 /** A CWallet is an extension of a keystore, which also maintains a set of transactions and balances,
  * and provides the ability to create new transactions.
  */
@@ -96,10 +104,21 @@ private:
 			::int64_t nMaxValue, int64_t nSpendTime, int nMinConf,
 			std::set<std::pair<const CWalletTx*, unsigned int> > &setCoinsRet,
 			::int64_t &nValueRet) const;
-	bool SelectCoins(::int64_t nTargetValue, int64_t nSpendTime,
-			std::set<std::pair<const CWalletTx*, unsigned int> > &setCoinsRet,
-			::int64_t &nValueRet, const CCoinControl *coinControl = NULL,
-			const CScript *fromScriptPubKey = NULL) const;
+    /**
+     * Select a set of coins such that nValueRet >= nTargetValue and at least
+     * all coins from coinControl are selected; Never select unconfirmed coins
+     * if they are not ours
+     */
+    bool SelectCoins(const CAmount &nTargetValue, int64_t nSpendTime,
+            const std::vector<COutput> &vAvailableCoins,
+            std::set<CInputCoin> &setCoinsRet, CAmount &nValueRet,
+            const CCoinControl *coinControl = NULL) const;
+    bool SelectTokens(
+        int64_t nSpendTime,
+        const std::map<std::string, std::vector<COutput> >& mapAvailableTokens,
+        const std::map<std::string, CAmount>& mapTokenTargetValue,
+        std::set<CInputCoin>& setCoinsRet,
+        std::map<std::string, CAmount>& mapValueRet) const;
 
     CWalletDB *pwalletdbEncryption, *pwalletdbDecryption;
 
@@ -170,8 +189,76 @@ public:
     bool CanSupportFeature(enum WalletFeature wf) { return nWalletMaxVersion >= wf; }
 
     void AvailableCoinsMinConf(std::vector<COutput>& vCoins, int nConf, ::int64_t nMinValue, ::int64_t nMaxValue) const;
-    void AvailableCoins(std::vector<COutput>& vCoins, bool fOnlyConfirmed=true, const CCoinControl *coinControl=NULL, const CScript *fromScriptPubKey=NULL, bool fCountCltvOrCsv=false) const;
-    bool SelectCoinsMinConf(::int64_t nTargetValue, int64_t nSpendTime, int nConfMine, int nConfTheirs, std::vector<COutput> vCoins, std::set<std::pair<const CWalletTx*,unsigned int> >& setCoinsRet, ::int64_t& nValueRet) const;
+
+    /**
+     * populate vCoins with vector of available COutputs.
+     */
+    void AvailableCoins(std::vector<COutput> &vCoins, bool fOnlySafe = true,
+            const CCoinControl *coinControl = NULL,
+            const CScript *fromScriptPubKey = NULL,
+            bool useExpiredTimelockUTXO = false, const CAmount &nMinimumAmount = 1,
+            const CAmount &nMaximumAmount = MAX_MONEY,
+            const CAmount &nMinimumSumAmount = MAX_MONEY,
+            const uint64_t nMaximumCount = 0, const int nMinDepth = 0,
+            const int nMaxDepth = 9999999) const;
+
+    /**
+     * Helper function that calls AvailableCoinsAll, used for transfering tokens
+     */
+    void AvailableTokens(
+        std::map<std::string, std::vector<COutput> >& mapTokenCoins,
+        bool fOnlySafe = true, const CCoinControl* coinControl = nullptr,
+        const CAmount& nMinimumAmount = 1,
+        const CAmount& nMaximumAmount = MAX_MONEY,
+        const CAmount& nMinimumSumAmount = MAX_MONEY,
+        const uint64_t& nMaximumCount = 0, const int& nMinDepth = 0,
+        const int& nMaxDepth = 9999999) const;
+
+    /**
+     * Helper function that calls AvailableCoinsAll, used to receive all coins,
+     * Tokens and YAC
+     */
+    void AvailableCoinsWithTokens(
+        std::vector<COutput>& vCoins,
+        std::map<std::string, std::vector<COutput> >& mapTokenCoins,
+        bool fOnlySafe = true, const CCoinControl* coinControl = nullptr,
+        const CScript *fromScriptPubKey = NULL, bool useExpiredTimelockUTXO = false,
+        const CAmount& nMinimumAmount = 1,
+        const CAmount& nMaximumAmount = MAX_MONEY,
+        const CAmount& nMinimumSumAmount = MAX_MONEY,
+        const uint64_t& nMaximumCount = 0, const int& nMinDepth = 0,
+        const int& nMaxDepth = 9999999) const;
+
+    /**
+     * populate vCoins with vector of available COutputs, and populates vTokenCoins in fWithTokens is set to true.
+     */
+    void AvailableCoinsAll(std::vector<COutput> &vCoins,
+            std::map<std::string, std::vector<COutput> > &mapTokenCoins,
+            bool fGetYAC = true, bool fGetTokens = false,
+            bool fOnlySafe = true, const CCoinControl *coinControl = nullptr,
+            const CScript *fromScriptPubKey = NULL,
+            bool useExpiredTimelockUTXO = false, const CAmount &nMinimumAmount = 1,
+            const CAmount &nMaximumAmount = MAX_MONEY,
+            const CAmount &nMinimumSumAmount = MAX_MONEY,
+            const uint64_t &nMaximumCount = 0, const int &nMinDepth = 0,
+            const int &nMaxDepth = 9999999) const;
+
+    /**
+     * Shuffle and select coins until nTargetValue is reached while avoiding
+     * small change; This method is stochastic for some inputs and upon
+     * completion the coin set and corresponding actual target value is
+     * assembled
+     */
+    bool SelectCoinsMinConf(const CAmount &nTargetValue, int64_t nSpendTime,
+            int nConfMine, int nConfTheirs, std::vector<COutput> vCoins,
+            std::set<CInputCoin> &setCoinsRet, CAmount &nValueRet) const;
+    bool SelectTokensMinConf(const CAmount& nTargetValue, int64_t nSpendTime,
+                             int nConfMine, int nConfTheirs,
+                             const std::string& strTokenName,
+                             std::vector<COutput> vCoins,
+                             std::set<CInputCoin>& setCoinsRet,
+                             CAmount& nValueRet) const;
+
     // keystore implementation
     // Generate a new key
     CPubKey GenerateNewKey();
@@ -233,7 +320,7 @@ public:
 //    int ScanForWalletTransaction(const uint256& hashTx);  NA
     void ReacceptWalletTransactions();
     void ResendWalletTransactions();
-    ::int64_t GetBalance() const;
+    ::int64_t GetBalance(bool fExcludeNotExpiredTimelock=false) const;
     ::int64_t GetWatchOnlyBalance() const;
     ::int64_t GetUnconfirmedBalance() const;
     ::int64_t GetUnconfirmedWatchOnlyBalance() const;
@@ -243,36 +330,69 @@ public:
     ::int64_t GetNewMint() const;
     ::int64_t GetWatchOnlyStake() const;
     ::int64_t GetWatchOnlyNewMint() const;
-	bool CreateTransaction(
-			const std::vector<std::pair<CScript, ::int64_t> > &vecSend,
-			CWalletTx &wtxNew, CReserveKey &reservekey, ::int64_t &nFeeRet,
-			const CCoinControl *coinControl = NULL,
-			const CScript *fromScriptPubKey = NULL);
-	bool CreateTransaction(CScript scriptPubKey, ::int64_t nValue,
-			CWalletTx &wtxNew, CReserveKey &reservekey, ::int64_t &nFeeRet,
-			const CCoinControl *coinControl = NULL,
-			const CScript *fromScriptPubKey = NULL);
+    bool CreateTransaction(CScript scriptPubKey, ::int64_t nValue,
+            CWalletTx &wtxNew, CReserveKey &reservekey, CAmount &nFeeRet,
+            int &nChangePosInOut, std::string &strFailReason,
+            const CCoinControl &coinControl,
+            const CScript *fromScriptPubKey = NULL,
+            bool useExpiredTimelockUTXO = false);
+
+    bool CreateTransaction(const std::vector<CRecipient> &vecSend,
+            CWalletTx &wtxNew, CReserveKey &reservekey, CAmount &nFeeRet,
+            int &nChangePosInOut, std::string &strFailReason,
+            const CCoinControl &coinControl,
+            const CScript *fromScriptPubKey = NULL,
+            bool useExpiredTimelockUTXO = false);
+
+    bool CreateTransactionAll(
+        const std::vector<CRecipient>& vecSend, CWalletTx& wtxNew,
+        CReserveKey& reservekey, CAmount& nFeeRet, int& nChangePosInOut,
+        std::string& strFailReason, const CCoinControl& coinControl,
+        const CScript* fromScriptPubKey, bool useExpiredTimelockUTXO, bool fNewToken,
+        const CNewToken& token, const CTxDestination destination,
+        bool fTransferToken, bool fReissueToken,
+        const CReissueToken& reissueToken, const ETokenType& tokenType);
+
+    bool CreateTransactionAll(
+        const std::vector<CRecipient>& vecSend, CWalletTx& wtxNew,
+        CReserveKey& reservekey, CAmount& nFeeRet, int& nChangePosInOut,
+        std::string& strFailReason, const CCoinControl& coinControl,
+        const CScript* fromScriptPubKey, bool useExpiredTimelockUTXO, bool fNewToken,
+        const std::vector<CNewToken> tokens, const CTxDestination destination,
+        bool fTransferToken, bool fReissueToken,
+        const CReissueToken& reissueToken, const ETokenType& tokenType);
+
+    /** YAC_TOKEN START */
+    bool CreateTransactionWithTokens(
+        const std::vector<CRecipient>& vecSend, CWalletTx& wtxNew,
+        CReserveKey& reservekey, CAmount& nFeeRet, int& nChangePosInOut,
+        std::string& strFailReason, const CCoinControl& coinControl,
+        const std::vector<CNewToken> tokens, const CTxDestination destination,
+        const ETokenType& tokenType);
+
+    bool CreateTransactionWithTransferToken(
+        const std::vector<CRecipient>& vecSend, CWalletTx& wtxNew,
+        CReserveKey& reservekey, CAmount& nFeeRet, int& nChangePosInOut,
+        std::string& strFailReason, const CCoinControl& coinControl);
+
+    bool CreateTransactionWithReissueToken(
+        const std::vector<CRecipient>& vecSend, CWalletTx& wtxNew,
+        CReserveKey& reservekey, CAmount& nFeeRet, int& nChangePosInOut,
+        std::string& strFailReason, const CCoinControl& coinControl,
+        const CReissueToken& reissueToken, const CTxDestination destination);
+
+    bool CreateNewChangeAddress(CReserveKey& reservekey, CKeyID& keyID,
+                                std::string& strFailReason);
+    /** YAC_TOKEN END */
+
     bool CommitTransaction(CWalletTx& wtxNew, CReserveKey& reservekey);
 
     void GetStakeStats(float &nKernelsRate, float &nCoinDaysRate);
     void GetStakeWeightFromValue(const ::int64_t& nTime, const ::int64_t& nValue, ::uint64_t& nWeight);
-    bool CreateCoinStake(
-                        const CKeyStore& keystore, 
-                        unsigned int nBits, 
-                        ::int64_t nSearchInterval, 
-                        CTransaction& txNew
-                        );
-    bool CreateCoinStake(
-                        const CKeyStore& keystore, 
-                        unsigned int nBits, 
-                        ::uint32_t nSearchInterval, 
-                        CTransaction& txNew, 
-                        CKey& key
-                        );
     bool MergeCoins(const ::int64_t& nAmount, const ::int64_t& nMinValue, const ::int64_t& nMaxValue, std::list<uint256>& listMerged);
 
-    std::string SendMoney(CScript scriptPubKey, ::int64_t nValue, CWalletTx& wtxNew, bool fAskFee=false, const CScript* fromScriptPubKey=NULL);
-    std::string SendMoneyToDestination(const CTxDestination &address, ::int64_t nValue, CWalletTx& wtxNew, bool fAskFee=false, const CScript* fromScriptPubKey=NULL);
+    std::string SendMoney(CScript scriptPubKey, ::int64_t nValue, CWalletTx& wtxNew, bool fAskFee=false, const CScript* fromScriptPubKey=NULL, bool useExpiredTimelockUTXO = false);
+    std::string SendMoneyToDestination(const CTxDestination &address, ::int64_t nValue, CWalletTx& wtxNew, bool fAskFee=false, const CScript* fromScriptPubKey=NULL, bool useExpiredTimelockUTXO = false);
 
     bool NewKeyPool(unsigned int nSize = 0);
     bool TopUpKeyPool(unsigned int nSize = 0);
@@ -293,14 +413,12 @@ public:
     {
         return ::IsMine(*this, txout.scriptPubKey);
     }
-    bool IsSpendableCltvUTXO(const CTxOut& txout) const
+    bool IsSpendableTimelockUTXO(const CTxOut& txout, txnouttype& retType, uint32_t& retLockDur) const
     {
-        return ::IsSpendableCltvUTXO(*this, txout.scriptPubKey);
+        return ::IsSpendableTimelockUTXO(*this, txout.scriptPubKey, retType, retLockDur);
     }
-    bool IsSpendableCsvUTXO(const CTxOut& txout) const
-    {
-        return ::IsSpendableCsvUTXO(*this, txout.scriptPubKey);
-    }
+    bool IsTimelockUTXOExpired(const CInputCoin& inputCoin, txnouttype utxoType, uint32_t lockDuration) const;
+
     ::int64_t GetCredit(const CTxOut& txout, const isminefilter& filter) const
     {
         if (!MoneyRange(txout.nValue))
@@ -317,7 +435,7 @@ public:
     bool IsMine(const CTransaction& tx) const
     {
         BOOST_FOREACH(const CTxOut& txout, tx.vout)
-            if (IsMine(txout) && txout.nValue >= nMinimumInputValue)
+            if (IsMine(txout) && txout.nValue >= 0) // Token UTXO has nValue = 0
                 return true;
         return false;
     }
@@ -462,6 +580,23 @@ static void WriteOrderPos(const ::int64_t& nOrderPos, mapValue_t& mapValue)
     mapValue["n"] = i64tostr(nOrderPos);
 }
 
+struct COutputEntry
+{
+    CTxDestination destination;
+    CAmount amount;
+    int vout;
+};
+
+/** YAC_TOKEN START */
+struct CTokenOutputEntry
+{
+    txnouttype type;
+    std::string tokenName;
+    CTxDestination destination;
+    CAmount nAmount = 0;
+    int vout;
+};
+/** YAC_TOKEN END */
 
 /** A transaction with a bunch of additional info that only the owner cares about.
  * It includes any unrecorded transactions needed to link it back to the block chain.
@@ -793,40 +928,7 @@ public:
     }
 
 
-    ::int64_t GetAvailableCredit(bool fUseCache=true) const
-    {
-        // Must wait until coinbase is safely deep enough in the chain before valuing it
-        if (
-            (IsCoinBase() || IsCoinStake()) && 
-            (GetBlocksToMaturity() > 0)
-           )
-            return 0;
-
-        if (fUseCache) 
-        {
-            if (fAvailableCreditCached)
-                return nAvailableCreditCached;
-        }
-
-        ::int64_t 
-            nCredit = 0;
-        for (unsigned int i = 0; i < vout.size(); ++i)
-        {
-            if (!IsSpent(i))
-            {
-                const CTxOut 
-                    &txout = vout[i];
-                nCredit += pwallet->GetCredit(txout, MINE_SPENDABLE);
-                if (!MoneyRange(nCredit))
-                    throw std::runtime_error("CWalletTx::GetAvailableCredit() : value out of range");
-            }
-        }
-
-        nAvailableCreditCached = nCredit;
-        fAvailableCreditCached = true;
-
-        return nCredit;
-    }
+    ::int64_t GetAvailableCredit(bool fUseCache=true, bool fExcludeNotExpiredTimelock=false) const;
 
     ::int64_t GetAvailableWatchCredit(bool fUseCache=true) const
     {
@@ -872,15 +974,19 @@ public:
         return nChangeCached;
     }
 
-    void GetAmounts(
-                    ::int64_t& nGeneratedImmature, 
-                    ::int64_t& nGeneratedMature, 
-                    std::list<std::pair<CTxDestination, ::int64_t> >& listReceived,
-                    std::list<std::pair<CTxDestination, ::int64_t> >& listSent, 
-                    ::int64_t& nFee, 
-                    std::string& strSentAccount, 
-                    const isminefilter& filter
-                   ) const;
+    void GetAmounts(::int64_t& nGeneratedImmature, ::int64_t& nGeneratedMature,
+                    std::list<COutputEntry>& listReceived,
+                    std::list<COutputEntry>& listSent, CAmount& nFee,
+                    std::string& strSentAccount, const isminefilter& filter,
+                    bool fExcludeNotExpiredTimelock=false) const;
+
+    void GetAmounts(::int64_t& nGeneratedImmature, ::int64_t& nGeneratedMature,
+                    std::list<COutputEntry>& listReceived,
+                    std::list<COutputEntry>& listSent, CAmount& nFee,
+                    std::string& strSentAccount, const isminefilter& filter,
+                    std::list<CTokenOutputEntry>& tokensReceived,
+                    std::list<CTokenOutputEntry>& tokensSent,
+                    bool fExcludeNotExpiredTimelock=false) const;
 
     void GetAccountAmounts(
                            const std::string& strAccount, 
@@ -888,7 +994,8 @@ public:
                            ::int64_t& nReceived,
                            ::int64_t& nSent, 
                            ::int64_t& nFee, 
-                           const isminefilter& filter
+                           const isminefilter& filter,
+                           bool fExcludeNotExpiredTimelock=false
                           ) const;
 
     bool IsFromMe(const isminefilter& filter) const
@@ -954,8 +1061,34 @@ public:
     void RelayWalletTransaction();
 };
 
+class CInputCoin {
+public:
+    CInputCoin(const CWalletTx* walletTx, unsigned int i)
+    {
+        if (!walletTx)
+            throw std::invalid_argument("walletTx should not be null");
+        if (i >= walletTx->vout.size())
+            throw std::out_of_range("The output index is out of range");
 
+        outpoint = COutPoint(walletTx->GetHash(), i);
+        txout = walletTx->vout[i];
+    }
 
+    COutPoint outpoint;
+    CTxOut txout;
+
+    bool operator<(const CInputCoin& rhs) const {
+        return outpoint < rhs.outpoint;
+    }
+
+    bool operator!=(const CInputCoin& rhs) const {
+        return outpoint != rhs.outpoint;
+    }
+
+    bool operator==(const CInputCoin& rhs) const {
+        return outpoint == rhs.outpoint;
+    }
+};
 
 class COutput
 {
@@ -963,16 +1096,25 @@ public:
     const CWalletTx *tx;
     int i;
     int nDepth;
+
+    /** Whether we have the private keys to spend this output */
     bool fSpendable;
 
-    COutput(const CWalletTx *txIn, int iIn, int nDepthIn, bool fSpendableIn)
+    /**
+     * Whether this output is considered safe to spend. Unconfirmed transactions
+     * from outside keys and unconfirmed replacement transactions are considered
+     * unsafe and will not be used to fund new spending transactions.
+     */
+    bool fSafe;
+
+    COutput(const CWalletTx *txIn, int iIn, int nDepthIn, bool fSpendableIn, bool fSafeIn=true)
     {
-        tx = txIn; i = iIn; nDepth = nDepthIn; fSpendable = fSpendableIn;
+        tx = txIn; i = iIn; nDepth = nDepthIn; fSpendable = fSpendableIn; fSafe = fSafeIn;
     }
 
     std::string ToString() const
     {
-        return strprintf("COutput(%s, %d, %d, %d) [%s]", tx->GetHash().ToString().substr(0,10).c_str(), i, fSpendable, nDepth, FormatMoney(tx->vout[i].nValue).c_str());
+        return strprintf("COutput(%s, %d, %d, %d) [%s]", tx->GetHash().ToString(), i, fSpendable, nDepth, FormatMoney(tx->vout[i].nValue).c_str());
     }
 
     void print() const

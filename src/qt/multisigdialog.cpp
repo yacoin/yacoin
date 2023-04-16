@@ -13,7 +13,7 @@
 #include "multisiginputentry.h"
 #include "multisigdialog.h"
 #include "ui_multisigdialog.h"
-#include "script.h"
+#include "script/script.h"
 #include "sendcoinsentry.h"
 #include "util.h"
 #include "wallet.h"

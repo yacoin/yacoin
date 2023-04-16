@@ -151,11 +151,15 @@ HEADERS += \
     src/kernelrecord.h \
     src/alert.h \
     src/addrman.h \
+    src/addressindex.h \
     src/base58.h \
     src/bignum.h \
     src/checkpoints.h \
     src/compat.h \
     src/coincontrol.h \
+    src/coins.h \
+    src/indirectmap.h \
+    src/LibBoolEE.h \
     src/sync.h \
     src/util.h \
     src/timestamps.h \
@@ -164,21 +168,27 @@ HEADERS += \
     src/kernel.h \
     src/scrypt.h \
     src/pbkdf2.h \
+    src/prevector.h \
     src/serialize.h \
     src/strlcpy.h \
     src/main.h \
+    src/memusage.h \
     src/miner.h \
     src/random_nonce.h \
     src/net.h \
     src/ministun.h \
     src/key.h \
     src/db.h \
+    src/dbwrapper.h \
     src/txdb.h \
+    src/tinyformat.h \
     src/walletdb.h \
-    src/script.h \
+    src/script/script.h \
     src/init.h \
     src/irc.h \
     src/mruset.h \
+    src/compat/endian.h \
+    src/compat/byteswap.h \
     src/json/json_spirit_writer_template.h \
     src/json/json_spirit_writer.h \
     src/json/json_spirit_value.h \
@@ -248,12 +258,14 @@ SOURCES += src/qt/bitcoin.cpp src/qt/bitcoingui.cpp \
     src/qt/mintingview.cpp \
     src/kernelrecord.cpp \
     src/alert.cpp \
+    src/base58.cpp \
     src/version.cpp \
     src/sync.cpp \
     src/util.cpp \
     src/netbase.cpp \
     src/key.cpp \
-    src/script.cpp \
+    src/LibBoolEE.cpp \
+    src/script/script.cpp \
     src/main.cpp \
     src/miner.cpp \
     src/init.cpp \
@@ -265,7 +277,13 @@ SOURCES += src/qt/bitcoin.cpp src/qt/bitcoingui.cpp \
     src/checkpoints.cpp \
     src/addrman.cpp \
     src/db.cpp \
+    src/dbwrapper.cpp \
     src/walletdb.cpp \
+    src/tokens/tokentypes.cpp \
+    src/tokens/tokendb.cpp \
+    src/tokens/tokens.cpp \
+    src/primitives/transaction.cpp \
+    src/primitives/block.cpp \
     src/qt/clientmodel.cpp \
     src/qt/guiutil.cpp \
     src/qt/transactionrecord.cpp \
@@ -281,9 +299,11 @@ SOURCES += src/qt/bitcoin.cpp src/qt/bitcoingui.cpp \
     src/qt/transactionview.cpp \
     src/qt/walletmodel.cpp \
     src/bitcoinrpc.cpp \
+    src/rpctokens.cpp \
     src/rpcdump.cpp \
     src/rpcnet.cpp \
     src/rpcmining.cpp \
+    src/rpcmisc.cpp \
     src/rpcwallet.cpp \
     src/rpcblockchain.cpp \
     src/rpcrawtransaction.cpp \

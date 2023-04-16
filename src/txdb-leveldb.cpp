@@ -8,19 +8,14 @@
 #include "msvc_warnings.push.h"
 #endif
 
-#ifndef BITCOIN_CHECKPOINT_H
+#include "addressindex.h"
 #include "checkpoints.h"
-#endif
-
-#ifndef BITCOIN_TXDB_H
 #include "txdb.h"
-#endif
-
-#ifndef PPCOIN_KERNEL_H
 #include "kernel.h"
-#endif
 
 #include <map>
+#include <string>
+#include <vector>
 
 #include <boost/version.hpp>
 #include <boost/filesystem.hpp>
@@ -31,8 +26,6 @@
 #include <leveldb/filter_policy.h>
 #include <memenv/memenv.h>
 
-using namespace boost;
-
 using std::make_pair;
 using std::map;
 using std::pair;
@@ -40,190 +33,13 @@ using std::runtime_error;
 using std::string;
 using std::vector;
 
-leveldb::DB *txdb; // global pointer for LevelDB object instance
-
-static leveldb::Options GetOptions()
-{
-    leveldb::Options options;
-    int nCacheSizeMB = GetArg("-dbcache", 25);
-    options.block_cache = leveldb::NewLRUCache(nCacheSizeMB * 1048576);
-    options.filter_policy = leveldb::NewBloomFilterPolicy(10);
-    return options;
-}
-
-void init_blockindex(leveldb::Options &options, bool fRemoveOld = false)
-{
-    // First time init.
-    filesystem::path directory = GetDataDir() / "txleveldb";
-
-    if (fRemoveOld)
-    {
-        filesystem::remove_all(directory); // remove directory
-        unsigned int nFile = 1;
-
-        while (true)
-        {
-            filesystem::path strBlockFile = GetDataDir() / strprintf("blk%04u.dat", nFile);
-
-            // Break if no such file
-            if (!filesystem::exists(strBlockFile))
-                break;
-
-            filesystem::remove(strBlockFile);
-
-            nFile++;
-        }
-    }
-
-    filesystem::create_directory(directory);
-    printf("Opening LevelDB in %s\n", directory.string().c_str());
-    leveldb::Status status = leveldb::DB::Open(options, directory.string(), &txdb);
-    if (!status.ok())
-    {
-        throw runtime_error(strprintf("init_blockindex(): error opening database environment %s", status.ToString().c_str()));
-    }
-}
+static const char DB_ADDRESSINDEX = 'a';
+static const char DB_ADDRESSUNSPENTINDEX = 'u';
 
 // CDB subclasses are created and destroyed VERY OFTEN. That's why
 // we shouldn't treat this as a free operations.
-CTxDB::CTxDB(const char *pszMode)
-{
-    Yassert(pszMode);
-    activeBatch = NULL;
-    fReadOnly = (!strchr(pszMode, '+') && !strchr(pszMode, 'w'));
-
-    if (txdb)
-    {
-        pdb = txdb;
-        return;
-    }
-
-    bool fCreate = strchr(pszMode, 'c');
-
-    options = GetOptions();
-    options.create_if_missing = fCreate;
-    options.filter_policy = leveldb::NewBloomFilterPolicy(10);
-
-    init_blockindex(options); // Init directory
-    pdb = txdb;
-
-    if (Exists(string("version")))
-    {
-        ReadVersion(nVersion);
-        printf("Transaction index version is %d\n", nVersion);
-
-        if (nVersion < DATABASE_VERSION)
-        {
-            printf("Required index version is %d, removing old database\n", DATABASE_VERSION);
-
-            // Leveldb instance destruction
-            delete txdb;
-            txdb = pdb = NULL;
-            delete activeBatch;
-            activeBatch = NULL;
-
-            init_blockindex(options, true); // Remove directory and create new database
-            pdb = txdb;
-
-            bool fTmp = fReadOnly;
-            fReadOnly = false;
-            WriteVersion(DATABASE_VERSION); // Save transaction index version
-            fReadOnly = fTmp;
-        }
-    }
-    else if (fCreate)
-    {
-        bool fTmp = fReadOnly;
-        fReadOnly = false;
-        WriteVersion(DATABASE_VERSION);
-        fReadOnly = fTmp;
-    }
-
-    printf("Opened LevelDB successfully\n");
-}
-
-void CTxDB::Close()
-{
-    delete txdb;
-    txdb = pdb = NULL;
-    delete options.filter_policy;
-    options.filter_policy = NULL;
-    delete options.block_cache;
-    options.block_cache = NULL;
-    delete activeBatch;
-    activeBatch = NULL;
-}
-
-bool CTxDB::TxnBegin()
-{
-    Yassert(!activeBatch);
-    activeBatch = new leveldb::WriteBatch();
-    return true;
-}
-
-bool CTxDB::TxnCommit()
-{
-    Yassert(activeBatch);
-    leveldb::Status status = pdb->Write(leveldb::WriteOptions(), activeBatch);
-    delete activeBatch;
-    activeBatch = NULL;
-    if (!status.ok())
-    {
-        printf("LevelDB batch commit failure: %s\n", status.ToString().c_str());
-        return false;
-    }
-    return true;
-}
-
-class CBatchScanner : public leveldb::WriteBatch::Handler
-{
-public:
-    std::string needle;
-    bool *deleted;
-    std::string *foundValue;
-    bool foundEntry;
-
-    CBatchScanner() : foundEntry(false) {}
-
-    virtual void Put(const leveldb::Slice &key, const leveldb::Slice &value)
-    {
-        if (key.ToString() == needle)
-        {
-            foundEntry = true;
-            *deleted = false;
-            *foundValue = value.ToString();
-        }
-    }
-
-    virtual void Delete(const leveldb::Slice &key)
-    {
-        if (key.ToString() == needle)
-        {
-            foundEntry = true;
-            *deleted = true;
-        }
-    }
-};
-
-// When performing a read, if we have an active batch we need to check it first
-// before reading from the database, as the rest of the code assumes that once
-// a database transaction begins reads are consistent with it. It would be good
-// to change that assumption in future and avoid the performance hit, though in
-// practice it does not appear to be large.
-bool CTxDB::ScanBatch(const CDataStream &key, string *value, bool *deleted) const
-{
-    Yassert(activeBatch);
-    *deleted = false;
-    CBatchScanner scanner;
-    scanner.needle = key.str();
-    scanner.deleted = deleted;
-    scanner.foundValue = value;
-    leveldb::Status status = activeBatch->Iterate(&scanner);
-    if (!status.ok())
-    {
-        throw runtime_error(status.ToString());
-    }
-    return scanner.foundEntry;
+CTxDB::CTxDB(const char *pszMode, bool fWipe) :
+		CDBWrapper(BLOCK_INDEX, pszMode, fWipe) {
 }
 
 bool CTxDB::ReadTxIndex(uint256 hash, CTxIndex &txindex)
@@ -254,6 +70,150 @@ bool CTxDB::EraseTxIndex(const CTransaction &tx)
     uint256 hash = tx.GetHash();
 
     return Erase(make_pair(string("tx"), hash));
+}
+
+bool CTxDB::UpdateAddressUnspentIndex(const std::vector<std::pair<CAddressUnspentKey, CAddressUnspentValue > >&vect) {
+    bool result = true;
+    for (std::vector<std::pair<CAddressUnspentKey, CAddressUnspentValue> >::const_iterator it=vect.begin(); it!=vect.end(); it++) {
+        if (it->second.IsNull()) {
+            result = Erase(std::make_pair(DB_ADDRESSUNSPENTINDEX, it->first));
+        } else {
+            result = Write(std::make_pair(DB_ADDRESSUNSPENTINDEX, it->first), it->second);
+        }
+
+        if (!result)
+        {
+            break;
+        }
+    }
+    return result;
+}
+
+bool CTxDB::ReadAddressUnspentIndex(uint160 addressHash, int type, std::string tokenName,
+                                           std::vector<std::pair<CAddressUnspentKey, CAddressUnspentValue> > &unspentOutputs) {
+
+    boost::scoped_ptr<CDBIterator> pcursor(NewIterator());
+
+    pcursor->Seek(std::make_pair(DB_ADDRESSUNSPENTINDEX, CAddressIndexIteratorTokenKey(type, addressHash, tokenName)));
+
+    while (pcursor->Valid()) {
+        boost::this_thread::interruption_point();
+        std::pair<char,CAddressUnspentKey> key;
+        if (pcursor->GetKey(key) && key.first == DB_ADDRESSUNSPENTINDEX && key.second.hashBytes == addressHash
+                && (tokenName.empty() || key.second.token == tokenName)) {
+            CAddressUnspentValue nValue;
+            if (pcursor->GetValue(nValue)) {
+                unspentOutputs.push_back(std::make_pair(key.second, nValue));
+                pcursor->Next();
+            } else {
+                return error("failed to get address unspent value");
+            }
+        } else {
+            break;
+        }
+    }
+
+    return true;
+}
+
+bool CTxDB::ReadAddressUnspentIndex(uint160 addressHash, int type,
+                                           std::vector<std::pair<CAddressUnspentKey, CAddressUnspentValue> > &unspentOutputs) {
+
+    boost::scoped_ptr<CDBIterator> pcursor(NewIterator());
+
+    pcursor->Seek(std::make_pair(DB_ADDRESSUNSPENTINDEX, CAddressIndexIteratorKey(type, addressHash)));
+
+    while (pcursor->Valid()) {
+        boost::this_thread::interruption_point();
+        std::pair<char,CAddressUnspentKey> key;
+        if (pcursor->GetKey(key) && key.first == DB_ADDRESSUNSPENTINDEX && key.second.hashBytes == addressHash) {
+            CAddressUnspentValue nValue;
+            if (pcursor->GetValue(nValue)) {
+                if (key.second.token != "YAC") {
+                    unspentOutputs.push_back(std::make_pair(key.second, nValue));
+                }
+                pcursor->Next();
+            } else {
+                return error("failed to get address unspent value");
+            }
+        } else {
+            break;
+        }
+    }
+
+    return true;
+}
+
+bool CTxDB::WriteAddressIndex(const std::vector<std::pair<CAddressIndexKey, CAmount > >&vect) {
+    bool result = true;
+    for (std::vector<std::pair<CAddressIndexKey, CAmount> >::const_iterator it=vect.begin(); it!=vect.end(); it++)
+    {
+        result = Write(std::make_pair(DB_ADDRESSINDEX, it->first), it->second);
+        if (!result)
+        {
+            break;
+        }
+    }
+    return result;
+}
+
+bool CTxDB::EraseAddressIndex(const std::vector<std::pair<CAddressIndexKey, CAmount > >&vect) {
+    bool result = true;
+    for (std::vector<std::pair<CAddressIndexKey, CAmount> >::const_iterator it=vect.begin(); it!=vect.end(); it++)
+    {
+        result = Erase(std::make_pair(DB_ADDRESSINDEX, it->first));
+        if (!result)
+        {
+            break;
+        }
+    }
+
+    return result;
+}
+
+bool CTxDB::ReadAddressIndex(uint160 addressHash, int type, std::string tokenName,
+                                    std::vector<std::pair<CAddressIndexKey, CAmount> > &addressIndex,
+                                    int start, int end) {
+
+    boost::scoped_ptr<CDBIterator> pcursor(NewIterator());
+
+    if (!tokenName.empty() && start > 0 && end > 0) {
+        pcursor->Seek(std::make_pair(DB_ADDRESSINDEX,
+                                     CAddressIndexIteratorHeightKey(type, addressHash, tokenName, start)));
+    } else if (!tokenName.empty()) {
+        pcursor->Seek(std::make_pair(DB_ADDRESSINDEX, CAddressIndexIteratorTokenKey(type, addressHash, tokenName)));
+    } else {
+        pcursor->Seek(std::make_pair(DB_ADDRESSINDEX, CAddressIndexIteratorKey(type, addressHash)));
+    }
+
+    while (pcursor->Valid()) {
+        boost::this_thread::interruption_point();
+        std::pair<char,CAddressIndexKey> key;
+        if (pcursor->GetKey(key) && key.first == DB_ADDRESSINDEX && key.second.hashBytes == addressHash
+                && (tokenName.empty() || key.second.token == tokenName)) {
+            if (end > 0 && key.second.blockHeight > end) {
+                break;
+            }
+            CAmount nValue;
+            if (pcursor->GetValue(nValue)) {
+                addressIndex.push_back(std::make_pair(key.second, nValue));
+                pcursor->Next();
+            } else {
+                return error("failed to get address index value");
+            }
+        } else {
+            break;
+        }
+    }
+
+    return true;
+}
+
+bool CTxDB::ReadAddressIndex(uint160 addressHash, int type,
+                                    std::vector<std::pair<CAddressIndexKey, CAmount> > &addressIndex,
+                                    int start, int end) {
+
+    return CTxDB::ReadAddressIndex(addressHash, type, "", addressIndex, start, end);
 }
 
 bool CTxDB::ContainsTx(uint256 hash)
@@ -372,6 +332,55 @@ static CBlockIndex *InsertBlockIndex(uint256 hash)
     pindexNew->phashBlock = &((*mi).first);
 
     return pindexNew;
+}
+
+bool CTxDB::BuildMapHash()
+{
+    // The block index is an in-memory structure that maps hashes to on-disk
+    // locations where the contents of the block can be found. Here, we scan it
+    // out of the DB and into mapBlockIndex.
+    leveldb::Iterator
+        *iterator = pdb->NewIterator(leveldb::ReadOptions());
+
+    // Seek to start key.
+    CDataStream ssStartKey(SER_DISK, CLIENT_VERSION);
+    ssStartKey << make_pair(string("blockindex"), uint256(0));
+    iterator->Seek(ssStartKey.str());
+    // Now read each entry.
+    while (iterator->Valid())
+    {
+        // Unpack keys and values.
+        CDataStream ssKey(SER_DISK, CLIENT_VERSION);
+        ssKey.write(iterator->key().data(), iterator->key().size());
+
+        CDataStream ssValue(SER_DISK, CLIENT_VERSION);
+        ssValue.write(iterator->value().data(), iterator->value().size());
+
+        string strType;
+        ssKey >> strType;
+
+        // Did we reach the end of the data to read?
+        if (fRequestShutdown || strType != "blockindex")
+            break;
+
+        CDiskBlockIndex diskindex;
+        ssValue >> diskindex;
+
+        uint256 blockHash = diskindex.GetBlockHash();  // the slow poke!
+        if (0 == blockHash)
+        {
+            if (fPrintToConsole)
+                (void)printf(
+                    "Error? at nHeight=%d"
+                    "\n"
+                    "",
+                    diskindex.nHeight);
+            continue; //?
+        }
+        mapHash.insert(make_pair( diskindex.GetSHA256Hash(), blockHash));
+        iterator->Next();
+    }
+    delete iterator;
 }
 
 bool CTxDB::LoadBlockIndex()
@@ -578,7 +587,7 @@ bool CTxDB::LoadBlockIndex()
         pindexNew->nStatus = diskindex.nStatus;
         pindexNew->blockHash = blockHash;
 
-        if (fReindex)
+        if (fReindexOnlyHeaderSync)
         {
             if ((pindexNew->nHeight == 0) || (pindexNew->nFile != 0 && pindexNew->nBlockPos != 0))
             {
@@ -710,6 +719,13 @@ bool CTxDB::LoadBlockIndex()
     }
     delete iterator;
 
+    printf("CTxDB::LoadBlockIndex(), fStoreBlockHashToDb = %d, "
+           "newStoredBlock = %d, "
+           "alreadyStoredBlock = %d\n",
+           fStoreBlockHashToDb,
+           newStoredBlock,
+           alreadyStoredBlock);
+
     // Load hashBestChain pointer to end of best chain
     if (!ReadHashBestChain(hashBestChain))
     {
@@ -751,9 +767,9 @@ bool CTxDB::LoadBlockIndex()
                  , CBigNum( bnMaximumTarget ).getuint256().ToString().substr(0,16).c_str()
                 );
 
-    if (fReindex)
+    if (fReindexOnlyHeaderSync)
     {
-        fReindex = false;
+        fReindexOnlyHeaderSync = false;
         CBlockIndex* chainTip = chainActive.Tip();
         while (chainTip != NULL)
         {
@@ -762,19 +778,18 @@ bool CTxDB::LoadBlockIndex()
         }
 
         map<uint256, CBlockIndex *>::iterator it;
-        int numberOfReindexBlock = 0;
+        int numberOfReindexOnlyHeaderSyncBlock = 0;
         for (it = mapBlockIndex.begin(); it != mapBlockIndex.end(); it++)
         {
             CBlockIndex* pindexCurrent = (*it).second;
             WriteBlockIndex(CDiskBlockIndex(pindexCurrent));
             mapHash.insert(make_pair(pindexCurrent->GetSHA256Hash(), (*it).first));
-            numberOfReindexBlock++;
+            numberOfReindexOnlyHeaderSyncBlock++;
         }
-        printf("CTxDB::LoadBlockIndex(), fReindex = 1, "
-               "numberOfReindexBlock = %d\n",
-               fReindex,
-               numberOfReindexBlock);
-
+        printf("CTxDB::LoadBlockIndex(), fReindexOnlyHeaderSync = 1, "
+               "numberOfReindexOnlyHeaderSyncBlock = %d\n",
+               fReindexOnlyHeaderSync,
+               numberOfReindexOnlyHeaderSyncBlock);
     }
     else
     {
@@ -786,12 +801,6 @@ bool CTxDB::LoadBlockIndex()
         }
     }
 
-    printf("CTxDB::LoadBlockIndex(), fStoreBlockHashToDb = %d, "
-           "newStoredBlock = %d, "
-           "alreadyStoredBlock = %d\n",
-           fStoreBlockHashToDb,
-           newStoredBlock,
-           alreadyStoredBlock);
     // Calculate current block reward
     map<uint256, CBlockIndex *>::iterator mi = mapBlockIndex.find(bestEpochIntervalHash);
     if (mi != mapBlockIndex.end())

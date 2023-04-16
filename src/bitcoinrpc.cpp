@@ -133,6 +133,42 @@ void RPCTypeCheck(const Object& o,
     return nAmount;
 }
 
+std::string TokenValueFromAmount(const CAmount& amount, const std::string token_name)
+{
+
+    auto currentActiveTokenCache = GetCurrentTokenCache();
+    if (!currentActiveTokenCache)
+        throw JSONRPCError(RPC_INTERNAL_ERROR, "Token cache isn't available.");
+
+    uint8_t units = OWNER_UNITS;
+    if (!IsTokenNameAnOwner(token_name)) {
+        CNewToken tokenData;
+        if (!currentActiveTokenCache->GetTokenMetaDataIfExists(token_name, tokenData))
+            units = MAX_UNIT;
+            //throw JSONRPCError(RPC_INTERNAL_ERROR, "Couldn't load token from cache: " + token_name);
+        else
+            units = tokenData.units;
+    }
+
+    return TokenValueFromAmountString(amount, units);
+}
+
+std::string TokenValueFromAmountString(const CAmount& amount, const int8_t units)
+{
+    bool sign = amount < 0;
+    int64_t n_abs = (sign ? -amount : amount);
+    int64_t quotient = n_abs / COIN;
+    int64_t remainder = n_abs % COIN;
+    remainder = remainder / pow(10, MAX_UNIT - units);
+
+    if (units == 0 && remainder == 0) {
+        return strprintf("%s%d", sign ? "-" : "", quotient);
+    }
+    else {
+        return strprintf("%s%d.%0" + std::to_string(units) + "d", sign ? "-" : "", quotient, remainder);
+    }
+}
+
 Value ValueFromAmount(::int64_t amount)
 {
     return (double)amount / (double)COIN;
@@ -1120,10 +1156,6 @@ json_spirit::Value CRPCTable::execute(const std::string &strMethod, const json_s
     {
         throw JSONRPCError(RPC_MISC_ERROR, e.what());
     }
-    catch (...)
-    {
-        throw JSONRPCError(RPC_MISC_ERROR, "unknown!?");
-    }
 }
 
 
@@ -1255,6 +1287,7 @@ static const CRPCCommand vRPCCommands[] =
     { "encryptwallet",          &encryptwallet,          false,  false },
     { "validateaddress",        &validateaddress,        true,   false },
     { "getbalance",             &getbalance,             false,  false },
+    { "getavailablebalance",    &getavailablebalance,    false,  false },
     { "move",                   &movecmd,                false,  false },
     { "sendfrom",               &sendfrom,               false,  false },
     { "sendmany",               &sendmany,               false,  false },
@@ -1302,7 +1335,21 @@ static const CRPCCommand vRPCCommands[] =
     { "repairwallet",           &repairwallet,           false,  true  },
     { "resendtx",               &resendtx,               false,  true  },
     { "makekeypair",            &makekeypair,            false,  true  },
-    { "sendalert",              &sendalert,              false,  false }
+    { "sendalert",              &sendalert,              false,  false },
+    /** YAC_TOKEN START */
+    { "issue",                  &issue,                  false,  false },
+    { "transfer",               &transfer,               false,  false },
+    { "transferfromaddress",    &transferfromaddress,    false,  false },
+    { "reissue",                &reissue,                false,  false },
+    { "listmytokens",           &listmytokens,           false,  false },
+    { "listtokens",             &listtokens,             false,  false },
+    { "listaddressesbytoken",   &listaddressesbytoken,   false,  false },
+    { "listtokenbalancesbyaddress",   &listtokenbalancesbyaddress,   false,  false },
+    { "getaddressbalance",      &getaddressbalance,      false,  false },
+    { "getaddressdeltas",       &getaddressdeltas,       false,  false },
+    { "getaddressutxos",        &getaddressutxos,        false,  false },
+    { "getaddresstxids",        &getaddresstxids,        false,  false }
+    /** YAC_TOKEN END */
 };
 
 CRPCTable::CRPCTable()
@@ -1342,7 +1389,8 @@ Array RPCConvertValues(std::string &strMethod, const std::vector<std::string> &s
     if (strMethod == "getaddednodeinfo"       && n > 0) ConvertTo<bool>(params[0]);
     if (strMethod == "setgenerate"            && n > 0) ConvertTo<bool>(params[0]);
     if (strMethod == "setgenerate"            && n > 1) ConvertTo<boost::int64_t>(params[1]);
-    if (strMethod == "sendtoaddress"          && n > 1) ConvertTo<double>(params[1]);
+    if (strMethod == "sendtoaddress"          && n > 1) ConvertTo<double>(params[1]); // amount
+    if (strMethod == "sendtoaddress"          && n > 2) ConvertTo<bool>(params[2]); // useExpiredTimelockUTXO
     if (strMethod == "mergecoins"            && n > 0) ConvertTo<double>(params[0]);
     if (strMethod == "mergecoins"            && n > 1) ConvertTo<double>(params[1]);
     if (strMethod == "mergecoins"            && n > 2) ConvertTo<double>(params[2]);
@@ -1354,6 +1402,7 @@ Array RPCConvertValues(std::string &strMethod, const std::vector<std::string> &s
     if (strMethod == "listreceivedbyaccount"  && n > 0) ConvertTo<boost::int64_t>(params[0]);
     if (strMethod == "listreceivedbyaccount"  && n > 1) ConvertTo<bool>(params[1]);
     if (strMethod == "getbalance"             && n > 1) ConvertTo<boost::int64_t>(params[1]);
+    if (strMethod == "getavailablebalance"    && n > 1) ConvertTo<boost::int64_t>(params[1]);
     if (strMethod == "getblock"               && n > 1) ConvertTo<bool>(params[1]);
     if (strMethod == "getblocktimes"          && n > 0) ConvertTo<int>(params[0]);
     if (strMethod == "getblockbynumber"       && n > 0) ConvertTo<int>(params[0]);
@@ -1362,7 +1411,8 @@ Array RPCConvertValues(std::string &strMethod, const std::vector<std::string> &s
     if (strMethod == "move"                   && n > 2) ConvertTo<double>(params[2]);
     if (strMethod == "move"                   && n > 3) ConvertTo<boost::int64_t>(params[3]);
     if (strMethod == "sendfrom"               && n > 2) ConvertTo<double>(params[2]);
-    if (strMethod == "sendfrom"               && n > 3) ConvertTo<boost::int64_t>(params[3]);
+    if (strMethod == "sendfrom"               && n > 3) ConvertTo<bool>(params[3]);
+    if (strMethod == "sendfrom"               && n > 4) ConvertTo<boost::int64_t>(params[4]);
     if (strMethod == "gettransaction"         && n > 1) ConvertTo<bool>(params[1]);
     if (strMethod == "listtransactions"       && n > 1) ConvertTo<boost::int64_t>(params[1]);
     if (strMethod == "listtransactions"       && n > 2) ConvertTo<boost::int64_t>(params[2]);
@@ -1381,7 +1431,8 @@ Array RPCConvertValues(std::string &strMethod, const std::vector<std::string> &s
     if (strMethod == "sendalert"              && n > 6) ConvertTo<boost::int64_t>(params[6]);
 
     if (strMethod == "sendmany"               && n > 1) ConvertTo<Object>(params[1]);
-    if (strMethod == "sendmany"               && n > 2) ConvertTo<boost::int64_t>(params[2]);
+    if (strMethod == "sendmany"               && n > 2) ConvertTo<bool>(params[2]);
+    if (strMethod == "sendmany"               && n > 3) ConvertTo<boost::int64_t>(params[3]);
     if (strMethod == "reservebalance"         && n > 0) ConvertTo<bool>(params[0]);
     if (strMethod == "reservebalance"         && n > 1) ConvertTo<double>(params[1]);
     if (strMethod == "addmultisigaddress"     && n > 0) ConvertTo<boost::int64_t>(params[0]);
@@ -1405,7 +1456,37 @@ Array RPCConvertValues(std::string &strMethod, const std::vector<std::string> &s
     if (strMethod == "keypoolreset"           && n > 0) ConvertTo<boost::int64_t>(params[0]);
     if (strMethod == "importaddress"          && n > 2) ConvertTo<bool>(params[2]);
     if (strMethod == "generatetoaddress"      && n > 2) ConvertTo<int>(params[0]);
-    if (strMethod == "generatetoaddress"      && n > 2) ConvertTo<int>(params[2]);    
+    if (strMethod == "generatetoaddress"      && n > 2) ConvertTo<int>(params[2]);
+    /** YAC_TOKEN START */
+    if (strMethod == "issue"               && n > 1) ConvertTo<double>(params[1]); // qty
+    if (strMethod == "issue"               && n > 2) ConvertTo<boost::int64_t>(params[2]); // units
+    if (strMethod == "issue"               && n > 3) ConvertTo<bool>(params[3]); // reissuable
+    if (strMethod == "issue"               && n > 4) ConvertTo<bool>(params[4]); // has_ipfs
+    if (strMethod == "transfer"            && n > 1) ConvertTo<double>(params[1]); // qty
+    if (strMethod == "transferfromaddress" && n > 2) ConvertTo<double>(params[2]); // qty
+    if (strMethod == "reissue"             && n > 1) ConvertTo<double>(params[1]); // qty
+    if (strMethod == "reissue"             && n > 2) ConvertTo<bool>(params[2]); // reissuable
+    if (strMethod == "reissue"             && n > 5) ConvertTo<boost::int64_t>(params[5]); // new_units
+    if (strMethod == "listmytokens"        && n > 1) ConvertTo<bool>(params[1]); // verbose
+    if (strMethod == "listmytokens"        && n > 2) ConvertTo<boost::int64_t>(params[2]); // count
+    if (strMethod == "listmytokens"        && n > 3) ConvertTo<boost::int64_t>(params[3]); // start
+    if (strMethod == "listmytokens"        && n > 4) ConvertTo<boost::int64_t>(params[4]); // confs
+    if (strMethod == "listtokens"          && n > 1) ConvertTo<bool>(params[1]); // verbose
+    if (strMethod == "listtokens"          && n > 2) ConvertTo<boost::int64_t>(params[2]); // count
+    if (strMethod == "listtokens"          && n > 3) ConvertTo<boost::int64_t>(params[3]); // start
+    if (strMethod == "listaddressesbytoken"       && n > 1) ConvertTo<bool>(params[1]); // onlytotal
+    if (strMethod == "listaddressesbytoken"       && n > 2) ConvertTo<boost::int64_t>(params[2]); // count
+    if (strMethod == "listaddressesbytoken"       && n > 3) ConvertTo<boost::int64_t>(params[3]); // start
+    if (strMethod == "listtokenbalancesbyaddress" && n > 1) ConvertTo<bool>(params[1]); // onlytotal
+    if (strMethod == "listtokenbalancesbyaddress" && n > 2) ConvertTo<boost::int64_t>(params[2]); // count
+    if (strMethod == "listtokenbalancesbyaddress" && n > 3) ConvertTo<boost::int64_t>(params[3]); // start
+    if (strMethod == "getaddressbalance"   && n > 0) ConvertTo<Object>(params[0]); // addresses
+    if (strMethod == "getaddressbalance"   && n > 1) ConvertTo<bool>(params[1]); // includeTokens
+    if (strMethod == "getaddressdeltas"    && n > 0) ConvertTo<Object>(params[0]); // addresses
+    if (strMethod == "getaddressutxos"     && n > 0) ConvertTo<Object>(params[0]); // addresses
+    if (strMethod == "getaddresstxids"     && n > 0) ConvertTo<Object>(params[0]); // addresses
+    if (strMethod == "getaddresstxids"     && n > 1) ConvertTo<bool>(params[1]); // includeTokens
+    /** YAC_TOKEN END */
 
     return params;
 }
@@ -1446,8 +1527,16 @@ int CommandLineRPC(int argc, char *argv[])
             if (error.type() != null_type)
             {
                 // Error
-                strPrint = "error: " + write_string(error, false);
+
                 int code = find_value(error.get_obj(), "code").get_int();
+                if (code == RPC_HELP_USAGE)
+                {
+                    strPrint = "RPC command help usage\n" + find_value(error.get_obj(), "message").get_str();
+                }
+                else
+                {
+                    strPrint = "error: " + write_string(error, false);
+                }
                 nRet = abs(code);
             }
             else
@@ -1491,7 +1580,16 @@ int CommandLineRPC(int argc, char *argv[])
     return nRet;
 }
 
+std::string HelpExampleCli(const std::string& methodname, const std::string& args)
+{
+    return "> yacoin-cli " + methodname + " " + args + "\n";
+}
 
+std::string HelpExampleRpc(const std::string& methodname, const std::string& args)
+{
+    return "> curl --user myusername --data-binary '{\"jsonrpc\": \"1.0\", \"id\":\"curltest\", "
+        "\"method\": \"" + methodname + "\", \"params\": [" + args + "] }' -H 'content-type: text/plain;' http://127.0.0.1:8332/\n";
+}
 
 
 #ifdef TEST
