@@ -711,6 +711,7 @@ bool DumpWallet(CWallet* pwallet, const string& strDest)
       // Populate maps
       std::map<CKeyID, ::int64_t> mapKeyBirth;
       std::set<CKeyID> setKeyPool;
+      ScriptMap mapScripts = pwallet->GetP2SHRedeemScriptMap();
       pwallet->GetKeyBirthTimes(mapKeyBirth);
       pwallet->GetAllReserveKeys(setKeyPool);
 
@@ -734,6 +735,7 @@ bool DumpWallet(CWallet* pwallet, const string& strDest)
       file << strprintf("# * Best block at time of backup was %i (%s),\n", chainActive.Height(), hashBestChain.ToString().c_str());
       file << strprintf("#   mined on %s\n", EncodeDumpTime(chainActive.Tip()->nTime).c_str());
       file << "\n";
+      file << "BELOW ARE LIST OF P2PKH ADDRESSES AND THEIR PRIVATE KEYS:";
       for (std::vector<std::pair< ::int64_t, CKeyID> >::const_iterator it = vKeyBirth.begin(); it != vKeyBirth.end(); it++) {
           const CKeyID &keyid = it->second;
           std::string strTime = EncodeDumpTime(it->first);
@@ -762,6 +764,30 @@ bool DumpWallet(CWallet* pwallet, const string& strDest)
                                     strTime.c_str(),
                                     strAddr.c_str());
               }
+          }
+      }
+      file << "\n";
+      file << "BELOW ARE LIST OF P2SH ADDRESSES AND THEIR PRIVATE KEYS:";
+      for (const auto& [redeemScriptHash, redeemScript]: mapScripts) {
+          CSecret secret;
+          bool IsCompressed;
+          txnouttype& whichTypeRet;
+          CScript tempScript;
+          std::string strAddr = CBitcoinAddress(redeemScriptHash).ToString();
+          pwallet->GetSecret(redeemScript, secret, IsCompressed, whichTypeRet, tempScript);
+
+          if (pwallet->mapAddressBook.count(redeemScriptHash)) {
+
+              file << strprintf("%s type=%s label=%s # addr=%s\n",
+                                CBitcoinSecret(secret, IsCompressed).ToString().c_str(),
+                                GetTxnOutputType(whichTypeRet),
+                                EncodeDumpString(pwallet->mapAddressBook[redeemScriptHash]).c_str(),
+                                strAddr.c_str());
+          } else {
+              file << strprintf("%s type=%s change=1 # addr=%s\n",
+                                CBitcoinSecret(secret, IsCompressed).ToString().c_str(),
+                                GetTxnOutputType(whichTypeRet),
+                                strAddr.c_str());
           }
       }
       file << "\n";

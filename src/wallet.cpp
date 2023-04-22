@@ -3858,6 +3858,11 @@ void CWallet::GetAllReserveKeys(set<CKeyID>& setAddress) const
     }
 }
 
+ScriptMap CWallet::GetP2SHRedeemScriptMap() const
+{
+    return this->mapScripts;
+}
+
 void CWallet::UpdatedTransaction(const uint256 &hashTx)
 {
     {
