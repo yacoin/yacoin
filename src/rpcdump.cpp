@@ -211,7 +211,7 @@ Value dumpprivkey(const Array& params, bool fHelp)
         throw JSONRPCError(RPC_WALLET_ERROR, "Wallet doesn't manage coins in this address");
 
     CSecret vchSecret;
-    txnouttype& whichTypeRet;
+    txnouttype whichTypeRet;
     bool fCompressed;
     CScript subscript;
     if (!pwalletMain->GetSecret(scriptPubKey, vchSecret, fCompressed, whichTypeRet, subscript))

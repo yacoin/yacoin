@@ -17,6 +17,24 @@
 #include <boost/variant.hpp>
 
 class CScript;
+enum txnouttype {
+    TX_NONSTANDARD,
+    // 'standard' transaction types:
+    TX_PUBKEY,
+    TX_PUBKEYHASH,
+    TX_SCRIPTHASH,
+    TX_MULTISIG,
+    TX_CLTV_P2SH,
+    TX_CSV_P2SH,
+    TX_CLTV_P2PKH,
+    TX_CSV_P2PKH,
+    TX_NULL_DATA,
+    /** YAC_TOKEN START */
+    TX_NEW_TOKEN,
+    TX_REISSUE_TOKEN,
+    TX_TRANSFER_TOKEN,
+    /** YAC_TOKEN END */
+};
 
 class CNoDestination {
 public:
@@ -62,60 +80,7 @@ public:
     virtual bool HaveWatchOnly(const CScript &dest) const =0;
     virtual bool HaveWatchOnly() const =0;
 
-    virtual bool GetSecret(const CScript& scriptPubKey, CSecret& vchSecret, bool &fCompressed, txnouttype& whichTypeRet, CScript& subscript) const
-    {
-        vector<valtype> vSolutions;
-        if (!Solver(scriptPubKey, whichTypeRet, vSolutions))
-            return false;
-
-        CKeyID keyID;
-    #ifdef _MSC_VER
-        bool
-            fTest = false;
-        if( vSolutions.empty() )
-            {       // one can't technically access vSolutions[ 0 ]
-            fTest = true;
-            return false;
-            }
-    #endif
-        switch (whichTypeRet)
-        {
-        case TX_NONSTANDARD:
-        case TX_NULL_DATA:  // this is not in 0.4.4 code
-            return false;
-        case TX_PUBKEY:
-        case TX_CLTV_P2SH:
-        case TX_CSV_P2SH:
-            keyID = CPubKey(vSolutions[0]).GetID();
-            break;
-        case TX_NEW_TOKEN:
-        case TX_REISSUE_TOKEN:
-        case TX_TRANSFER_TOKEN:
-        case TX_CLTV_P2PKH:
-        case TX_CSV_P2PKH:
-        case TX_PUBKEYHASH:
-            keyID = CKeyID(uint160(vSolutions[0]));
-            break;
-        case TX_SCRIPTHASH:
-            CScriptID scriptID = CScriptID(uint160(vSolutions[0]));
-            CScript tempScript;
-            if (GetCScript(scriptID, subscript)) {
-                if (GetSecret(subscript, vchSecret, fCompressed, whichTypeRet, tempScript)) {
-                    return true;
-                }
-            }
-            return false;
-        case TX_MULTISIG:
-            return false;
-        }
-
-        CKey key;
-        if (!GetKey(keyID, key))
-            return false;
-        vchSecret = key.GetSecret(fCompressed);
-        return true;
-    }
-
+    virtual bool GetSecret(const CScript& scriptPubKey, CSecret& vchSecret, bool &fCompressed, txnouttype& whichTypeRet, CScript& subscript) const = 0;
     virtual bool GetSecret(const CKeyID &address, CSecret& vchSecret, bool &fCompressed) const
     {
         CKey key;
@@ -176,6 +141,7 @@ public:
         }
         return false;
     }
+    bool GetSecret(const CScript& scriptPubKey, CSecret& vchSecret, bool &fCompressed, txnouttype& whichTypeRet, CScript& subscript) const;
     virtual bool AddCScript(const CScript& redeemScript);
     virtual bool HaveCScript(const CScriptID &hash) const;
     virtual bool GetCScript(const CScriptID &hash, CScript& redeemScriptOut) const;

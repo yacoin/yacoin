@@ -736,6 +736,7 @@ bool DumpWallet(CWallet* pwallet, const string& strDest)
       file << strprintf("#   mined on %s\n", EncodeDumpTime(chainActive.Tip()->nTime).c_str());
       file << "\n";
       file << "@ BELOW ARE LIST OF P2PKH ADDRESSES AND THEIR PRIVATE KEYS:";
+      file << "\n";
       for (std::vector<std::pair< ::int64_t, CKeyID> >::const_iterator it = vKeyBirth.begin(); it != vKeyBirth.end(); it++) {
           const CKeyID &keyid = it->second;
           std::string strTime = EncodeDumpTime(it->first);
@@ -768,10 +769,13 @@ bool DumpWallet(CWallet* pwallet, const string& strDest)
       }
       file << "\n";
       file << "@ BELOW ARE LIST OF P2SH ADDRESSES AND THEIR PRIVATE KEYS:";
-      for (const auto& [redeemScriptHash, redeemScript]: mapScripts) {
+      file << "\n";
+      for (const auto& elem: mapScripts) {
+          const auto& redeemScriptHash = elem.first;
+          const auto& redeemScript = elem.second;
           CSecret secret;
           bool IsCompressed;
-          txnouttype& whichTypeRet;
+          txnouttype whichTypeRet;
           CScript tempScript;
           std::string strAddr = CBitcoinAddress(redeemScriptHash).ToString();
           pwallet->GetSecret(redeemScript, secret, IsCompressed, whichTypeRet, tempScript);
@@ -782,13 +786,13 @@ bool DumpWallet(CWallet* pwallet, const string& strDest)
                                 CBitcoinSecret(secret, IsCompressed).ToString().c_str(),
                                 GetTxnOutputType(whichTypeRet),
                                 EncodeDumpString(pwallet->mapAddressBook[redeemScriptHash]).c_str(),
-                                HexStr(redeemScript.begin(), redeemScript.end()),
+                                HexStr(redeemScript.begin(), redeemScript.end()).c_str(),
                                 strAddr.c_str());
           } else {
               file << strprintf("%s type=%s change=1 redeemscript=%s # addr=%s\n",
                                 CBitcoinSecret(secret, IsCompressed).ToString().c_str(),
                                 GetTxnOutputType(whichTypeRet),
-                                HexStr(redeemScript.begin(), redeemScript.end()),
+                                HexStr(redeemScript.begin(), redeemScript.end()).c_str(),
                                 strAddr.c_str());
           }
       }
@@ -825,7 +829,7 @@ bool ImportWallet(CWallet *pwallet, const string& strLocation)
           readP2SH = 2,
           finish = 3
       };
-      ReadState readState = begin;
+      ::uint32_t readState = begin;
 
       while (file.good()) {
           std::string line;
