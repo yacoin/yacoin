@@ -117,7 +117,7 @@ class TokenTest(BitcoinTestFramework):
         assert_equal(tokendata["units"], 4)
         assert_equal(tokendata["reissuable"], 1)
         assert_equal(tokendata["has_ipfs"], 1)
-        assert_equal(tokendata["ipfs_hash"], ipfs_hash)
+        assert_equal(tokendata["ipfs_hash_cidv0"], ipfs_hash)
 
         self.log.info("Checking listmytokens()...")
         mytokens = n0.listmytokens("TEST_YATOKEN*", True)
@@ -253,7 +253,7 @@ class TokenTest(BitcoinTestFramework):
         assert_equal(tokendata["units"], 4)
         assert_equal(tokendata["reissuable"], 0)
         assert_equal(tokendata["has_ipfs"], 1)
-        assert_equal(tokendata["ipfs_hash"], ipfs_hash2)
+        assert_equal(tokendata["ipfs_hash_cidv0"], ipfs_hash2)
 
         self.log.info("Checking listtokenbalancesbyaddress()...")
         assert_equal(
@@ -309,7 +309,7 @@ class TokenTest(BitcoinTestFramework):
         assert_equal(tokendata["units"], 4)
         assert_equal(tokendata["reissuable"], 1)
         assert_equal(tokendata["has_ipfs"], 1)
-        assert_equal(tokendata["ipfs_hash"], ipfs_hash)
+        assert_equal(tokendata["ipfs_hash_cidv0"], ipfs_hash)
 
         # TEST ISSUE UNIQUE-TOKEN
         self.log.info("Creating some Unique-tokens...")
@@ -523,7 +523,7 @@ class TokenTest(BitcoinTestFramework):
         self.mine_blocks(0, 1)
         ad = n0.listtokens(token_name2, True)[token_name2]
         assert_equal(0, ad["has_ipfs"])
-        assert_does_not_contain_key("ipfs_hash", ad)
+        assert_does_not_contain_key("ipfs_hash_cidv0", ad)
 
         ########################################
         # reissue w/ bad hash
@@ -547,7 +547,7 @@ class TokenTest(BitcoinTestFramework):
         self.mine_blocks(0, 1)
         ad = n0.listtokens(token_name2, True)[token_name2]
         assert_equal(1, ad["has_ipfs"])
-        assert_equal(ipfs_hash, ad["ipfs_hash"])
+        assert_equal(ipfs_hash, ad["ipfs_hash_cidv0"])
 
     def reissue_prec_change(self):
         self.log.info("Testing precision change on reissue...")
