@@ -51,7 +51,7 @@ void safe_advance(Iter& curr, const Iter& end, Incr n)
 Value issue(const Array& params, bool fHelp)
 {
     if (fHelp || !AreTokensDeployed() || params.size() < 1 || params.size() > 8)
-        throw JSONRPCError(RPC_HELP_USAGE,
+        throw runtime_error(
             "issue <token_name> [qty] [units] [reissuable] [has_ipfs] [ipfs_hash] [to_address] [change_address]\n"
             + TokenActivationWarning() +
             "\nIssue a YA-token, Sub-token or Unique-token.\n"
@@ -208,7 +208,7 @@ Value issue(const Array& params, bool fHelp)
 Value transfer(const Array& params, bool fHelp)
 {
     if (fHelp || !AreTokensDeployed() || params.size() < 3 || params.size() > 5)
-        throw JSONRPCError(RPC_HELP_USAGE,
+        throw runtime_error(
                 "transfer <token_name> [qty] <to_address> [change_address] [token_change_address]\n"
                 + TokenActivationWarning() +
                 "\nTransfers a quantity of an owned token to a given address"
@@ -289,7 +289,7 @@ Value transfer(const Array& params, bool fHelp)
 Value transferfromaddress(const Array& params, bool fHelp)
 {
     if (fHelp || !AreTokensDeployed() || params.size() < 4 || params.size() > 6)
-        throw JSONRPCError(RPC_HELP_USAGE,
+        throw runtime_error(
                 "transferfromaddress <token_name> <from_address> <qty> <to_address> [yac_change_address] [token_change_address]\n"
                 + TokenActivationWarning() +
                 "\nTransfer a quantity of an owned token in a specific address to a given address"
@@ -400,7 +400,7 @@ Value transferfromaddress(const Array& params, bool fHelp)
 Value reissue(const Array& params, bool fHelp)
 {
     if (fHelp || !AreTokensDeployed() || params.size() > 7 || params.size() < 2)
-        throw JSONRPCError(RPC_HELP_USAGE,
+        throw runtime_error(
                 "reissue <token_name> <qty> [reissuable] [to_address] [change_address] [new_unit] [new_ipfs]\n"
                 + TokenActivationWarning() +
                 "\nReissues a quantity of an token to an owned address if you own the Owner Token"
@@ -523,7 +523,7 @@ Value reissue(const Array& params, bool fHelp)
 Value listmytokens(const Array& params, bool fHelp)
 {
     if (fHelp || !AreTokensDeployed() || params.size() > 5)
-        throw JSONRPCError(RPC_HELP_USAGE,
+        throw runtime_error(
                 "listmytokens [token] [verbose] [count] [start] (confs) \n"
                 + TokenActivationWarning() +
                 "\nReturns a list of all token that are owned by this wallet\n"
@@ -715,7 +715,7 @@ Value listmytokens(const Array& params, bool fHelp)
 Value listtokens(const Array& params, bool fHelp)
 {
     if (fHelp || !AreTokensDeployed() || params.size() > 4)
-        throw JSONRPCError(RPC_HELP_USAGE,
+        throw runtime_error(
                 "listtokens [token] [verbose] [count] [start]\n"
                 + TokenActivationWarning() +
                 "\nReturns a list of all tokens in the blockchain\n"
@@ -838,7 +838,7 @@ Value listaddressesbytoken(const Array& params, bool fHelp)
     }
 
     if (fHelp || !AreTokensDeployed() || params.size() > 4 || params.size() < 1)
-        throw JSONRPCError(RPC_HELP_USAGE,
+        throw runtime_error(
                 "listaddressesbytoken <token_name> [onlytotal] [count] [start]\n"
                 + TokenActivationWarning() +
                 "\nReturns a list of all address that own the given token (with balances)"
@@ -912,7 +912,7 @@ Value listtokenbalancesbyaddress(const Array& params, bool fHelp)
     }
 
     if (fHelp || !AreTokensDeployed() || params.size() > 4 || params.size() < 1)
-        throw JSONRPCError(RPC_HELP_USAGE,
+        throw runtime_error(
             "listtokenbalancesbyaddress <address> [onlytotal] [count] [start]\n"
             + TokenActivationWarning() +
             "\nReturns a list of all token balances for an address.\n"

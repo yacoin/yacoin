@@ -1425,7 +1425,7 @@ Value timelockcoins(const Array& params, bool fHelp)
 {
     if (fHelp || params.size() < 2 || params.size() > 5)
     {
-        throw JSONRPCError(RPC_HELP_USAGE,
+        throw runtime_error(
             "timelockcoins <amount> <lock_time> [isRelativeTimelock] [isBlockHeightLock] [to_address]\n"
             "\nTimelocks an amount of coins within a number of blocks/seconds (relative timelock) or until a specific block/time (absolute timelock)\n"
 
