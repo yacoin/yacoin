@@ -116,7 +116,7 @@ class TokenTest(BitcoinTestFramework):
         )
         self.mine_blocks(0, 1)
         expected_message = (
-            "%d.000000 YAC are already locked. These coins will be locked for a period of %d seconds"
+            "%d.000000 YAC are now locked. These coins will be locked for a period of %d seconds"
             % (amount_timelock_coins, LOCK_TIME)
         )
         assert_equal(timelock_result_0["message"], expected_message)
@@ -185,7 +185,7 @@ class TokenTest(BitcoinTestFramework):
         )
         self.mine_blocks(0, 1)
         expected_message = (
-            "%d.000000 YAC are already locked. These coins will be locked within %d blocks"
+            "%d.000000 YAC are now locked. These coins will be locked within %d blocks"
             % (amount_timelock_coins, LOCK_TIME)
         )
         assert_equal(timelock_result_0["message"], expected_message)
@@ -255,7 +255,7 @@ class TokenTest(BitcoinTestFramework):
         date_time = datetime.utcfromtimestamp(LOCK_TIME)
         timestamp_str = date_time.strftime("%Y-%m-%d %H:%M:%S UTC")
         expected_message = (
-            "%d.000000 YAC are already locked. These coins will be locked until %s"
+            "%d.000000 YAC are now locked. These coins will be locked until %s"
             % (amount_timelock_coins, timestamp_str)
         )
         assert_equal(timelock_result_0["message"], expected_message)
@@ -324,7 +324,7 @@ class TokenTest(BitcoinTestFramework):
         )
         self.mine_blocks(0, 1)
         expected_message = (
-            "%d.000000 YAC are already locked. These coins will be locked until block height %d"
+            "%d.000000 YAC are now locked. These coins will be locked until block height %d"
             % (amount_timelock_coins, LOCK_TIME)
         )
         assert_equal(timelock_result_0["message"], expected_message)

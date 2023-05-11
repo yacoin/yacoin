@@ -1536,7 +1536,7 @@ Value timelockcoins(const Array& params, bool fHelp)
     std::stringstream ss;
     if (isRelativeTimelock)
     {
-        ss << ValueFromAmountStr(nAmount) << " YAC are already locked. These coins will be locked ";
+        ss << ValueFromAmountStr(nAmount) << " YAC are now locked. These coins will be locked ";
         if (isBlockHeightLock)
         {
             ss << "within " << nLockTime << " blocks";
@@ -1548,7 +1548,7 @@ Value timelockcoins(const Array& params, bool fHelp)
     }
     else
     {
-        ss << ValueFromAmountStr(nAmount) << " YAC are already locked. These coins will be locked until ";
+        ss << ValueFromAmountStr(nAmount) << " YAC are now locked. These coins will be locked until ";
         if (nLockTime < LOCKTIME_THRESHOLD)
         {
             ss << "block height " << nLockTime;
