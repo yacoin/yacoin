@@ -607,6 +607,8 @@ Value getreceivedbyaddress(const Array& params, bool fHelp)
     if (!IsMine(*pwalletMain,scriptPubKey))
         return (double)0.0;
 
+    CTxDestination dest = address.Get();
+
     // Minimum confirmations
     int nMinDepth = 1;
     if (params.size() > 1)
@@ -620,10 +622,15 @@ Value getreceivedbyaddress(const Array& params, bool fHelp)
         if (wtx.IsCoinBase() || wtx.IsCoinStake() || !wtx.IsFinal())
             continue;
 
-        BOOST_FOREACH(const CTxOut& txout, wtx.vout)
-            if (txout.scriptPubKey == scriptPubKey)
+        for (const auto& txout : wtx.vout)
+        {
+            CTxDestination addressRet;
+            if (ExtractDestination(txout.scriptPubKey, addressRet) && addressRet == dest)
+            {
                 if (wtx.GetDepthInMainChain() >= nMinDepth)
                     nAmount += txout.nValue;
+            }
+        }
     }
 
     return  ValueFromAmount(nAmount);
@@ -1411,6 +1418,150 @@ Value createcsvaddress(const Array& params, bool fHelp)
     result.push_back(Pair("Warning", warnMsg));
 
     pwalletMain->SetAddressBookName(innerID, strAccount);
+    return result;
+}
+
+Value timelockcoins(const Array& params, bool fHelp)
+{
+    if (fHelp || params.size() < 2 || params.size() > 5)
+    {
+        throw runtime_error(
+            "timelockcoins <amount> <lock_time> [isRelativeTimelock] [isBlockHeightLock] [to_address]\n"
+            "\nTimelocks an amount of coins within a number of blocks/seconds (relative timelock) or until a specific block/time (absolute timelock)\n"
+
+            "\nArguments:\n"
+            "1. \"amount\"                (numeric, required) Number of YAC you want to timelock\n"
+            "2. \"lock_time\"             (integer, required) The meaning of lock_time depends on isRelativeTimelock, isBlockHeightLock and the value itself\n"
+            "                                                 If isRelativeTimelock = true: Specify time in seconds (isBlockHeightLock = false) or number of blocks (isBlockHeightLock = true) which coins will be locked within. Valid range 1->1073741823\n"
+            "                                                 If isRelativeTimelock = false: Specify specific time (lock_time >= 500000000) or a specific block number (lock_time < 500000000) which coins will be locked until. Valid range 1->4294967295\n"
+            "3. \"isRelativeTimelock\"    (boolean, optional, default=true), Whether it is relative or absolute timelock\n"
+            "4. \"isBlockHeightLock\"     (boolean, optional, default=true), Whether <lock_time> is in units of block or time (in seconds)\n"
+            "                                                                This argument is only used in case isRelativeTimelock = true\n"
+            "5. \"to_address\"            (string), optional, default=\"\"), Address contains the timelocked coins, if it is empty, address will be generated for you\n"
+
+            "\nResult:\n"
+            "\"txid\"                     (string) The transaction id\n"
+
+            "\nExamples:\n"
+            "Lock 1000 YAC within 21000 blocks: timelockcoins 1000 21000\n"
+            "Lock 1000 YAC within 600 seconds: timelockcoins 1000 600 true false\n"
+            "Lock 1000 YAC until block height = 1990000: timelockcoins 1000 1990000 false\n"
+            "Lock 1000 YAC until Tuesday, March 4, 2025 12:00:00 AM UTC: 1000 1741046400 false false\n"
+            "Lock 1000 YAC within 21000 blocks at address YCk26dUcaXu8vu6zG3E2PrbBeECAV8RNFp: timelockcoins 1000 21000 true true YCk26dUcaXu8vu6zG3E2PrbBeECAV8RNFp\n"
+        );
+    }
+
+    if (pwalletMain->IsLocked())
+        throw JSONRPCError(RPC_WALLET_UNLOCK_NEEDED, "Error: Please enter the wallet passphrase with walletpassphrase first.");
+
+    // Amount
+    CAmount nAmount = AmountFromValue(params[0]);
+    if (nAmount < MIN_TXOUT_AMOUNT)
+        throw JSONRPCError(RPC_TYPE_ERROR, "Lock amount too small");
+
+    // isRelativeTimelock
+    bool isRelativeTimelock = true;
+    if (params.size() > 2)
+        isRelativeTimelock = params[2].get_bool();
+
+    // isBlockHeightLock
+    bool isBlockHeightLock = true;
+    if (params.size() > 3)
+        isBlockHeightLock = params[3].get_bool();
+
+    // Get lock time
+    int64_t nLockTime = params[1].get_int64();
+    if (isRelativeTimelock && (nLockTime < 1 || nLockTime > CTxIn::SEQUENCE_LOCKTIME_MASK))
+        throw JSONRPCError(RPC_INVALID_PARAMS, std::string("For relative timelock, <lock_time> must be in range of 1->1073741823"));
+    else if (!isRelativeTimelock && (nLockTime < 1 || nLockTime > std::numeric_limits<uint32_t>::max()))
+        throw JSONRPCError(RPC_INVALID_PARAMS, std::string("For absolute timelock, <lock_time> must be in range of 1->4294967295"));
+
+    // to_address
+    std::string address = "";
+    if (params.size() > 4)
+        address = params[4].get_str();
+    CKeyID keyID;
+
+    if (!address.empty()) {
+        CTxDestination destination = DecodeDestination(address);
+        if (!IsValidDestination(destination)) {
+            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, std::string("Invalid Yacoin address: ") + address);
+        }
+        keyID = boost::get<CKeyID>(destination);
+    } else {
+        // Create a new address
+        std::string strAccount;
+
+        if (!pwalletMain->IsLocked()) {
+            pwalletMain->TopUpKeyPool();
+        }
+
+        // Generate a new key that is added to wallet
+        CPubKey newKey;
+        if (!pwalletMain->GetKeyFromPool(newKey)) {
+            throw JSONRPCError(RPC_WALLET_KEYPOOL_RAN_OUT, "Error: Keypool ran out, please call keypoolrefill first");
+        }
+        keyID = newKey.GetID();
+
+        pwalletMain->SetAddressBookName(keyID, strAccount);
+
+        address = EncodeDestination(keyID);
+    }
+
+    // Create timelock script
+    CScript timeLockScriptPubKey;
+    if (isRelativeTimelock)
+    {
+        ::uint32_t nSequence = isBlockHeightLock? nLockTime: (nLockTime | CTxIn::SEQUENCE_LOCKTIME_TYPE_FLAG);
+        timeLockScriptPubKey.SetCsvP2PKH(nSequence, keyID);
+    }
+    else
+    {
+        timeLockScriptPubKey.SetCltvP2PKH(::uint32_t(nLockTime), keyID);
+    }
+
+    if (timeLockScriptPubKey.size() > MAX_SCRIPT_ELEMENT_SIZE)
+        throw runtime_error(
+            strprintf("redeemScript exceeds size limit: %" PRIszu " > %d", timeLockScriptPubKey.size(), MAX_SCRIPT_ELEMENT_SIZE));
+
+    Object result;
+
+    // Create transaction
+    CWalletTx wtx;
+    string strError = pwalletMain->SendMoney(timeLockScriptPubKey, nAmount, wtx, false, NULL, true);
+    if (strError != "")
+        throw JSONRPCError(RPC_WALLET_ERROR, strError);
+
+    // Output the message
+    std::stringstream ss;
+    if (isRelativeTimelock)
+    {
+        ss << ValueFromAmountStr(nAmount) << " YAC are now locked. These coins will be locked ";
+        if (isBlockHeightLock)
+        {
+            ss << "within " << nLockTime << " blocks";
+        }
+        else
+        {
+            ss << "for a period of " << (nLockTime * (1 << CTxIn::SEQUENCE_LOCKTIME_GRANULARITY)) << " seconds";
+        }
+    }
+    else
+    {
+        ss << ValueFromAmountStr(nAmount) << " YAC are now locked. These coins will be locked until ";
+        if (nLockTime < LOCKTIME_THRESHOLD)
+        {
+            ss << "block height " << nLockTime;
+        }
+        else
+        {
+            ss << DateTimeStrFormat(nLockTime);
+        }
+    }
+    result.push_back(Pair("message", ss.str()));
+    result.push_back(Pair("address_containing_timelocked_coins", address));
+    result.push_back(Pair("txid", wtx.GetHash().GetHex()));
+
     return result;
 }
 

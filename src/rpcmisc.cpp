@@ -92,7 +92,7 @@ Value getaddressbalance(const Array& params, bool fHelp)
     }
 
     if (fHelp || params.size() > 2 || params[0].type() != obj_type)
-        throw JSONRPCError(RPC_HELP_USAGE,
+        throw runtime_error(
             "getaddressbalance\n"
             "\nReturns the balance for an address(es) (requires -addressindex to be enabled).\n"
             "\nArguments:\n"
@@ -216,7 +216,7 @@ Value getaddressdeltas(const Array& params, bool fHelp)
     }
 
     if (fHelp || params.size() != 1 || params[0].type() != obj_type)
-        throw JSONRPCError(RPC_HELP_USAGE,
+        throw runtime_error(
             "getaddressdeltas\n"
             "\nReturns all changes for an address (requires addressindex to be enabled).\n"
             "\nArguments:\n"
@@ -361,7 +361,7 @@ Value getaddressutxos(const Array& params, bool fHelp)
     }
 
     if (fHelp || params.size() != 1 || params[0].type() != obj_type)
-        throw JSONRPCError(RPC_HELP_USAGE,
+        throw runtime_error(
             "getaddressutxos\n"
             "\nReturns all unspent outputs for an address (requires addressindex to be enabled).\n"
             "\nArguments:\n"
@@ -480,7 +480,7 @@ Value getaddresstxids(const Array& params, bool fHelp)
     }
 
     if (fHelp || params.size() > 2 || params[0].type() != obj_type)
-        throw JSONRPCError(RPC_HELP_USAGE,
+        throw runtime_error(
             "getaddresstxids\n"
             "\nReturns the txids for an address(es) (requires addressindex to be enabled).\n"
             "\nArguments:\n"

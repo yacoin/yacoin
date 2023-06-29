@@ -711,6 +711,7 @@ bool DumpWallet(CWallet* pwallet, const string& strDest)
       // Populate maps
       std::map<CKeyID, ::int64_t> mapKeyBirth;
       std::set<CKeyID> setKeyPool;
+      ScriptMap mapScripts = pwallet->GetP2SHRedeemScriptMap();
       pwallet->GetKeyBirthTimes(mapKeyBirth);
       pwallet->GetAllReserveKeys(setKeyPool);
 
@@ -733,6 +734,8 @@ bool DumpWallet(CWallet* pwallet, const string& strDest)
       file << strprintf("# * Created on %s\n", EncodeDumpTime(GetTime()).c_str());
       file << strprintf("# * Best block at time of backup was %i (%s),\n", chainActive.Height(), hashBestChain.ToString().c_str());
       file << strprintf("#   mined on %s\n", EncodeDumpTime(chainActive.Tip()->nTime).c_str());
+      file << "\n";
+      file << "@ BELOW ARE LIST OF P2PKH ADDRESSES AND THEIR PRIVATE KEYS:";
       file << "\n";
       for (std::vector<std::pair< ::int64_t, CKeyID> >::const_iterator it = vKeyBirth.begin(); it != vKeyBirth.end(); it++) {
           const CKeyID &keyid = it->second;
@@ -765,6 +768,35 @@ bool DumpWallet(CWallet* pwallet, const string& strDest)
           }
       }
       file << "\n";
+      file << "@ BELOW ARE LIST OF P2SH ADDRESSES AND THEIR PRIVATE KEYS:";
+      file << "\n";
+      for (const auto& elem: mapScripts) {
+          const auto& redeemScriptHash = elem.first;
+          const auto& redeemScript = elem.second;
+          CSecret secret;
+          bool IsCompressed;
+          txnouttype whichTypeRet;
+          CScript tempScript;
+          std::string strAddr = CBitcoinAddress(redeemScriptHash).ToString();
+          pwallet->GetSecret(redeemScript, secret, IsCompressed, whichTypeRet, tempScript);
+
+          if (pwallet->mapAddressBook.count(redeemScriptHash)) {
+
+              file << strprintf("%s type=%s label=%s redeemscript=%s # addr=%s\n",
+                                CBitcoinSecret(secret, IsCompressed).ToString().c_str(),
+                                GetTxnOutputType(whichTypeRet),
+                                EncodeDumpString(pwallet->mapAddressBook[redeemScriptHash]).c_str(),
+                                HexStr(redeemScript.begin(), redeemScript.end()).c_str(),
+                                strAddr.c_str());
+          } else {
+              file << strprintf("%s type=%s change=1 redeemscript=%s # addr=%s\n",
+                                CBitcoinSecret(secret, IsCompressed).ToString().c_str(),
+                                GetTxnOutputType(whichTypeRet),
+                                HexStr(redeemScript.begin(), redeemScript.end()).c_str(),
+                                strAddr.c_str());
+          }
+      }
+      file << "\n";
       file << "# End of dump\n";
       file.close();
       return true;
@@ -791,11 +823,24 @@ bool ImportWallet(CWallet *pwallet, const string& strLocation)
       bool fGood = true;
 
       // read through input file checking and importing keys into wallet.
+      enum ReadState {
+          begin = 0,
+          readP2PKH = 1,
+          readP2SH = 2,
+          finish = 3
+      };
+      ::uint32_t readState = begin;
+
       while (file.good()) {
           std::string line;
           std::getline(file, line);
           if (line.empty() || line[0] == '#')
               continue;
+
+          if (line[0] == '@') {
+              readState++;
+              continue;
+          }
 
           std::vector<std::string> vstr;
           boost::split(vstr, line, boost::is_any_of(" "));
@@ -810,12 +855,7 @@ bool ImportWallet(CWallet *pwallet, const string& strLocation)
           CSecret secret = vchSecret.GetSecret(fCompressed);
           key.SetSecret(secret, fCompressed);
           CKeyID keyid = key.GetPubKey().GetID();
-
-          if (pwallet->HaveKey(keyid)) {
-              printf("Skipping import of %s (key already present)\n", CBitcoinAddress(keyid).ToString().c_str());
-             continue;
-          }
-          ::int64_t nTime = DecodeDumpTime(vstr[1]);
+          CScript scriptP2SH;
           std::string strLabel;
           bool fLabel = true;
           for (unsigned int nStr = 2; nStr < vstr.size(); nStr++) {
@@ -829,16 +869,42 @@ bool ImportWallet(CWallet *pwallet, const string& strLocation)
                   strLabel = DecodeDumpString(vstr[nStr].substr(6));
                   fLabel = true;
               }
+              if (boost::algorithm::starts_with(vstr[nStr], "redeemscript=")) {
+                  vector<unsigned char> innerData = ParseHex(vstr[nStr].substr(13));
+                  scriptP2SH.assign(innerData.begin(), innerData.end());
+              }
+          }
+
+          if (pwallet->HaveKey(keyid)) {
+              if (readState == readP2SH && !pwallet->GetCScript(scriptP2SH.GetID(), scriptP2SH))
+              {
+                  pwallet->AddCScript(scriptP2SH);
+                  if (fLabel)
+                      pwallet->SetAddressBookName(scriptP2SH.GetID(), strLabel);
+              }
+              printf("Skipping import of %s (key already present)\n", CBitcoinAddress(keyid).ToString().c_str());
+             continue;
           }
           printf("Importing %s...\n", CBitcoinAddress(keyid).ToString().c_str());
           if (!pwallet->AddKey(key)) {
               fGood = false;
               continue;
           }
-          pwallet->mapKeyMetadata[keyid].nCreateTime = nTime;
-          if (fLabel)
-              pwallet->SetAddressBookName(keyid, strLabel);
-          nTimeBegin = std::min(nTimeBegin, nTime);
+
+          if (readState == readP2PKH)
+          {
+              ::int64_t nTime = DecodeDumpTime(vstr[1]);
+              pwallet->mapKeyMetadata[keyid].nCreateTime = nTime;
+              nTimeBegin = std::min(nTimeBegin, nTime);
+              if (fLabel)
+                  pwallet->SetAddressBookName(keyid, strLabel);
+          }
+          else if (readState == readP2SH)
+          {
+              pwallet->AddCScript(scriptP2SH);
+              if (fLabel)
+                  pwallet->SetAddressBookName(scriptP2SH.GetID(), strLabel);
+          }
       }
       file.close();
 

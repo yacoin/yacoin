@@ -17,6 +17,24 @@
 #include <boost/variant.hpp>
 
 class CScript;
+enum txnouttype {
+    TX_NONSTANDARD,
+    // 'standard' transaction types:
+    TX_PUBKEY,
+    TX_PUBKEYHASH,
+    TX_SCRIPTHASH,
+    TX_MULTISIG,
+    TX_CLTV_P2SH,
+    TX_CSV_P2SH,
+    TX_CLTV_P2PKH,
+    TX_CSV_P2PKH,
+    TX_NULL_DATA,
+    /** YAC_TOKEN START */
+    TX_NEW_TOKEN,
+    TX_REISSUE_TOKEN,
+    TX_TRANSFER_TOKEN,
+    /** YAC_TOKEN END */
+};
 
 class CNoDestination {
 public:
@@ -62,6 +80,7 @@ public:
     virtual bool HaveWatchOnly(const CScript &dest) const =0;
     virtual bool HaveWatchOnly() const =0;
 
+    virtual bool GetSecret(const CScript& scriptPubKey, CSecret& vchSecret, bool &fCompressed, txnouttype& whichTypeRet, CScript& subscript) const = 0;
     virtual bool GetSecret(const CKeyID &address, CSecret& vchSecret, bool &fCompressed) const
     {
         CKey key;
@@ -122,6 +141,7 @@ public:
         }
         return false;
     }
+    bool GetSecret(const CScript& scriptPubKey, CSecret& vchSecret, bool &fCompressed, txnouttype& whichTypeRet, CScript& subscript) const;
     virtual bool AddCScript(const CScript& redeemScript);
     virtual bool HaveCScript(const CScriptID &hash) const;
     virtual bool GetCScript(const CScriptID &hash, CScript& redeemScriptOut) const;

@@ -174,6 +174,15 @@ Value ValueFromAmount(::int64_t amount)
     return (double)amount / (double)COIN;
 }
 
+std::string ValueFromAmountStr(const CAmount& amount)
+{
+    bool sign = amount < 0;
+    int64_t n_abs = (sign ? -amount : amount);
+    int64_t quotient = n_abs / COIN;
+    int64_t remainder = n_abs % COIN;
+    return strprintf("%s%d.%06d", sign ? "-" : "", quotient, remainder);
+}
+
 std::string HexBits(unsigned int nBits)
 {
     union
@@ -1348,8 +1357,9 @@ static const CRPCCommand vRPCCommands[] =
     { "getaddressbalance",      &getaddressbalance,      false,  false },
     { "getaddressdeltas",       &getaddressdeltas,       false,  false },
     { "getaddressutxos",        &getaddressutxos,        false,  false },
-    { "getaddresstxids",        &getaddresstxids,        false,  false }
+    { "getaddresstxids",        &getaddresstxids,        false,  false },
     /** YAC_TOKEN END */
+    { "timelockcoins",          &timelockcoins,          false,  false }
 };
 
 CRPCTable::CRPCTable()
@@ -1442,6 +1452,10 @@ Array RPCConvertValues(std::string &strMethod, const std::vector<std::string> &s
     if (strMethod == "createcsvaddress"       && n > 0) ConvertTo<boost::int64_t>(params[0]);
     if (strMethod == "createcsvaddress"       && n > 1) ConvertTo<bool>(params[1]);
     if (strMethod == "spendcsv"               && n > 2) ConvertTo<boost::int64_t>(params[2]);
+    if (strMethod == "timelockcoins"          && n > 0) ConvertTo<double>(params[0]);         // amount
+    if (strMethod == "timelockcoins"          && n > 1) ConvertTo<boost::int64_t>(params[1]); // lock_time
+    if (strMethod == "timelockcoins"          && n > 2) ConvertTo<bool>(params[2]);           // isRelativeTimelock
+    if (strMethod == "timelockcoins"          && n > 3) ConvertTo<bool>(params[3]);           // isBlockHeightLock
     if (strMethod == "listunspent"            && n > 0) ConvertTo<boost::int64_t>(params[0]);
     if (strMethod == "listunspent"            && n > 1) ConvertTo<boost::int64_t>(params[1]);
     if (strMethod == "listunspent"            && n > 2) ConvertTo<Array>(params[2]);
