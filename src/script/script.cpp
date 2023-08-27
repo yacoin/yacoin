@@ -2461,6 +2461,22 @@ bool CScript::IsPayToScriptHash() const
             this->at(22) == OP_EQUAL);
 }
 
+bool CScript::IsP2PKHTimelock(std::vector<unsigned char>& addressRet) const
+{
+    // Extra-fast test for pay-to-script-hash CScripts:
+    vector<valtype> vSolutions;
+    txnouttype whichType;
+    if (!Solver(*this, whichType, vSolutions))
+        return false;
+
+    if (whichType == TX_CLTV_P2PKH || whichType == TX_CSV_P2PKH)
+    {
+        addressRet = vSolutions[0];
+        return true;
+    }
+    return false;
+}
+
 /** YAC_TOKEN START */
 bool CScript::IsTokenScript() const
 {

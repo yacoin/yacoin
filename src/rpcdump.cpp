@@ -204,14 +204,32 @@ Value dumpprivkey(const Array& params, bool fHelp)
         throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid Yacoin address");
     if (fWalletUnlockMintOnly) // ppcoin: no dumpprivkey in mint-only mode
         throw JSONRPCError(RPC_WALLET_UNLOCK_NEEDED, "Wallet is unlocked for minting only.");
-    CKeyID keyID;
-    if (!address.GetKeyID(keyID))
-        throw JSONRPCError(RPC_TYPE_ERROR, "Address does not refer to a key");
+
+    CScript scriptPubKey;
+    scriptPubKey.SetDestination(address.Get());
+    if (!IsMine(*pwalletMain,scriptPubKey))
+        throw JSONRPCError(RPC_WALLET_ERROR, "Wallet doesn't manage coins in this address");
+
     CSecret vchSecret;
+    txnouttype whichTypeRet;
     bool fCompressed;
-    if (!pwalletMain->GetSecret(keyID, vchSecret, fCompressed))
+    CScript subscript;
+    if (!pwalletMain->GetSecret(scriptPubKey, vchSecret, fCompressed, whichTypeRet, subscript))
         throw JSONRPCError(RPC_WALLET_ERROR, "Private key for address " + strAddress + " is not known");
-    return CBitcoinSecret(vchSecret, fCompressed).ToString();
+
+    Object result;
+    if (whichTypeRet == TX_CLTV_P2SH || whichTypeRet == TX_CSV_P2SH)
+    {
+        result.push_back(Pair("address_type", "P2SH address"));
+        result.push_back(Pair("private_key", CBitcoinSecret(vchSecret, fCompressed).ToString()));
+        result.push_back(Pair("redeem_script", HexStr(subscript.begin(), subscript.end())));
+    }
+    else
+    {
+        result.push_back(Pair("address_type", "P2PKH address"));
+        result.push_back(Pair("private_key", CBitcoinSecret(vchSecret, fCompressed).ToString()));
+    }
+    return result;
 }
 
 Value dumpwallet(const Array& params, bool fHelp)

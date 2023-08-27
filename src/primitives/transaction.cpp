@@ -311,56 +311,59 @@ bool CTransaction::CheckTransaction(CValidationState &state) const
             return state.DoS(100, error("CTransaction::CheckTransaction() : txout total out of range"));
 
         /** YAC_TOKEN START */
-        bool isToken = false;
-        int nType;
-        bool fIsOwner;
-        if (txout.scriptPubKey.IsTokenScript(nType, fIsOwner))
-            isToken = true;
+        if (AreTokensDeployed())
+        {
+            bool isToken = false;
+            int nType;
+            bool fIsOwner;
+            if (txout.scriptPubKey.IsTokenScript(nType, fIsOwner))
+                isToken = true;
 
-        // Check for transfers that don't meet the tokens units only if the tokenCache is not null
-        if (isToken) {
-            // Get the transfer transaction data from the scriptPubKey
-            if (nType == TX_TRANSFER_TOKEN) {
-                CTokenTransfer transfer;
-                std::string address;
-                if (!TransferTokenFromScript(txout.scriptPubKey, transfer, address))
-                    return state.DoS(100, error("bad-txns-transfer-token-bad-deserialize"));
+            // Check for transfers that don't meet the tokens units only if the tokenCache is not null
+            if (isToken) {
+                // Get the transfer transaction data from the scriptPubKey
+                if (nType == TX_TRANSFER_TOKEN) {
+                    CTokenTransfer transfer;
+                    std::string address;
+                    if (!TransferTokenFromScript(txout.scriptPubKey, transfer, address))
+                        return state.DoS(100, error("bad-txns-transfer-token-bad-deserialize"));
 
-                // insert into set, so that later on we can check token null data transactions
-                setTokenTransferNames.insert(transfer.strName);
+                    // insert into set, so that later on we can check token null data transactions
+                    setTokenTransferNames.insert(transfer.strName);
 
-                // Check token name validity and get type
-                ETokenType tokenType;
-                if (!IsTokenNameValid(transfer.strName, tokenType)) {
-                    return state.DoS(100, error("bad-txns-transfer-token-name-invalid"));
+                    // Check token name validity and get type
+                    ETokenType tokenType;
+                    if (!IsTokenNameValid(transfer.strName, tokenType)) {
+                        return state.DoS(100, error("bad-txns-transfer-token-name-invalid"));
+                    }
+
+                    // If the transfer is an ownership token. Check to make sure that it is OWNER_TOKEN_AMOUNT
+                    if (IsTokenNameAnOwner(transfer.strName)) {
+                        if (transfer.nAmount != OWNER_TOKEN_AMOUNT)
+                            return state.DoS(100, error("bad-txns-transfer-owner-amount-was-not-1"));
+                    }
+
+                    // If the transfer is a unique token. Check to make sure that it is UNIQUE_TOKEN_AMOUNT
+                    if (tokenType == ETokenType::UNIQUE) {
+                        if (transfer.nAmount != UNIQUE_TOKEN_AMOUNT)
+                            return state.DoS(100, error("bad-txns-transfer-unique-amount-was-not-1"));
+                    }
+
+                    // Specific check and error message to go with to make sure the amount is 0
+                    if (txout.nValue != 0)
+                        return state.DoS(100, error("bad-txns-token-transfer-amount-isn't-zero"));
+                } else if (nType == TX_NEW_TOKEN) {
+                    // Specific check and error message to go with to make sure the amount is 0
+                    if (txout.nValue != 0)
+                        return state.DoS(100, error("bad-txns-token-issued-amount-isn't-zero"));
+                } else if (nType == TX_REISSUE_TOKEN) {
+                    // Specific check and error message to go with to make sure the amount is 0
+                    if (txout.nValue != 0) {
+                        return state.DoS(0, error("bad-txns-token-reissued-amount-isn't-zero"));
+                    }
+                } else {
+                    return state.DoS(0, error("bad-token-type-not-any-of-the-main-three"));
                 }
-
-                // If the transfer is an ownership token. Check to make sure that it is OWNER_TOKEN_AMOUNT
-                if (IsTokenNameAnOwner(transfer.strName)) {
-                    if (transfer.nAmount != OWNER_TOKEN_AMOUNT)
-                        return state.DoS(100, error("bad-txns-transfer-owner-amount-was-not-1"));
-                }
-
-                // If the transfer is a unique token. Check to make sure that it is UNIQUE_TOKEN_AMOUNT
-                if (tokenType == ETokenType::UNIQUE) {
-                    if (transfer.nAmount != UNIQUE_TOKEN_AMOUNT)
-                        return state.DoS(100, error("bad-txns-transfer-unique-amount-was-not-1"));
-                }
-
-                // Specific check and error message to go with to make sure the amount is 0
-                if (txout.nValue != 0)
-                    return state.DoS(100, error("bad-txns-token-transfer-amount-isn't-zero"));
-            } else if (nType == TX_NEW_TOKEN) {
-                // Specific check and error message to go with to make sure the amount is 0
-                if (txout.nValue != 0)
-                    return state.DoS(100, error("bad-txns-token-issued-amount-isn't-zero"));
-            } else if (nType == TX_REISSUE_TOKEN) {
-                // Specific check and error message to go with to make sure the amount is 0
-                if (txout.nValue != 0) {
-                    return state.DoS(0, error("bad-txns-token-reissued-amount-isn't-zero"));
-                }
-            } else {
-                return state.DoS(0, error("bad-token-type-not-any-of-the-main-three"));
             }
         }
         /** YAC_TOKEN END */
@@ -395,80 +398,83 @@ bool CTransaction::CheckTransaction(CValidationState &state) const
     }
 
     /* YAC_TOKEN START */
-    if (IsNewToken()) {
-        /** Verify the reissue tokens data */
-        std::string strError = "";
-        if(!VerifyNewToken(strError))
-            return state.DoS(100, error(strError.c_str()));
+    if (AreTokensDeployed())
+    {
+        if (IsNewToken()) {
+            /** Verify the reissue tokens data */
+            std::string strError = "";
+            if(!VerifyNewToken(strError))
+                return state.DoS(100, error(strError.c_str()));
 
-        CNewToken token;
-        std::string strAddress;
-        if (!TokenFromTransaction(*this, token, strAddress))
-            return state.DoS(100, error("bad-txns-issue-token-from-transaction"));
+            CNewToken token;
+            std::string strAddress;
+            if (!TokenFromTransaction(*this, token, strAddress))
+                return state.DoS(100, error("bad-txns-issue-token-from-transaction"));
 
-        // Validate the new tokens information
-        if (!IsNewOwnerTxValid(*this, token.strName, strAddress, strError))
-            return state.DoS(100, error(strError.c_str()));
+            // Validate the new tokens information
+            if (!IsNewOwnerTxValid(*this, token.strName, strAddress, strError))
+                return state.DoS(100, error(strError.c_str()));
 
-        if(!CheckNewToken(token, strError))
-            return state.DoS(100, error(strError.c_str()));
+            if(!CheckNewToken(token, strError))
+                return state.DoS(100, error(strError.c_str()));
 
-    } else if (IsReissueToken()) {
+        } else if (IsReissueToken()) {
 
-        /** Verify the reissue tokens data */
-        std::string strError;
-        if (!VerifyReissueToken(strError))
-            return state.DoS(100, error(strError.c_str()));
+            /** Verify the reissue tokens data */
+            std::string strError;
+            if (!VerifyReissueToken(strError))
+                return state.DoS(100, error(strError.c_str()));
 
-        CReissueToken reissue;
-        std::string strAddress;
-        if (!ReissueTokenFromTransaction(*this, reissue, strAddress))
-            return state.DoS(100, error("bad-txns-reissue-token"));
+            CReissueToken reissue;
+            std::string strAddress;
+            if (!ReissueTokenFromTransaction(*this, reissue, strAddress))
+                return state.DoS(100, error("bad-txns-reissue-token"));
 
-        if (!CheckReissueToken(reissue, strError))
-            return state.DoS(100, error(strError.c_str()));
+            if (!CheckReissueToken(reissue, strError))
+                return state.DoS(100, error(strError.c_str()));
 
-        // Get the tokenType
-        ETokenType type;
-        IsTokenNameValid(reissue.strName, type);
+            // Get the tokenType
+            ETokenType type;
+            IsTokenNameValid(reissue.strName, type);
 
-    } else if (IsNewUniqueToken()) {
+        } else if (IsNewUniqueToken()) {
 
-        /** Verify the unique tokens data */
-        std::string strError = "";
-        if (!VerifyNewUniqueToken(strError)) {
-            return state.DoS(100, error(strError.c_str()));
-        }
+            /** Verify the unique tokens data */
+            std::string strError = "";
+            if (!VerifyNewUniqueToken(strError)) {
+                return state.DoS(100, error(strError.c_str()));
+            }
 
 
-        for (auto out : vout)
-        {
-            if (IsScriptNewUniqueToken(out.scriptPubKey))
+            for (auto out : vout)
             {
-                CNewToken token;
-                std::string strAddress;
-                if (!TokenFromScript(out.scriptPubKey, token, strAddress))
-                    return state.DoS(100, error("bad-txns-check-transaction-issue-unique-token-serialization"));
+                if (IsScriptNewUniqueToken(out.scriptPubKey))
+                {
+                    CNewToken token;
+                    std::string strAddress;
+                    if (!TokenFromScript(out.scriptPubKey, token, strAddress))
+                        return state.DoS(100, error("bad-txns-check-transaction-issue-unique-token-serialization"));
 
-                if (!CheckNewToken(token, strError))
-                    return state.DoS(100, error(strError.c_str()));
+                    if (!CheckNewToken(token, strError))
+                        return state.DoS(100, error(strError.c_str()));
+                }
             }
         }
-    }
-    else {
-        // Fail if transaction contains any non-transfer token scripts and hasn't conformed to one of the
-        // above transaction types.  Also fail if it contains OP_YAC_TOKEN opcode but wasn't a valid script.
-        for (auto out : vout) {
-            int nType;
-            bool _isOwner;
-            if (out.scriptPubKey.IsTokenScript(nType, _isOwner)) {
-                if (nType != TX_TRANSFER_TOKEN) {
-                    return state.DoS(100, error("bad-txns-bad-token-transaction"));
-                }
-            } else {
-                if (out.scriptPubKey.Find(OP_YAC_TOKEN)) {
-                    if (out.scriptPubKey[0] != OP_YAC_TOKEN) {
-                        return state.DoS(100, error("bad-txns-op-yac-token-not-in-right-script-location"));
+        else {
+            // Fail if transaction contains any non-transfer token scripts and hasn't conformed to one of the
+            // above transaction types.  Also fail if it contains OP_YAC_TOKEN opcode but wasn't a valid script.
+            for (auto out : vout) {
+                int nType;
+                bool _isOwner;
+                if (out.scriptPubKey.IsTokenScript(nType, _isOwner)) {
+                    if (nType != TX_TRANSFER_TOKEN) {
+                        return state.DoS(100, error("bad-txns-bad-token-transaction"));
+                    }
+                } else {
+                    if (out.scriptPubKey.Find(OP_YAC_TOKEN)) {
+                        if (out.scriptPubKey[0] != OP_YAC_TOKEN) {
+                            return state.DoS(100, error("bad-txns-op-yac-token-not-in-right-script-location"));
+                        }
                     }
                 }
             }

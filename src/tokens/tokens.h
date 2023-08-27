@@ -57,6 +57,14 @@ class CCoinControl;
 struct CBlockTokenUndo;
 class COutput;
 
+enum class CIDVersion
+{
+    CIDv0 = 0,
+    CIDv1 = 1,
+    CIDv2 = 2,
+    UNKNOWN = 3
+};
+
 // 2500 * 82 Bytes == 205 KB (kilobytes) of memory
 #define MAX_CACHE_TOKENS_SIZE 2500
 
@@ -356,10 +364,8 @@ bool GetBestTokenAddressAmount(CTokensCache& cache, const std::string& tokenName
 
 
 //! Decode and Encode IPFS hashes, or OIP hashes
-std::string DecodeTokenData(std::string encoded);
-std::string EncodeTokenData(std::string decoded);
-std::string DecodeIPFS(std::string encoded);
-std::string EncodeIPFS(std::string decoded);
+std::string DecodeTokenData(std::string encoded, CIDVersion& cidVersion);
+std::string EncodeTokenData(std::string decoded, CIDVersion cidVersion = CIDVersion::CIDv0);
 
 
 bool GetAllMyTokenBalances(std::map<std::string, std::vector<COutput> >& outputs, std::map<std::string, CAmount>& amounts, const int confirmations = 0, const std::string& prefix = "");

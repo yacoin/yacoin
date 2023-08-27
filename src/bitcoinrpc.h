@@ -155,6 +155,7 @@ extern const CRPCTable tableRPC;
 extern int64_t nWalletUnlockTime;
 extern int64_t AmountFromValue(const json_spirit::Value& value);
 extern json_spirit::Value ValueFromAmount(int64_t amount);
+extern std::string ValueFromAmountStr(const CAmount& amount);
 extern std::string TokenValueFromAmount(const CAmount& amount, const std::string token_name);
 extern std::string TokenValueFromAmountString(const CAmount& amount, const int8_t units);
 extern double GetDifficulty(const CBlockIndex* blockindex = NULL);
@@ -276,6 +277,7 @@ extern json_spirit::Value getblocktimes(const json_spirit::Array& params, bool f
 extern json_spirit::Value getcheckpoint(const json_spirit::Array& params, bool fHelp);
 
 extern json_spirit::Value generatetoaddress(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value timelockcoins(const json_spirit::Array& params, bool fHelp);
 /** YAC_TOKEN START */
 extern json_spirit::Value issue(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value transfer(const json_spirit::Array& params, bool fHelp);

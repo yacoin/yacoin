@@ -2399,52 +2399,86 @@ bool GetBestTokenAddressAmount(CTokensCache& cache, const std::string& tokenName
     return false;
 }
 
-// 46 char base58 --> 34 char KAW compatible
-std::string DecodeTokenData(std::string encoded)
+bool isCIDv0StrFormat(std::string ipfs_hash)
 {
-    if (encoded.size() == 46) {
-        std::vector<unsigned char> b;
+    return (ipfs_hash.length() == 46 && ipfs_hash.substr(0,2) == "Qm");
+}
+
+bool isCIDv1StrFormat(std::string ipfs_hash)
+{
+    return ipfs_hash.substr(0,1) == "b";
+}
+
+// 46 char base58 --> 34 char KAW compatible
+std::string DecodeTokenData(std::string encoded, CIDVersion& cidVersion)
+{
+    cidVersion = CIDVersion::UNKNOWN;
+    std::vector<unsigned char> b;
+    if (isCIDv0StrFormat(encoded))
+    {
+        cidVersion = CIDVersion::CIDv0;
         DecodeBase58(encoded, b);
-        return std::string(b.begin(), b.end());
+        /*
+         * Check if CIDv0 hexadecimal format is correct, must have:
+         * <multihash-algorithm> = sha2-256 (start with 0x12, 0x20)
+         * <multihash-length> = 32 (32 bytes, equivalent to 256 bits)
+         * Total 34 bytes
+         */
+
+        if (b.size() == 34 && b[0] == 0x12 && b[1] == 0x20)
+        {
+            return std::string(b.begin(), b.end());
+        }
     }
 
-    else if (encoded.size() == 64 && IsHex(encoded)) {
-        std::vector<unsigned char> vec = ParseHex(encoded);
-        return std::string(vec.begin(), vec.end());
+    else if (isCIDv1StrFormat(encoded))
+    {
+        cidVersion = CIDVersion::CIDv1;
+        // Decode the string after the first 'b' character
+        b = DecodeBase32(encoded.substr(1).c_str(), NULL);
+        /*
+         * Check if CIDv1 hexadecimal format is correct, must have:
+         * <version> = 1
+         * <multicodec> = dag-pb
+         * <multihash-algorithm> = sha2-256 (start with 0x12, 0x20)
+         * <multihash-length> = 32 (32 bytes, equivalent to 256 bits)
+         * Total 36 bytes
+         */
+        if (b.size() == 36 && b[0] == 0x01 && b[1] == 0x70 && b[2] == 0x12 && b[3] == 0x20)
+        {
+            // Get only last 34 bytes
+            return std::string(b.begin() + 2, b.end());
+        }
     }
 
     return "";
-
 };
 
-std::string EncodeTokenData(std::string decoded)
+std::string EncodeTokenData(std::string decoded, CIDVersion cidVersion)
 {
-    if (decoded.size() == 34) {
-        return EncodeIPFS(decoded);
+    std::vector<char> charData(decoded.begin(), decoded.end());
+    std::vector<unsigned char> unsignedCharData;
+
+    if (cidVersion == CIDVersion::CIDv0 && decoded.size() == 34)
+    {
+        for (char c : charData)
+            unsignedCharData.push_back(static_cast<unsigned char>(c));
+        return EncodeBase58(unsignedCharData);
     }
-    else if (decoded.size() == 32){
-        return HexStr(decoded);
+    else if (cidVersion == CIDVersion::CIDv1)
+    {
+        unsignedCharData.push_back(0x01); // <cid_version> = 1
+        unsignedCharData.push_back(0x70); // <multicodec> = dag-pb
+        for (char c : charData)
+            unsignedCharData.push_back(static_cast<unsigned char>(c));
+        std::string encoded = EncodeBase32(&unsignedCharData[0], unsignedCharData.size());
+        // Prefix with <multibase> = base32, remove padding character "=" at the end
+        boost::erase_all(encoded, "=");
+        return std::string("b") + encoded;
     }
 
     return "";
 }
-
-// 46 char base58 --> 34 char KAW compatible
-std::string DecodeIPFS(std::string encoded)
-{
-    std::vector<unsigned char> b;
-    DecodeBase58(encoded, b);
-    return std::string(b.begin(), b.end());
-};
-
-// 34 char KAW compatible --> 46 char base58
-std::string EncodeIPFS(std::string decoded){
-    std::vector<char> charData(decoded.begin(), decoded.end());
-    std::vector<unsigned char> unsignedCharData;
-    for (char c : charData)
-        unsignedCharData.push_back(static_cast<unsigned char>(c));
-    return EncodeBase58(unsignedCharData);
-};
 
 void GetAllAdministrativeTokens(CWallet *pwallet, std::vector<std::string> &names, int nMinConf)
 {
@@ -2871,12 +2905,12 @@ bool CheckAmountWithUnits(const CAmount& nAmount, const int8_t nUnits)
 }
 
 bool CheckEncoded(const std::string& hash, std::string& strError) {
-    std::string encodedStr = EncodeTokenData(hash);
+    std::string encodedStr = EncodeTokenData(hash, CIDVersion::CIDv0);
     if (encodedStr.substr(0, 2) == "Qm" && encodedStr.size() == 46) {
         return true;
     }
 
-    strError = _("Invalid parameter: ipfs_hash is not valid, or txid hash is not the right length");
+    strError = _("Invalid parameter: ipfs_hash is not valid");
 
     return false;
 }
@@ -3062,7 +3096,7 @@ bool ContextualCheckNewToken(CTokensCache* tokenCache, const CNewToken& token, s
 
     // Check the ipfs hash
     if (token.nHasIPFS && token.strIPFSHash.size() != 34) {
-        strError = _("Invalid parameter: ipfs_hash must be 46 characters. Txid must be valid 64 character hash");
+        strError = _("Invalid parameter: ipfs_hash must be 46 characters");
         return false;
     }
 

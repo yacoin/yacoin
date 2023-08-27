@@ -268,25 +268,6 @@ static const unsigned int SOFT_FLAGS = STRICT_FLAGS & ~STRICT_FORMAT_FLAGS;
 /** Used as the flags parameter to sequence and nLocktime checks in non-consensus code. */
 static const unsigned int STANDARD_LOCKTIME_VERIFY_FLAGS = LOCKTIME_VERIFY_SEQUENCE;
 
-enum txnouttype {
-    TX_NONSTANDARD,
-    // 'standard' transaction types:
-    TX_PUBKEY,
-    TX_PUBKEYHASH,
-    TX_SCRIPTHASH,
-    TX_MULTISIG,
-    TX_CLTV_P2SH,
-    TX_CSV_P2SH,
-    TX_CLTV_P2PKH,
-    TX_CSV_P2PKH,
-    TX_NULL_DATA,
-    /** YAC_TOKEN START */
-    TX_NEW_TOKEN,
-    TX_REISSUE_TOKEN,
-    TX_TRANSFER_TOKEN,
-    /** YAC_TOKEN END */
-};
-
 const char* GetTxnOutputType(txnouttype t);
 
 /** Script opcodes */
@@ -751,6 +732,7 @@ public:
     bool IsPayToPublicKey() const;
     bool IsPayToPublicKeyHash() const;
     bool IsPayToScriptHash() const;
+    bool IsP2PKHTimelock(std::vector<unsigned char>& addressRet) const;
 
     /** YAC_TOKEN START */
     bool IsTokenScript(int& nType, bool& fIsOwner, int& nStartingIndex) const;
