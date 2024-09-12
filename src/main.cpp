@@ -696,7 +696,7 @@ const string strMessageMagic = "Yacoin Signed Message:\n";
 ::int64_t nMinimumInputValue = MIN_TX_FEE;
 
 // Ping and address broadcast intervals
-::int64_t nPingInterval = 30 * nSecondsPerMinute;  // I presume 30 minutes????
+::int64_t nPingInterval = 10 * nSecondsPerMinute;  // 10 mins
 
 ::int64_t nBroadcastInterval = nOneDayInSeconds;    // can be from 6 days in seconds down to 0!
 
