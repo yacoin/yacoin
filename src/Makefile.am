@@ -64,6 +64,7 @@ libyacoin_common_a_SOURCES= \
     tokens/tokentypes.cpp \
     tokens/tokendb.cpp \
     tokens/tokens.cpp \
+    crypto/siphash.cpp \
     primitives/transaction.cpp \
     primitives/block.cpp \
     dbwrapper.cpp \

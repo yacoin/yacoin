@@ -490,7 +490,7 @@ bool CTransaction::CheckTransaction(CValidationState &state) const
     return (nBytes * MIN_TX_FEE) / 1000;
 }
 
-bool CTransaction::AcceptToMemoryPool(CValidationState &state, CTxDB& txdb, bool fCheckInputs, bool* pfMissingInputs)
+bool CTransaction::AcceptToMemoryPool(CValidationState &state, CTxDB& txdb, bool fCheckInputs, bool* pfMissingInputs) const
 {
     return mempool.accept(state, txdb, *this, fCheckInputs, pfMissingInputs);
 }

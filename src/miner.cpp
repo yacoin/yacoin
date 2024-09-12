@@ -257,6 +257,7 @@ CBlock* CreateNewBlock(CWallet* pwallet, bool fProofOfStake)
             map<uint256, vector<COrphan*> > mapDependers;
 
             // This vector will be sorted into a priority queue:
+            printf("Collecting txs from mempool\n");
             vector<TxPriority> 
                 vecPriority;
             vecPriority.reserve(mempool.mapTx.size());
@@ -324,7 +325,6 @@ CBlock* CreateNewBlock(CWallet* pwallet, bool fProofOfStake)
                 }
                 if (fMissingInputs) 
                     continue;
-
                 // Priority is sum(valuein * age) / txsize
                 unsigned int 
                     nTxSize = ::GetSerializeSize(tx, SER_NETWORK, PROTOCOL_VERSION);

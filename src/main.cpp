@@ -64,6 +64,54 @@ using std::min;
 using std::multimap;
 using std::deque;
 
+
+//
+// FOR UPDATE TRANSACTION MEMPOOL IN REORG
+//
+
+DisconnectedBlockTransactions disconnectpool;
+
+/* Make mempool consistent after a reorg, by re-adding disconnected block
+ * transactions from the mempool, and also removing any other transactions from
+ * the mempool that are no longer valid given the new tip/height.
+ *
+ * Note: we assume that disconnectpool only contains transactions that are NOT
+ * confirmed in the current chain nor already in the mempool (otherwise,
+ * in-mempool descendants of such transactions would be removed).
+ */
+
+static void UpdateMempoolForReorg(CTxDB& txdb)
+{
+    // disconnectpool's insertion_order index sorts the entries from
+    // oldest to newest, but the oldest entry will be the last tx from the
+    // latest mined block that was disconnected.
+    // Iterate disconnectpool in reverse, so that we add transactions
+    // back to the mempool starting with the earliest transaction that had
+    // been previously seen in a block.
+    auto it = disconnectpool.queuedTx.get<insertion_order>().rbegin();
+    while (it != disconnectpool.queuedTx.get<insertion_order>().rend()) {
+        const CTransaction &tx = *it;
+        // ignore validation errors in resurrected transactions
+        CValidationState stateDummy;
+        if (!(tx.IsCoinBase() || tx.IsCoinStake()))
+        {
+            printf("UpdateMempoolForReorg, Adding tx = %s to mempool...\n", tx.GetHash().ToString().c_str());
+            if (!tx.AcceptToMemoryPool(stateDummy, txdb, true))
+            {
+                printf("UpdateMempoolForReorg, Failed to add tx = %s to mempool\n", tx.GetHash().ToString().c_str());
+            }
+            else {
+                printf("UpdateMempoolForReorg, Added tx = %s to mempool successfully\n", tx.GetHash().ToString().c_str());
+            }
+        }
+        ++it;
+    }
+    disconnectpool.clear();
+}
+//
+// END OF FOR UPDATE TRANSACTION MEMPOOL IN REORG
+//
+
 //
 // GLOBAL VARIABLES USED FOR TOKEN MANAGEMENT SYSTEM
 //
@@ -1380,7 +1428,7 @@ int CMerkleTx::SetMerkleBranch(const CBlock* pblock)
     return chainActive.Tip()->nHeight - pindex->nHeight + 1;
 }
 
-bool CTxMemPool::accept(CValidationState &state, CTxDB& txdb, CTransaction &tx, bool fCheckInputs,
+bool CTxMemPool::accept(CValidationState &state, CTxDB& txdb, const CTransaction &tx, bool fCheckInputs,
                         bool* pfMissingInputs)
 {
     if (pfMissingInputs)
@@ -1590,7 +1638,7 @@ bool CTxMemPool::accept(CValidationState &state, CTxDB& txdb, CTransaction &tx, 
     return true;
 }
 
-bool CTxMemPool::addUnchecked(const uint256& hash, CTransaction &tx)
+bool CTxMemPool::addUnchecked(const uint256& hash, const CTransaction &tx)
 {
     // Add to memory pool without checking anything.  Don't call this directly,
     // call CTxMemPool::accept to properly check the transaction first.
@@ -2872,15 +2920,26 @@ bool static DisconnectTip(CValidationState &state, CTxDB& txdb) {
     }
 
     printf("DisconnectTip, disconnect block (height: %d, hash: %s)\n", pindexDelete->nHeight, block.GetHash().GetHex().c_str());
+
+//    BOOST_FOREACH(CTransaction &tx, block.vtx) {
+//        // ignore validation errors in resurrected transactions
+//        CValidationState stateDummy;
+//        if (!(tx.IsCoinBase() || tx.IsCoinStake()))
+//        {
+//            tx.AcceptToMemoryPool(stateDummy, txdb, false);
+//        }
+//    }
     // Ressurect mempool transactions from the disconnected block.
-    BOOST_FOREACH(CTransaction &tx, block.vtx) {
-        // ignore validation errors in resurrected transactions
-        CValidationState stateDummy;
+    // Save transactions to re-add to mempool at end of reorg
+    for (auto it = block.vtx.rbegin(); it != block.vtx.rend(); ++it) {
+        const CTransaction& tx = *it;
         if (!(tx.IsCoinBase() || tx.IsCoinStake()))
         {
-            tx.AcceptToMemoryPool(stateDummy, txdb, false);
+            printf("DisconnectTip, Add tx %s to disconnectpool\n", tx.GetHash().ToString().c_str());
+            disconnectpool.addTransaction(tx);
         }
     }
+
     // Disconnect shorter branch, SPECIFIC FOR YACOIN
     if (pindexDelete->pprev)
         pindexDelete->pprev->pnext = NULL;
@@ -2960,6 +3019,9 @@ bool static ConnectTip(CValidationState &state, CTxDB& txdb, CBlockIndex *pindex
 
         // Remove conflicting transactions from the mempool.
         mempool.remove(block.vtx, tokenDataFromBlock);
+        if (disconnectpool.isInReorg()) {
+            disconnectpool.removeForBlock(block.vtx);
+        }
 
         // Connect longer branch, SPECIFIC FOR YACOIN
         if (pindexNew->pprev)
@@ -3019,16 +3081,24 @@ static bool ActivateBestChainStep(CValidationState &state, CTxDB& txdb, CBlockIn
     CBlockIndex *pindexFork = chainActive.FindFork(pindexMostWork);
 
     // Disconnect active blocks which are no longer in the best chain.
+    bool fBlocksDisconnected = false;
+    // Disconnect active blocks which are no longer in the best chain.
     while (chainActive.Tip() && chainActive.Tip() != pindexFork) {
+        if (disconnectpool.isInReorg() && !fBlocksDisconnected) {
+            printf("Warning: DisconnectTip, reorg happens continuously\n");
+        }
+
         if (!txdb.TxnBegin()) {
             return error("ActivateBestChainStep () : TxnBegin 1 failed");
         }
+
         if (!DisconnectTip(state, txdb)) // Disconnect the latest block on the chain
         {
             error("ActivateBestChainStep, failed to disconnect block");
             txdb.TxnAbort();
             return false;
         }
+        fBlocksDisconnected = true;
     }
 
     // Build list of new blocks to connect.
@@ -3113,6 +3183,15 @@ bool ActivateBestChain(CValidationState &state, CTxDB& txdb) {
 
             if (!ActivateBestChainStep(state, txdb, pindexMostWork))
                 return false;
+
+            const int bestHeaderHeight =  pindexBestHeader ? pindexBestHeader->nHeight : -1;
+
+            if (disconnectpool.isInReorg() && chainActive.Height() == bestHeaderHeight && chainActive.Tip()->GetBlockHash() == pindexBestHeader->GetBlockHash()) {
+                // If any blocks were disconnected, disconnectpool may be non empty.  Add
+                // any disconnected transactions back to the mempool.
+                printf("ActivateBestChain, reorg completed (best header = %s, height = %d), update mempool\n", chainActive.Tip()->GetBlockHash().GetHex().c_str(), chainActive.Height());
+                UpdateMempoolForReorg(txdb);
+            }
 
             pindexNewTip = chainActive.Tip();
             fInitialDownload = IsInitialBlockDownload();

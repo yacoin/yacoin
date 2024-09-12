@@ -547,7 +547,7 @@ public:
                      unsigned int flags=STRICT_FLAGS, std::vector<CScriptCheck> *pvChecks = NULL) const;
     bool ClientConnectInputs();
     bool CheckTransaction(CValidationState &state) const;
-    bool AcceptToMemoryPool(CValidationState &state, CTxDB& txdb, bool fCheckInputs=true, bool* pfMissingInputs=NULL);
+    bool AcceptToMemoryPool(CValidationState &state, CTxDB& txdb, bool fCheckInputs=true, bool* pfMissingInputs=NULL) const;
     bool GetCoinAge(CTxDB& txdb, ::uint64_t& nCoinAge) const;  // ppcoin: get transaction coin age
 
     /** YAC_TOKEN START */

@@ -47,6 +47,7 @@ BOOST_SUFFIX?=-mgw48-mt-sd-1_55
 INCLUDEPATHS= \
 -I"$(CURDIR)" \
 -I"$(CURDIR)/tokens" \
+-I"$(CURDIR)/crypto" \
 -I"$(CURDIR)/primitives" \
 -I"$(CURDIR)/scrypt-jane" \
 -I"$(CURDIR)/script" \
@@ -219,6 +220,7 @@ obj/addrman.o \
 obj/tokentypes.o \
 obj/tokendb.o \
 obj/tokens.o \
+obj/siphash.o \
 obj/base58.o \
 obj/bitcoinrpc.o \
 obj/block.o \
@@ -313,6 +315,9 @@ obj/tokendb.o: tokens/tokendb.cpp
 	$(CXX) -c -frandom-seed=$@ $(CFLAGS) $(INCLUDEPATHS) -o $@ $<
 
 obj/tokens.o: tokens/tokens.cpp
+	$(CXX) -c -frandom-seed=$@ $(CFLAGS) $(INCLUDEPATHS) -o $@ $<
+
+obj/siphash.o: crypto/siphash.cpp
 	$(CXX) -c -frandom-seed=$@ $(CFLAGS) $(INCLUDEPATHS) -o $@ $<
 
 obj/scrypt-jane.o: scrypt-jane/scrypt-jane.c
