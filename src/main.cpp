@@ -1599,11 +1599,11 @@ bool CTxMemPool::accept(CValidationState &state, CTxDB& txdb, const CTransaction
 //    }
 
     /** YAC_TOKEN START */
-    for (auto out : vReissueTokens) {
-        mapReissuedTokens.insert(out);
-        mapReissuedTx.insert(std::make_pair(out.second, out.first));
-    }
     if (AreTokensDeployed()) {
+        for (auto out : vReissueTokens) {
+            mapReissuedTokens.insert(out);
+            mapReissuedTx.insert(std::make_pair(out.second, out.first));
+        }
         for (auto out : tx.vout) {
             if (out.scriptPubKey.IsTokenScript()) {
                 CTokenOutputEntry data;
@@ -1661,18 +1661,20 @@ void CTxMemPool::removeUnchecked(const CTransaction& tx, const uint256& hash)
     nTransactionsUpdated++;
 
     /** YAC_TOKEN START */
-    // If the transaction being removed from the mempool is locking other reissues. Free them
-    if (mapReissuedTx.count(hash)) {
-        if (mapReissuedTokens.count(mapReissuedTx.at(hash))) {
-            mapReissuedTokens.erase(mapReissuedTx.at((hash)));
-            mapReissuedTx.erase(hash);
+    if (AreTokensDeployed()) {
+        // If the transaction being removed from the mempool is locking other reissues. Free them
+        if (mapReissuedTx.count(hash)) {
+            if (mapReissuedTokens.count(mapReissuedTx.at(hash))) {
+                mapReissuedTokens.erase(mapReissuedTx.at((hash)));
+                mapReissuedTx.erase(hash);
+            }
         }
-    }
 
-    // Erase from the token mempool maps if they match txid
-    if (mapHashToToken.count(hash)) {
-        mapTokenToHash.erase(mapHashToToken.at(hash));
-        mapHashToToken.erase(hash);
+        // Erase from the token mempool maps if they match txid
+        if (mapHashToToken.count(hash)) {
+            mapTokenToHash.erase(mapHashToToken.at(hash));
+            mapHashToToken.erase(hash);
+        }
     }
     /** YAC_TOKEN END */
 }
@@ -1704,13 +1706,15 @@ void CTxMemPool::remove(const std::vector<CTransaction>& vtx, ConnectedBlockToke
     }
 
     /** YAC_TOKEN START */
-    // Remove newly added token issue transactions from the mempool if they haven't been removed already    std::vector<CTransaction> trans;
-    for (auto it : connectedBlockData.newTokensToAdd) {
-        if (mapTokenToHash.count(it.token.strName)) {
-            const uint256& hash = mapTokenToHash.at(it.token.strName);
-            auto itMapTx = mapTx.find(hash);
-            if (itMapTx != mapTx.end()) {
-                removeUnchecked(itMapTx->second, hash);
+    if (AreTokensDeployed()) {
+        // Remove newly added token issue transactions from the mempool if they haven't been removed already    std::vector<CTransaction> trans;
+        for (auto it : connectedBlockData.newTokensToAdd) {
+            if (mapTokenToHash.count(it.token.strName)) {
+                const uint256& hash = mapTokenToHash.at(it.token.strName);
+                auto itMapTx = mapTx.find(hash);
+                if (itMapTx != mapTx.end()) {
+                    removeUnchecked(itMapTx->second, hash);
+                }
             }
         }
     }

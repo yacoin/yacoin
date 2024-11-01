@@ -619,17 +619,17 @@ bool CBlock::DisconnectBlock(CValidationState& state, CTxDB& txdb,
             }
         }
 
-        // TODO: Check that all outputs are available and match the outputs in the block itself exactly.
-        for (size_t o = 0; o < tx.vout.size(); o++) {
-            /** YAC_TOKEN START */
-            if (AreTokensDeployed()) {
-                if (tokensCache) {
+        // Check that all outputs are available and match the outputs in the block itself exactly.
+        /** YAC_TOKEN START */
+        if (AreTokensDeployed()) {
+            if (tokensCache) {
+                for (size_t o = 0; o < tx.vout.size(); o++) {
                     if (IsScriptTransferToken(tx.vout[o].scriptPubKey))
                         vTokenTxIndex.emplace_back(o);
                 }
             }
-            /** YAC_TOKEN START */
         }
+        /** YAC_TOKEN START */
 
         /** YAC_TOKEN START */
         // Update token cache, it is used for updating token database later
@@ -1160,15 +1160,17 @@ bool CBlock::ConnectBlock(CValidationState &state, CTxDB& txdb, CBlockIndex* pin
         /** YAC_TOKEN END */
 
         /** YAC_TOKEN START */
-        // Create the basic empty string pair for the undoblock
-        std::pair<std::string, CBlockTokenUndo> undoPair = std::make_pair("", CBlockTokenUndo());
-        std::pair<std::string, CBlockTokenUndo>* undoTokenData = &undoPair;
+        if (AreTokensDeployed()) {
+            // Create the basic empty string pair for the undoblock
+            std::pair<std::string, CBlockTokenUndo> undoPair = std::make_pair("", CBlockTokenUndo());
+            std::pair<std::string, CBlockTokenUndo>* undoTokenData = &undoPair;
 
-        // Update token info (tokenCache, undoTokenData)
-        UpdateTokenInfo(tx, mapInputs, pindex->nHeight, GetHash(), tokensCache, undoTokenData);
+            // Update token info (tokenCache, undoTokenData)
+            UpdateTokenInfo(tx, mapInputs, pindex->nHeight, GetHash(), tokensCache, undoTokenData);
 
-        if (!undoTokenData->first.empty()) {
-            vUndoTokenData.emplace_back(*undoTokenData);
+            if (!undoTokenData->first.empty()) {
+                vUndoTokenData.emplace_back(*undoTokenData);
+            }
         }
         /** YAC_TOKEN END */
     } // END OF for (unsigned int i = 0; i < vtx.size(); i++)
