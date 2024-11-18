@@ -279,6 +279,7 @@ SOURCES += src/qt/bitcoin.cpp src/qt/bitcoingui.cpp \
     src/db.cpp \
     src/dbwrapper.cpp \
     src/walletdb.cpp \
+    src/txmempool.cpp \
     src/tokens/tokentypes.cpp \
     src/tokens/tokendb.cpp \
     src/tokens/tokens.cpp \

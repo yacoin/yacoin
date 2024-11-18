@@ -46,6 +46,8 @@
 #include <boost/multi_index/hashed_index.hpp>
 #include <boost/multi_index/ordered_index.hpp>
 #include <boost/multi_index/sequenced_index.hpp>
+#include <txmempool.h>
+#include <validation.h>
 
 class CWallet;
 class CBlock;
@@ -224,6 +226,9 @@ static const ::uint64_t nMinDiskSpace = 52428800;
 // Median starting height of all connected peers.
 extern int nMedianStartingHeight;
 
+// Mempool
+extern CTxMemPool mempool;
+
 enum GetMaxSize_mode
 {
     MAX_BLOCK_SIZE,
@@ -330,9 +335,6 @@ public:
 /** The currently-connected chain of blocks. */
 extern CChain chainActive;
 
-/** Convert CValidationState to a human-readable message for logging */
-std::string FormatStateMessage(const CValidationState &state);
-
 void RegisterWallet(CWallet* pwalletIn);
 void CloseWallets();
 void SyncWithWallets(const CTransaction& tx, const CBlock* pblock = NULL, bool fUpdate = false, bool fConnect = true);
@@ -410,11 +412,6 @@ int GetCoinbaseMaturity();
  */
 int GetCoinbaseMaturityOffset();
 
-/**
- * Check if the hardfork happens
- */
-bool isHardforkHappened();
-
 //bool GetWalletFile(CWallet* pwallet, std::string &strWalletFileOut);
 
 bool SetBestChain(CValidationState &state, CTxDB& txdb, CBlockIndex* pindexNew);
@@ -488,21 +485,6 @@ public:
     {
         printf("%s", ToString().c_str());
     }
-};
-
-/** An inpoint - a combination of a transaction and an index n into its vin */
-class CInPoint
-{
-//public:
-private:
-    CTransaction* ptx;
-    ::uint32_t n;
-public:
-    CTransaction* GetPtx() const { return ptx; }
-    CInPoint() { SetNull(); }
-    CInPoint(CTransaction* ptxIn, unsigned int nIn) { ptx = ptxIn; n = nIn; }
-    void SetNull() { ptx = NULL; n = (unsigned int) -1; }
-    bool IsNull() const { return (ptx == NULL && n == (unsigned int) -1); }
 };
 
 /** Closure representing one script verification
@@ -1092,116 +1074,6 @@ struct CBlockIndexWorkComparator
         return false;
     }
 };
-
-/** Capture information about block/transaction validation */
-class CValidationState {
-private:
-    enum mode_state {
-        MODE_VALID,   // everything ok
-        MODE_INVALID, // network rule violation (DoS value may be set)
-        MODE_ERROR,   // run-time error
-    } mode;
-    int nDoS;
-    std::string strRejectReason;
-    unsigned char chRejectCode;
-    bool corruptionPossible;
-    uint256 failedTransaction;
-public:
-    CValidationState() : mode(MODE_VALID), nDoS(0), corruptionPossible(false) {}
-    bool DoS(int level, bool ret = false,
-             unsigned char chRejectCodeIn=0, std::string strRejectReasonIn="",
-             bool corruptionIn=false) {
-        chRejectCode = chRejectCodeIn;
-        strRejectReason = strRejectReasonIn;
-        corruptionPossible = corruptionIn;
-        if (mode == MODE_ERROR)
-            return ret;
-        nDoS += level;
-        mode = MODE_INVALID;
-        return ret;
-    }
-    bool Invalid(bool ret = false,
-                 unsigned char _chRejectCode=0, std::string _strRejectReason="") {
-        return DoS(0, ret, _chRejectCode, _strRejectReason);
-    }
-    bool Error() {
-        mode = MODE_ERROR;
-        return false;
-    }
-    bool Abort(const std::string &msg) {
-        AbortNode(msg);
-        return Error();
-    }
-    bool IsValid() const {
-        return mode == MODE_VALID;
-    }
-    bool IsInvalid() const {
-        return mode == MODE_INVALID;
-    }
-    bool IsError() const {
-        return mode == MODE_ERROR;
-    }
-    bool IsInvalid(int &nDoSOut) const {
-        if (IsInvalid()) {
-            nDoSOut = nDoS;
-            return true;
-        }
-        return false;
-    }
-    bool CorruptionPossible() const {
-        return corruptionPossible;
-    }
-    void SetFailedTransaction(const uint256& txhash) {
-        failedTransaction = txhash;
-    }
-    uint256 GetFailedTransaction() {
-        return failedTransaction;
-    }
-    bool IsTransactionError() const  {
-        return failedTransaction != uint256();
-    }
-    unsigned char GetRejectCode() const { return chRejectCode; }
-    std::string GetRejectReason() const { return strRejectReason; }
-};
-
-class CTxMemPool
-{
-public:
-    mutable CCriticalSection cs;
-    std::map<uint256, CTransaction> mapTx;
-    std::map<COutPoint, CInPoint> mapNextTx;
-    std::map<std::string, uint256> mapTokenToHash;
-    std::map<uint256, std::string> mapHashToToken;
-
-    bool accept(CValidationState &state, CTxDB& txdb, const CTransaction &tx,
-                bool fCheckInputs, bool* pfMissingInputs);
-    bool addUnchecked(const uint256& hash, const CTransaction &tx);
-    void remove(const CTransaction& tx);
-    void remove(const std::vector<CTransaction>& vtx);
-    void remove(const std::vector<CTransaction>& vtx, ConnectedBlockTokenData& connectedBlockData);
-    void removeUnchecked(const CTransaction& tx, const uint256& hash);
-    void clear();
-    void queryHashes(std::vector<uint256>& vtxid);
-
-    size_t size()
-    {
-        LOCK(cs);
-        return mapTx.size();
-    }
-
-    bool exists(uint256 hash)
-    {
-        return (mapTx.count(hash) != 0);
-    }
-
-    CTransaction& lookup(uint256 hash)
-    {
-        return mapTx[hash];
-    }
-};
-
-extern CTxMemPool mempool;
-
 
 class SaltedTxidHasher
 {

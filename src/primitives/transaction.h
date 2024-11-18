@@ -24,6 +24,21 @@ typedef std::map<uint256, std::pair<CTxIndex, CTransaction> > MapPrevTx;
 extern CChain chainActive;
 FILE* OpenBlockFile(unsigned int nFile, unsigned int nBlockPos, const char* pszMode="rb");
 
+/** An inpoint - a combination of a transaction and an index n into its vin */
+class CInPoint
+{
+//public:
+private:
+    CTransaction* ptx;
+    ::uint32_t n;
+public:
+    CTransaction* GetPtx() const { return ptx; }
+    CInPoint() { SetNull(); }
+    CInPoint(CTransaction* ptxIn, unsigned int nIn) { ptx = ptxIn; n = nIn; }
+    void SetNull() { ptx = NULL; n = (unsigned int) -1; }
+    bool IsNull() const { return (ptx == NULL && n == (unsigned int) -1); }
+};
+
 /** An outpoint - a combination of a transaction hash and an index n into its vout */
 class COutPoint
 {

@@ -267,6 +267,7 @@ obj/dbwrapper.o \
 obj/txdb-leveldb.o \
 obj/util.o \
 obj/version.o \
+obj/txmempool.o \
 obj/wallet.o \
 obj/walletdb.o
 

@@ -101,6 +101,7 @@ libyacoin_common_a_SOURCES= \
     script/script.cpp \
     sync.cpp \
     util.cpp \
+    txmempool.cpp \
     wallet.cpp \
     walletdb.cpp \
     noui.cpp \

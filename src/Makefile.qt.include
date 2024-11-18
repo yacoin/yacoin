@@ -276,6 +276,7 @@ BITCOIN_QT_CPP = \
   script/script.cpp \
   sync.cpp \
   util.cpp \
+  txmempool.cpp \
   wallet.cpp \
   walletdb.cpp \
   noui.cpp \
