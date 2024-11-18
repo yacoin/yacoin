@@ -1043,10 +1043,9 @@ bool EvalScript(
                     // Drop the signature, since there's no way for a signature to sign itself
                     scriptCode.FindAndDelete(CScript(vchSig));
 
-                    bool fSuccess = 
-                        (fUseOld044Rules? true: IsCanonicalSignature(vchSig, flags)) && //<<<<<< test
-                        IsCanonicalPubKey(vchPubKey, flags) &&
-                        CheckSig(vchSig, vchPubKey, scriptCode, txTo, nIn, nHashType, flags);
+                    bool fSuccess = IsCanonicalPubKey(vchPubKey, flags) &&
+                                    CheckSig(vchSig, vchPubKey, scriptCode,
+                                             txTo, nIn, nHashType, flags);
 
                     popstack(stack);
                     popstack(stack);
@@ -1107,15 +1106,7 @@ bool EvalScript(
 
                         // Check signature
                         bool 
-                            fOk = (
-                                   fUseOld044Rules?
-                                   true:
-                                   (
-                                    IsCanonicalSignature(vchSig, flags) && 
-                                    IsCanonicalPubKey(vchPubKey, flags)
-                                   )
-                                  ) &&
-                                  CheckSig(vchSig, vchPubKey, scriptCode, txTo, nIn, nHashType, flags);
+                            fOk = CheckSig(vchSig, vchPubKey, scriptCode, txTo, nIn, nHashType, flags);
 
                         if (fOk) 
                         {
@@ -1131,23 +1122,9 @@ bool EvalScript(
                             fSuccess = false;
                     }
 
-                    while (i-- > (fUseOld044Rules? 0: 1))
+                    while (i-- > 0)
                         popstack(stack);
 
-                    if( !fUseOld044Rules )  // i.e. new 0.4.5 rules
-                    {
-                        // A bug causes CHECKMULTISIG to consume one extra argument
-                        // whose contents were not checked in any way.
-                        //
-                        // Unfortunately this is a potential source of mutability,
-                        // so optionally verify it is exactly equal to zero prior
-                        // to removing it from the stack.
-                        if (stack.size() < 1)
-                            return false;
-                        if ((flags & SCRIPT_VERIFY_NULLDUMMY) && stacktop(-1).size())
-                            return error("CHECKMULTISIG dummy argument not null");
-                        popstack(stack);
-                    }
                     stack.push_back(fSuccess ? vchTrue : vchFalse);
 
                     if (opcode == OP_CHECKMULTISIGVERIFY)
@@ -1477,71 +1454,31 @@ bool CheckSig(
     static CSignatureCache 
         signatureCache;
 
-    if (fUseOld044Rules)
-    {
-        // Hash type is one byte tacked on to the end of the signature
-        if (vchSig.empty())
-            return false;
-        if (nHashType == 0)
-            nHashType = vchSig.back();
-        else if (nHashType != vchSig.back())
-            return false;
-        vchSig.pop_back();
+    // Hash type is one byte tacked on to the end of the signature
+    if (vchSig.empty())
+        return false;
+    if (nHashType == 0)
+        nHashType = vchSig.back();
+    else if (nHashType != vchSig.back())
+        return false;
+    vchSig.pop_back();
 
-        uint256 
-            sighash = SignatureHash(scriptCode, txTo, nIn, nHashType);
+    uint256
+        sighash = SignatureHash(scriptCode, txTo, nIn, nHashType);
 
-        if (signatureCache.Get(sighash, vchSig, vchPubKey))
-            return true;
+    if (signatureCache.Get(sighash, vchSig, vchPubKey))
+        return true;
 
-        CKey 
-            key;
+    CKey
+        key;
 
-        if (!key.SetPubKey(vchPubKey))
-            return false;
+    if (!key.SetPubKey(vchPubKey))
+        return false;
 
-        if (!key.Verify(sighash, vchSig))
-            return false;
+    if (!key.Verify(sighash, vchSig))
+        return false;
 
-        signatureCache.Set(sighash, vchSig, vchPubKey);
-    }
-    else
-    {
-        CKey 
-            key;
-    
-        bool
-            fKey = key.SetPubKey(vchPubKey);
-
-        if (!fKey)
-            return false;
-
-        CPubKey 
-            pubkey = key.GetPubKey();
-
-        if (!pubkey.IsValid())
-            return false;
-        // Hash type is one byte tacked on to the end of the signature
-        if (vchSig.empty())
-            return false;
-        if (nHashType == 0)
-            nHashType = vchSig.back();
-        else if (nHashType != vchSig.back())
-            return false;
-        vchSig.pop_back();
-
-        uint256 
-            sighash = SignatureHash(scriptCode, txTo, nIn, nHashType);
-
-        if (signatureCache.Get(sighash, vchSig, pubkey))
-            return true;
-
-        if (!key.Verify(sighash, vchSig))
-            return false;
-
-        if ( !(flags & SCRIPT_VERIFY_NOCACHE) )
-            signatureCache.Set(sighash, vchSig, pubkey);
-    }
+    signatureCache.Set(sighash, vchSig, vchPubKey);
     return true;
 }
 
@@ -1585,11 +1522,6 @@ bool Solver(
 
         // CSV-P2PKH transaction, sender provides hash of pubkey, receiver provides signature and pubkey
         mTemplates.insert(make_pair(TX_CSV_P2PKH, CScript() << OP_SMALLDATA << OP_NOP3 << OP_DROP << OP_DUP << OP_HASH160 << OP_PUBKEYHASH << OP_EQUALVERIFY << OP_CHECKSIG));
-
-        if (!fUseOld044Rules)
-        {   // Empty, provably prunable, data-carrying output
-            mTemplates.insert(make_pair(TX_NULL_DATA, CScript() << OP_RETURN << OP_SMALLDATA));
-        }
     }
 
     // Shortcut for pay-to-script-hash, which are more constrained than the other types:
@@ -1697,11 +1629,7 @@ bool Solver(
             }
             else if (opcode2 == OP_SMALLDATA)   // this is different from 0.4.4
             {
-                if (!fUseOld044Rules)
-                {   // small pushdata, <= 80 bytes
-                    if (vch1.size() > 80)
-                        break;
-                }
+                // Nothing
             }
             else if ((opcode1 != opcode2) || (vch1 != vch2))
             {   // Others must match exactly

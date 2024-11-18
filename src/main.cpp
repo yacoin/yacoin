@@ -2066,41 +2066,6 @@ const CBlockIndex* GetLastPoWBlockIndex( const CBlockIndex* pindex )
     return GetLastBlockIndex( pindex, false);
 }
 
-//_____________________________________________________________________________
-bool HaveWeSwitchedToNewLogicRules( bool &fUsingOld044Rules )
-{
-    bool
-        fReturn = false;
-
-    if (true == fUsingOld044Rules)         // should we switch to new rules
-    {
-        if(
-           fTestNet &&    // may use new rules, ATM only in TestNet
-           (
-            fTestNetNewLogic &&
-            (nMainnetNewLogicBlockNumber <= chainActive.Height())
-           )
-          )
-        {
-            fUsingOld044Rules = false;
-            fReturn = true;
-            if (fDebug)
-            {
-#ifdef WIN32
-                (void)printf(
-                     "\n"
-                     "fUseOld044Rules is "
-                     "%s"
-                     "\n"
-                     "\n"
-                     , fUsingOld044Rules? "true": "false"
-                            );
-#endif
-            }
-        }
-    }
-    return fReturn;
-}
 /*****************/
 static unsigned int CalculateNextWorkRequired(const CBlockIndex* pindexLast, ::int64_t nFirstBlockTime)
 {
@@ -3301,20 +3266,7 @@ void UnloadBlockIndex()
 }
 
 bool LoadBlockIndex(bool fAllowNew)
-{   // by default fUseOld044Rules are false, i.e new rules are true
-    if (
-        !fTestNet ||    // may use new rules, ATM only in TestNet
-        (
-         (GetTime() < (::int64_t)YACOIN_NEW_LOGIC_SWITCH_TIME)   // before the new PoW/PoS rules date-time
-         &&
-         !fTestNetNewLogic      // (0 == nMainnetNewLogicBlockNumber )  // if fTestNetNewLogic is true, we
-        )                                                               // will use it in TestNet
-       )
-        fUseOld044Rules = true;
-    // the implied else is that
-    // new rules if TestNet AND 
-
-
+{
     if (fTestNet)
     {
         pchMessageStart[0] = 0xcd;

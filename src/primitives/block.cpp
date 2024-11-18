@@ -434,9 +434,7 @@ bool CBlock::AcceptBlock(CValidationState &state, CBlockIndex **ppindex, CDiskBl
 
     // Enforce rule that the coinbase starts with serialized block height
     CScript expect = CScript() << nHeight;
-    if (((!fUseOld044Rules) &&
-         (vtx[0].vin[0].scriptSig.size() < expect.size())) ||
-        !std::equal(expect.begin(), expect.end(),
+    if (!std::equal(expect.begin(), expect.end(),
                     vtx[0].vin[0].scriptSig.begin()))
     {
         pindex->nStatus |= BLOCK_FAILED_VALID;

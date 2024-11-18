@@ -1368,8 +1368,6 @@ bool AppInit2()
 #endif
     }
 
-    (void)HaveWeSwitchedToNewLogicRules( fUseOld044Rules );
-
     if (GetBoolArg("-printblockindex") || GetBoolArg("-printblocktree"))
     {
         PrintBlockTree();

@@ -175,20 +175,17 @@ CBlock* CreateNewBlock(CWallet* pwallet, bool fProofOfStake)
     CdoTempoaryMockTime
         junk;   // just need to instantiate it so the ctors & dtors can do their work
 
-    if( fUseOld044Rules )
+    //pblock->nVersion = CBlock::VERSION_of_block_for_yac_044_old;
+    if (chainActive.Genesis() && (chainActive.Height() + 1) >= nMainnetNewLogicBlockNumber)
     {
-      //pblock->nVersion = CBlock::VERSION_of_block_for_yac_044_old;
-    	// TODO: Need update for mainet
-    	if (chainActive.Genesis() && (chainActive.Height() + 1) >= nMainnetNewLogicBlockNumber)
-    	{
-            pblock->nVersion = VERSION_of_block_for_yac_05x_new;
-    	}
-    	else
-    	{
-            pblock->nVersion = CURRENT_VERSION_of_block;
-    	}
-        // here we can fiddle with time to try to make block generation easier
+        pblock->nVersion = VERSION_of_block_for_yac_05x_new;
     }
+    else
+    {
+        pblock->nVersion = CURRENT_VERSION_of_block;
+    }
+    // here we can fiddle with time to try to make block generation easier
+
     // Create coinbase tx
     CTransaction 
         txNew;         // this uses real time
@@ -206,7 +203,7 @@ CBlock* CreateNewBlock(CWallet* pwallet, bool fProofOfStake)
     }
     txNew.vout[0].scriptPubKey << reservekey.GetReservedKey() << OP_CHECKSIG;
 
-    // Add our coinbase tx as first transaction
+    // Add dummy coinbase tx as first transaction
     pblock->vtx.push_back(txNew);
 
     // Largest block you're willing to create:
@@ -222,271 +219,11 @@ CBlock* CreateNewBlock(CWallet* pwallet, bool fProofOfStake)
 
     CBlockIndex
         * pindexPrev = chainActive.Tip();
-/*********************/
-    // ppcoin: if coinstake available add coinstake tx
-    static ::int64_t 
-        nLastCoinStakeSearchTime = GetAdjustedTime();  // only initialized at startup
-    //CBlockIndex* pindexPrev = chainActive.Tip();
-
-    if (fProofOfStake)  // attempt to find a coinstake
-    {
-        // Yacoin 1.0.0 doesn't support POS anymore
-        return NULL;
-    }
-/**********************/
 
     pblock->nBits = GetNextTargetRequired(pindexPrev, fProofOfStake);
 
-    if(
-        fUseOld044Rules
-      )
-    {   // Collect memory pool transactions into the block
-        ::int64_t 
-            nFees = 0;
-        {
-            LOCK2(cs_main, mempool.cs);
-            CBlockIndex
-                * pindexPrev = chainActive.Tip();
-            const int nHeight = pindexPrev->nHeight + 1;
-            CTxDB 
-                txdb("r");
-
-            // Priority order to process transactions
-            list<COrphan> 
-                vOrphan; // list memory doesn't move
-            map<uint256, vector<COrphan*> > mapDependers;
-
-            // This vector will be sorted into a priority queue:
-            printf("Collecting txs from mempool\n");
-            vector<TxPriority> 
-                vecPriority;
-            vecPriority.reserve(mempool.mapTx.size());
-            for (
-                 map<uint256, CTransaction>::iterator mi = mempool.mapTx.begin(); 
-                 mi != mempool.mapTx.end(); 
-                 ++mi
-                )
-            {
-                CTransaction& 
-                    tx = (*mi).second;
-                if (tx.IsCoinBase() || tx.IsCoinStake() || !tx.IsFinal(nHeight))
-                    continue;
-
-                COrphan
-                    * porphan = NULL;
-                double 
-                    dPriority = 0;
-                ::int64_t 
-                    nTotalIn = 0;
-                bool 
-                    fMissingInputs = false;
-                BOOST_FOREACH(const CTxIn& txin, tx.vin)
-                {   // Read prev transaction
-                    CTransaction 
-                        txPrev;
-                    CTxIndex 
-                        txindex;
-                    if (!txPrev.ReadFromDisk(txdb, txin.prevout, txindex))
-                    {   // This should never happen; all transactions in the memory
-                        // pool should connect to either transactions in the chain
-                        // or other transactions in the memory pool.
-                        if (!mempool.mapTx.count(txin.prevout.COutPointGetHash()))
-                        {
-                            printf("ERROR: mempool transaction missing input\n");
-                            if (fDebug) 
-                            {
-                                //Yassert("mempool transaction missing input" == 0);
-                            }
-                            fMissingInputs = true;
-                            if (porphan)
-                                vOrphan.pop_back();
-                            break;
-                        }
-
-                        // Has to wait for dependencies
-                        if (!porphan)
-                        {
-                            // Use list for automatic deletion
-                            vOrphan.push_back(COrphan(&tx));
-                            porphan = &vOrphan.back();
-                        }
-                        mapDependers[txin.prevout.COutPointGetHash()].push_back(porphan);
-                        porphan->setDependsOn.insert(txin.prevout.COutPointGetHash());
-                        nTotalIn += mempool.mapTx[txin.prevout.COutPointGetHash()].vout[txin.prevout.COutPointGet_n()].nValue;
-                        continue;
-                    }
-                    ::int64_t 
-                        nValueIn = txPrev.vout[txin.prevout.COutPointGet_n()].nValue;
-                    nTotalIn += nValueIn;
-
-                    int 
-                        nConf = txindex.GetDepthInMainChain();
-                    dPriority += (double)nValueIn * nConf;
-                }
-                if (fMissingInputs) 
-                    continue;
-                // Priority is sum(valuein * age) / txsize
-                unsigned int 
-                    nTxSize = ::GetSerializeSize(tx, SER_NETWORK, PROTOCOL_VERSION);
-                dPriority /= nTxSize;
-
-                // This is a more accurate fee-per-kilobyte than is used by the client code, because the
-                // client code rounds up the size to the nearest 1K. That's good, because it gives an
-                // incentive to create smaller transactions.
-                double 
-                    dFeePerKb =  double(nTotalIn-tx.GetValueOut()) / (double(nTxSize)/1000.0);
-
-                if (porphan)
-                {
-                    porphan->dPriority = dPriority;
-                    porphan->dFeePerKb = dFeePerKb;
-                }
-                else
-                    vecPriority.push_back(TxPriority(dPriority, dFeePerKb, &(*mi).second));
-            }
-
-            // Collect transactions into block
-            map<uint256, CTxIndex> 
-                mapTestPool;
-            ::uint64_t 
-                nBlockSize = 1000;
-            ::uint64_t 
-                nBlockTx = 0;
-            int 
-                nBlockSigOps = 100;
-
-            // From yacoin 1.0.0, the order of transaction included to a block is
-            // based on FeePerKb by default. If FeePerKb are equal between transactions,
-            // coin-age could then take priority
-            bool 
-                fSortedByFee = true;
-
-            TxPriorityCompare 
-                comparer(fSortedByFee);
-            std::make_heap(vecPriority.begin(), vecPriority.end(), comparer);
-
-            while (!vecPriority.empty())
-            {
-                // Take highest priority transaction off the priority queue:
-                double 
-                    dPriority = vecPriority.front().get<0>();
-                double 
-                    dFeePerKb = vecPriority.front().get<1>();
-                CTransaction
-                    & tx = *(vecPriority.front().get<2>());
-
-                std::pop_heap(vecPriority.begin(), vecPriority.end(), comparer);
-                vecPriority.pop_back();
-
-                // Size limits
-                unsigned int 
-                    nTxSize = ::GetSerializeSize(tx, SER_NETWORK, PROTOCOL_VERSION);
-                if ((nBlockSize + nTxSize) >= nBlockMaxSize)
-                    continue;
-
-                // Legacy limits on sigOps:
-                unsigned int 
-                    nTxSigOps = tx.GetLegacySigOpCount();
-                if (nBlockSigOps + nTxSigOps >= GetMaxSize(MAX_BLOCK_SIGOPS))
-                    continue;
-
-                // Timestamp limit
-                if (
-                    (tx.nTime > GetAdjustedTime()) || 
-                    (pblock->IsProofOfStake() && (tx.nTime > pblock->vtx[1].nTime))
-                   )
-                    continue;
-
-                // Never include transactions with fee < min fee
-                if (dFeePerKb < nMinTxFee) // nMinTxFee = 0.01 YAC/kb
-                    continue;
-
-                // Connecting shouldn't fail due to dependency on other memory pool transactions
-                // because we're already processing them in order of dependency
-                map<uint256, CTxIndex> 
-                    mapTestPoolTmp(mapTestPool);
-                MapPrevTx 
-                    mapInputs;
-                bool 
-                    fInvalid;
-                CValidationState state;
-                if (!tx.FetchInputs(state, txdb, mapTestPoolTmp, false, true, mapInputs, fInvalid))
-                    continue;
-
-                ::int64_t 
-                    nTxFees = tx.GetValueIn(mapInputs)-tx.GetValueOut();
-
-                nTxSigOps += tx.GetP2SHSigOpCount(mapInputs);
-                if ((nBlockSigOps + nTxSigOps) >= GetMaxSize(MAX_BLOCK_SIGOPS))
-                    continue;
-
-                if (!tx.ConnectInputs(state, txdb, mapInputs, mapTestPoolTmp, CDiskTxPos(1,1,1), pindexPrev, false, true))
-                    continue;
-                mapTestPoolTmp[tx.GetHash()] = CTxIndex(CDiskTxPos(1,1,1), tx.vout.size());
-                swap(mapTestPool, mapTestPoolTmp);
-
-                // Added
-                pblock->vtx.push_back(tx);
-                nBlockSize += nTxSize;
-                ++nBlockTx;
-                nBlockSigOps += nTxSigOps;
-                nFees += nTxFees;
-
-                if (fDebug && GetBoolArg("-printpriority"))
-                {
-                    printf("priority %.1f feeperkb %.1f txid %s\n",
-                           dPriority, dFeePerKb, tx.GetHash().ToString().c_str());
-                }
-
-                // Add transactions that depend on this one to the priority queue
-                uint256 
-                    hash = tx.GetHash();
-                if (mapDependers.count(hash))
-                {
-                    BOOST_FOREACH(COrphan* porphan, mapDependers[hash])
-                    {
-                        if (!porphan->setDependsOn.empty())
-                        {
-                            porphan->setDependsOn.erase(hash);
-                            if (porphan->setDependsOn.empty())
-                            {
-                                vecPriority.push_back(TxPriority(porphan->dPriority, porphan->dFeePerKb, porphan->ptx));
-                                std::push_heap(vecPriority.begin(), vecPriority.end(), comparer);
-                            }
-                        }
-                    }
-                }
-            }
-
-            nLastBlockTx = nBlockTx;
-            nLastBlockSize = nBlockSize;
-
-            if (fDebug && GetBoolArg("-printpriority"))
-                printf("CreateNewBlock (): total size %" PRI64u "\n", nBlockSize);
-
-            if (pblock->IsProofOfWork())
-                pblock->vtx[0].vout[0].nValue = GetProofOfWorkReward(pblock->nBits);
-
-            // Fill in header
-            pblock->hashPrevBlock  = pindexPrev->GetBlockHash();
-            if (pblock->IsProofOfStake())   // nTime, this is overwritten immediately???!!!
-                pblock->nTime      = pblock->vtx[1].nTime; //same as coinstake timestamp
-            pblock->nTime          = max(                                   
-                                        pindexPrev->GetMedianTimePast() + 1,
-                                        pblock->GetMaxTransactionTime()     
-                                        );                                  
-            pblock->nTime          = max(
-                                         pblock->GetBlockTime(),    // lo & behold this is nTime!?
-                                         pindexPrev->GetBlockTime() - nMaxClockDrift
-                                        );
-            if (pblock->IsProofOfWork())
-                pblock->UpdateTime(pindexPrev);
-            pblock->nNonce         = 0;
-        }
-        return pblock.release();
-    }
     // Collect memory pool transactions into the block
-    int64_t 
+    ::int64_t
         nFees = 0;
     {
         LOCK2(cs_main, mempool.cs);
@@ -499,10 +236,10 @@ CBlock* CreateNewBlock(CWallet* pwallet, bool fProofOfStake)
         // Priority order to process transactions
         list<COrphan> 
             vOrphan; // list memory doesn't move
-        map<uint256, vector<COrphan*> > 
-            mapDependers;
+        map<uint256, vector<COrphan*> > mapDependers;
 
         // This vector will be sorted into a priority queue:
+        printf("Collecting txs from mempool\n");
         vector<TxPriority> 
             vecPriority;
         vecPriority.reserve(mempool.mapTx.size());
@@ -512,30 +249,36 @@ CBlock* CreateNewBlock(CWallet* pwallet, bool fProofOfStake)
              ++mi
             )
         {
-            CTransaction
-                & tx = (*mi).second;
+            CTransaction&
+                tx = (*mi).second;
             if (tx.IsCoinBase() || tx.IsCoinStake() || !tx.IsFinal(nHeight))
                 continue;
 
-            COrphan* porphan = NULL;
-            double dPriority = 0;
-            int64_t nTotalIn = 0;
-            bool fMissingInputs = false;
+            COrphan
+                * porphan = NULL;
+            double
+                dPriority = 0;
+            ::int64_t
+                nTotalIn = 0;
+            bool
+                fMissingInputs = false;
             BOOST_FOREACH(const CTxIn& txin, tx.vin)
-            {
-                // Read prev transaction
-                CTransaction txPrev;
-                CTxIndex txindex;
+            {   // Read prev transaction
+                CTransaction
+                    txPrev;
+                CTxIndex
+                    txindex;
                 if (!txPrev.ReadFromDisk(txdb, txin.prevout, txindex))
-                {
-                    // This should never happen; all transactions in the memory
+                {   // This should never happen; all transactions in the memory
                     // pool should connect to either transactions in the chain
                     // or other transactions in the memory pool.
                     if (!mempool.mapTx.count(txin.prevout.COutPointGetHash()))
                     {
                         printf("ERROR: mempool transaction missing input\n");
-                        //if (fDebug) 
-                        //    Yassert("mempool transaction missing input" == 0);
+                        if (fDebug)
+                        {
+                            //Yassert("mempool transaction missing input" == 0);
+                        }
                         fMissingInputs = true;
                         if (porphan)
                             vOrphan.pop_back();
@@ -554,22 +297,26 @@ CBlock* CreateNewBlock(CWallet* pwallet, bool fProofOfStake)
                     nTotalIn += mempool.mapTx[txin.prevout.COutPointGetHash()].vout[txin.prevout.COutPointGet_n()].nValue;
                     continue;
                 }
-                int64_t nValueIn = txPrev.vout[txin.prevout.COutPointGet_n()].nValue;
+                ::int64_t
+                    nValueIn = txPrev.vout[txin.prevout.COutPointGet_n()].nValue;
                 nTotalIn += nValueIn;
 
-                int nConf = txindex.GetDepthInMainChain();
+                int
+                    nConf = txindex.GetDepthInMainChain();
                 dPriority += (double)nValueIn * nConf;
             }
-            if (fMissingInputs) continue;
-
+            if (fMissingInputs)
+                continue;
             // Priority is sum(valuein * age) / txsize
-            unsigned int nTxSize = ::GetSerializeSize(tx, SER_NETWORK, PROTOCOL_VERSION);
+            unsigned int
+                nTxSize = ::GetSerializeSize(tx, SER_NETWORK, PROTOCOL_VERSION);
             dPriority /= nTxSize;
 
             // This is a more accurate fee-per-kilobyte than is used by the client code, because the
             // client code rounds up the size to the nearest 1K. That's good, because it gives an
             // incentive to create smaller transactions.
-            double dFeePerKb =  double(nTotalIn-tx.GetValueOut()) / (double(nTxSize)/1000.0);
+            double
+                dFeePerKb =  double(nTotalIn-tx.GetValueOut()) / (double(nTxSize)/1000.0);
 
             if (porphan)
             {
@@ -581,37 +328,55 @@ CBlock* CreateNewBlock(CWallet* pwallet, bool fProofOfStake)
         }
 
         // Collect transactions into block
-        map<uint256, CTxIndex> mapTestPool;
-        uint64_t nBlockSize = 1000;
-        uint64_t nBlockTx = 0;
-        int nBlockSigOps = 100;
-        bool fSortedByFee = true;
+        map<uint256, CTxIndex>
+            mapTestPool;
+        ::uint64_t
+            nBlockSize = 1000;
+        ::uint64_t
+            nBlockTx = 0;
+        int
+            nBlockSigOps = 100;
 
-        TxPriorityCompare comparer(fSortedByFee);
+        // From yacoin 1.0.0, the order of transaction included to a block is
+        // based on FeePerKb by default. If FeePerKb are equal between transactions,
+        // coin-age could then take priority
+        bool
+            fSortedByFee = true;
+
+        TxPriorityCompare
+            comparer(fSortedByFee);
         std::make_heap(vecPriority.begin(), vecPriority.end(), comparer);
 
         while (!vecPriority.empty())
         {
             // Take highest priority transaction off the priority queue:
-            double dPriority = vecPriority.front().get<0>();
-            double dFeePerKb = vecPriority.front().get<1>();
-            CTransaction& tx = *(vecPriority.front().get<2>());
+            double
+                dPriority = vecPriority.front().get<0>();
+            double
+                dFeePerKb = vecPriority.front().get<1>();
+            CTransaction
+                & tx = *(vecPriority.front().get<2>());
 
             std::pop_heap(vecPriority.begin(), vecPriority.end(), comparer);
             vecPriority.pop_back();
 
             // Size limits
-            unsigned int nTxSize = ::GetSerializeSize(tx, SER_NETWORK, PROTOCOL_VERSION);
-            if (nBlockSize + nTxSize >= nBlockMaxSize)
+            unsigned int
+                nTxSize = ::GetSerializeSize(tx, SER_NETWORK, PROTOCOL_VERSION);
+            if ((nBlockSize + nTxSize) >= nBlockMaxSize)
                 continue;
 
             // Legacy limits on sigOps:
-            unsigned int nTxSigOps = tx.GetLegacySigOpCount();
+            unsigned int
+                nTxSigOps = tx.GetLegacySigOpCount();
             if (nBlockSigOps + nTxSigOps >= GetMaxSize(MAX_BLOCK_SIGOPS))
                 continue;
 
             // Timestamp limit
-            if (tx.nTime > GetAdjustedTime() || (fProofOfStake && tx.nTime > pblock->vtx[0].nTime))
+            if (
+                (tx.nTime > GetAdjustedTime()) ||
+                (pblock->IsProofOfStake() && (tx.nTime > pblock->vtx[1].nTime))
+               )
                 continue;
 
             // Never include transactions with fee < min fee
@@ -620,20 +385,24 @@ CBlock* CreateNewBlock(CWallet* pwallet, bool fProofOfStake)
 
             // Connecting shouldn't fail due to dependency on other memory pool transactions
             // because we're already processing them in order of dependency
-            map<uint256, CTxIndex> mapTestPoolTmp(mapTestPool);
-            MapPrevTx mapInputs;
-            bool fInvalid;
+            map<uint256, CTxIndex>
+                mapTestPoolTmp(mapTestPool);
+            MapPrevTx
+                mapInputs;
+            bool
+                fInvalid;
             CValidationState state;
             if (!tx.FetchInputs(state, txdb, mapTestPoolTmp, false, true, mapInputs, fInvalid))
                 continue;
 
-            int64_t nTxFees = tx.GetValueIn(mapInputs)-tx.GetValueOut();
+            ::int64_t
+                nTxFees = tx.GetValueIn(mapInputs)-tx.GetValueOut();
 
             nTxSigOps += tx.GetP2SHSigOpCount(mapInputs);
-            if (nBlockSigOps + nTxSigOps >= GetMaxSize(MAX_BLOCK_SIGOPS))
+            if ((nBlockSigOps + nTxSigOps) >= GetMaxSize(MAX_BLOCK_SIGOPS))
                 continue;
 
-            if (!tx.ConnectInputs(state, txdb, mapInputs, mapTestPoolTmp, CDiskTxPos(1,1,1), pindexPrev, false, true, true, MANDATORY_SCRIPT_VERIFY_FLAGS))
+            if (!tx.ConnectInputs(state, txdb, mapInputs, mapTestPoolTmp, CDiskTxPos(1,1,1), pindexPrev, false, true))
                 continue;
             mapTestPoolTmp[tx.GetHash()] = CTxIndex(CDiskTxPos(1,1,1), tx.vout.size());
             swap(mapTestPool, mapTestPoolTmp);
@@ -652,7 +421,8 @@ CBlock* CreateNewBlock(CWallet* pwallet, bool fProofOfStake)
             }
 
             // Add transactions that depend on this one to the priority queue
-            uint256 hash = tx.GetHash();
+            uint256
+                hash = tx.GetHash();
             if (mapDependers.count(hash))
             {
                 BOOST_FOREACH(COrphan* porphan, mapDependers[hash])
@@ -673,28 +443,28 @@ CBlock* CreateNewBlock(CWallet* pwallet, bool fProofOfStake)
         nLastBlockTx = nBlockTx;
         nLastBlockSize = nBlockSize;
 
-        if (!fProofOfStake)
-        {
-            pblock->vtx[0].vout[0].nValue = GetProofOfWorkReward(pblock->nBits, nFees);
-
-            if (fDebug)
-                printf("PoW CreateNewBlock (): reward %" PRIu64 "\n", pblock->vtx[0].vout[0].nValue);
-        }
-
         if (fDebug && GetBoolArg("-printpriority"))
-            printf("CreateNewBlock (): total size %" PRIu64 "\n", nBlockSize);
+            printf("CreateNewBlock (): total size %" PRI64u "\n", nBlockSize);
+
+        if (pblock->IsProofOfWork())
+            pblock->vtx[0].vout[0].nValue = GetProofOfWorkReward(pblock->nBits);
 
         // Fill in header
         pblock->hashPrevBlock  = pindexPrev->GetBlockHash();
-        if (!fProofOfStake)
-        {
-            pblock->nTime = max(pindexPrev->GetMedianTimePast()+1, pblock->GetMaxTransactionTime());
-            pblock->nTime = max(pblock->GetBlockTime(), PastDrift(pindexPrev->GetBlockTime()));
+        if (pblock->IsProofOfStake())   // nTime, this is overwritten immediately???!!!
+            pblock->nTime      = pblock->vtx[1].nTime; //same as coinstake timestamp
+        pblock->nTime          = max(
+                                    pindexPrev->GetMedianTimePast() + 1,
+                                    pblock->GetMaxTransactionTime()
+                                    );
+        pblock->nTime          = max(
+                                     pblock->GetBlockTime(),    // lo & behold this is nTime!?
+                                     pindexPrev->GetBlockTime() - nMaxClockDrift
+                                    );
+        if (pblock->IsProofOfWork())
             pblock->UpdateTime(pindexPrev);
-        }
-        pblock->nNonce = 0;
+        pblock->nNonce         = 0;
     }
-
     return pblock.release();
 }
 
@@ -968,21 +738,18 @@ void StakeMinter(CWallet *pwallet)
         CBlockIndex
             * pindexPrev = chainActive.Tip();
 
-        if ( fUseOld044Rules )
-        {                                                   // behave as previously
-            if (
-                pindexPrev->IsProofOfStake() && // which was, if last block was a PoS
-                ( pindexPrev->nHeight >= nConsecutiveStakeSwitchHeight )
-               ) 
-            {
-                bool 
-                    fFastPOS = GetArg("-fastpos", 0);
+        if (
+            pindexPrev->IsProofOfStake() && // which was, if last block was a PoS
+            ( pindexPrev->nHeight >= nConsecutiveStakeSwitchHeight )
+           )
+        {
+            bool
+                fFastPOS = GetArg("-fastpos", 0);
 
-                if (!fFastPOS) 
-                    Sleep(500);
-                continue;       // does this mean we stay at this point?  It looks that way?
-            }                   // we stall and don't attempt to PoS
-        }
+            if (!fFastPOS)
+                Sleep(500);
+            continue;       // does this mean we stay at this point?  It looks that way?
+        }                   // we stall and don't attempt to PoS
 
         if (pwallet->GetBalance() > 0 )
         {

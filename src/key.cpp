@@ -340,44 +340,14 @@ CPubKey CKey::GetPubKey() const
 
 bool CKey::Sign(uint256 hash, std::vector<unsigned char>& vchSig)
 {
-    if ( fUseOld044Rules )
-    {
-        unsigned int nSize = ECDSA_size(pkey);
-        vchSig.resize(nSize); // Make sure it is big enough
-        if (!ECDSA_sign(0, (unsigned char*)&hash, sizeof(hash), &vchSig[0], &nSize, pkey))
-        {
-            vchSig.clear();
-            return false;
-        }
-        vchSig.resize(nSize); // Shrink to fit actual size
-        return true;
-    }
-    vchSig.clear();
-    ECDSA_SIG *sig = ECDSA_do_sign((unsigned char*)&hash, sizeof(hash), pkey);
-    if (sig==NULL)
-        return false;
-    const EC_GROUP *group = EC_KEY_get0_group(pkey);
-    CBigNum order, halforder;
-    EC_GROUP_get_order(group, &order, NULL);
-    BN_rshift1(&halforder, &order);
-    // enforce low S values, by negating the value (modulo the order) if above order/2.
-    if (BN_cmp(sig->s, &halforder) > 0) 
-    {
-        BN_sub(sig->s, &order, sig->s);
-    }
     unsigned int nSize = ECDSA_size(pkey);
     vchSig.resize(nSize); // Make sure it is big enough
-
-    unsigned char *pos = &vchSig[0];
-    nSize = i2d_ECDSA_SIG(sig, &pos);
-    ECDSA_SIG_free(sig);
-    vchSig.resize(nSize); // Shrink to fit actual size
-    // Testing our new signature
-    if (ECDSA_verify(0, (unsigned char*)&hash, sizeof(hash), &vchSig[0], vchSig.size(), pkey) != 1) 
+    if (!ECDSA_sign(0, (unsigned char*)&hash, sizeof(hash), &vchSig[0], &nSize, pkey))
     {
         vchSig.clear();
         return false;
     }
+    vchSig.resize(nSize); // Shrink to fit actual size
     return true;
 }
 

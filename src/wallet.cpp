@@ -2033,17 +2033,7 @@ int64_t CWallet::GetStake() const
             pcoin->GetDepthInMainChain() > 0
            )
         {
-            if(
-               fUseOld044Rules
-              )
-            {
-                nTotal += CWallet::GetDebit(*pcoin, MINE_ALL );
-            }
-            else   // fTestnet || (pcoin->nTimeReceived >= YACOIN_NEW_LOGIC_SWITCH_TIME)
-            {
-              //nTotal += CWallet::GetDebit(*pcoin, MINE_ALL);  //<<<<<<<<<<<<<<<< test
-                nTotal += CWallet::GetCredit(*pcoin, MINE_ALL);
-            }
+            nTotal += CWallet::GetDebit(*pcoin, MINE_ALL );
         }
     }
     return nTotal;
