@@ -7,22 +7,25 @@
 #define NOVACOIN_MINER_H
 
 #ifndef BITCOIN_MAIN_H
- #include "main.h"
+#include "main.h"
 #endif
 
 #ifndef BITCOIN_WALLET_H
- #include "wallet.h"
+#include "wallet.h"
 #endif
 
 /* Generate a new block, without valid proof-of-work */
-CBlock* CreateNewBlock(CWallet* pwallet, bool fProofOfStake=false);
+CBlock* CreateNewBlock(CWallet* pwallet, bool fProofOfStake = false);
 
 /** Modify the extranonce in a block */
-void IncrementExtraNonce(CBlock* pblock, CBlockIndex* pindexPrev, unsigned int& nExtraNonce);
+void IncrementExtraNonce(CBlock* pblock, CBlockIndex* pindexPrev,
+                         unsigned int& nExtraNonce);
 
 /** Do mining precalculation */
-void FormatHashBuffers(CBlock* pblock, char* pmidstate, char* pdata, char* phash1);
-void FormatHashBuffers_64bit_nTime(char* pblock, char* pmidstate, char* pdata, char* phash1);
+void FormatHashBuffers(CBlock* pblock, char* pmidstate, char* pdata,
+                       char* phash1);
+void FormatHashBuffers_64bit_nTime(char* pblock, char* pmidstate, char* pdata,
+                                   char* phash1);
 
 /** Check mined proof-of-work block */
 bool CheckWork(CBlock* pblock, CWallet& wallet, CReserveKey& reservekey);
@@ -36,6 +39,6 @@ void SHA256Transform(void* pstate, void* pinput, const void* pinit);
 extern double dHashesPerSec;
 extern ::int64_t nHPSTimerStart;
 
-void GenerateYacoins(bool fGenerate, CWallet* pwallet, int nblocks=-10);
+void GenerateYacoins(bool fGenerate, CWallet* pwallet, int nblocks = -10);
 
-#endif // NOVACOIN_MINER_H
+#endif  // NOVACOIN_MINER_H
