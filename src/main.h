@@ -394,7 +394,7 @@ bool SequenceLocks(const CTransaction &tx, int flags, std::vector<int>* prevHeig
 /**
  * Check if transaction will be BIP 68 final in the next block to be created.
  */
-bool CheckSequenceLocks(const CTransaction &tx, int flags);
+bool CheckSequenceLocks(const CTransaction &tx, int flags, LockPoints* lp = nullptr);
 
 /**
  * Get minimum confirmations to use coinbase
@@ -575,7 +575,7 @@ public:
     int GetDepthInMainChain() const { CBlockIndex *pindexRet; return GetDepthInMainChain(pindexRet); }
     bool IsInMainChain() const { return GetDepthInMainChain() > 0; }
     int GetBlocksToMaturity() const;
-    bool AcceptToMemoryPool(CTxDB& txdb, bool fCheckInputs=true);
+    bool AcceptToMemoryPool(CTxDB& txdb);
     bool AcceptToMemoryPool();
 };
 

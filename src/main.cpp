@@ -96,7 +96,7 @@ static void UpdateMempoolForReorg(CTxDB& txdb)
         if (!(tx->IsCoinBase() || tx->IsCoinStake()))
         {
             printf("UpdateMempoolForReorg, Adding tx = %s to mempool...\n", tx->GetHash().ToString().c_str());
-            if (!tx->AcceptToMemoryPool(stateDummy, txdb, true))
+            if (!tx->AcceptToMemoryPool(stateDummy, txdb))
             {
                 printf("UpdateMempoolForReorg, Failed to add tx = %s to mempool\n", tx->GetHash().ToString().c_str());
             }
@@ -1265,12 +1265,13 @@ bool SequenceLocks(const CTransaction &tx, int flags, std::vector<int>* prevHeig
     return EvaluateSequenceLocks(block, CalculateSequenceLocks(tx, flags, prevHeights, block));
 }
 
-bool CheckSequenceLocks(const CTransaction &tx, int flags)
+bool CheckSequenceLocks(const CTransaction &tx, int flags, LockPoints* lp)
 {
     LOCK2(cs_main, mempool.cs);
 
+    CBlockIndex* tip = chainActive.Tip();
     CBlockIndex index;
-    index.pprev = chainActive.Tip();
+    index.pprev = tip;
     // CheckSequenceLocks() uses chainActive.Tip()->nHeight+1 to evaluate
     // height based locks because when SequenceLocks() is called within
     // ConnectBlock(), the height of the block *being*
@@ -1326,6 +1327,31 @@ bool CheckSequenceLocks(const CTransaction &tx, int flags)
     }
 
     std::pair<int, int64_t> lockPair = CalculateSequenceLocks(tx, flags, &prevheights, index);
+    if (lp) {
+        lp->height = lockPair.first;
+        lp->time = lockPair.second;
+        // Also store the hash of the block with the highest height of
+        // all the blocks which have sequence locked prevouts.
+        // This hash needs to still be on the chain
+        // for these LockPoint calculations to be valid
+        // Note: It is impossible to correctly calculate a maxInputBlock
+        // if any of the sequence locked inputs depend on unconfirmed txs,
+        // except in the special case where the relative lock time/height
+        // is 0, which is equivalent to no sequence lock. Since we assume
+        // input height of tip+1 for mempool txs and test the resulting
+        // lockPair from CalculateSequenceLocks against tip+1.  We know
+        // EvaluateSequenceLocks will fail if there was a non-zero sequence
+        // lock on a mempool input, so we can use the return value of
+        // CheckSequenceLocks to indicate the LockPoints validity
+        int maxInputHeight = 0;
+        for (int height : prevheights) {
+            // Can ignore mempool inputs since we'll fail if they had non-zero locks
+            if (height != tip->nHeight+1) {
+                maxInputHeight = std::max(maxInputHeight, height);
+            }
+        }
+        lp->maxInputBlock = tip->GetAncestor(maxInputHeight);
+    }
     return EvaluateSequenceLocks(index, lockPair);
 }
 
@@ -1447,18 +1473,18 @@ int CMerkleTx::GetBlocksToMaturity() const
 }
 
 
-bool CMerkleTx::AcceptToMemoryPool(CTxDB& txdb, bool fCheckInputs)
+bool CMerkleTx::AcceptToMemoryPool(CTxDB& txdb)
 {
     CValidationState state;
     if (fClient)
     {
         if (!IsInMainChain() && !ClientConnectInputs())
             return false;
-        return CTransaction::AcceptToMemoryPool(state, txdb, false);
+        return CTransaction::AcceptToMemoryPool(state, txdb);
     }
     else
     {
-        return CTransaction::AcceptToMemoryPool(state, txdb, fCheckInputs);
+        return CTransaction::AcceptToMemoryPool(state, txdb);
     }
 }
 
@@ -1470,7 +1496,7 @@ bool CMerkleTx::AcceptToMemoryPool()
 
 
 
-bool CWalletTx::AcceptWalletTransaction(CTxDB& txdb, bool fCheckInputs)
+bool CWalletTx::AcceptWalletTransaction(CTxDB& txdb)
 {
 
     {
@@ -1482,10 +1508,10 @@ bool CWalletTx::AcceptWalletTransaction(CTxDB& txdb, bool fCheckInputs)
             {
                 uint256 hash = tx.GetHash();
                 if (!mempool.exists(hash) && !txdb.ContainsTx(hash))
-                    tx.AcceptToMemoryPool(txdb, fCheckInputs);
+                    tx.AcceptToMemoryPool(txdb);
             }
         }
-        return AcceptToMemoryPool(txdb, fCheckInputs);
+        return AcceptToMemoryPool(txdb);
     }
     return false;
 }
@@ -1521,7 +1547,7 @@ bool GetTransaction(const uint256 &hash, CTransaction &tx, uint256 &hashBlock)
             LOCK(mempool.cs);
             if (mempool.exists(hash))
             {
-                tx = mempool.lookup(hash);
+                tx = mempool.get(hash);
                 return true;
             }
         }
@@ -4328,7 +4354,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
           {
             LOCK(mempool.cs);
             if (mempool.exists(inv.hash)) {
-              CTransaction tx = mempool.lookup(inv.hash);
+              CTransaction tx = mempool.get(inv.hash);
 
               CDataStream ss(SER_NETWORK, PROTOCOL_VERSION);
 
@@ -4476,7 +4502,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
         bool 
             fMissingInputs = false;
         CValidationState state;
-        if (tx.AcceptToMemoryPool(state, txdb, true, &fMissingInputs))
+        if (tx.AcceptToMemoryPool(state, txdb, &fMissingInputs))
         {
             SyncWithWallets(tx, NULL, true);
             RelayTransaction(tx, inv.hash);

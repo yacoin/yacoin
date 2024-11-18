@@ -395,6 +395,8 @@ public:
         return fNewer;
     }
 
+    unsigned int GetTotalSize() const;
+
     bool IsCoinBase() const
     {
         return (vin.size() == 1 && vin[0].prevout.IsNull() && vout.size() >= 1);
@@ -563,7 +565,7 @@ public:
                      unsigned int flags=STRICT_FLAGS, std::vector<CScriptCheck> *pvChecks = NULL) const;
     bool ClientConnectInputs();
     bool CheckTransaction(CValidationState &state) const;
-    bool AcceptToMemoryPool(CValidationState &state, CTxDB& txdb, bool fCheckInputs=true, bool* pfMissingInputs=NULL) const;
+    bool AcceptToMemoryPool(CValidationState &state, CTxDB& txdb, bool *pfMissingInputs=NULL) const;
     bool GetCoinAge(CTxDB& txdb, ::uint64_t& nCoinAge) const;  // ppcoin: get transaction coin age
 
     /** YAC_TOKEN START */

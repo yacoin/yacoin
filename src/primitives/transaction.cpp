@@ -274,6 +274,11 @@ CTransaction::GetLegacySigOpCount() const
     return nSigOps;
 }
 
+unsigned int CTransaction::GetTotalSize() const
+{
+    return ::GetSerializeSize(*this, SER_NETWORK, PROTOCOL_VERSION);
+}
+
 bool CTransaction::CheckTransaction(CValidationState &state) const
 {
     // Basic checks that don't depend on any context
@@ -490,9 +495,9 @@ bool CTransaction::CheckTransaction(CValidationState &state) const
     return (nBytes * MIN_TX_FEE) / 1000;
 }
 
-bool CTransaction::AcceptToMemoryPool(CValidationState &state, CTxDB& txdb, bool fCheckInputs, bool* pfMissingInputs) const
+bool CTransaction::AcceptToMemoryPool(CValidationState &state, CTxDB& txdb, bool* pfMissingInputs) const
 {
-    return mempool.accept(state, txdb, *this, fCheckInputs, pfMissingInputs);
+    return mempool.accept(state, txdb, *this, pfMissingInputs);
 }
 
 bool CTransaction::DisconnectInputs(CValidationState &state, CTxDB& txdb)
@@ -574,7 +579,7 @@ bool CTransaction::FetchInputs(CValidationState &state, CTxDB& txdb, const map<u
                 LOCK(mempool.cs);
                 if (!mempool.exists(prevout.COutPointGetHash()))
                     return state.Invalid(error("FetchInputs() : %s mempool Tx prev not found %s", GetHash().ToString().substr(0,10).c_str(),  prevout.COutPointGetHash().ToString().substr(0,10).c_str()));
-                txPrev = mempool.lookup(prevout.COutPointGetHash());
+                txPrev = mempool.get(prevout.COutPointGetHash());
             }
             if (!fFound)
                 txindex.vSpent.resize(txPrev.vout.size());
@@ -858,7 +863,7 @@ bool CTransaction::ClientConnectInputs()
             COutPoint prevout = vin[i].prevout;
             if (!mempool.exists(prevout.COutPointGetHash()))
                 return false;
-            CTransaction& txPrev = mempool.lookup(prevout.COutPointGetHash());
+            CTransaction& txPrev = mempool.get(prevout.COutPointGetHash());
 
             if (prevout.COutPointGet_n() >= txPrev.vout.size())
                 return false;
