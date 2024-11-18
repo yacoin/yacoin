@@ -471,8 +471,8 @@ public:
     };
     typedef std::set<txiter, CompareIteratorByHash> setEntries;
 
-    const setEntries & GetMemPoolParents(txiter entry) const;
-    const setEntries & GetMemPoolChildren(txiter entry) const;
+    const setEntries & GetMemPoolParents(txiter entry) const; // Get parent of a transaction by using mapLinks
+    const setEntries & GetMemPoolChildren(txiter entry) const; // Get children of a transaction by using mapLinks
 
 private:
     typedef std::map<txiter, setEntries, CompareIteratorByHash> cacheMap;
@@ -486,8 +486,8 @@ private:
     typedef std::map<txiter, TxLinks, CompareIteratorByHash> txlinksMap;
     txlinksMap mapLinks;
 
-    void UpdateParent(txiter entry, txiter parent, bool add);
-    void UpdateChild(txiter entry, txiter child, bool add);
+    void UpdateParent(txiter entry, txiter parent, bool add); // Update parent info of a transaction in mapLinks
+    void UpdateChild(txiter entry, txiter child, bool add); // Update children info of a transaction in mapLinks
 
     std::vector<indexed_transaction_set::const_iterator> GetSortedDepthAndScore() const;
 
@@ -520,10 +520,11 @@ public:
     // then invoke the second version.
     bool addUnchecked(const uint256& hash, const CTxMemPoolEntry &entry);
     bool addUnchecked(const uint256& hash, const CTxMemPoolEntry &entry, setEntries &setAncestors);
+
     void removeRecursive(const CTransaction &tx, MemPoolRemovalReason reason = MemPoolRemovalReason::UNKNOWN);
-    void removeForReorg(unsigned int nMemPoolHeight, int flags);
+    void removeForReorg(unsigned int nMemPoolHeight, int flags); // Used in case of reorg to remove any now-immature tx and any no-longer-final timelock tx
     void removeConflicts(const CTransaction &tx);
-    void removeForBlock(const std::vector<CTransactionRef>& vtx, unsigned int nBlockHeight);
+    void removeForBlock(const std::vector<CTransaction>& vtx, ConnectedBlockTokenData& connectedBlockData);
 
     void clear();
     void _clear(); //lock free
@@ -543,21 +544,8 @@ public:
     void ApplyDelta(const uint256 hash, CAmount &nFeeDelta) const;
     void ClearPrioritisation(const uint256 hash);
 
-    /*
-     * OLD IMPLEMENTATION
-     */
+    // Old implementation
     bool accept(CValidationState &state, CTxDB& txdb, const CTransaction &tx, bool* pfMissingInputs);
-//    bool addUnchecked(const uint256& hash, const CTransaction &tx);
-//    void remove(const CTransaction& tx);
-//    void remove(const std::vector<CTransaction>& vtx);
-//    void remove(const std::vector<CTransaction>& vtx, ConnectedBlockTokenData& connectedBlockData);
-//    void removeUnchecked(const CTransaction& tx, const uint256& hash);
-//    void clear();
-//    void queryHashes(std::vector<uint256>& vtxid);
-//
-//    // Transaction updated
-//    unsigned int GetTransactionsUpdated() const;
-//    void AddTransactionsUpdated(unsigned int n);
 
 public:
     /** Remove a set of transactions from the mempool.
@@ -578,7 +566,7 @@ public:
      *  for).  Note: vHashesToUpdate should be the set of transactions from the
      *  disconnected block that have been accepted back into the mempool.
      */
-    void UpdateTransactionsFromBlock(const std::vector<uint256> &vHashesToUpdate);
+    void UpdateTransactionsFromBlock(const std::vector<uint256> &vHashesToUpdate); // Used in case of reorg
 
     /** Try to calculate all in-mempool ancestors of entry.
      *  (these are all calculated including the tx itself)
@@ -604,16 +592,16 @@ public:
       *  takes the fee rate to go back down all the way to 0. When the feerate
       *  would otherwise be half of this, it is set to 0 instead.
       */
-    CFeeRate GetMinFee(size_t sizelimit) const;
+//    CFeeRate GetMinFee(size_t sizelimit) const;
 
     /** Remove transactions from the mempool until its dynamic size is <= sizelimit.
       *  pvNoSpendsRemaining, if set, will be populated with the list of outpoints
       *  which are not in mempool which no longer have any spends in this mempool.
       */
-    void TrimToSize(size_t sizelimit, std::vector<COutPoint>* pvNoSpendsRemaining=nullptr);
+//    void TrimToSize(size_t sizelimit, std::vector<COutPoint>* pvNoSpendsRemaining=nullptr);
 
     /** Expire all transaction (and their dependencies) in the mempool older than time. Return the number of removed transactions. */
-    int Expire(int64_t time);
+//    int Expire(int64_t time);
 
     /** Returns false if the transaction is in the mempool and not within the chain limit specified. */
     bool TransactionWithinChainLimit(const uint256& txid, size_t chainLimit) const;
@@ -771,10 +759,6 @@ struct DisconnectedBlockTransactions {
     {
         cachedInnerUsage = 0;
         queuedTx.clear();
-    }
-
-    bool isInReorg() {
-        return !queuedTx.empty();
     }
 };
 

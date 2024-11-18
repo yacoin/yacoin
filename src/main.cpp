@@ -68,20 +68,22 @@ using std::deque;
 //
 // FOR UPDATE TRANSACTION MEMPOOL IN REORG
 //
-
-DisconnectedBlockTransactions disconnectpool;
-
-/* Make mempool consistent after a reorg, by re-adding disconnected block
- * transactions from the mempool, and also removing any other transactions from
- * the mempool that are no longer valid given the new tip/height.
+/* Make mempool consistent after a reorg, by re-adding or recursively erasing
+ * disconnected block transactions from the mempool, and also removing any
+ * other transactions from the mempool that are no longer valid given the new
+ * tip/height.
  *
  * Note: we assume that disconnectpool only contains transactions that are NOT
  * confirmed in the current chain nor already in the mempool (otherwise,
  * in-mempool descendants of such transactions would be removed).
+ *
+ * Passing fAddToMempool=false will skip trying to add the transactions back,
+ * and instead just erase from the mempool as needed.
  */
 
-static void UpdateMempoolForReorg(CTxDB& txdb)
+static void UpdateMempoolForReorg(CTxDB& txdb, DisconnectedBlockTransactions &disconnectpool, bool fAddToMempool)
 {
+    std::vector<uint256> vHashUpdate;
     // disconnectpool's insertion_order index sorts the entries from
     // oldest to newest, but the oldest entry will be the last tx from the
     // latest mined block that was disconnected.
@@ -93,20 +95,37 @@ static void UpdateMempoolForReorg(CTxDB& txdb)
         CTransactionRef tx = *it;
         // ignore validation errors in resurrected transactions
         CValidationState stateDummy;
-        if (!(tx->IsCoinBase() || tx->IsCoinStake()))
-        {
-            printf("UpdateMempoolForReorg, Adding tx = %s to mempool...\n", tx->GetHash().ToString().c_str());
-            if (!tx->AcceptToMemoryPool(stateDummy, txdb))
-            {
-                printf("UpdateMempoolForReorg, Failed to add tx = %s to mempool\n", tx->GetHash().ToString().c_str());
-            }
-            else {
-                printf("UpdateMempoolForReorg, Added tx = %s to mempool successfully\n", tx->GetHash().ToString().c_str());
-            }
+        // OLD LOGIC
+//        if (!(tx->IsCoinBase() || tx->IsCoinStake()))
+//        {
+//            printf("UpdateMempoolForReorg, Adding tx = %s to mempool...\n", tx->GetHash().ToString().c_str());
+//            if (!tx->AcceptToMemoryPool(stateDummy, txdb))
+//            {
+//                printf("UpdateMempoolForReorg, Failed to add tx = %s to mempool\n", tx->GetHash().ToString().c_str());
+//            }
+//            else {
+//                printf("UpdateMempoolForReorg, Added tx = %s to mempool successfully\n", tx->GetHash().ToString().c_str());
+//            }
+//        }
+
+        if (!fAddToMempool || tx->IsCoinBase() || tx->IsCoinStake() || !tx->AcceptToMemoryPool(stateDummy, txdb)) {
+            // If the transaction doesn't make it in to the mempool, remove any
+            // transactions that depend on it (which would now be orphans).
+            mempool.removeRecursive(*tx, MemPoolRemovalReason::REORG);
+        } else if (mempool.exists(tx->GetHash())) {
+            vHashUpdate.push_back(tx->GetHash());
         }
         ++it;
     }
-    disconnectpool.clear();
+    disconnectpool.queuedTx.clear();
+    // AcceptToMemoryPool/addUnchecked all assume that new mempool entries have
+    // no in-mempool children, which is generally not true when adding
+    // previously-confirmed transactions back to the mempool.
+    // UpdateTransactionsFromBlock finds descendants of any transactions in
+    // the disconnectpool that were added back and cleans up the mempool state.
+    mempool.UpdateTransactionsFromBlock(vHashUpdate);
+    // We also need to remove any now-immature transactions
+    mempool.removeForReorg(chainActive.Tip()->nHeight + 1, STANDARD_LOCKTIME_VERIFY_FLAGS);
 }
 //
 // END OF FOR UPDATE TRANSACTION MEMPOOL IN REORG
@@ -1265,7 +1284,24 @@ bool SequenceLocks(const CTransaction &tx, int flags, std::vector<int>* prevHeig
     return EvaluateSequenceLocks(block, CalculateSequenceLocks(tx, flags, prevHeights, block));
 }
 
-bool CheckSequenceLocks(const CTransaction &tx, int flags, LockPoints* lp)
+bool TestLockPointValidity(const LockPoints* lp)
+{
+    assert(lp);
+    // If there are relative lock times then the maxInputBlock will be set
+    // If there are no relative lock times, the LockPoints don't depend on the chain
+    if (lp->maxInputBlock) {
+        // Check whether chainActive is an extension of the block at which the LockPoints
+        // calculation was valid.  If not LockPoints are no longer valid
+        if (!chainActive.Contains(lp->maxInputBlock)) {
+            return false;
+        }
+    }
+
+    // LockPoints still valid
+    return true;
+}
+
+bool CheckSequenceLocks(const CTransaction &tx, int flags, LockPoints* lp, bool useExistingLockPoints = false)
 {
     LOCK2(cs_main, mempool.cs);
 
@@ -1280,78 +1316,87 @@ bool CheckSequenceLocks(const CTransaction &tx, int flags, LockPoints* lp)
     // *next* block, we need to use one more than chainActive.Tip()->nHeight
     index.nHeight = chainActive.Tip()->nHeight + 1;
 
-    std::vector<int> prevheights;
-    prevheights.resize(tx.vin.size());
-    for (size_t txinIndex = 0; txinIndex < tx.vin.size(); txinIndex++) {
-        COutPoint prevout = tx.vin[txinIndex].prevout;
+    std::pair<int, int64_t> lockPair;
+    if (useExistingLockPoints) {
+        assert(lp);
+        lockPair.first = lp->height;
+        lockPair.second = lp->time;
+    }
+    else {
+        std::vector<int> prevheights;
+        prevheights.resize(tx.vin.size());
+        for (size_t txinIndex = 0; txinIndex < tx.vin.size(); txinIndex++) {
+            COutPoint prevout = tx.vin[txinIndex].prevout;
 
-        // Check from both mempool and db
-        if (mempool.exists(prevout.COutPointGetHash()))
-        {
-            // Assume all mempool transaction confirm in the next block
-            prevheights[txinIndex] = chainActive.Tip()->nHeight + 1;
+            // Check from both mempool and db
+            if (mempool.exists(prevout.COutPointGetHash()))
+            {
+                // Assume all mempool transaction confirm in the next block
+                prevheights[txinIndex] = chainActive.Tip()->nHeight + 1;
+            }
+            else // Check from txdb
+            {
+                CTransaction txPrev;
+                CTxIndex txindex;
+                CTxDB txdb("r");
+                if (!txPrev.ReadFromDisk(txdb, prevout, txindex))
+                {
+                    // Can't find transaction index
+                    return error("CheckSequenceLocks : ReadFromDisk tx %s failed", prevout.COutPointGetHash().ToString().substr(0,10).c_str());
+                }
+
+                uint256 hashBlock = 0;
+                CBlock block;
+                if (!block.ReadFromDisk(txindex.pos.Get_CDiskTxPos_nFile(), txindex.pos.Get_CDiskTxPos_nBlockPos(), false))
+                {
+                    return error("CheckSequenceLocks : ReadFromDisk block containing tx %s failed", prevout.COutPointGetHash().ToString().substr(0,10).c_str());
+                }
+                else
+                {
+                    hashBlock = block.GetHash();
+                }
+
+                map<uint256, CBlockIndex*>::iterator mi = mapBlockIndex.find(hashBlock);
+                if (mi != mapBlockIndex.end() && (*mi).second)
+                {
+                    CBlockIndex* pindex = (*mi).second;
+                    prevheights[txinIndex] = pindex->nHeight;
+                }
+                else
+                {
+                    return error("CheckSequenceLocks : mapBlockIndex doesn't contains block %s", hashBlock.ToString().substr(0,10).c_str());
+                }
+            }
         }
-        else // Check from txdb
-        {
-            CTransaction txPrev;
-            CTxIndex txindex;
-            CTxDB txdb("r");
-            if (!txPrev.ReadFromDisk(txdb, prevout, txindex))
-            {
-                // Can't find transaction index
-                return error("CheckSequenceLocks : ReadFromDisk tx %s failed", prevout.COutPointGetHash().ToString().substr(0,10).c_str());
-            }
 
-            uint256 hashBlock = 0;
-            CBlock block;
-            if (!block.ReadFromDisk(txindex.pos.Get_CDiskTxPos_nFile(), txindex.pos.Get_CDiskTxPos_nBlockPos(), false))
-            {
-                return error("CheckSequenceLocks : ReadFromDisk block containing tx %s failed", prevout.COutPointGetHash().ToString().substr(0,10).c_str());
+        lockPair = CalculateSequenceLocks(tx, flags, &prevheights, index);
+        if (lp) {
+            lp->height = lockPair.first;
+            lp->time = lockPair.second;
+            // Also store the hash of the block with the highest height of
+            // all the blocks which have sequence locked prevouts.
+            // This hash needs to still be on the chain
+            // for these LockPoint calculations to be valid
+            // Note: It is impossible to correctly calculate a maxInputBlock
+            // if any of the sequence locked inputs depend on unconfirmed txs,
+            // except in the special case where the relative lock time/height
+            // is 0, which is equivalent to no sequence lock. Since we assume
+            // input height of tip+1 for mempool txs and test the resulting
+            // lockPair from CalculateSequenceLocks against tip+1.  We know
+            // EvaluateSequenceLocks will fail if there was a non-zero sequence
+            // lock on a mempool input, so we can use the return value of
+            // CheckSequenceLocks to indicate the LockPoints validity
+            int maxInputHeight = 0;
+            for (int height : prevheights) {
+                // Can ignore mempool inputs since we'll fail if they had non-zero locks
+                if (height != tip->nHeight+1) {
+                    maxInputHeight = std::max(maxInputHeight, height);
+                }
             }
-            else
-            {
-                hashBlock = block.GetHash();
-            }
-
-            map<uint256, CBlockIndex*>::iterator mi = mapBlockIndex.find(hashBlock);
-            if (mi != mapBlockIndex.end() && (*mi).second)
-            {
-                CBlockIndex* pindex = (*mi).second;
-                prevheights[txinIndex] = pindex->nHeight;
-            }
-            else
-            {
-                return error("CheckSequenceLocks : mapBlockIndex doesn't contains block %s", hashBlock.ToString().substr(0,10).c_str());
-            }
+            lp->maxInputBlock = tip->GetAncestor(maxInputHeight);
         }
     }
 
-    std::pair<int, int64_t> lockPair = CalculateSequenceLocks(tx, flags, &prevheights, index);
-    if (lp) {
-        lp->height = lockPair.first;
-        lp->time = lockPair.second;
-        // Also store the hash of the block with the highest height of
-        // all the blocks which have sequence locked prevouts.
-        // This hash needs to still be on the chain
-        // for these LockPoint calculations to be valid
-        // Note: It is impossible to correctly calculate a maxInputBlock
-        // if any of the sequence locked inputs depend on unconfirmed txs,
-        // except in the special case where the relative lock time/height
-        // is 0, which is equivalent to no sequence lock. Since we assume
-        // input height of tip+1 for mempool txs and test the resulting
-        // lockPair from CalculateSequenceLocks against tip+1.  We know
-        // EvaluateSequenceLocks will fail if there was a non-zero sequence
-        // lock on a mempool input, so we can use the return value of
-        // CheckSequenceLocks to indicate the LockPoints validity
-        int maxInputHeight = 0;
-        for (int height : prevheights) {
-            // Can ignore mempool inputs since we'll fail if they had non-zero locks
-            if (height != tip->nHeight+1) {
-                maxInputHeight = std::max(maxInputHeight, height);
-            }
-        }
-        lp->maxInputBlock = tip->GetAncestor(maxInputHeight);
-    }
     return EvaluateSequenceLocks(index, lockPair);
 }
 
@@ -2597,7 +2642,7 @@ void static UpdateTip(CBlockIndex *pindexNew) {
 }
 
 // Disconnect chainActive's tip.
-bool static DisconnectTip(CValidationState &state, CTxDB& txdb) {
+bool static DisconnectTip(CValidationState &state, CTxDB& txdb, DisconnectedBlockTransactions *disconnectpool) {
     CBlockIndex *pindexDelete = chainActive.Tip();
     assert(pindexDelete);
     // Read block from disk.
@@ -2625,14 +2670,17 @@ bool static DisconnectTip(CValidationState &state, CTxDB& txdb) {
 //            tx.AcceptToMemoryPool(stateDummy, txdb, false);
 //        }
 //    }
+
     // Ressurect mempool transactions from the disconnected block.
     // Save transactions to re-add to mempool at end of reorg
-    for (auto it = block.vtx.rbegin(); it != block.vtx.rend(); ++it) {
-        const CTransaction& tx = *it;
-        if (!(tx.IsCoinBase() || tx.IsCoinStake()))
-        {
-            printf("DisconnectTip, Add tx %s to disconnectpool\n", tx.GetHash().ToString().c_str());
-            disconnectpool.addTransaction(tx);
+    if (disconnectpool) {
+        for (auto it = block.vtx.rbegin(); it != block.vtx.rend(); ++it) {
+            const CTransaction& tx = *it;
+            if (!(tx.IsCoinBase() || tx.IsCoinStake()))
+            {
+                printf("DisconnectTip, Add tx %s to disconnectpool\n", tx.GetHash().ToString().c_str());
+                disconnectpool.addTransaction(tx);
+            }
         }
     }
 
@@ -2714,10 +2762,8 @@ bool static ConnectTip(CValidationState &state, CTxDB& txdb, CBlockIndex *pindex
             return false;
 
         // Remove conflicting transactions from the mempool.
-        mempool.remove(block.vtx, tokenDataFromBlock);
-        if (disconnectpool.isInReorg()) {
-            disconnectpool.removeForBlock(block.vtx);
-        }
+        mempool.removeForBlock(block.vtx, tokenDataFromBlock);
+        disconnectpool.removeForBlock(block.vtx);
 
         // Connect longer branch, SPECIFIC FOR YACOIN
         if (pindexNew->pprev)
@@ -2770,6 +2816,18 @@ static CBlockIndex* FindMostWorkChain() {
     } while(true);
 }
 
+/** Delete all entries in setBlockIndexCandidates that are worse than the current tip. */
+static void PruneBlockIndexCandidates() {
+    // Note that we can't delete the current block itself, as we may need to return to it later in case a
+    // reorganization to a better block fails.
+    std::set<CBlockIndex*, CBlockIndexWorkComparator>::iterator it = setBlockIndexCandidates.begin();
+    while (it != setBlockIndexCandidates.end() && setBlockIndexCandidates.value_comp()(*it, chainActive.Tip())) {
+        setBlockIndexCandidates.erase(it++);
+    }
+    // Either the current tip or a successor of it we're working towards is left in setBlockIndexCandidates.
+    assert(!setBlockIndexCandidates.empty());
+}
+
 // Try to make some progress towards making pindexMostWork the active block.
 static bool ActivateBestChainStep(CValidationState &state, CTxDB& txdb, CBlockIndex *pindexMostWork) {
 //    bool fInvalidFound = false;
@@ -2778,20 +2836,19 @@ static bool ActivateBestChainStep(CValidationState &state, CTxDB& txdb, CBlockIn
 
     // Disconnect active blocks which are no longer in the best chain.
     bool fBlocksDisconnected = false;
-    // Disconnect active blocks which are no longer in the best chain.
+    DisconnectedBlockTransactions disconnectpool;
     while (chainActive.Tip() && chainActive.Tip() != pindexFork) {
-        if (disconnectpool.isInReorg() && !fBlocksDisconnected) {
-            printf("Warning: DisconnectTip, reorg happens continuously\n");
-        }
-
         if (!txdb.TxnBegin()) {
             return error("ActivateBestChainStep () : TxnBegin 1 failed");
         }
 
-        if (!DisconnectTip(state, txdb)) // Disconnect the latest block on the chain
+        if (!DisconnectTip(state, txdb, disconnectpool)) // Disconnect the latest block on the chain
         {
             error("ActivateBestChainStep, failed to disconnect block");
             txdb.TxnAbort();
+            // This is likely a fatal error, but keep the mempool consistent,
+            // just in case. Only remove from the mempool in this case.
+            UpdateMempoolForReorg(txdb, disconnectpool, false);
             return false;
         }
         fBlocksDisconnected = true;
@@ -2815,7 +2872,7 @@ static bool ActivateBestChainStep(CValidationState &state, CTxDB& txdb, CBlockIn
         nHeight = nTargetHeight;
 
         // Connect new blocks.
-        BOOST_REVERSE_FOREACH(CBlockIndex *pindexConnect, vpindexToConnect) {
+        for (CBlockIndex *pindexConnect : reverse_iterate(vpindexToConnect)) {
             if (!txdb.TxnBegin()) {
                 return error("ActivateBestChainStep () : TxnBegin 2 failed");
             }
@@ -2831,20 +2888,15 @@ static bool ActivateBestChainStep(CValidationState &state, CTxDB& txdb, CBlockIn
                     break;
                 } else {
                     // A system error occurred (disk space, database error, ...).
+                    // Make the mempool consistent with the current tip, just in case
+                    // any observers try to use it before shutdown.
                     txdb.TxnAbort();
+                    UpdateMempoolForReorg(txdb, disconnectpool, false);
                     return false;
                 }
             }
             else {
-                // Delete all entries in setBlockIndexValid that are worse than our new current block.
-                // Note that we can't delete the current block itself, as we may need to return to it later in case a
-                // reorganization to a better block fails.
-                set<CBlockIndex*, CBlockIndexWorkComparator>::iterator it = setBlockIndexCandidates.begin();
-                while (setBlockIndexCandidates.value_comp()(*it, chainActive.Tip())) {
-                    setBlockIndexCandidates.erase(it++);
-                }
-                // Either the current tip or a successor of it we're working towards is left in setBlockIndexValid.
-                assert(!setBlockIndexCandidates.empty());
+                PruneBlockIndexCandidates();
                 if (!pindexOldTip || chainActive.Tip()->bnChainTrust > pindexOldTip->bnChainTrust) {
                     // We're in a better position than we were. Return temporarily to release the lock.
                     fContinue = false;
@@ -2852,6 +2904,13 @@ static bool ActivateBestChainStep(CValidationState &state, CTxDB& txdb, CBlockIn
                 }
             }
         }
+    }
+
+    if (fBlocksDisconnected) {
+        // If any blocks were disconnected, disconnectpool may be non empty.  Add
+        // any disconnected transactions back to the mempool.
+        printf("ActivateBestChainStep, reorg completed (best header = %s, height = %d), update mempool\n", chainActive.Tip()->GetBlockHash().GetHex().c_str(), chainActive.Height());
+        UpdateMempoolForReorg(txdb, disconnectpool, true);
     }
     // Callbacks/notifications for a new best chain.
 //    if (fInvalidFound)
@@ -2879,15 +2938,6 @@ bool ActivateBestChain(CValidationState &state, CTxDB& txdb) {
 
             if (!ActivateBestChainStep(state, txdb, pindexMostWork))
                 return false;
-
-            const int bestHeaderHeight =  pindexBestHeader ? pindexBestHeader->nHeight : -1;
-
-            if (disconnectpool.isInReorg() && chainActive.Height() == bestHeaderHeight && chainActive.Tip()->GetBlockHash() == pindexBestHeader->GetBlockHash()) {
-                // If any blocks were disconnected, disconnectpool may be non empty.  Add
-                // any disconnected transactions back to the mempool.
-                printf("ActivateBestChain, reorg completed (best header = %s, height = %d), update mempool\n", chainActive.Tip()->GetBlockHash().GetHex().c_str(), chainActive.Height());
-                UpdateMempoolForReorg(txdb);
-            }
 
             pindexNewTip = chainActive.Tip();
             fInitialDownload = IsInitialBlockDownload();
