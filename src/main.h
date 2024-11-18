@@ -38,6 +38,7 @@
 #include "tokens/tokendb.h"
 #include "tokens/tokens.h"
 #include "amount.h"
+#include "policy/fees.h"
 #include <list>
 #include <map>
 #include <boost/filesystem.hpp>
@@ -120,9 +121,6 @@ static const unsigned int MAX_ORPHAN_TRANSACTIONS = 10000;
 static const unsigned int MAX_INV_SZ = 50000;
 /** Maxiumum number of signature check operations in an IsStandard() P2SH script */
 static const unsigned int MAX_P2SH_SIGOPS = 21;
-
-static const ::int64_t MIN_TX_FEE = CENT;
-static const ::int64_t MIN_RELAY_TX_FEE = MIN_TX_FEE;
 
 static const ::int64_t MAX_MINT_PROOF_OF_WORK = 100 * COIN;
 static const ::int64_t MAX_MINT_PROOF_OF_STAKE = 1 * COIN;

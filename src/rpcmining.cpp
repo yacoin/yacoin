@@ -240,9 +240,13 @@ Value getworkex(const Array& params, bool fHelp)
             nStart = GetTime();
 
             // Create new block
-            pblock = CreateNewBlock(pwalletMain);
+            std::unique_ptr<CBlockTemplate> pblocktemplate(BlockAssembler().CreateNewBlock(pwalletMain));
+            if (!pblocktemplate.get())
+                throw JSONRPCError(RPC_INTERNAL_ERROR, "Couldn't create new block");
+            pblock = &pblocktemplate->block;
             if (!pblock)
-                throw JSONRPCError(-7, "Out of memory");
+                throw JSONRPCError(RPC_INTERNAL_ERROR, "Couldn't create new block");
+
             vNewBlock.push_back(pblock);
         }
 
@@ -384,11 +388,12 @@ Value getwork(const Array& params, bool fHelp)
             nStart = GetTime();
 
             // Create new block
-            pblock = CreateNewBlock(pwalletMain);
+            std::unique_ptr<CBlockTemplate> pblocktemplate(BlockAssembler().CreateNewBlock(pwalletMain));
+            if (!pblocktemplate.get())
+                throw JSONRPCError(RPC_INTERNAL_ERROR, "Couldn't create new block");
+            pblock = &pblocktemplate->block;
             if (!pblock)
-            {
-                throw JSONRPCError(RPC_OUT_OF_MEMORY, "Out of memory");
-            }
+                throw JSONRPCError(RPC_INTERNAL_ERROR, "Couldn't create new block");
             vNewBlock.push_back(pblock);
 
             // Need to update only after we know CreateNewBlock succeeded
@@ -576,9 +581,13 @@ Value getblocktemplate(const Array& params, bool fHelp)
             delete pblock;
             pblock = NULL;
         }
-        pblock = CreateNewBlock(pwalletMain);
+
+        std::unique_ptr<CBlockTemplate> pblocktemplate(BlockAssembler().CreateNewBlock(pwalletMain));
+        if (!pblocktemplate.get())
+            throw JSONRPCError(RPC_INTERNAL_ERROR, "Couldn't create new block");
+        pblock = &pblocktemplate->block;
         if (!pblock)
-            throw JSONRPCError(RPC_OUT_OF_MEMORY, "Out of memory");
+            throw JSONRPCError(RPC_INTERNAL_ERROR, "Couldn't create new block");
 
         // Need to update only after we know CreateNewBlock succeeded
         pindexPrev = pindexPrevNew;

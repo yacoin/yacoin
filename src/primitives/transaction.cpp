@@ -8,6 +8,7 @@
 #include "primitives/transaction.h"
 #include "txdb.h"
 #include "wallet.h"
+#include "fees.h"
 
 #include <map>
 
@@ -263,11 +264,11 @@ unsigned int
 CTransaction::GetLegacySigOpCount() const
 {
     unsigned int nSigOps = 0;
-    BOOST_FOREACH(const CTxIn& txin, vin)
+    for (const auto& txin : vin)
     {
         nSigOps += txin.scriptSig.GetSigOpCount(false);
     }
-    BOOST_FOREACH(const CTxOut& txout, vout)
+    for (const auto& txout : vout)
     {
         nSigOps += txout.scriptPubKey.GetSigOpCount(false);
     }
@@ -492,7 +493,7 @@ bool CTransaction::CheckTransaction(CValidationState &state) const
 
 ::int64_t CTransaction::GetMinFee(unsigned int nBytes) const
 {
-    return (nBytes * MIN_TX_FEE) / 1000;
+    return ::GetMinFee(nBytes);
 }
 
 bool CTransaction::AcceptToMemoryPool(CValidationState &state, CTxDB& txdb, bool* pfMissingInputs) const

@@ -3,6 +3,8 @@
 // Copyright (c) 2013 The NovaCoin developers
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
+#include "miner.h"
+
 #ifdef _MSC_VER
 #include <stdint.h>
 
@@ -26,6 +28,8 @@
 #ifndef YACOIN_RANDOM_NONCE_H
 #include "random_nonce.h"
 #endif
+
+#include "policy/fees.h"
 
 using std::auto_ptr;
 using std::list;
@@ -148,252 +152,346 @@ class CdoTempoaryMockTime {
 };
 //_____________________________________________________________________________
 
-// CreateNewBlock: create new block (without proof-of-work/proof-of-stake)
-CBlock* CreateNewBlock(CWallet* pwallet, bool fProofOfStake) {
-  // Create new block
-  auto_ptr<CBlock> pblock(new CBlock());
-  if (!pblock.get()) return NULL;
+/* NEW IMPLEMENTATION START */
+BlockAssembler::BlockAssembler()
+{
+    // Largest block you're willing to create
+    nBlockMaxSize = GetMaxSize(MAX_BLOCK_SIZE);
 
-  CdoTempoaryMockTime junk;  // just need to instantiate it so the ctors & dtors
-                             // can do their work
+    // Maximum number of sig operations in a block you're willing to create
+    nBlockMaxSigOps = GetMaxSize(MAX_BLOCK_SIGOPS);
+}
 
-  // pblock->nVersion = CBlock::VERSION_of_block_for_yac_044_old;
-  if (chainActive.Genesis() &&
-      (chainActive.Height() + 1) >= nMainnetNewLogicBlockNumber) {
-    pblock->nVersion = VERSION_of_block_for_yac_05x_new;
-  } else {
-    pblock->nVersion = CURRENT_VERSION_of_block;
-  }
-  // here we can fiddle with time to try to make block generation easier
+void BlockAssembler::resetBlock()
+{
+    inBlock.clear();
 
-  // Create coinbase tx
-  CTransaction txNew;  // this uses real time
+    // Reserve space for coinbase tx
+    nBlockSigOpsCost = 100;
+    nBlockSize = 1000;
 
-  txNew.vin.resize(1);
-  txNew.vin[0].prevout.SetNull();
-  txNew.vout.resize(1);
+    // These counters do not include coinbase tx
+    nBlockTx = 0;
+    nFees = 0;
+}
 
-  CReserveKey reservekey(pwallet);
+// Skip entries in mapTx that are already in a block or are present
+// in mapModifiedTx (which implies that the mapTx ancestor state is
+// stale due to ancestor inclusion in the block)
+// Also skip transactions that we've already failed to add. This can happen if
+// we consider a transaction in mapModifiedTx and it fails: we can then
+// potentially consider it again while walking mapTx.  It's currently
+// guaranteed to fail again, but as a belt-and-suspenders check we put it in
+// failedTx and avoid re-evaluation, since the re-evaluation would be using
+// cached size/sigops/fee values that are not actually correct.
+bool BlockAssembler::SkipMapTxEntry(CTxMemPool::txiter it, indexed_modified_transaction_set &mapModifiedTx, CTxMemPool::setEntries &failedTx)
+{
+    assert (it != mempool.mapTx.end());
+    return mapModifiedTx.count(it) || inBlock.count(it) || failedTx.count(it);
+}
 
-  if (fProofOfStake) {
-    txNew.vout[0].SetEmpty();
-  }
-  txNew.vout[0].scriptPubKey << reservekey.GetReservedKey() << OP_CHECKSIG;
+void BlockAssembler::AddToBlock(CTxMemPool::txiter iter)
+{
+    pblock->vtx.emplace_back(iter->GetSharedTx());
+    pblocktemplate->vTxFees.push_back(iter->GetFee());
+    pblocktemplate->vTxSigOpsCost.push_back(iter->GetSigOpCost());
+    nBlockSize += iter->GetTxSize();
+    ++nBlockTx;
+    nBlockSigOpsCost += iter->GetSigOpCost();
+    nFees += iter->GetFee();
+    inBlock.insert(iter);
 
-  // Add dummy coinbase tx as first transaction
-  pblock->vtx.push_back(txNew);
+    if (fDebug && GetBoolArg("-printpriority")) {
+      printf("fee %s txid %s\n",
+                CFeeRate(iter->GetModifiedFee(), iter->GetTxSize()).ToString(),
+                iter->GetTx().GetHash().ToString());
+    }
+}
 
-  // Largest block you're willing to create:
-  unsigned int nBlockMaxSize = GetMaxSize(MAX_BLOCK_SIZE);
+int BlockAssembler::UpdatePackagesForAdded(const CTxMemPool::setEntries& alreadyAdded,
+        indexed_modified_transaction_set &mapModifiedTx)
+{
+    int nDescendantsUpdated = 0;
+    for (const CTxMemPool::txiter it : alreadyAdded) {
+        CTxMemPool::setEntries descendants;
+        mempool.CalculateDescendants(it, descendants);
+        // Insert all descendants (not yet in block) into the modified set
+        for (CTxMemPool::txiter desc : descendants) {
+            if (alreadyAdded.count(desc))
+                continue;
+            ++nDescendantsUpdated;
+            modtxiter mit = mapModifiedTx.find(desc);
+            if (mit == mapModifiedTx.end()) {
+                CTxMemPoolModifiedEntry modEntry(desc);
+                modEntry.nSizeWithAncestors -= it->GetTxSize();
+                modEntry.nModFeesWithAncestors -= it->GetModifiedFee();
+                mapModifiedTx.insert(modEntry);
+            } else {
+                mapModifiedTx.modify(mit, update_for_parent_inclusion(it));
+            }
+        }
+    }
+    return nDescendantsUpdated;
+}
 
-  // Fee-per-kilobyte amount considered the same as "free"
-  // Be careful setting this: if you set it to zero then
-  // a transaction spammer can cheaply fill blocks using
-  // 1-satoshi-fee transactions. It should be set above the real
-  // cost to you of processing a transaction.
-  int64_t nMinTxFee = MIN_TX_FEE;
+void BlockAssembler::SortForBlock(const CTxMemPool::setEntries& package, CTxMemPool::txiter entry, std::vector<CTxMemPool::txiter>& sortedEntries)
+{
+    // Sort package by ancestor count
+    // If a transaction A depends on transaction B, then A's ancestor count
+    // must be greater than B's.  So this is sufficient to validly order the
+    // transactions for block inclusion.
+    sortedEntries.clear();
+    sortedEntries.insert(sortedEntries.begin(), package.begin(), package.end());
+    std::sort(sortedEntries.begin(), sortedEntries.end(), CompareTxIterByAncestorCount());
+}
 
-  CBlockIndex* pindexPrev = chainActive.Tip();
+// This transaction selection algorithm orders the mempool based
+// on feerate of a transaction including all unconfirmed ancestors.
+// Since we don't remove transactions from the mempool as we select them
+// for block inclusion, we need an alternate method of updating the feerate
+// of a transaction with its not-yet-selected ancestors as we go.
+// This is accomplished by walking the in-mempool descendants of selected
+// transactions and storing a temporary modified state in mapModifiedTxs.
+// Each time through the loop, we compare the best transaction in
+// mapModifiedTxs with the next transaction in the mempool to decide what
+// transaction package to work on next.
+void BlockAssembler::addPackageTxs(int &nPackagesSelected, int &nDescendantsUpdated)
+{
+    // mapModifiedTx will store sorted packages after they are modified
+    // because some of their txs are already in the block
+    indexed_modified_transaction_set mapModifiedTx;
+    // Keep track of entries that failed inclusion, to avoid duplicate work
+    CTxMemPool::setEntries failedTx;
 
-  pblock->nBits = GetNextTargetRequired(pindexPrev, fProofOfStake);
+    // Start by adding all descendants of previously added txs to mapModifiedTx
+    // and modifying them for their already included ancestors
+    UpdatePackagesForAdded(inBlock, mapModifiedTx);
 
-  // Collect memory pool transactions into the block
-  ::int64_t nFees = 0;
-  {
-    LOCK2(cs_main, mempool.cs);
+    CTxMemPool::indexed_transaction_set::index<ancestor_score>::type::iterator mi = mempool.mapTx.get<ancestor_score>().begin();
+    CTxMemPool::txiter iter;
+
+    // Limit the number of attempts to add transactions to the block when it is
+    // close to full; this is just a simple heuristic to finish quickly if the
+    // mempool has a lot of entries.
+    const int64_t MAX_CONSECUTIVE_FAILURES = 1000;
+    int64_t nConsecutiveFailed = 0;
+
+    while (mi != mempool.mapTx.get<ancestor_score>().end() || !mapModifiedTx.empty())
+    {
+        // First try to find a new transaction in mapTx to evaluate.
+        if (mi != mempool.mapTx.get<ancestor_score>().end() &&
+                SkipMapTxEntry(mempool.mapTx.project<0>(mi), mapModifiedTx, failedTx)) {
+            ++mi;
+            continue;
+        }
+
+        // Now that mi is not stale, determine which transaction to evaluate:
+        // the next entry from mapTx, or the best from mapModifiedTx?
+        bool fUsingModified = false;
+
+        modtxscoreiter modit = mapModifiedTx.get<ancestor_score>().begin();
+        if (mi == mempool.mapTx.get<ancestor_score>().end()) {
+            // We're out of entries in mapTx; use the entry from mapModifiedTx
+            iter = modit->iter;
+            fUsingModified = true;
+        } else {
+            // Try to compare the mapTx entry to the mapModifiedTx entry
+            iter = mempool.mapTx.project<0>(mi);
+            if (modit != mapModifiedTx.get<ancestor_score>().end() &&
+                    CompareModifiedEntry()(*modit, CTxMemPoolModifiedEntry(iter))) {
+                // The best entry in mapModifiedTx has higher score
+                // than the one from mapTx.
+                // Switch which transaction (package) to consider
+                iter = modit->iter;
+                fUsingModified = true;
+            } else {
+                // Either no entry in mapModifiedTx, or it's worse than mapTx.
+                // Increment mi for the next loop iteration.
+                ++mi;
+            }
+        }
+
+        // We skip mapTx entries that are inBlock, and mapModifiedTx shouldn't
+        // contain anything that is inBlock.
+        assert(!inBlock.count(iter));
+
+        uint64_t packageSize = iter->GetSizeWithAncestors();
+        CAmount packageFees = iter->GetModFeesWithAncestors();
+        int64_t packageSigOpsCost = iter->GetSigOpCostWithAncestors();
+        if (fUsingModified) {
+            packageSize = modit->nSizeWithAncestors;
+            packageFees = modit->nModFeesWithAncestors;
+            packageSigOpsCost = modit->nSigOpCostWithAncestors;
+        }
+
+        if (packageFees < GetMinFee(packageSize)) {
+            // Everything else we might consider has a lower fee rate
+            return;
+        }
+
+        if (!TestPackage(packageSize, packageSigOpsCost)) {
+            if (fUsingModified) {
+                // Since we always look at the best entry in mapModifiedTx,
+                // we must erase failed entries so that we can consider the
+                // next best entry on the next loop iteration
+                mapModifiedTx.get<ancestor_score>().erase(modit);
+                failedTx.insert(iter);
+            }
+
+            ++nConsecutiveFailed;
+
+            if (nConsecutiveFailed > MAX_CONSECUTIVE_FAILURES && nBlockSize >
+                    nBlockMaxSize - 1000) {
+                // Give up if we're close to full and haven't succeeded in a while
+                break;
+            }
+            continue;
+        }
+
+        CTxMemPool::setEntries ancestors;
+        uint64_t nNoLimit = std::numeric_limits<uint64_t>::max();
+        std::string dummy;
+        mempool.CalculateMemPoolAncestors(*iter, ancestors, nNoLimit, nNoLimit, nNoLimit, nNoLimit, dummy, false);
+
+        onlyUnconfirmed(ancestors);
+        ancestors.insert(iter);
+
+        // Test if all tx's are Final
+        if (!TestPackageTransactions(ancestors)) {
+            if (fUsingModified) {
+                mapModifiedTx.get<ancestor_score>().erase(modit);
+                failedTx.insert(iter);
+            }
+            continue;
+        }
+
+        // This transaction will make it in; reset the failed counter.
+        nConsecutiveFailed = 0;
+
+        // Package can be added. Sort the entries in a valid order.
+        std::vector<CTxMemPool::txiter> sortedEntries;
+        SortForBlock(ancestors, iter, sortedEntries);
+
+        for (size_t i=0; i<sortedEntries.size(); ++i) {
+            AddToBlock(sortedEntries[i]);
+            // Erase from the modified set, if present
+            mapModifiedTx.erase(sortedEntries[i]);
+        }
+
+        ++nPackagesSelected;
+
+        // Update transactions that depend on each of these
+        nDescendantsUpdated += UpdatePackagesForAdded(ancestors, mapModifiedTx);
+    }
+}
+
+void BlockAssembler::onlyUnconfirmed(CTxMemPool::setEntries& testSet)
+{
+    for (CTxMemPool::setEntries::iterator iit = testSet.begin(); iit != testSet.end(); ) {
+        // Only test txs not already in the block
+        if (inBlock.count(*iit)) {
+            testSet.erase(iit++);
+        }
+        else {
+            iit++;
+        }
+    }
+}
+
+bool BlockAssembler::TestPackage(uint64_t packageSize, int64_t packageSigOpsCost)
+{
+    if ((nBlockSize + packageSize) >= nBlockMaxSize)
+        return false;
+    if (nBlockSigOpsCost + packageSigOpsCost >= nBlockMaxSigOps)
+        return false;
+    return true;
+}
+
+// Perform transaction-level checks before adding to block:
+// - transaction finality (locktime)
+bool BlockAssembler::TestPackageTransactions(const CTxMemPool::setEntries& package)
+{
+    for (const CTxMemPool::txiter it : package) {
+        CTransaction& tx = it->GetTx();
+        if (!tx.IsFinal(nHeight))
+            return false;
+    }
+    return true;
+}
+
+std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(CWallet* pwallet)
+{
+    int64_t nTimeStart = GetTimeMicros();
+
+    resetBlock();
+
+    pblocktemplate.reset(new CBlockTemplate());
+
+    if(!pblocktemplate.get())
+        return nullptr;
+    pblock = &pblocktemplate->block; // pointer for convenience
+
+    // Create coinbase tx
+    CTransaction txNew;  // this uses real time
+    txNew.vin.resize(1);
+    txNew.vin[0].prevout.SetNull();
+    txNew.vout.resize(1);
+
+    CReserveKey reservekey(pwallet);
+    txNew.vout[0].scriptPubKey << reservekey.GetReservedKey() << OP_CHECKSIG;
+
+    // Add coinbase tx as first transaction
+    pblock->vtx.push_back(txNew);
+
+    // Next block height
     CBlockIndex* pindexPrev = chainActive.Tip();
-    const int nHeight = pindexPrev->nHeight + 1;
-    CTxDB txdb("r");
+    nHeight = pindexPrev->nHeight + 1;
 
-    // Priority order to process transactions
-    list<COrphan> vOrphan;  // list memory doesn't move
-    map<uint256, vector<COrphan*> > mapDependers;
-
-    // This vector will be sorted into a priority queue:
-    printf("Collecting txs from mempool\n");
-    vector<TxPriority> vecPriority;
-    vecPriority.reserve(mempool.mapTx.size());
-    for (map<uint256, CTransaction>::iterator mi = mempool.mapTx.begin();
-         mi != mempool.mapTx.end(); ++mi) {
-      CTransaction& tx = (*mi).second;
-      if (tx.IsCoinBase() || tx.IsCoinStake() || !tx.IsFinal(nHeight)) continue;
-
-      COrphan* porphan = NULL;
-      double dPriority = 0;
-      ::int64_t nTotalIn = 0;
-      bool fMissingInputs = false;
-      BOOST_FOREACH (const CTxIn& txin, tx.vin) {  // Read prev transaction
-        CTransaction txPrev;
-        CTxIndex txindex;
-        if (!txPrev.ReadFromDisk(txdb, txin.prevout,
-                                 txindex)) {  // This should never happen; all
-                                              // transactions in the memory
-          // pool should connect to either transactions in the chain
-          // or other transactions in the memory pool.
-          if (!mempool.mapTx.count(txin.prevout.COutPointGetHash())) {
-            printf("ERROR: mempool transaction missing input\n");
-            if (fDebug) {
-              // Yassert("mempool transaction missing input" == 0);
-            }
-            fMissingInputs = true;
-            if (porphan) vOrphan.pop_back();
-            break;
-          }
-
-          // Has to wait for dependencies
-          if (!porphan) {
-            // Use list for automatic deletion
-            vOrphan.push_back(COrphan(&tx));
-            porphan = &vOrphan.back();
-          }
-          mapDependers[txin.prevout.COutPointGetHash()].push_back(porphan);
-          porphan->setDependsOn.insert(txin.prevout.COutPointGetHash());
-          nTotalIn += mempool.mapTx[txin.prevout.COutPointGetHash()]
-                          .vout[txin.prevout.COutPointGet_n()]
-                          .nValue;
-          continue;
-        }
-        ::int64_t nValueIn = txPrev.vout[txin.prevout.COutPointGet_n()].nValue;
-        nTotalIn += nValueIn;
-
-        int nConf = txindex.GetDepthInMainChain();
-        dPriority += (double)nValueIn * nConf;
-      }
-      if (fMissingInputs) continue;
-      // Priority is sum(valuein * age) / txsize
-      unsigned int nTxSize =
-          ::GetSerializeSize(tx, SER_NETWORK, PROTOCOL_VERSION);
-      dPriority /= nTxSize;
-
-      // This is a more accurate fee-per-kilobyte than is used by the client
-      // code, because the client code rounds up the size to the nearest 1K.
-      // That's good, because it gives an incentive to create smaller
-      // transactions.
-      double dFeePerKb =
-          double(nTotalIn - tx.GetValueOut()) / (double(nTxSize) / 1000.0);
-
-      if (porphan) {
-        porphan->dPriority = dPriority;
-        porphan->dFeePerKb = dFeePerKb;
-      } else
-        vecPriority.push_back(TxPriority(dPriority, dFeePerKb, &(*mi).second));
+    // Block version
+    if (chainActive.Genesis() &&
+        (chainActive.Height() + 1) >= nMainnetNewLogicBlockNumber) {
+      pblock->nVersion = VERSION_of_block_for_yac_05x_new;
+    } else {
+      pblock->nVersion = CURRENT_VERSION_of_block;
     }
+    // here we can fiddle with time to try to make block generation easier
 
-    // Collect transactions into block
-    map<uint256, CTxIndex> mapTestPool;
-    ::uint64_t nBlockSize = 1000;
-    ::uint64_t nBlockTx = 0;
-    int nBlockSigOps = 100;
+    // Add transaction to block
+    int nPackagesSelected = 0;
+    int nDescendantsUpdated = 0;
+    addPackageTxs(nPackagesSelected, nDescendantsUpdated);
 
-    // From yacoin 1.0.0, the order of transaction included to a block is
-    // based on FeePerKb by default. If FeePerKb are equal between transactions,
-    // coin-age could then take priority
-    bool fSortedByFee = true;
+    int64_t nTime1 = GetTimeMicros();
 
-    TxPriorityCompare comparer(fSortedByFee);
-    std::make_heap(vecPriority.begin(), vecPriority.end(), comparer);
-
-    while (!vecPriority.empty()) {
-      // Take highest priority transaction off the priority queue:
-      double dPriority = vecPriority.front().get<0>();
-      double dFeePerKb = vecPriority.front().get<1>();
-      CTransaction& tx = *(vecPriority.front().get<2>());
-
-      std::pop_heap(vecPriority.begin(), vecPriority.end(), comparer);
-      vecPriority.pop_back();
-
-      // Size limits
-      unsigned int nTxSize =
-          ::GetSerializeSize(tx, SER_NETWORK, PROTOCOL_VERSION);
-      if ((nBlockSize + nTxSize) >= nBlockMaxSize) continue;
-
-      // Legacy limits on sigOps:
-      unsigned int nTxSigOps = tx.GetLegacySigOpCount();
-      if (nBlockSigOps + nTxSigOps >= GetMaxSize(MAX_BLOCK_SIGOPS)) continue;
-
-      // Timestamp limit
-      if ((tx.nTime > GetAdjustedTime()) ||
-          (pblock->IsProofOfStake() && (tx.nTime > pblock->vtx[1].nTime)))
-        continue;
-
-      // Never include transactions with fee < min fee
-      if (dFeePerKb < nMinTxFee)  // nMinTxFee = 0.01 YAC/kb
-        continue;
-
-      // Connecting shouldn't fail due to dependency on other memory pool
-      // transactions because we're already processing them in order of
-      // dependency
-      map<uint256, CTxIndex> mapTestPoolTmp(mapTestPool);
-      MapPrevTx mapInputs;
-      bool fInvalid;
-      CValidationState state;
-      if (!tx.FetchInputs(state, txdb, mapTestPoolTmp, false, true, mapInputs,
-                          fInvalid))
-        continue;
-
-      ::int64_t nTxFees = tx.GetValueIn(mapInputs) - tx.GetValueOut();
-
-      nTxSigOps += tx.GetP2SHSigOpCount(mapInputs);
-      if ((nBlockSigOps + nTxSigOps) >= GetMaxSize(MAX_BLOCK_SIGOPS)) continue;
-
-      if (!tx.ConnectInputs(state, txdb, mapInputs, mapTestPoolTmp,
-                            CDiskTxPos(1, 1, 1), pindexPrev, false, true))
-        continue;
-      mapTestPoolTmp[tx.GetHash()] =
-          CTxIndex(CDiskTxPos(1, 1, 1), tx.vout.size());
-      swap(mapTestPool, mapTestPoolTmp);
-
-      // Added
-      pblock->vtx.push_back(tx);
-      nBlockSize += nTxSize;
-      ++nBlockTx;
-      nBlockSigOps += nTxSigOps;
-      nFees += nTxFees;
-
-      if (fDebug && GetBoolArg("-printpriority")) {
-        printf("priority %.1f feeperkb %.1f txid %s\n", dPriority, dFeePerKb,
-               tx.GetHash().ToString().c_str());
-      }
-
-      // Add transactions that depend on this one to the priority queue
-      uint256 hash = tx.GetHash();
-      if (mapDependers.count(hash)) {
-        BOOST_FOREACH (COrphan* porphan, mapDependers[hash]) {
-          if (!porphan->setDependsOn.empty()) {
-            porphan->setDependsOn.erase(hash);
-            if (porphan->setDependsOn.empty()) {
-              vecPriority.push_back(TxPriority(
-                  porphan->dPriority, porphan->dFeePerKb, porphan->ptx));
-              std::push_heap(vecPriority.begin(), vecPriority.end(), comparer);
-            }
-          }
-        }
-      }
-    }
-
+    // Used for getmininginfo rpc
     nLastBlockTx = nBlockTx;
     nLastBlockSize = nBlockSize;
 
     if (fDebug && GetBoolArg("-printpriority"))
       printf("CreateNewBlock (): total size %" PRI64u "\n", nBlockSize);
 
-    if (pblock->IsProofOfWork())
-      pblock->vtx[0].vout[0].nValue = GetProofOfWorkReward(pblock->nBits);
+    // Fill in block header and subsidy for coinbase
+    pblock->nBits = GetNextTargetRequired(pindexPrev, false);
 
-    // Fill in block header
+    pblock->vtx[0].vout[0].nValue = GetProofOfWorkReward(pblock->nBits);
+
     pblock->hashPrevBlock = pindexPrev->GetBlockHash();
-    if (pblock
-            ->IsProofOfStake())  // nTime, this is overwritten immediately???!!!
-      pblock->nTime = pblock->vtx[1].nTime;  // same as coinstake timestamp
     pblock->nTime = max(pindexPrev->GetMedianTimePast() + 1,
                         pblock->GetMaxTransactionTime());
     pblock->nTime = max(pblock->GetBlockTime(),  // lo & behold this is nTime!?
                         pindexPrev->GetBlockTime() - nMaxClockDrift);
-    if (pblock->IsProofOfWork()) pblock->UpdateTime(pindexPrev);
+    pblock->UpdateTime(pindexPrev);
     pblock->nNonce = 0;
-  }
-  return pblock.release();
+
+    printf(
+        "CreateNewBlock() packages: %.2fms (%d packages, %d updated "
+        "descendants)\n",
+        0.001 * (nTime1 - nTimeStart), nPackagesSelected, nDescendantsUpdated);
+
+    return std::move(pblocktemplate);
 }
+
+/* NEW IMPLEMENTATION END */
 
 void IncrementExtraNonce(CBlock* pblock, CBlockIndex* pindexPrev,
                          unsigned int& nExtraNonce) {
@@ -616,11 +714,15 @@ static void YacoinMiner(CWallet* pwallet)  // here fProofOfStake is always false
 
     CBlockIndex* pindexPrev = chainActive.Tip();
 
-    auto_ptr<CBlock> pblock(CreateNewBlock(pwallet, false));
+    // Create new block
+    std::unique_ptr<CBlockTemplate> pblocktemplate(BlockAssembler().CreateNewBlock(pwallet));
+    if (!pblocktemplate.get())
+        return;
+    CBlock *pblock = &pblocktemplate->block;
+    if (!pblock)
+        return;
 
-    if (!pblock.get())  // means what, I wonder?
-      return;
-    IncrementExtraNonce(pblock.get(), pindexPrev, nExtraNonce);
+    IncrementExtraNonce(pblock, pindexPrev, nExtraNonce);
 
     bool fYac1dot0BlockOrTx = false;
     if ((pindexPrev->nHeight + 1) >= nMainnetNewLogicBlockNumber) {
@@ -644,7 +746,7 @@ static void YacoinMiner(CWallet* pwallet)  // here fProofOfStake is always false
     char phash1buf[64 + 16];
     char* phash1 = alignup<16>(phash1buf);
 
-    FormatHashBuffers(pblock.get(), pmidstate, pdata, phash1);
+    FormatHashBuffers(pblock, pmidstate, pdata, phash1);
 
     ::int64_t& nBlockTime = *(::int64_t*)(pdata + 64 + 4);
     unsigned int& nBlockNonce = *(unsigned int*)(pdata + 64 + 16);
@@ -703,7 +805,7 @@ static void YacoinMiner(CWallet* pwallet)  // here fProofOfStake is always false
         strMintWarning = "";
 
         SetThreadPriority(THREAD_PRIORITY_NORMAL);
-        if (CheckWork(pblock.get(), *pwalletMain, reservekey)) {
+        if (CheckWork(pblock, *pwalletMain, reservekey)) {
           printf(
               "\nCPUMiner : proof-of-work block found \n"
               "%s"
