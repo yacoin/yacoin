@@ -2811,7 +2811,6 @@ bool StopNode()
     SetThreadExecutionState(ES_CONTINUOUS);
 #endif
 
-    ++nTransactionsUpdated;
     ::int64_t nStart = GetTime();
     {
         LOCK(cs_main);

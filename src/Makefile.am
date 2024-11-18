@@ -67,6 +67,7 @@ libyacoin_common_a_SOURCES= \
     crypto/siphash.cpp \
     primitives/transaction.cpp \
     primitives/block.cpp \
+    policy/feerate.cpp \
     dbwrapper.cpp \
     txdb-leveldb.cpp \
     alert.cpp \

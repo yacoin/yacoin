@@ -339,3 +339,14 @@ void CTxMemPool::queryHashes(std::vector<uint256>& vtxid)
     for (std::map<uint256, CTransaction>::iterator mi = mapTx.begin(); mi != mapTx.end(); ++mi)
         vtxid.push_back((*mi).first);
 }
+
+unsigned int CTxMemPool::GetTransactionsUpdated() const
+{
+    return nTransactionsUpdated;
+}
+
+void CTxMemPool::AddTransactionsUpdated(unsigned int n)
+{
+    nTransactionsUpdated += n;
+}
+

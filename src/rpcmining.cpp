@@ -222,6 +222,7 @@ Value getworkex(const Array& params, bool fHelp)
         static CBlockIndex* pindexPrev;
         static int64_t nStart;
         static CBlock* pblock;
+        unsigned int nTransactionsUpdated = mempool.GetTransactionsUpdated();
         if (pindexPrev != chainActive.Tip() ||
             (nTransactionsUpdated != nTransactionsUpdatedLast && GetTime() - nStart > 60)
             || (GetTime() - nStart > nMaxClockDrift*0.75))
@@ -358,6 +359,8 @@ Value getwork(const Array& params, bool fHelp)
         static CBlockIndex* pindexPrev;
         static int64_t nStart;
         static CBlock* pblock;
+        unsigned int nTransactionsUpdated = mempool.GetTransactionsUpdated();
+
         if ((pindexPrev != chainActive.Tip())
             || (nTransactionsUpdated != nTransactionsUpdatedLast && GetTime() - nStart > 60)
             || (GetTime() - nStart > nMaxClockDrift*0.75)
@@ -554,6 +557,8 @@ Value getblocktemplate(const Array& params, bool fHelp)
     static CBlockIndex* pindexPrev;
     static int64_t nStart;
     static CBlock* pblock;
+    unsigned int nTransactionsUpdated = mempool.GetTransactionsUpdated();
+
     if (pindexPrev != chainActive.Tip() ||
         (nTransactionsUpdated != nTransactionsUpdatedLast && GetTime() - nStart > 5))
     {

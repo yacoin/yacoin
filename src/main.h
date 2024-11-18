@@ -40,12 +40,7 @@
 #include "amount.h"
 #include <list>
 #include <map>
-#include <crypto/siphash.h>
 #include <boost/filesystem.hpp>
-#include <boost/multi_index_container.hpp>
-#include <boost/multi_index/hashed_index.hpp>
-#include <boost/multi_index/ordered_index.hpp>
-#include <boost/multi_index/sequenced_index.hpp>
 #include <txmempool.h>
 #include <validation.h>
 
@@ -195,7 +190,6 @@ extern int nCoinbaseMaturity;
 extern CBigNum bnBestChainTrust;
 extern CBlockIndex *pindexBestInvalid;
 extern uint256 hashBestChain;
-extern unsigned int nTransactionsUpdated;
 extern ::uint64_t nLastBlockTx;
 extern ::uint64_t nLastBlockSize;
 extern ::uint32_t nLastCoinStakeSearchInterval;
@@ -1072,115 +1066,6 @@ struct CBlockIndexWorkComparator
 
         // Identical blocks.
         return false;
-    }
-};
-
-class SaltedTxidHasher
-{
-private:
-    /** Salt */
-    const uint64_t k0, k1;
-
-public:
-    SaltedTxidHasher()
-     : k0(GetRand(std::numeric_limits<uint64_t>::max())),
-       k1(GetRand(std::numeric_limits<uint64_t>::max())) {}
-
-    size_t operator()(const uint256& txid) const {
-        return SipHashUint256(k0, k1, txid);
-    }
-};
-
-// extracts a transaction hash from CTxMemPoolEntry or CTransactionRef
-struct mempoolentry_txid
-{
-    typedef uint256 result_type;
-    result_type operator() (const CTransaction& tx) const
-    {
-        return tx.GetHash();
-    }
-};
-
-/**
- * DisconnectedBlockTransactions
-
- * During the reorg, it's desirable to re-add previously confirmed transactions
- * to the mempool, so that anything not re-confirmed in the new chain is
- * available to be mined. However, it's more efficient to wait until the reorg
- * is complete and process all still-unconfirmed transactions at that time,
- * since we expect most confirmed transactions to (typically) still be
- * confirmed in the new chain, and re-accepting to the memory pool is expensive
- * (and therefore better to not do in the middle of reorg-processing).
- * Instead, store the disconnected transactions (in order!) as we go, remove any
- * that are included in blocks in the new chain, and then process the remaining
- * still-unconfirmed transactions at the end.
- */
-
-// multi_index tag names
-struct txid_index {};
-struct insertion_order {};
-
-struct DisconnectedBlockTransactions {
-    typedef boost::multi_index_container<
-        CTransaction,
-        boost::multi_index::indexed_by<
-            // sorted by txid
-            boost::multi_index::hashed_unique<
-                boost::multi_index::tag<txid_index>,
-                mempoolentry_txid,
-                SaltedTxidHasher
-            >,
-            // sorted by order in the blockchain
-            boost::multi_index::sequenced<
-                boost::multi_index::tag<insertion_order>
-            >
-        >
-    > indexed_disconnected_transactions;
-
-    // It's almost certainly a logic bug if we don't clear out queuedTx before
-    // destruction, as we add to it while disconnecting blocks, and then we
-    // need to re-process remaining transactions to ensure mempool consistency.
-    // For now, assert() that we've emptied out this object on destruction.
-    // This assert() can always be removed if the reorg-processing code were
-    // to be refactored such that this assumption is no longer true (for
-    // instance if there was some other way we cleaned up the mempool after a
-    // reorg, besides draining this object).
-    ~DisconnectedBlockTransactions() { assert(queuedTx.empty()); }
-    indexed_disconnected_transactions queuedTx;
-
-    void addTransaction(const CTransaction& tx)
-    {
-        queuedTx.insert(tx);
-    }
-
-    // Remove entries based on txid_index, and update memory usage.
-    void removeForBlock(const std::vector<CTransaction>& vtx)
-    {
-        // Short-circuit in the common case of a block being added to the tip
-        if (queuedTx.empty()) {
-            return;
-        }
-        for (auto const &tx : vtx) {
-            auto it = queuedTx.find(tx.GetHash());
-            if (it != queuedTx.end()) {
-                queuedTx.erase(it);
-            }
-        }
-    }
-
-    // Remove an entry by insertion_order index, and update memory usage.
-    void removeEntry(indexed_disconnected_transactions::index<insertion_order>::type::iterator entry)
-    {
-        queuedTx.get<insertion_order>().erase(entry);
-    }
-
-    void clear()
-    {
-        queuedTx.clear();
-    }
-
-    bool isInReorg() {
-        return !queuedTx.empty();
     }
 };
 

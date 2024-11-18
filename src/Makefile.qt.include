@@ -241,6 +241,7 @@ BITCOIN_QT_CPP = \
   crypto/siphash.cpp \
   primitives/transaction.cpp \
   primitives/block.cpp \
+  policy/feerate.cpp \
   init.cpp \
   dbwrapper.cpp \
   txdb-leveldb.cpp \

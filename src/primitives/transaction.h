@@ -8,6 +8,7 @@
 #define YACOIN_PRIMITIVES_TRANSACTION_H
 
 #include <stdint.h>
+#include <memory>
 #include "amount.h"
 #include "script/script.h"
 #include "serialize.h"
@@ -578,4 +579,5 @@ protected:
     const CTxOut& GetOutputFor(const CTxIn& input, const MapPrevTx& inputs) const;
 };
 
+typedef std::shared_ptr<const CTransaction> CTransactionRef;
 #endif // YACOIN_PRIMITIVES_TRANSACTION_H

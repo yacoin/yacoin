@@ -90,18 +90,18 @@ static void UpdateMempoolForReorg(CTxDB& txdb)
     // been previously seen in a block.
     auto it = disconnectpool.queuedTx.get<insertion_order>().rbegin();
     while (it != disconnectpool.queuedTx.get<insertion_order>().rend()) {
-        const CTransaction &tx = *it;
+        CTransactionRef tx = *it;
         // ignore validation errors in resurrected transactions
         CValidationState stateDummy;
-        if (!(tx.IsCoinBase() || tx.IsCoinStake()))
+        if (!(tx->IsCoinBase() || tx->IsCoinStake()))
         {
-            printf("UpdateMempoolForReorg, Adding tx = %s to mempool...\n", tx.GetHash().ToString().c_str());
-            if (!tx.AcceptToMemoryPool(stateDummy, txdb, true))
+            printf("UpdateMempoolForReorg, Adding tx = %s to mempool...\n", tx->GetHash().ToString().c_str());
+            if (!tx->AcceptToMemoryPool(stateDummy, txdb, true))
             {
-                printf("UpdateMempoolForReorg, Failed to add tx = %s to mempool\n", tx.GetHash().ToString().c_str());
+                printf("UpdateMempoolForReorg, Failed to add tx = %s to mempool\n", tx->GetHash().ToString().c_str());
             }
             else {
-                printf("UpdateMempoolForReorg, Added tx = %s to mempool successfully\n", tx.GetHash().ToString().c_str());
+                printf("UpdateMempoolForReorg, Added tx = %s to mempool successfully\n", tx->GetHash().ToString().c_str());
             }
         }
         ++it;
@@ -605,7 +605,6 @@ vector<CWallet*> vpwalletRegistered;
 CCriticalSection cs_main;
 
 CTxMemPool mempool;
-unsigned int nTransactionsUpdated = 0;
 
 map<uint256, CBlockIndex*> mapBlockIndex;
 boost::mutex mapHashmutex;
@@ -2526,7 +2525,7 @@ void static UpdateTip(CBlockIndex *pindexNew) {
 
     bnBestChainTrust = pindexNew->bnChainTrust;
     nTimeBestReceived = GetTime();
-    nTransactionsUpdated++;
+    mempool.AddTransactionsUpdated(1);
 
     CBigNum bnBestBlockTrust =
         (chainActive.Tip()->nHeight != 0)?

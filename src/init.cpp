@@ -126,7 +126,6 @@ void Shutdown(void* parg)
     {
         fShutdown = true;
         fRequestShutdown = true;
-        ++nTransactionsUpdated;
 //        CTxDB().Close();
         bitdb.Flush(false);
         StopNode();

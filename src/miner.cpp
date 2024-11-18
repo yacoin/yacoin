@@ -1106,7 +1106,7 @@ static void YacoinMiner(CWallet *pwallet)  // here fProofOfStake is always false
         // Create new block
         //
         unsigned int 
-            nTransactionsUpdatedLast = nTransactionsUpdated;
+            nTransactionsUpdatedLast = mempool.GetTransactionsUpdated();
 
         CBlockIndex
             * pindexPrev = chainActive.Tip();
@@ -1337,11 +1337,6 @@ static void YacoinMiner(CWallet *pwallet)  // here fProofOfStake is always false
             {
                 return;
             }
-            //if (nBlockNonce >= 0xffff0000)
-            //    break;
-
-            //if (nTransactionsUpdated != nTransactionsUpdatedLast && GetTime() - nStart > 60)
-            //   break;
 
             // Update nTime every few seconds
             pblock->nTime = max(pindexPrev->GetMedianTimePast()+1, pblock->GetMaxTransactionTime());
