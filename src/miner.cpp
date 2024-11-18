@@ -192,7 +192,7 @@ bool BlockAssembler::SkipMapTxEntry(CTxMemPool::txiter it, indexed_modified_tran
 
 void BlockAssembler::AddToBlock(CTxMemPool::txiter iter)
 {
-    pblock->vtx.emplace_back(iter->GetSharedTx());
+    pblock->vtx.emplace_back(iter->GetTx());
     pblocktemplate->vTxFees.push_back(iter->GetFee());
     pblocktemplate->vTxSigOpsCost.push_back(iter->GetSigOpCost());
     nBlockSize += iter->GetTxSize();
@@ -412,7 +412,7 @@ bool BlockAssembler::TestPackage(uint64_t packageSize, int64_t packageSigOpsCost
 bool BlockAssembler::TestPackageTransactions(const CTxMemPool::setEntries& package)
 {
     for (const CTxMemPool::txiter it : package) {
-        CTransaction& tx = it->GetTx();
+        const CTransaction& tx = it->GetTx();
         if (!tx.IsFinal(nHeight))
             return false;
     }

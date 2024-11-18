@@ -4,8 +4,8 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-#ifndef BITCOIN_CONSENSUS_VALIDATION_H
-#define BITCOIN_CONSENSUS_VALIDATION_H
+#ifndef YACOIN_CONSENSUS_VALIDATION_H
+#define YACOIN_CONSENSUS_VALIDATION_H
 
 #include <string>
 #include <uint256.h>
@@ -101,4 +101,4 @@ public:
     std::string GetRejectReason() const { return strRejectReason; }
     std::string GetDebugMessage() const { return strDebugMessage; }
 };
-#endif // BITCOIN_CONSENSUS_VALIDATION_H
+#endif // YACOIN_CONSENSUS_VALIDATION_H

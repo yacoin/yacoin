@@ -286,6 +286,7 @@ SOURCES += src/qt/bitcoin.cpp src/qt/bitcoingui.cpp \
     src/primitives/transaction.cpp \
     src/primitives/block.cpp \
     src/policy/feerate.cpp \
+    src/policy/fees.cpp \
     src/qt/clientmodel.cpp \
     src/qt/guiutil.cpp \
     src/qt/transactionrecord.cpp \

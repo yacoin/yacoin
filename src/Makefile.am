@@ -68,6 +68,7 @@ libyacoin_common_a_SOURCES= \
     primitives/transaction.cpp \
     primitives/block.cpp \
     policy/feerate.cpp \
+    policy/fees.cpp \
     dbwrapper.cpp \
     txdb-leveldb.cpp \
     alert.cpp \

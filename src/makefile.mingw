@@ -244,7 +244,8 @@ obj/noui.o \
 obj/pbkdf2.o \
 obj/price.o \
 obj/protocol.o \
-obj/policy.o \
+obj/feerate.o \
+obj/fees.o \
 obj/random_nonce.o \
 obj/rpcblockchain.o \
 obj/rpctokens.o \
@@ -321,6 +322,9 @@ obj/tokens.o: tokens/tokens.cpp
 	$(CXX) -c -frandom-seed=$@ $(CFLAGS) $(INCLUDEPATHS) -o $@ $<
 
 obj/feerate.o: policy/feerate.cpp
+	$(CXX) -c -frandom-seed=$@ $(CFLAGS) $(INCLUDEPATHS) -o $@ $<
+
+obj/fees.o: policy/fees.cpp
 	$(CXX) -c -frandom-seed=$@ $(CFLAGS) $(INCLUDEPATHS) -o $@ $<
 
 obj/siphash.o: crypto/siphash.cpp

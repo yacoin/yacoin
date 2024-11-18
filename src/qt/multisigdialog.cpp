@@ -558,7 +558,7 @@ void MultisigDialog::on_sendTransactionButton_clicked()
     // Send the transaction to the local node
     CTxDB txdb("r");
 	CValidationState state;
-    if(!tx.AcceptToMemoryPool(state, txdb, false))
+    if(!tx.AcceptToMemoryPool(state, txdb))
     return;
     SyncWithWallets(tx, NULL, true);
     //(CInv(MSG_TX, txHash), tx);

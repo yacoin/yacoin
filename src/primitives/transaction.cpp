@@ -8,7 +8,7 @@
 #include "primitives/transaction.h"
 #include "txdb.h"
 #include "wallet.h"
-#include "fees.h"
+#include "policy/fees.h"
 
 #include <map>
 
@@ -864,7 +864,7 @@ bool CTransaction::ClientConnectInputs()
             COutPoint prevout = vin[i].prevout;
             if (!mempool.exists(prevout.COutPointGetHash()))
                 return false;
-            CTransaction& txPrev = mempool.get(prevout.COutPointGetHash());
+            const CTransaction& txPrev = mempool.get(prevout.COutPointGetHash());
 
             if (prevout.COutPointGet_n() >= txPrev.vout.size())
                 return false;

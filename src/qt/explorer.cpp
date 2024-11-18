@@ -1562,7 +1562,7 @@ void ExplorerPage::setNumBlocks( int currentHeight )
 
             if( mempool.exists( latestHashSeen ) )
             {
-                CrefToTx = mempool.lookup( latestHashSeen );
+                CrefToTx = mempool.get( latestHashSeen );
 
                 std::string
                     strTemporary;

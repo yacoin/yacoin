@@ -49,6 +49,8 @@
  #include "main.h"
 #endif
 
+#include "reverse_iterator.h"
+
 using namespace boost;
 
 using std::list;
@@ -1301,7 +1303,7 @@ bool TestLockPointValidity(const LockPoints* lp)
     return true;
 }
 
-bool CheckSequenceLocks(const CTransaction &tx, int flags, LockPoints* lp, bool useExistingLockPoints = false)
+bool CheckSequenceLocks(const CTransaction &tx, int flags, LockPoints* lp, bool useExistingLockPoints)
 {
     LOCK2(cs_main, mempool.cs);
 
@@ -2644,7 +2646,7 @@ bool static DisconnectTip(CValidationState &state, CTxDB& txdb, DisconnectedBloc
             if (!(tx.IsCoinBase() || tx.IsCoinStake()))
             {
                 printf("DisconnectTip, Add tx %s to disconnectpool\n", tx.GetHash().ToString().c_str());
-                disconnectpool.addTransaction(tx);
+                disconnectpool->addTransaction(tx);
             }
         }
     }
@@ -2659,7 +2661,7 @@ bool static DisconnectTip(CValidationState &state, CTxDB& txdb, DisconnectedBloc
 }
 
 // Connect a new block to chainActive.
-bool static ConnectTip(CValidationState &state, CTxDB& txdb, CBlockIndex *pindexNew)
+bool static ConnectTip(CValidationState &state, CTxDB& txdb, CBlockIndex *pindexNew, DisconnectedBlockTransactions *disconnectpool)
 {
     uint256 hash = pindexNew->GetBlockHash();
 
@@ -2728,7 +2730,7 @@ bool static ConnectTip(CValidationState &state, CTxDB& txdb, CBlockIndex *pindex
 
         // Remove conflicting transactions from the mempool.
         mempool.removeForBlock(block.vtx, tokenDataFromBlock);
-        disconnectpool.removeForBlock(block.vtx);
+        disconnectpool->removeForBlock(block.vtx);
 
         // Connect longer branch, SPECIFIC FOR YACOIN
         if (pindexNew->pprev)
@@ -2807,7 +2809,7 @@ static bool ActivateBestChainStep(CValidationState &state, CTxDB& txdb, CBlockIn
             return error("ActivateBestChainStep () : TxnBegin 1 failed");
         }
 
-        if (!DisconnectTip(state, txdb, disconnectpool)) // Disconnect the latest block on the chain
+        if (!DisconnectTip(state, txdb, &disconnectpool)) // Disconnect the latest block on the chain
         {
             error("ActivateBestChainStep, failed to disconnect block");
             txdb.TxnAbort();
@@ -2841,7 +2843,7 @@ static bool ActivateBestChainStep(CValidationState &state, CTxDB& txdb, CBlockIn
             if (!txdb.TxnBegin()) {
                 return error("ActivateBestChainStep () : TxnBegin 2 failed");
             }
-            if (!ConnectTip(state, txdb, pindexConnect)) {
+            if (!ConnectTip(state, txdb, pindexConnect, &disconnectpool)) {
                 if (state.IsInvalid()) {
                     // The block violates a consensus rule.
                     if (!state.CorruptionPossible())
@@ -4529,7 +4531,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
                         fMissingInputs2 = false;
 
                     CValidationState tmpState;
-                    if (orphanTx.AcceptToMemoryPool(tmpState, txdb, true, &fMissingInputs2))
+                    if (orphanTx.AcceptToMemoryPool(tmpState, txdb, &fMissingInputs2))
                     {
                         printf("   accepted orphan tx %s\n", orphanTxHash.ToString().substr(0,10).c_str());
                         SyncWithWallets(tx, NULL, true);

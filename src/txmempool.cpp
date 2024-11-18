@@ -1,4 +1,3 @@
-#include "txmempool.h"
 #include "wallet.h"
 #include "validation.h"
 #include "txdb.h"
@@ -7,6 +6,7 @@
  #include "explorer.h"
 #endif
 #include "reverse_iterator.h"
+#include "txmempool.h"
 
 extern std::vector<CWallet*> vpwalletRegistered;
 extern CChain chainActive;
@@ -353,8 +353,6 @@ CTransaction CTxMemPool::get(const uint256& hash) const
 {
     LOCK(cs);
     indexed_transaction_set::const_iterator i = mapTx.find(hash);
-    if (i == mapTx.end())
-        return nullptr;
     return i->GetTx();
 }
 

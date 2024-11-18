@@ -242,6 +242,7 @@ BITCOIN_QT_CPP = \
   primitives/transaction.cpp \
   primitives/block.cpp \
   policy/feerate.cpp \
+  policy/fees.cpp \
   init.cpp \
   dbwrapper.cpp \
   txdb-leveldb.cpp \
