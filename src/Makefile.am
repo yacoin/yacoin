@@ -80,6 +80,7 @@ libyacoin_common_a_SOURCES= \
     crypter.cpp \
     key.cpp \
     db.cpp \
+    fs.cpp \
     irc.cpp \
     keystore.cpp \
     kernelrecord.cpp \

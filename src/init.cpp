@@ -699,7 +699,9 @@ bool AppInit2()
     fPrintToConsole = false;
 #endif
     fPrintToDebugger = GetBoolArg("-printtodebugger");
-    fLogTimestamps = GetBoolArg("-logtimestamps");
+    fLogTimestamps = GetBoolArg("-logtimestamps", DEFAULT_LOGTIMESTAMPS);
+    fLogTimeMicros = GetBoolArg("-logtimemicros", DEFAULT_LOGTIMEMICROS);
+
 
     nEpochInterval = (::uint32_t)(GetArg("-epochinterval", 21000));
     nDifficultyInterval = nEpochInterval;

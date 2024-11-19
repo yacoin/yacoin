@@ -124,7 +124,7 @@ struct LocalServiceInfo
 bool fClient = false;
 bool fDiscover = true;
 bool fUseUPnP = false;
-::uint64_t nLocalServices = (fClient ? 0 : NODE_NETWORK);
+ServiceFlags nLocalServices = (fClient ? NODE_NONE : NODE_NETWORK);
 static CCriticalSection cs_mapLocalHost;
 static map<CNetAddr, LocalServiceInfo> mapLocalHost;
 static bool vfReachable[NET_MAX] = {};
@@ -233,11 +233,11 @@ bool GetLocal(CService &addr, const CNetAddr *paddrPeer)
 // get best local address for a particular peer as a CAddress
 CAddress GetLocalAddress(const CNetAddr *paddrPeer)
 {
-    CAddress ret(CService("0.0.0.0", 0), 0);
+    CAddress ret(CService("0.0.0.0", 0), NODE_NONE);
     CService addr;
     if (GetLocal(addr, paddrPeer))
     {
-        ret = CAddress(addr);
+        ret = CAddress(addr, NODE_NETWORK);
         ret.nServices = nLocalServices;
         ret.nTime = GetAdjustedTime();
     }
@@ -719,7 +719,7 @@ void CNode::PushVersion()
             if (addrTorName.IsValid())
             {
                 addrYou = addr;
-                addrMe = CAddress(addrTorName);
+                addrMe = CAddress(addrTorName, NODE_NETWORK);
                 fHidden = true;
             }
         }
@@ -729,7 +729,7 @@ void CNode::PushVersion()
     {
         addrYou = (addr.IsRoutable() && !IsProxy(addr)
                        ? addr
-                       : CAddress(CService("0.0.0.0", 0)));
+                       : CAddress(CService("0.0.0.0", 0), NODE_NETWORK));
         addrMe = GetLocalAddress(&addr);
     }
 
@@ -1755,7 +1755,7 @@ void ThreadDNSAddressSeed2(void *parg)
                     BOOST_FOREACH (CNetAddr &ip, vaddr)
                     {
                         int nOneDay = 24 * 3600;
-                        CAddress addr = CAddress(CService(ip, GetDefaultPort()));
+                        CAddress addr = CAddress(CService(ip, GetDefaultPort()), NODE_NETWORK);
                         addr.nTime =
                             GetTime() - 3 * nOneDay -
                             GetRand(4 *
@@ -2046,7 +2046,7 @@ void ThreadOpenConnections2(void *parg)
 
                 memcpy(&ip, &pnSeed[i], sizeof(ip));
 
-                CAddress addr(CService(ip, GetDefaultPort()));
+                CAddress addr(CService(ip, GetDefaultPort()), NODE_NETWORK);
 
                 addr.nTime = GetTime() - GetRand(nOneWeek) - nOneWeek;
                 vAdd.push_back(addr);
@@ -2064,7 +2064,7 @@ void ThreadOpenConnections2(void *parg)
             for (unsigned int i = 0; i < Length; ++i)
             {
                 const ::int64_t nOneWeek = 7 * 24 * 60 * 60;
-                CAddress addr(CService(pchTorSeed[i], GetDefaultPort()));
+                CAddress addr(CService(pchTorSeed[i], GetDefaultPort()), NODE_NETWORK);
                 addr.nTime = GetTime() - GetRand(nOneWeek) - nOneWeek;
                 vAdd.push_back(addr);
             }
@@ -2134,7 +2134,7 @@ void ThreadOpenConnections2(void *parg)
             // Is it ten minutes?????????????????????????
             // If so, why?????????????????????????????????
 
-            if (nANow - addr.nLastTry < 600 && nTries < 30)
+            if (nTries < 30)
                 continue;
 
             // do not allow non-default ports, unless after 50 invalid addresses
@@ -2296,7 +2296,7 @@ void ThreadOpenAddedConnections2(void *parg)
             bool fConnected;
 
             fConnected =
-                OpenNetworkConnection(CAddress(vserv[i % vserv.size()]), &grant);
+                OpenNetworkConnection(CAddress(vserv[i % vserv.size()], NODE_NETWORK), &grant);
             if (!fShutdown)
             {
                 // Sleep(6 * nMillisecondsPerSecond);  // is this related to

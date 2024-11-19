@@ -18,6 +18,7 @@
 #include <map>
 #include <vector>
 #include <string>
+#include <atomic>
 
 #ifndef Q_MOC_RUN
 #include <boost/thread.hpp>
@@ -40,6 +41,10 @@
 #endif
 #include "amount.h"
 #include "tinyformat.h"
+
+static const bool DEFAULT_LOGTIMEMICROS = false;
+static const bool DEFAULT_LOGIPS        = false;
+static const bool DEFAULT_LOGTIMESTAMPS = true;
 
 //THEREFORE
 const int COINdecimalPower = 16;     // i.e. log10( COIN )
@@ -184,6 +189,7 @@ extern bool
     fUseOld044Rules,
     fNoListen,
     fLogTimestamps,
+    fLogTimeMicros,
     fReopenDebugLog;
 extern ::int32_t
     nTestNetNewLogicBlockNumber,
@@ -228,6 +234,32 @@ std::string vstrprintf(const char *format, va_list ap);
  * which confuses gcc.
  */
 #define printf OutputDebugStringF
+
+/** Send a string to the log output */
+int LogPrintStr(const std::string &str);
+/** Get format string from VA_ARGS for error reporting */
+template<typename... Args> std::string FormatStringFromLogArgs(const char *fmt, const Args&... args) { return fmt; }
+#ifdef USE_COVERAGE
+#define LogPrintf(...) do { MarkUsed(__VA_ARGS__); } while(0)
+#define LogPrint(category, ...) do { MarkUsed(__VA_ARGS__); } while(0)
+#else
+#define LogPrintf(...) do { \
+    std::string _log_msg_; /* Unlikely name to avoid shadowing variables */ \
+    try { \
+        _log_msg_ = tfm::format(__VA_ARGS__); \
+    } catch (tinyformat::format_error &fmterr) { \
+        /* Original format string will have newline so don't add one here */ \
+        _log_msg_ = "Error \"" + std::string(fmterr.what()) + "\" while formatting log message: " + FormatStringFromLogArgs(__VA_ARGS__); \
+    } \
+    LogPrintStr(_log_msg_); \
+} while(0)
+
+#define LogPrint(category, ...) do { \
+    if (LogAcceptCategory((category))) { \
+        LogPrintf(__VA_ARGS__); \
+    } \
+} while(0)
+#endif
 
 template<typename... Args>
 bool error(const char *fmt, const Args &... args)

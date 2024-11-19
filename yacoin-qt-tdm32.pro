@@ -277,6 +277,7 @@ SOURCES += src/qt/bitcoin.cpp src/qt/bitcoingui.cpp \
     src/checkpoints.cpp \
     src/addrman.cpp \
     src/db.cpp \
+    src/fs.cpp \
     src/dbwrapper.cpp \
     src/walletdb.cpp \
     src/txmempool.cpp \

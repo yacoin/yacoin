@@ -6,22 +6,11 @@
     #include "msvc_warnings.push.h"
 #endif
 
-#ifndef BITCOIN_UTIL_H
- #include "util.h"
-#endif
-
-#ifndef BITCOIN_SYNC_H
- #include "sync.h"
-#endif
-
-#ifndef BITCOIN_STRLCPY_H
- #include "strlcpy.h"
-#endif
-
-#ifndef BITCOIN_UI_INTERFACE_H
- #include "ui_interface.h"
-#endif
-
+#include "util.h"
+#include "sync.h"
+#include "strlcpy.h"
+#include "ui_interface.h"
+#include "fs.h"
 #include <boost/algorithm/string/join.hpp>
 
 // Work around clang compilation problem in Boost 1.46:
@@ -38,6 +27,7 @@ namespace boost {
 #include <boost/program_options/parsers.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/filesystem/fstream.hpp>
+#include <boost/thread.hpp>
 
 #include <boost/date_time/posix_time/posix_time.hpp>
 #include <boost/foreach.hpp>
@@ -101,6 +91,8 @@ unsigned char MAXIMUM_YAC1DOT0_N_FACTOR;
 ::uint32_t nDifficultyInterval = nEpochInterval;
 bool fPrintToConsole = false;
 bool fPrintToDebugger = false;
+bool fLogTimestamps = DEFAULT_LOGTIMESTAMPS;
+bool fLogTimeMicros = DEFAULT_LOGTIMEMICROS;
 bool fRequestShutdown = false;
 bool fShutdown = false;
 bool fDaemon = false;
@@ -109,7 +101,6 @@ string strMiscWarning;
 bool fTestNet = false;
 bool fUseOld044Rules = true;
 bool fNoListen = false;
-bool fLogTimestamps = false;
 CMedianFilter< int64_t> vTimeOffsets(200,0);
 bool fReopenDebugLog = false;
 
@@ -261,7 +252,116 @@ std::string GetDebugLogPathName(){
     return (GetDataDir() / "debug.log").string();
 }
 
+/**
+ * LogPrintf() has been broken a couple of times now
+ * by well-meaning people adding mutexes in the most straightforward way.
+ * It breaks because it may be called by global destructors during shutdown.
+ * Since the order of destruction of static/global objects is undefined,
+ * defining a mutex as a global object doesn't work (the mutex gets
+ * destroyed, and then some later destructor calls OutputDebugStringF,
+ * maybe indirectly, and you get a core dump at shutdown trying to lock
+ * the mutex).
+ */
+
+static boost::once_flag debugPrintInitFlag = BOOST_ONCE_INIT;
+
+/**
+ * We use boost::call_once() to make sure mutexDebugLog and
+ * vMsgsBeforeOpenLog are initialized in a thread-safe manner.
+ *
+ * NOTE: fileout, mutexDebugLog and sometimes vMsgsBeforeOpenLog
+ * are leaked on exit. This is ugly, but will be cleaned up by
+ * the OS/libc. When the shutdown sequence is fully audited and
+ * tested, explicit destruction of these objects can be implemented.
+ */
 static FILE* fileout = NULL;
+static boost::mutex* mutexDebugLog = nullptr;
+static std::list<std::string>* vMsgsBeforeOpenLog;
+
+static int FileWriteStr(const std::string &str, FILE *fp)
+{
+    return fwrite(str.data(), 1, str.size(), fp);
+}
+
+static void DebugPrintInit()
+{
+    assert(mutexDebugLog == nullptr);
+    mutexDebugLog = new boost::mutex();
+    vMsgsBeforeOpenLog = new std::list<std::string>;
+}
+
+/**
+ * fStartedNewLine is a state variable held by the calling context that will
+ * suppress printing of the timestamp when multiple calls are made that don't
+ * end in a newline. Initialize it to true, and hold it, in the calling context.
+ */
+static std::string LogTimestampStr(const std::string &str, std::atomic_bool *fStartedNewLine)
+{
+    std::string strStamped;
+
+    if (!fLogTimestamps)
+        return str;
+
+    if (*fStartedNewLine) {
+        int64_t nTimeMicros = GetTimeMicros();
+        strStamped = DateTimeStrFormat("%Y-%m-%d %H:%M:%S", nTimeMicros/1000000);
+        if (fLogTimeMicros)
+            strStamped += strprintf(".%06d", nTimeMicros%1000000);
+        int64_t mocktime = GetTime();
+        if (mocktime) {
+            strStamped += " (mocktime: " + DateTimeStrFormat("%Y-%m-%d %H:%M:%S", mocktime) + ")";
+        }
+        strStamped += ' ' + str;
+    } else
+        strStamped = str;
+
+    if (!str.empty() && str[str.size()-1] == '\n')
+        *fStartedNewLine = true;
+    else
+        *fStartedNewLine = false;
+
+    return strStamped;
+}
+
+int LogPrintStr(const std::string &str)
+{
+    int ret = 0; // Returns total number of characters written
+    static std::atomic_bool fStartedNewLine(true);
+
+    std::string strTimestamped = LogTimestampStr(str, &fStartedNewLine);
+
+    if (fPrintToConsole)
+    {
+        // print to console
+        ret = fwrite(strTimestamped.data(), 1, strTimestamped.size(), stdout);
+        fflush(stdout);
+    }
+    else if (fPrintToDebugger)
+    {
+        boost::call_once(&DebugPrintInit, debugPrintInitFlag);
+        boost::mutex::scoped_lock scoped_lock(*mutexDebugLog);
+
+        // buffer if we haven't opened the log yet
+        if (fileout == nullptr) {
+            assert(vMsgsBeforeOpenLog);
+            ret = strTimestamped.length();
+            vMsgsBeforeOpenLog->push_back(strTimestamped);
+        }
+        else
+        {
+            // reopen the log file, if requested
+            if (fReopenDebugLog) {
+                fReopenDebugLog = false;
+                fs::path pathDebug = GetDataDir() / "debug.log";
+                if (fsbridge::freopen(pathDebug,"a",fileout) != nullptr)
+                    setbuf(fileout, nullptr); // unbuffered
+            }
+
+            ret = FileWriteStr(strTimestamped, fileout);
+        }
+    }
+    return ret;
+}
 
 inline int OutputDebugStringF(const char* pszFormat, ...)
 {

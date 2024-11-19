@@ -4338,7 +4338,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
             }
           }
           Sleep(nOneMillisecond);     // just to test if RPC can run?
-        } else if (inv.IsKnownType()) // it must be a transaction
+        } else if (inv.type == MSG_TX) // it must be a transaction
         {
           // Send stream from relay memory
           bool pushed = false;
@@ -4348,7 +4348,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
 
             if (mi != mapRelay.end()) // we found it
             {
-              pfrom->PushMessage(inv.GetCommand(), (*mi).second);
+              pfrom->PushMessage(inv.GetCommand().c_str(), (*mi).second);
               pushed = true;
             }
           }
@@ -4974,7 +4974,7 @@ bool ProcessMessages(CNode* pfrom)
             pstart = search(vRecv.begin(), vRecv.end(), BEGIN(pchMessageStart), END(pchMessageStart));
 
         int 
-            nHeaderSize = vRecv.GetSerializeSize(CMessageHeader());
+            nHeaderSize = CMessageHeader::HEADER_SIZE;
 
         if (vRecv.end() - pstart < nHeaderSize)
         {
@@ -5035,10 +5035,12 @@ bool ProcessMessages(CNode* pfrom)
             nChecksum = 0;
 
         memcpy(&nChecksum, &hash, sizeof(nChecksum));
-        if (nChecksum != hdr.nChecksum)
+        if (memcmp(hash.begin(), hdr.pchChecksum, CMessageHeader::CHECKSUM_SIZE) != 0)
         {
-            printf("ProcessMessages(%s, %u bytes) : CHECKSUM ERROR nChecksum=%08x hdr.nChecksum=%08x\n",
-               strCommand.c_str(), nMessageSize, nChecksum, hdr.nChecksum);
+            LogPrintf("%s(%s, %u bytes): CHECKSUM ERROR expected %s was %s\n", __func__,
+               strCommand.c_str(), nMessageSize,
+               HexStr(hash.begin(), hash.begin()+CMessageHeader::CHECKSUM_SIZE),
+               HexStr(hdr.pchChecksum, hdr.pchChecksum+CMessageHeader::CHECKSUM_SIZE));
             continue;
         }
 

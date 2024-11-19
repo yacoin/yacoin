@@ -228,6 +228,7 @@ obj/block.o \
 obj/checkpoints.o \
 obj/crypter.o \
 obj/db.o \
+obj/fs.o \
 obj/init.o \
 obj/irc.o \
 obj/json_spirit_reader.o \

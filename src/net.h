@@ -179,12 +179,6 @@ bool IsReachable(const CNetAddr &addr);
 void SetReachable(enum Network net, bool fFlag = true);
 CAddress GetLocalAddress(const CNetAddr *paddrPeer = NULL);
 
-enum
-{
-    MSG_TX = 1,
-    MSG_BLOCK,
-};
-
 class CRequestTracker
 {
 public:
@@ -224,7 +218,7 @@ enum threadId
 extern bool fClient;
 extern bool fDiscover;
 extern bool fUseUPnP;
-extern ::uint64_t nLocalServices;
+extern ServiceFlags nLocalServices;
 extern ::uint64_t nLocalHostNonce;
 extern CAddress addrSeenByPeer;
 extern boost::array<int, THREAD_MAX> vnThreadsRunning;
