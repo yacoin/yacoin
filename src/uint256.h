@@ -366,6 +366,16 @@ public:
         return (unsigned char*)&pn[WIDTH];
     }
 
+    const unsigned char* begin() const
+    {
+        return (unsigned char*)&pn[0];
+    }
+
+    const unsigned char* end() const
+    {
+        return (unsigned char*)&pn[WIDTH];
+    }
+
     std::vector<unsigned char> getBytes()
     {
         return std::vector<unsigned char>(begin(), end());

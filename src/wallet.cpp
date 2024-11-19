@@ -24,6 +24,7 @@
  #include "coincontrol.h"
 #endif
 
+#include "random.h"
 #include <boost/algorithm/string/replace.hpp>
 
 using std::list;

@@ -9,13 +9,9 @@
 #include <set>
 #include <string>
 
-#ifndef BITCOIN_UINT256_H
- #include "uint256.h"
-#endif
-
-#ifndef BITCOIN_UTIL_H
- #include "util.h"
-#endif
+#include "uint256.h"
+#include "util.h"
+#include "serialize.h"
 
 class CNode;
 

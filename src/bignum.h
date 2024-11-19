@@ -9,9 +9,9 @@
 #include <vector>
 #include <openssl/bn.h>
 
-#ifndef BITCOIN_UTIL_H
- #include "util.h"
-#endif
+#include "util.h"
+#include "version.h"
+#include "serialize.h"
 
 /** Errors thrown by the bignum class */
 class bignum_error : public std::runtime_error

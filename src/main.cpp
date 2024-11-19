@@ -50,6 +50,7 @@
 #endif
 
 #include "reverse_iterator.h"
+#include "random.h"
 
 using namespace boost;
 
@@ -3993,7 +3994,8 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
 
         pfrom->fClient = !(pfrom->nServices & NODE_NETWORK);
 
-        AddTimeData(pfrom->addr, nTime);
+        int64_t nTimeOffset = nTime - GetTime();
+        AddTimeData(pfrom->addr, nTimeOffset);
 
         // Change version
         pfrom->PushMessage("verack");

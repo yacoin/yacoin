@@ -21,6 +21,7 @@
 #include "policy/feerate.h"
 #include "core_memusage.h"
 #include "memusage.h"
+#include "random.h"
 
 class CTxDB;
 

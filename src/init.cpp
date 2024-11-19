@@ -32,6 +32,7 @@
 #include <boost/interprocess/sync/file_lock.hpp>
 #include <boost/algorithm/string/predicate.hpp>
 #include <openssl/crypto.h>
+#include "random.h"
 
 #ifndef WIN32
 #include <signal.h>
@@ -698,7 +699,7 @@ bool AppInit2()
 #else
     fPrintToConsole = false;
 #endif
-    fPrintToDebugger = GetBoolArg("-printtodebugger");
+    fPrintToDebugLog = GetBoolArg("-printtodebugger");
     fLogTimestamps = GetBoolArg("-logtimestamps", DEFAULT_LOGTIMESTAMPS);
     fLogTimeMicros = GetBoolArg("-logtimemicros", DEFAULT_LOGTIMEMICROS);
 

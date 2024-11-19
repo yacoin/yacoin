@@ -20,6 +20,8 @@
 #include <winsock2.h>
 #include <mswsock.h>
 #include <ws2tcpip.h>
+#include <cstdint>  // For uint32_t
+#include <cstdio>   // For printf
 #else
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -33,6 +35,7 @@
 #include <net/if.h>
 #include <netinet/in.h>
 #include <ifaddrs.h>
+#include <unistd.h>
 
 typedef u_int SOCKET;
 #endif
@@ -55,6 +58,10 @@ typedef int socklen_t;
 #define INVALID_SOCKET      (SOCKET)(~0)
 #define SOCKET_ERROR        -1
 #endif
+
+#if HAVE_DECL_STRNLEN == 0
+size_t strnlen( const char *start, size_t max_len);
+#endif // HAVE_DECL_STRNLEN
 
 extern bool 
     fDebug;

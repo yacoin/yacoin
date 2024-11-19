@@ -162,6 +162,11 @@ HEADERS += \
     src/LibBoolEE.h \
     src/sync.h \
     src/util.h \
+    src/utilstrencodings.h \
+    src/utiltime.h \
+    src/netaddress.h \
+    src/timedata.h \
+    src/warnings.h \
     src/timestamps.h \
     src/hash.h \
     src/uint256.h \
@@ -262,6 +267,11 @@ SOURCES += src/qt/bitcoin.cpp src/qt/bitcoingui.cpp \
     src/version.cpp \
     src/sync.cpp \
     src/util.cpp \
+    src/utilstrencodings.cpp \
+    src/utiltime.cpp \
+    src/netaddress.cpp \
+    src/timedata.cpp \
+    src/warnings.cpp \
     src/netbase.cpp \
     src/key.cpp \
     src/LibBoolEE.cpp \
@@ -278,6 +288,9 @@ SOURCES += src/qt/bitcoin.cpp src/qt/bitcoingui.cpp \
     src/addrman.cpp \
     src/db.cpp \
     src/fs.cpp \
+    src/validationinterface.cpp \
+    src/scheduler.cpp \
+    src/random.cpp \
     src/dbwrapper.cpp \
     src/walletdb.cpp \
     src/txmempool.cpp \
@@ -288,6 +301,12 @@ SOURCES += src/qt/bitcoin.cpp src/qt/bitcoingui.cpp \
     src/primitives/block.cpp \
     src/policy/feerate.cpp \
     src/policy/fees.cpp \
+    src/crypto/siphash.cpp \
+    src/crypto/chacha20.cpp \
+    src/crypto/sha256.cpp \
+    src/crypto/sha512.cpp \
+    src/compat/strnlen.cpp \
+    src/support/cleanse.cpp \
     src/qt/clientmodel.cpp \
     src/qt/guiutil.cpp \
     src/qt/transactionrecord.cpp \

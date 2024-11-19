@@ -20,29 +20,13 @@
 #include <arpa/inet.h>
 #endif
 
-#ifndef YACOIN_YASSERT_H
 #include "Yassert.h"
-#endif
-
-#ifndef BITCOIN_MRUSET_H
 #include "mruset.h"
-#endif
-
-#ifndef BITCOIN_NETBASE_H
 #include "netbase.h"
-#endif
-
-#ifndef __INCLUDED_PROTOCOL_H__
 #include "protocol.h"
-#endif
-
-#ifndef _BITCOIN_ADDRMAN
 #include "addrman.h"
-#endif
-
-#ifndef BITCOIN_HASH_H
 #include "hash.h"
-#endif
+#include "random.h"
 
 class CRequestTracker;
 class CNode;

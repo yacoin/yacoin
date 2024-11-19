@@ -48,10 +48,12 @@ INCLUDEPATHS= \
 -I"$(CURDIR)" \
 -I"$(CURDIR)/tokens" \
 -I"$(CURDIR)/crypto" \
+-I"$(CURDIR)/compat" \
 -I"$(CURDIR)/primitives" \
 -I"$(CURDIR)/policy" \
 -I"$(CURDIR)/scrypt-jane" \
 -I"$(CURDIR)/script" \
+-I"$(CURDIR)/support" \
 -I"$(CURDIR)/obj" \
 -I'./leveldb/include' \
 -I'./leveldb/helpers' \
@@ -229,6 +231,9 @@ obj/checkpoints.o \
 obj/crypter.o \
 obj/db.o \
 obj/fs.o \
+obj/validationinterface.o \
+obj/scheduler.o \
+obj/random.o \
 obj/init.o \
 obj/irc.o \
 obj/json_spirit_reader.o \
@@ -270,6 +275,11 @@ obj/txdb-bdb.o \
 obj/dbwrapper.o \
 obj/txdb-leveldb.o \
 obj/util.o \
+obj/utilstrencodings.o \
+obj/utiltime.o \
+obj/netaddress.o \
+obj/timedata.o \
+obj/warnings.o \
 obj/version.o \
 obj/txmempool.o \
 obj/wallet.o \
@@ -329,6 +339,21 @@ obj/fees.o: policy/fees.cpp
 	$(CXX) -c -frandom-seed=$@ $(CFLAGS) $(INCLUDEPATHS) -o $@ $<
 
 obj/siphash.o: crypto/siphash.cpp
+	$(CXX) -c -frandom-seed=$@ $(CFLAGS) $(INCLUDEPATHS) -o $@ $<
+
+obj/chacha20.o: crypto/chacha20.cpp
+	$(CXX) -c -frandom-seed=$@ $(CFLAGS) $(INCLUDEPATHS) -o $@ $<
+
+obj/sha256.o: crypto/sha256.cpp
+	$(CXX) -c -frandom-seed=$@ $(CFLAGS) $(INCLUDEPATHS) -o $@ $<
+
+obj/sha512.o: crypto/sha512.cpp
+	$(CXX) -c -frandom-seed=$@ $(CFLAGS) $(INCLUDEPATHS) -o $@ $<
+
+obj/strnlen.o: compat/strnlen.cpp
+	$(CXX) -c -frandom-seed=$@ $(CFLAGS) $(INCLUDEPATHS) -o $@ $<
+
+obj/cleanse.o: support/cleanse.cpp
 	$(CXX) -c -frandom-seed=$@ $(CFLAGS) $(INCLUDEPATHS) -o $@ $<
 
 obj/scrypt-jane.o: scrypt-jane/scrypt-jane.c

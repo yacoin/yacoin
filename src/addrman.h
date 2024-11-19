@@ -4,22 +4,11 @@
 #ifndef _BITCOIN_ADDRMAN
 #define _BITCOIN_ADDRMAN 1
 
-#ifndef BITCOIN_NETBASE_H
- #include "netbase.h"
-#endif
-
-#ifndef __INCLUDED_PROTOCOL_H__
- #include "protocol.h"
-#endif
-
-#ifndef BITCOIN_UTIL_H
- #include "util.h"
-#endif
-
-#ifndef BITCOIN_SYNC_H
- #include "sync.h"
-#endif
-
+#include "netbase.h"
+#include "protocol.h"
+#include "util.h"
+#include "sync.h"
+#include "timedata.h"
 
 #include <map>
 #include <vector>
