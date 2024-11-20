@@ -236,11 +236,11 @@ void ThreadIRCSeed2(void* parg)
         return;
 
     // ... or if we won't make outbound connections and won't accept inbound ones.
-    if (mapArgs.count("-connect") && fNoListen)
+    if (gArgs.IsArgSet("-connect") && fNoListen)
         return;
 
     // ... or if IRC is not enabled.
-    if (!GetBoolArg("-irc", true))
+    if (!gArgs.GetBoolArg("-irc", true))
         return;
 
     printf("ThreadIRCSeed started\n");

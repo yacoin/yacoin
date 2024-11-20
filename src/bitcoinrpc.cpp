@@ -71,7 +71,7 @@ void ThreadRPCServer3(void* parg);
 
 static inline unsigned short GetDefaultRPCPort()
 {
-    return GetBoolArg("-testnet", false)? 17687: 7687;
+    return gArgs.GetBoolArg("-testnet", false)? 17687: 7687;
 }
 
 Object JSONRPCError(int code, const string& message)
@@ -333,7 +333,7 @@ Value getrpcinfo(const Array& params, bool fHelp){
     Object res;
     res.push_back(Pair("active_commands",commands));
     res.push_back(Pair("logpath",GetDebugLogPathName()));
-    res.push_back(Pair("RPCport", GetArg("-rpcport", GetDefaultRPCPort()) ));
+    res.push_back(Pair("RPCport", gArgs.GetArg("-rpcport", GetDefaultRPCPort()) ));
     return res;
 }
 
@@ -579,10 +579,10 @@ bool ClientAllowed(const boost::asio::ip::address& address)
         return true;
 
     const string strAddress = address.to_string();
-    const vector<string>& vAllow = mapMultiArgs["-rpcallowip"];
-    BOOST_FOREACH(string strAllow, vAllow)
+    for (const std::string& strAllow : gArgs.GetArgs("-rpcallowip")) {
         if (WildcardMatch(strAddress, strAllow))
             return true;
+    }
     return false;
 }
 
@@ -787,15 +787,15 @@ void ThreadRPCServer2(void* parg)
 {
     printf("ThreadRPCServer2 started\n");
 
-    strRPCUserColonPass = mapArgs["-rpcuser"] + ":" + mapArgs["-rpcpassword"];
-    if (mapArgs["-rpcpassword"] == "")
+    strRPCUserColonPass = gArgs.GetArg("-rpcuser", "") + ":" + gArgs.GetArg("-rpcpassword", "");
+    if (gArgs.GetArg("-rpcpassword", "") == "")
     {
         unsigned char rand_pwd[32];
         RAND_bytes(rand_pwd, 32);
         string strWhatAmI = "To use yacoind";
-        if (mapArgs.count("-server"))
+        if (gArgs.IsArgSet("-server"))
             strWhatAmI = strprintf(_("To use the %s option"), "\"-server\"");
-        else if (mapArgs.count("-daemon"))
+        else if (gArgs.IsArgSet("-daemon"))
             strWhatAmI = strprintf(_("To use the %s option"), "\"-daemon\"");
         uiInterface.ThreadSafeMessageBox(strprintf(
             _("%s, you must set a rpcpassword in the configuration file:\n %s\n"
@@ -805,14 +805,14 @@ void ThreadRPCServer2(void* parg)
               "(you do not need to remember this password)\n"
               "If the file does not exist, create it with owner-readable-only file permissions.\n"),
                 strWhatAmI.c_str(),
-                GetConfigFile().string().c_str(),
+                GetConfigFile(gArgs.GetArg("-conf", YACOIN_CONF_FILENAME)).string().c_str(),
                 EncodeBase58(&rand_pwd[0],&rand_pwd[0]+32).c_str()),
             _("Error"), CClientUIInterface::OK | CClientUIInterface::MODAL);
         StartShutdown();
         return;
     }
 
-    const bool fUseSSL = GetBoolArg("-rpcssl");
+    const bool fUseSSL = gArgs.GetBoolArg("-rpcssl");
 
     asio::io_service io_service;
 
@@ -822,7 +822,7 @@ void ThreadRPCServer2(void* parg)
         context.set_options(ssl::context::no_sslv2);
 
         filesystem::path
-            pathCertFile(GetArg("-rpcsslcertificatechainfile", "server.cert"));
+            pathCertFile(gArgs.GetArg("-rpcsslcertificatechainfile", "server.cert"));
 
         if (!pathCertFile.is_complete()) 
             pathCertFile = filesystem::path(GetDataDir()) / pathCertFile;
@@ -834,7 +834,7 @@ void ThreadRPCServer2(void* parg)
                   );
 
         filesystem::path
-            pathPKFile(GetArg("-rpcsslprivatekeyfile", "server.pem"));
+            pathPKFile(gArgs.GetArg("-rpcsslprivatekeyfile", "server.pem"));
         if (!pathPKFile.is_complete())
             pathPKFile = filesystem::path(GetDataDir()) / pathPKFile;
         if (filesystem::exists(pathPKFile))
@@ -845,14 +845,14 @@ void ThreadRPCServer2(void* parg)
                   );
 
         string
-            strCiphers = GetArg("-rpcsslciphers", "TLSv1+HIGH:!SSLv2:!aNULL:!eNULL:!AH:!3DES:@STRENGTH");
+            strCiphers = gArgs.GetArg("-rpcsslciphers", "TLSv1+HIGH:!SSLv2:!aNULL:!eNULL:!AH:!3DES:@STRENGTH");
         SSL_CTX_set_cipher_list(context.impl(), strCiphers.c_str());
     }
 
     // Try a dual IPv6/IPv4 socket, falling back to separate IPv4 and IPv6 sockets
-    const bool loopback = !mapArgs.count("-rpcallowip");
+    const bool loopback = !gArgs.IsArgSet("-rpcallowip");
     asio::ip::address bindAddress = loopback ? asio::ip::address_v6::loopback() : asio::ip::address_v6::any();
-    ip::tcp::endpoint endpoint(bindAddress, GetArg("-rpcport", GetDefaultRPCPort()));
+    ip::tcp::endpoint endpoint(bindAddress, gArgs.GetArg("-rpcport", GetDefaultRPCPort()));
     boost::system::error_code v6_only_error;
     boost::shared_ptr<ip::tcp::acceptor> acceptor(new ip::tcp::acceptor(io_service));
 
@@ -1078,7 +1078,7 @@ void ThreadRPCServer3(void* parg)
             /* Deter brute-forcing short passwords.
                If this results in a DOS the user really
                shouldn't have their RPC port exposed.*/
-            if (mapArgs["-rpcpassword"].size() < 20)
+            if (gArgs.GetArg("-rpcpassword", "").size() < 20)
                 Sleep(250);
 
             conn->stream() << HTTPReply(HTTP_UNAUTHORIZED, "", false) << std::flush;
@@ -1142,7 +1142,7 @@ json_spirit::Value CRPCTable::execute(const std::string &strMethod, const json_s
 
     // Observe safe mode
     string strWarning = GetWarnings("rpc");
-    if (strWarning != "" && !GetBoolArg("-disablesafemode") &&
+    if (strWarning != "" && !gArgs.GetBoolArg("-disablesafemode") &&
         !pcmd->okSafeMode)
         throw JSONRPCError(RPC_FORBIDDEN_BY_SAFE_MODE, string("Safe mode: ") + strWarning);
 
@@ -1170,25 +1170,25 @@ json_spirit::Value CRPCTable::execute(const std::string &strMethod, const json_s
 
 Object CallRPC(const string& strMethod, const Array& params)
 {
-    if (mapArgs["-rpcuser"] == "" && mapArgs["-rpcpassword"] == "")
+    if (gArgs.GetArg("-rpcuser", "") == "" && gArgs.GetArg("-rpcpassword", "") == "")
         throw runtime_error(strprintf(
             _("You must set rpcpassword=<password> in the configuration file:\n%s\n"
               "If the file does not exist, create it with owner-readable-only file permissions."),
-                GetConfigFile().string().c_str()));
+              GetConfigFile(gArgs.GetArg("-conf", YACOIN_CONF_FILENAME)).string().c_str()));
 
     // Connect to localhost
-    bool fUseSSL = GetBoolArg("-rpcssl");
+    bool fUseSSL = gArgs.GetBoolArg("-rpcssl");
     asio::io_service io_service;
     ssl::context context(io_service, ssl::context::sslv23);
     context.set_options(ssl::context::no_sslv2);
     asio::ssl::stream<asio::ip::tcp::socket> sslStream(io_service, context);
     SSLIOStreamDevice<asio::ip::tcp> d(sslStream, fUseSSL);
     iostreams::stream< SSLIOStreamDevice<asio::ip::tcp> > stream(d);
-    if (!d.connect(GetArg("-rpcconnect", "127.0.0.1"), GetArg("-rpcport", itostr(GetDefaultRPCPort()))))
+    if (!d.connect(gArgs.GetArg("-rpcconnect", "127.0.0.1"), gArgs.GetArg("-rpcport", itostr(GetDefaultRPCPort()))))
         throw runtime_error("couldn't connect to server");
 
     // HTTP basic authentication
-    string strUserPass64 = EncodeBase64(mapArgs["-rpcuser"] + ":" + mapArgs["-rpcpassword"]);
+    string strUserPass64 = EncodeBase64(gArgs.GetArg("-rpcuser", "") + ":" + gArgs.GetArg("-rpcpassword", ""));
     map<string, string> mapRequestHeaders;
     mapRequestHeaders["Authorization"] = string("Basic ") + strUserPass64;
 

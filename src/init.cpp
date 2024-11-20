@@ -250,7 +250,7 @@ bool AppInit(int argc, char* argv[])
         // Parameters
         //
         // If Qt is used, parameters/bitcoin.conf are parsed in qt/bitcoin.cpp's main()
-        ParseParameters(argc, argv);
+        gArgs.ParseParameters(argc, argv);
         bool 
             fTest_or_Main_Net_is_decided = false;
 
@@ -259,22 +259,20 @@ bool AppInit(int argc, char* argv[])
             fprintf(stderr, "Error: Specified directory does not exist\n");
             Shutdown(NULL);
         }
-        ReadConfigFile(mapArgs, mapMultiArgs);  // now two things have happened:
-                                                // testnet/mainnet has been decided, and
-                                                // the 'data directory' has been set
-                                                // either by command line arguments or in
-                                                // the configuration file.
-                                                // this means that fTestNet should be tested 
-                                                // first, before GetDataDir() is called next
-                                                
-                                                // this is documentation!
+        try
+        {
+            gArgs.ReadConfigFile(gArgs.GetArg("-conf", YACOIN_CONF_FILENAME));
+        } catch (const std::exception& e) {
+            fprintf(stderr,"Error reading configuration file: %s\n", e.what());
+            return false;
+        }
 
-        if(mapArgs.count("--version") || mapArgs.count("-v"))
+        if(gArgs.IsArgSet("-version") || gArgs.IsArgSet("-v"))
         {
             std::string msg = "Yacoin version: " + FormatFullVersion() + "\n\n";
             fprintf(stdout, "%s", msg.c_str());
             exit(0);
-        } else if (mapArgs.count("-?") || mapArgs.count("-h") || mapArgs.count("--help"))
+        } else if (gArgs.IsArgSet("-?") || gArgs.IsArgSet("-h") || gArgs.IsArgSet("-help"))
         {
             // First part of help message is specific to yacoind / RPC client
             std::string strUsage = _("Yacoin version") + " " + FormatFullVersion() + "\n\n" +
@@ -566,36 +564,36 @@ bool AppInit2()
 
     // ********************************************************* Step 2: parameter interactions
 
-    nNodeLifespan = (unsigned int)(GetArg("-addrlifespan", 7));
-    fUseFastIndex = GetBoolArg("-fastindex", true);
-    fStoreBlockHashToDb = GetBoolArg("-storeblockhash", true);
-    fUseMemoryLog = GetBoolArg("-memorylog", true);
+    nNodeLifespan = (unsigned int)(gArgs.GetArg("-addrlifespan", 7));
+    fUseFastIndex = gArgs.GetBoolArg("-fastindex", true);
+    fStoreBlockHashToDb = gArgs.GetBoolArg("-storeblockhash", true);
+    fUseMemoryLog = gArgs.GetBoolArg("-memorylog", true);
     // YAC_TOKEN START
-    fTokenIndex = GetBoolArg("-tokenindex", false);
-    fAddressIndex = GetBoolArg("-addressindex", false);
+    fTokenIndex = gArgs.GetBoolArg("-tokenindex", false);
+    fAddressIndex = gArgs.GetBoolArg("-addressindex", false);
     // YAC_TOKEN END
-    nMinerSleep = (unsigned int)(GetArg("-minersleep", nOneHundredMilliseconds));
+    nMinerSleep = (unsigned int)(gArgs.GetArg("-minersleep", nOneHundredMilliseconds));
 
-    HEADERS_DOWNLOAD_TIMEOUT_BASE = GetArg("-initSyncDownloadTimeout", 10 * 60) * 1000000;
+    HEADERS_DOWNLOAD_TIMEOUT_BASE = gArgs.GetArg("-initSyncDownloadTimeout", 10 * 60) * 1000000;
     BLOCK_DOWNLOAD_TIMEOUT_BASE = HEADERS_DOWNLOAD_TIMEOUT_BASE;
-    MAX_BLOCKS_IN_TRANSIT_PER_PEER = GetArg("-initSyncMaximumBlocksInDownloadPerPeer", 500);
-    BLOCK_DOWNLOAD_WINDOW = GetArg("-initSyncBlockDownloadWindow", MAX_BLOCKS_IN_TRANSIT_PER_PEER * 64);
-    HEADER_BLOCK_DIFFERENCES_TRIGGER_GETBLOCKS = GetArg("-initSyncTriggerGetBlocks", 10000);
+    MAX_BLOCKS_IN_TRANSIT_PER_PEER = gArgs.GetArg("-initSyncMaximumBlocksInDownloadPerPeer", 500);
+    BLOCK_DOWNLOAD_WINDOW = gArgs.GetArg("-initSyncBlockDownloadWindow", MAX_BLOCKS_IN_TRANSIT_PER_PEER * 64);
+    HEADER_BLOCK_DIFFERENCES_TRIGGER_GETBLOCKS = gArgs.GetArg("-initSyncTriggerGetBlocks", 10000);
 
     int maximumHashCalcThread = boost::thread::hardware_concurrency();
-    nHashCalcThreads = (int)(GetArg("-hashcalcthreads", 1));
+    nHashCalcThreads = (int)(gArgs.GetArg("-hashcalcthreads", 1));
     if (nHashCalcThreads <= 0)
         nHashCalcThreads = 1;
     else if (nHashCalcThreads > maximumHashCalcThread)
         nHashCalcThreads = maximumHashCalcThread;
 
     // Ping and address broadcast intervals
-    nPingInterval = max< ::int64_t>(10, GetArg("-keepalive", 10 * 60));
+    nPingInterval = max< ::int64_t>(10, gArgs.GetArg("-keepalive", 10 * 60));
 
-    nBroadcastInterval = max< ::int64_t>(6 * 60 * 60, GetArg("-addrsetlifetime", 24 * 60 * 60));
+    nBroadcastInterval = max< ::int64_t>(6 * 60 * 60, gArgs.GetArg("-addrsetlifetime", 24 * 60 * 60));
 
     CheckpointsMode = Checkpoints::STRICT_;
-    std::string strCpMode = GetArg("-cppolicy", "strict");
+    std::string strCpMode = gArgs.GetArg("-cppolicy", "strict");
 
     if(strCpMode == "strict") {
         CheckpointsMode = Checkpoints::STRICT_;
@@ -614,54 +612,54 @@ bool AppInit2()
 #endif
 
     // Good that testnet is tested here, but closer to AppInit() => ReadConfigFile() would be better
-    fTestNet = GetBoolArg("-testnet");
+    fTestNet = gArgs.GetBoolArg("-testnet");
     // now the program is definitively running MainNet or TestNet.
     if (fTestNet)
     {
-        SoftSetBoolArg("-irc", true);
+        gArgs.SoftSetBoolArg("-irc", true);
     }
     // else    // not Test Net
     // {
     //     return InitError( _("Yac1.0 must be set for testNet.") );
     // }
 
-    if (mapArgs.count("-bind")) {
+    if (gArgs.IsArgSet("-bind")) {
         // when specifying an explicit binding address, you want to listen on it
         // even when -connect or -proxy is specified
-        SoftSetBoolArg("-listen", true);
+        gArgs.SoftSetBoolArg("-listen", true);
     }
 
-    if (mapArgs.count("-connect") && mapMultiArgs["-connect"].size() > 0) {
+    if (gArgs.IsArgSet("-connect") &&  gArgs.GetArgs("-connect").size() > 0) {
         // when only connecting to trusted nodes, do not seed via DNS, or listen by default
-        SoftSetBoolArg("-dnsseed", false);
-        SoftSetBoolArg("-listen", false);
+        gArgs.SoftSetBoolArg("-dnsseed", false);
+        gArgs.SoftSetBoolArg("-listen", false);
     }
 
-    if (mapArgs.count("-proxy")) {
+    if (gArgs.IsArgSet("-proxy")) {
         // to protect privacy, do not listen by default if a proxy server is specified
-        SoftSetBoolArg("-listen", false);
+        gArgs.SoftSetBoolArg("-listen", false);
     }
 
-    if (!GetBoolArg("-listen", true)) {
+    if (!gArgs.GetBoolArg("-listen", true)) {
         // do not map ports or try to retrieve public IP when not listening (pointless)
-        SoftSetBoolArg("-upnp", false);
-        SoftSetBoolArg("-discover", false);
+        gArgs.SoftSetBoolArg("-upnp", false);
+        gArgs.SoftSetBoolArg("-discover", false);
     }
 
-    if (mapArgs.count("-externalip")) {
+    if (gArgs.IsArgSet("-externalip")) {
         // if an explicit public IP is specified, do not try to find others
-        SoftSetBoolArg("-discover", false);
+        gArgs.SoftSetBoolArg("-discover", false);
     }
 
-    if (GetBoolArg("-salvagewallet")) {
+    if (gArgs.GetBoolArg("-salvagewallet")) {
         // Rewrite just private keys: rescan to find transactions
-        SoftSetBoolArg("-rescan", true);
+        gArgs.SoftSetBoolArg("-rescan", true);
     }
 
     // ********************************************************* Step 3: parameter-to-internal-flags
 
     // -par=0 means autodetect, but nScriptCheckThreads==0 means no concurrency
-    nScriptCheckThreads = (int)(GetArg("-par", 0));
+    nScriptCheckThreads = (int)(gArgs.GetArg("-par", 0));
     if (nScriptCheckThreads == 0)
         nScriptCheckThreads = boost::thread::hardware_concurrency();
     if (nScriptCheckThreads <= 1) 
@@ -669,20 +667,20 @@ bool AppInit2()
     else if (nScriptCheckThreads > MAX_SCRIPTCHECK_THREADS)
         nScriptCheckThreads = MAX_SCRIPTCHECK_THREADS;
 
-    fDebug = GetBoolArg("-debug");
+    fDebug = gArgs.GetBoolArg("-debug");
 
     // -debug implies fDebug*
     if (fDebug)
         fDebugNet = true;
     else
-        fDebugNet = GetBoolArg("-debugnet");
+        fDebugNet = gArgs.GetBoolArg("-debugnet");
 
-    fTestNetNewLogic = GetBoolArg("-testnetNewLogic");
+    fTestNetNewLogic = gArgs.GetBoolArg("-testnetNewLogic");
 
-    bitdb.SetDetach(GetBoolArg("-detachdb", false));
+    bitdb.SetDetach(gArgs.GetBoolArg("-detachdb", false));
 
 #if !defined(WIN32) && !defined(QT_GUI)
-    fDaemon = GetBoolArg("-daemon");
+    fDaemon = gArgs.GetBoolArg("-daemon");
 #else
     fDaemon = false;
 #endif
@@ -690,26 +688,26 @@ bool AppInit2()
     if (fDaemon)
         fServer = true;
     else
-        fServer = GetBoolArg("-server");
+        fServer = gArgs.GetBoolArg("-server");
 
     /* force fServer when running without GUI */
 #if !defined(QT_GUI)
     fServer = true;
-    fPrintToConsole = GetBoolArg("-printtoconsole");
+    fPrintToConsole = gArgs.GetBoolArg("-printtoconsole");
 #else
     fPrintToConsole = false;
 #endif
-    fPrintToDebugLog = GetBoolArg("-printtodebugger");
-    fLogTimestamps = GetBoolArg("-logtimestamps", DEFAULT_LOGTIMESTAMPS);
-    fLogTimeMicros = GetBoolArg("-logtimemicros", DEFAULT_LOGTIMEMICROS);
+    fPrintToDebugLog = gArgs.GetBoolArg("-printtodebugger");
+    fLogTimestamps = gArgs.GetBoolArg("-logtimestamps", DEFAULT_LOGTIMESTAMPS);
+    fLogTimeMicros = gArgs.GetBoolArg("-logtimemicros", DEFAULT_LOGTIMEMICROS);
 
 
-    nEpochInterval = (::uint32_t)(GetArg("-epochinterval", 21000));
+    nEpochInterval = (::uint32_t)(gArgs.GetArg("-epochinterval", 21000));
     nDifficultyInterval = nEpochInterval;
 
-    if (mapArgs.count("-timeout"))
+    if (gArgs.IsArgSet("-timeout"))
     {
-        int nNewTimeout = (int)(GetArg("-timeout", 5000));
+        int nNewTimeout = (int)(gArgs.GetArg("-timeout", 5000));
         if (nNewTimeout > 0 && nNewTimeout < 600000)
             nConnectTimeout = nNewTimeout;
     }
@@ -721,20 +719,20 @@ bool AppInit2()
     COINBASE_FLAGS << std::vector<unsigned char>(pszP2SH, pszP2SH+strlen(pszP2SH));
 
 
-    if (mapArgs.count("-paytxfee"))
+    if (gArgs.IsArgSet("-paytxfee"))
     {
-        if (!ParseMoney(mapArgs["-paytxfee"], nTransactionFee))
-            return InitError(strprintf(_("Invalid amount for -paytxfee=<amount>: '%s'"), mapArgs["-paytxfee"].c_str()));
+        if (!ParseMoney(gArgs.GetArg("-paytxfee", ""), nTransactionFee))
+            return InitError(strprintf(_("Invalid amount for -paytxfee=<amount>: '%s'"), gArgs.GetArg("-paytxfee", "").c_str()));
         if (nTransactionFee > 0.25 * COIN)
             InitWarning(_("Warning: -paytxfee is set very high! This is the transaction fee you will pay if you send a transaction."));
     }
 
-    fConfChange = GetBoolArg("-confchange", false);
+    fConfChange = gArgs.GetBoolArg("-confchange", false);
 
-    if (mapArgs.count("-mininput"))
+    if (gArgs.IsArgSet("-mininput"))
     {
-        if (!ParseMoney(mapArgs["-mininput"], nMinimumInputValue))
-            return InitError(strprintf(_("Invalid amount for -mininput=<amount>: '%s'"), mapArgs["-mininput"].c_str()));
+        if (!ParseMoney(gArgs.GetArg("-mininput", ""), nMinimumInputValue))
+            return InitError(strprintf(_("Invalid amount for -mininput=<amount>: '%s'"), gArgs.GetArg("-mininput", "").c_str()));
     }
 
     // ********************************************************* Step 4: application initialization: dir lock, daemonize, pidfile, debug log
@@ -742,7 +740,7 @@ bool AppInit2()
     std::string // note fTestNet has been set and finally we 'discover' the 'data directory'!
         strDataDir = GetDataDir().string();
 
-    strWalletFileName = GetArg("-wallet", "wallet.dat");
+    strWalletFileName = gArgs.GetArg("-wallet", "wallet.dat");
 
     // strWalletFileName must be a plain filename without a directory
     if (
@@ -801,7 +799,7 @@ bool AppInit2()
     }
 #endif
 
-    if (GetBoolArg("-shrinkdebugfile", !fDebug))
+    if (gArgs.GetBoolArg("-shrinkdebugfile", !fDebug))
         ShrinkDebugFile();
     printf("\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n");
     printf("Yacoin version %s (%s)\n", FormatFullVersion().c_str(), CLIENT_DATE.c_str());
@@ -961,7 +959,7 @@ bool AppInit2()
         return InitError(msg);
     }
 
-    if (GetBoolArg("-salvagewallet"))
+    if (gArgs.GetBoolArg("-salvagewallet"))
     {
         // Recover readable keypairs:
         if (!CWalletDB::Recover(bitdb, strWalletFileName, true))
@@ -985,7 +983,7 @@ bool AppInit2()
 
     // ********************************************************* Step 6: network initialization
     RegisterNodeSignals(GetNodeSignals());
-    int nSocksVersion = (int)(GetArg("-socks", 5));
+    int nSocksVersion = (int)(gArgs.GetArg("-socks", 5));
 
 #ifdef WIN32
     // Initialize Windows Sockets
@@ -1023,9 +1021,9 @@ bool AppInit2()
     if (nSocksVersion != 4 && nSocksVersion != 5)
         return InitError(strprintf(_("Unknown -socks proxy version requested: %i"), nSocksVersion));
 
-    if (mapArgs.count("-onlynet")) {
+    if (gArgs.IsArgSet("-onlynet")) {
         std::set<enum Network> nets;
-        BOOST_FOREACH(std::string snet, mapMultiArgs["-onlynet"]) {
+        for (const std::string& snet : gArgs.GetArgs("-onlynet")) {
             enum Network net = ParseNetwork(snet);
             if (net == NET_UNROUTABLE)
                 return InitError(strprintf(_("Unknown network specified in -onlynet: '%s'"), snet.c_str()));
@@ -1046,11 +1044,11 @@ bool AppInit2()
 
     CService addrProxy;
     bool fProxy = false;
-    if (mapArgs.count("-proxy"))
+    if (gArgs.IsArgSet("-proxy"))
     {
-        addrProxy = CService(mapArgs["-proxy"], 9050);
+        addrProxy = CService(gArgs.GetArg("-proxy", ""), 9050);
         if (!addrProxy.IsValid())
-            return InitError(strprintf(_("Invalid -proxy address: '%s'"), mapArgs["-proxy"].c_str()));
+            return InitError(strprintf(_("Invalid -proxy address: '%s'"), gArgs.GetArg("-proxy", "").c_str()));
 
         if (!IsLimited(NET_IPV4))
             SetProxy(NET_IPV4, addrProxy, nSocksVersion);
@@ -1065,14 +1063,14 @@ bool AppInit2()
     }
 
     // -tor can override normal proxy, -notor disables tor entirely
-    if (!(mapArgs.count("-tor") && mapArgs["-tor"] == "0") && (fProxy || mapArgs.count("-tor"))) {
+    if (!(gArgs.IsArgSet("-tor") && gArgs.GetArg("-tor", "") == "0") && (fProxy || gArgs.IsArgSet("-tor"))) {
         CService addrOnion;
-        if (!mapArgs.count("-tor"))
+        if (!gArgs.IsArgSet("-tor"))
             addrOnion = addrProxy;
         else
-            addrOnion = CService(mapArgs["-tor"], 9050);
+            addrOnion = CService(gArgs.GetArg("-tor", ""), 9050);
         if (!addrOnion.IsValid())
-            return InitError(strprintf(_("Invalid -tor address: '%s'"), mapArgs["-tor"].c_str()));
+            return InitError(strprintf(_("Invalid -tor address: '%s'"), gArgs.GetArg("-tor", "").c_str()));
         SetProxy(NET_TOR, addrOnion, 5);
         SetReachable(NET_TOR);
     }
@@ -1080,11 +1078,11 @@ bool AppInit2()
     // see Step 2: parameter interactions for more information about these
     if (!IsLimited(NET_IPV4) || !IsLimited(NET_IPV6))
     {
-        fNoListen = !GetBoolArg("-listen", true);
-        fDiscover = GetBoolArg("-discover", true);
-        fNameLookup = GetBoolArg("-dns", true);
+        fNoListen = !gArgs.GetBoolArg("-listen", true);
+        fDiscover = gArgs.GetBoolArg("-discover", true);
+        fNameLookup = gArgs.GetBoolArg("-dns", true);
 #ifdef USE_UPNP
-        fUseUPnP = GetBoolArg("-upnp", USE_UPNP);
+        fUseUPnP = gArgs.GetBoolArg("-upnp", USE_UPNP);
 #endif
     } 
     else 
@@ -1092,8 +1090,8 @@ bool AppInit2()
         // Don't listen, discover addresses or search for nodes if IPv4 and IPv6 networking is disabled.
         fNoListen = true;
         fDiscover = fNameLookup = fUseUPnP = false;
-        SoftSetBoolArg("-irc", false);
-        SoftSetBoolArg("-dnsseed", false);
+        gArgs.SoftSetBoolArg("-irc", false);
+        gArgs.SoftSetBoolArg("-dnsseed", false);
         printf(
                "strange ini path?\n"
               );
@@ -1103,10 +1101,9 @@ bool AppInit2()
     if (!fNoListen)
     {
         std::string strError;
-        if (mapArgs.count("-bind")) 
+        if (gArgs.IsArgSet("-bind")) 
         {
-            BOOST_FOREACH(std::string strBind, mapMultiArgs["-bind"]) 
-            {
+            for (const std::string& strBind : gArgs.GetArgs("-bind")) {
                 CService addrBind;
                 if (!Lookup(strBind.c_str(), addrBind, GetListenPort(), false))
                     return InitError(
@@ -1134,7 +1131,7 @@ bool AppInit2()
 
     // If Tor is reachable then listen on loopback interface,
     //    to allow allow other users reach you through the hidden service
-    if (!IsLimited(NET_TOR) && mapArgs.count("-torname")) 
+    if (!IsLimited(NET_TOR) && gArgs.IsArgSet("-torname")) 
     {
         std::string strError;
         struct in_addr inaddr_loopback;
@@ -1148,9 +1145,9 @@ bool AppInit2()
             return InitError(strError);
     }
 
-    if (mapArgs.count("-externalip"))
+    if (gArgs.IsArgSet("-externalip"))
     {
-        BOOST_FOREACH(string strAddr, mapMultiArgs["-externalip"]) {
+        for (const std::string& strAddr : gArgs.GetArgs("-externalip")) {
             CService addrLocal(strAddr, GetListenPort(), fNameLookup);
             if (!addrLocal.IsValid())
                 return InitError(strprintf(_("Cannot resolve -externalip address: '%s'"), strAddr.c_str()));
@@ -1158,25 +1155,25 @@ bool AppInit2()
         }
     }
 
-    if (mapArgs.count("-reservebalance")) // ppcoin: reserve balance amount
+    if (gArgs.IsArgSet("-reservebalance")) // ppcoin: reserve balance amount
     {
         ::int64_t nReserveBalance = 0;
-        if (!ParseMoney(mapArgs["-reservebalance"], nReserveBalance))
+        if (!ParseMoney(gArgs.GetArg("-reservebalance", ""), nReserveBalance))
         {
             InitError(_("Invalid amount for -reservebalance=<amount>"));
             return false;
         }
     }
 
-    if (mapArgs.count("-checkpointkey")) // ppcoin: checkpoint master priv key
+    if (gArgs.IsArgSet("-checkpointkey")) // ppcoin: checkpoint master priv key
     {
-        if (!Checkpoints::SetCheckpointPrivKey(GetArg("-checkpointkey", "")))
+        if (!Checkpoints::SetCheckpointPrivKey(gArgs.GetArg("-checkpointkey", "")))
             InitError(_("Unable to sign checkpoint, wrong checkpointkey?\n"));
     }
 
-    BOOST_FOREACH(string strDest, mapMultiArgs["-seednode"])
+    for (const std::string& strDest : gArgs.GetArgs("-seednode")) {
         AddOneShot(strDest);
-
+    }
 //test for https, before loading block index, so as to test with fast turn around
 // until done, then remove
 //#ifdef _DEBUG
@@ -1214,9 +1211,9 @@ bool AppInit2()
             strErrors << _("Error loading wallet.dat") << "\n";
     }
 
-    if (GetBoolArg("-upgradewallet", fFirstRun))
+    if (gArgs.GetBoolArg("-upgradewallet", fFirstRun))
     {
-        int nMaxVersion = (int)(GetArg("-upgradewallet", 0));
+        int nMaxVersion = (int)(gArgs.GetArg("-upgradewallet", 0));
         if (nMaxVersion == 0) // the -upgradewallet without argument case
         {
             printf("Performing wallet upgrade to %i\n", FEATURE_LATEST);
@@ -1231,17 +1228,17 @@ bool AppInit2()
     }
     // ********************************************************* Step 8 was Step 7: load blockchain
 
-    fReindexOnlyHeaderSync = GetBoolArg("-reindex-onlyheadersync", false);
-    fReindexBlockIndex = GetBoolArg("-reindex-blockindex", false);
+    fReindexOnlyHeaderSync = gArgs.GetBoolArg("-reindex-onlyheadersync", false);
+    fReindexBlockIndex = gArgs.GetBoolArg("-reindex-blockindex", false);
     if (!fReindexBlockIndex)
     {
-        fReindexToken = GetBoolArg("-reindex-token", false);
+        fReindexToken = gArgs.GetBoolArg("-reindex-token", false);
     }
     printf("Param fReindexOnlyHeaderSync = %d, fReindexBlockIndex = %d, fReindexToken = %d\n", fReindexOnlyHeaderSync, fReindexBlockIndex, fReindexToken);
 
-    nMainnetNewLogicBlockNumber = GetArg("-testnetNewLogicBlockNumber", mainnetNewLogicBlockNumber);
-    nTestNetNewLogicBlockNumber = GetArg("-testnetNewLogicBlockNumber", testnetNewLogicBlockNumber);
-    nTokenSupportBlockNumber = GetArg("-tokenSupportBlockNumber", tokenSupportBlockNumber);
+    nMainnetNewLogicBlockNumber = gArgs.GetArg("-testnetNewLogicBlockNumber", mainnetNewLogicBlockNumber);
+    nTestNetNewLogicBlockNumber = gArgs.GetArg("-testnetNewLogicBlockNumber", testnetNewLogicBlockNumber);
+    nTokenSupportBlockNumber = gArgs.GetArg("-tokenSupportBlockNumber", tokenSupportBlockNumber);
     printf("Param nMainnetNewLogicBlockNumber = %d\n",nMainnetNewLogicBlockNumber);
     printf("Param testnetNewLogicBlockNumber = %d\n",nTestNetNewLogicBlockNumber);
 
@@ -1253,7 +1250,7 @@ bool AppInit2()
         return InitError(msg);
     }
 
-    if (GetBoolArg("-loadblockindextest"))
+    if (gArgs.GetBoolArg("-loadblockindextest"))
     {
         CTxDB txdb("r");
         txdb.LoadBlockIndex();
@@ -1261,7 +1258,7 @@ bool AppInit2()
         return false;
     }
 
-    MAXIMUM_YAC1DOT0_N_FACTOR = GetArg("-nFactorAtHardfork", 21);
+    MAXIMUM_YAC1DOT0_N_FACTOR = gArgs.GetArg("-nFactorAtHardfork", 21);
     printf("Param nFactorAtHardfork = %d\n", MAXIMUM_YAC1DOT0_N_FACTOR);
 
     std::string additionalInfo = fReindexBlockIndex ? "(reindex block index)" : fReindexToken ? "(reindex token)" : "";
@@ -1371,15 +1368,15 @@ bool AppInit2()
 #endif
     }
 
-    if (GetBoolArg("-printblockindex") || GetBoolArg("-printblocktree"))
+    if (gArgs.GetBoolArg("-printblockindex") || gArgs.GetBoolArg("-printblocktree"))
     {
         PrintBlockTree();
         return false;
     }
 
-    if (mapArgs.count("-printblock"))
+    if (gArgs.IsArgSet("-printblock"))
     {
-        string strMatch = mapArgs["-printblock"];
+        string strMatch = gArgs.GetArg("-printblock", "");
         int nFound = 0;
         for (map<uint256, CBlockIndex*>::iterator mi = mapBlockIndex.begin(); mi != mapBlockIndex.end(); ++mi)
         {
@@ -1420,7 +1417,7 @@ bool AppInit2()
     RegisterWallet(pwalletMain);
 
     CBlockIndex *pindexRescan = chainActive.Tip();
-    if (GetBoolArg("-rescan"))
+    if (gArgs.GetBoolArg("-rescan"))
         pindexRescan = chainActive.Genesis();
     else
     {
@@ -1471,12 +1468,11 @@ bool AppInit2()
         printf("Reindexing finished\n");
     }
 
-    if (mapArgs.count("-loadblock"))
+    if (gArgs.IsArgSet("-loadblock"))
     {
         uiInterface.InitMessage(_("<b>Importing blockchain data file.</b>"));
 
-        BOOST_FOREACH(string strFile, mapMultiArgs["-loadblock"])
-        {
+        for (const std::string& strFile : gArgs.GetArgs("-loadblock")) {
             FILE *file = fopen(strFile.c_str(), "rb");
             if (file)
                 LoadExternalBlockFile(file);

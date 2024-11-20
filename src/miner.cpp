@@ -201,7 +201,7 @@ void BlockAssembler::AddToBlock(CTxMemPool::txiter iter)
     nFees += iter->GetFee();
     inBlock.insert(iter);
 
-    if (fDebug && GetBoolArg("-printpriority")) {
+    if (fDebug && gArgs.GetBoolArg("-printpriority")) {
       printf("fee %s txid %s\n",
                 CFeeRate(iter->GetModifiedFee(), iter->GetTxSize()).ToString(),
                 iter->GetTx().GetHash().ToString());
@@ -467,7 +467,7 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(CWallet* pwallet)
     nLastBlockTx = nBlockTx;
     nLastBlockSize = nBlockSize;
 
-    if (fDebug && GetBoolArg("-printpriority"))
+    if (fDebug && gArgs.GetBoolArg("-printpriority"))
       printf("CreateNewBlock (): total size %" PRI64u "\n", nBlockSize);
 
     // Fill in block header and subsidy for coinbase
@@ -953,7 +953,7 @@ void static ThreadYacoinMiner(void* parg) {
 // here we add the missing PoW mining code from 0.4.4
 void GenerateYacoins(bool fGenerate, CWallet* pwallet, int nblocks) {
   fGenerateBitcoins = fGenerate;
-  nLimitProcessors = GetArg("-genproclimit", -1);
+  nLimitProcessors = gArgs.GetArg("-genproclimit", -1);
   if (nLimitProcessors == 0) fGenerateBitcoins = false;
   fLimitProcessors = (nLimitProcessors != -1);
 

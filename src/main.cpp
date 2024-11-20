@@ -1812,7 +1812,7 @@ CBigNum inline GetProofOfStakeLimit(int nHeight, unsigned int nTime)
     while (bnLowerBound + CENT <= bnUpperBound)
     {
         CBigNum bnMidValue = (bnLowerBound + bnUpperBound) / 2;
-        if (fDebug && GetBoolArg("-printcreation"))
+        if (fDebug && gArgs.GetBoolArg("-printcreation"))
             printf("GetProofOfWorkReward() : lower=%" PRId64 " upper=%" PRId64 " mid=%" PRId64 "\n", bnLowerBound.getuint64(), bnUpperBound.getuint64(), bnMidValue.getuint64());
         if (bnMidValue * bnMidValue * bnMidValue * bnMidValue * bnMidValue * bnMidValue * bnTargetLimit > bnSubsidyLimit * bnSubsidyLimit * bnSubsidyLimit * bnSubsidyLimit * bnSubsidyLimit * bnSubsidyLimit * bnTarget)
             bnUpperBound = bnMidValue;
@@ -1823,7 +1823,7 @@ CBigNum inline GetProofOfStakeLimit(int nHeight, unsigned int nTime)
     ::int64_t nSubsidy = bnUpperBound.getuint64();
 
     nSubsidy = (nSubsidy / CENT) * CENT;
-    if (fDebug && GetBoolArg("-printcreation"))
+    if (fDebug && gArgs.GetBoolArg("-printcreation"))
         printf("GetProofOfWorkReward() : create=%s nBits=0x%08x nSubsidy=%" PRId64 "\n", FormatMoney(nSubsidy).c_str(), nBits, nSubsidy);
 
     return min(nSubsidy, MAX_MINT_PROOF_OF_WORK) + nFees;
@@ -1866,7 +1866,7 @@ CBigNum inline GetProofOfStakeLimit(int nHeight, unsigned int nTime)
 
     ::int64_t 
         nSubsidy = nCoinAge * 33 / (365 * 33 + 8) * nRewardCoinYear;
-    if (fDebug && GetBoolArg("-printcreation"))
+    if (fDebug && gArgs.GetBoolArg("-printcreation"))
         printf("GetProofOfStakeReward(): create=%s nCoinAge=%"PRId64"\n", FormatMoney(nSubsidy).c_str(), nCoinAge);
     return nSubsidy;
 }
@@ -1910,7 +1910,7 @@ CBigNum inline GetProofOfStakeLimit(int nHeight, unsigned int nTime)
             CBigNum 
                 bnMidValue = (bnLowerBound + bnUpperBound) / 2;
 
-            if (fDebug && GetBoolArg("-printcreation"))
+            if (fDebug && gArgs.GetBoolArg("-printcreation"))
                 printf("GetProofOfStakeReward() : lower=%" PRId64 " upper=%" PRId64 " mid=%" PRId64 "\n", bnLowerBound.getuint64(), bnUpperBound.getuint64(), bnMidValue.getuint64());
 
             if(
@@ -1984,13 +1984,13 @@ CBigNum inline GetProofOfStakeLimit(int nHeight, unsigned int nTime)
         // ?.  It seems not??
       )
     {
-        if (fDebug && GetBoolArg("-printcreation") && nSubsidyLimit < nSubsidy)
+        if (fDebug && gArgs.GetBoolArg("-printcreation") && nSubsidyLimit < nSubsidy)
             printf("GetProofOfStakeReward(): %s is greater than %s, coinstake reward will be truncated\n", FormatMoney(nSubsidy).c_str(), FormatMoney(nSubsidyLimit).c_str());
 
         nSubsidy = min(nSubsidy, nSubsidyLimit);
     }
 
-    if (fDebug && GetBoolArg("-printcreation"))
+    if (fDebug && gArgs.GetBoolArg("-printcreation"))
         printf("GetProofOfStakeReward(): create=%s nCoinAge=%" PRId64 " nBits=%d\n", FormatMoney(nSubsidy).c_str(), nCoinAge, nBits);
     return nSubsidy;
 }
@@ -2464,7 +2464,7 @@ void Misbehaving(NodeId pnode, int howmuch)
         return;
 
     state->nMisbehavior += howmuch;
-    if (state->nMisbehavior >= GetArg("-banscore", nDEFAULT_BAN_SCORE))
+    if (state->nMisbehavior >= gArgs.GetArg("-banscore", nDEFAULT_BAN_SCORE))
     {
         printf("Misbehaving: %s (%d -> %d) BAN THRESHOLD EXCEEDED\n", state->name.c_str(), state->nMisbehavior-howmuch, state->nMisbehavior);
         printf("(Node %s) Close connection to node due to misbehaving\n",
@@ -2922,7 +2922,7 @@ bool ActivateBestChain(CValidationState &state, CTxDB& txdb) {
                 if (chainActive.Height() > (pnode->nStartingHeight != -1 ? pnode->nStartingHeight - 2000 : nBlockEstimate))
                     pnode->PushInventory(CInv(MSG_BLOCK, hashNewTip));
 
-            std::string strCmd = GetArg("-blocknotify", "");
+            std::string strCmd = gArgs.GetArg("-blocknotify", "");
             if (!strCmd.empty()) {
                 boost::replace_all(strCmd, "%s", hashNewTip.GetHex());
                 boost::thread t(runCommand, strCmd); // thread runs free
@@ -3769,7 +3769,7 @@ string GetWarnings(string strFor)
     string strStatusBar;
     string strRPC;
 
-    if (GetBoolArg("-testsafemode"))
+    if (gArgs.GetBoolArg("-testsafemode"))
         strRPC = "test";
 
     // Misc warnings like out of disk space and clock is wrong
@@ -3867,7 +3867,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
     RandAddSeedPerfmon();
     if (fDebug)
         printf("received: %s (%" PRIszu " bytes) from node %s\n", strCommand.c_str(), vRecv.size(), pfrom->addrName.c_str());
-    if (mapArgs.count("-dropmessagestest") && GetRand(atoi(mapArgs["-dropmessagestest"])) == 0)
+    if (gArgs.IsArgSet("-dropmessagestest") && GetRand(atoi(gArgs.GetArg("-dropmessagestest", "0"))) == 0)
     {
         printf("dropmessagestest DROPPING RECV MESSAGE\n");
         return true;
@@ -4822,7 +4822,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
         uint256 hashReply;
         vRecv >> hashReply;
 
-        if (!GetBoolArg("-allowreceivebyip"))
+        if (!gArgs.GetBoolArg("-allowreceivebyip"))
         {
             pfrom->PushMessage("reply", hashReply, (int)2, string(""));
             return true;

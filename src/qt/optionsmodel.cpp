@@ -79,32 +79,32 @@ void OptionsModel::Init()
     // These are shared with core Bitcoin; we want
     // command-line options to override the GUI settings:
     if (settings.contains("fUseUPnP"))
-        SoftSetBoolArg("-upnp", settings.value("fUseUPnP").toBool());
+        gArgs.SoftSetBoolArg("-upnp", settings.value("fUseUPnP").toBool());
     if ( !(settings.value("fTorOnly").toBool() && settings.contains("addrTor")) ) {
         if (settings.contains("addrProxy") && settings.value("fUseProxy").toBool())
-            SoftSetArg("-proxy", settings.value("addrProxy").toString().toStdString());
+            gArgs.SoftSetArg("-proxy", settings.value("addrProxy").toString().toStdString());
         if (settings.contains("nSocksVersion") && settings.value("fUseProxy").toBool())
-            SoftSetArg("-socks", settings.value("nSocksVersion").toString().toStdString());
+            gArgs.SoftSetArg("-socks", settings.value("nSocksVersion").toString().toStdString());
     }
 
     if (settings.contains("addrTor") && settings.value("fUseTor").toBool()) {
-        SoftSetArg("-tor", settings.value("addrTor").toString().toStdString());
+        gArgs.SoftSetArg("-tor", settings.value("addrTor").toString().toStdString());
         if (settings.value("fTorOnly").toBool())
-            SoftSetArg("-onlynet", "tor");
+            gArgs.SoftSetArg("-onlynet", "tor");
 
         if (settings.value("TorName").toString().length() == 22) {
             std::string strTorName = settings.value("TorName").toString().toStdString();
 
             CService addrTorName(strTorName, GetListenPort());
             if (addrTorName.IsValid())
-                SoftSetArg("-torname", strTorName);
+                gArgs.SoftSetArg("-torname", strTorName);
         }
     }
 
     if (settings.contains("detachDB"))
-        SoftSetBoolArg("-detachdb", settings.value("detachDB").toBool());
+        gArgs.SoftSetBoolArg("-detachdb", settings.value("detachDB").toBool());
     if (!language.isEmpty())
-        SoftSetArg("-lang", language.toStdString());
+        gArgs.SoftSetArg("-lang", language.toStdString());
 }
 
 int OptionsModel::rowCount(const QModelIndex & parent) const
@@ -124,7 +124,7 @@ QVariant OptionsModel::data(const QModelIndex & index, int role) const
         case MinimizeToTray:
             return QVariant(fMinimizeToTray);
         case MapPortUPnP:
-            return settings.value("fUseUPnP", GetBoolArg("-upnp", true));
+            return settings.value("fUseUPnP", gArgs.GetBoolArg("-upnp", true));
         case MinimizeOnClose:
             return QVariant(fMinimizeOnClose);
         case ProxyUse:

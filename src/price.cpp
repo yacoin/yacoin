@@ -191,7 +191,7 @@ static bool read_in_new_provider( std::string sKey, std::vector< CProvider > & v
 *************************/
 
     std::string
-        sProvider = GetArg( sKey, "" );
+        sProvider = gArgs.GetArg( sKey, "" );
 
     static const int
         nArbitrayUrlDomainLength = 200,

@@ -77,11 +77,11 @@ extern unsigned int // not const because of fTestNet
 
 inline ::uint64_t ReceiveBufferSize()
 {
-    return 1000 * GetArg("-maxreceivebuffer", 5 * 1000);
+    return 1000 * gArgs.GetArg("-maxreceivebuffer", 5 * 1000);
 }
 inline ::uint64_t SendBufferSize()
 {
-    return 1000 * GetArg("-maxsendbuffer", 1 * 1000);
+    return 1000 * gArgs.GetArg("-maxsendbuffer", 1 * 1000);
 }
 
 void AddOneShot(std::string strDest);
@@ -468,8 +468,8 @@ public:
 
     void EndMessage()
     {
-        if (mapArgs.count("-dropmessagestest") &&
-            GetRand(atoi(mapArgs["-dropmessagestest"])) == 0)
+        if (gArgs.IsArgSet("-dropmessagestest") &&
+            GetRand(atoi(gArgs.GetArg("-dropmessagestest", "0"))) == 0)
         {
             printf("dropmessages DROPPING SEND MESSAGE\n");
             AbortMessage();

@@ -576,8 +576,6 @@ using std::set;
 
 namespace bt = boost::posix_time;
 
-map<string, string> mapArgs;
-map<string, vector<string> > mapMultiArgs;
 bool fDebug = false;
 bool fDebugNet = false;
 bool fTestNetNewLogic = false;
@@ -884,103 +882,10 @@ static void InterpretNegativeSetting(string name, map<string, string>& mapSettin
         positive.append(name.begin()+3, name.end());
         if (mapSettingsRet.count(positive) == 0)
         {
-            bool value = !GetBoolArg(name);
+            bool value = !gArgs.GetBoolArg(name);
             mapSettingsRet[positive] = (value ? "1" : "0");
         }
     }
-}
-
-void ParseParameters(int argc, const char* const argv[])
-{
-    mapArgs.clear();
-    mapMultiArgs.clear();
-    for (int i = 1; i < argc; i++)
-    {
-        char psz[10000];
-        strlcpy(psz, argv[i], sizeof(psz));
-        char* pszValue = (char*)"";
-        if (strchr(psz, '='))
-        {
-            pszValue = strchr(psz, '=');
-            *pszValue++ = '\0';
-        }
-#ifdef WIN32
-        _strlwr(psz);
-        if (psz[0] == '/')
-            psz[0] = '-';
-#endif
-#ifdef _MSC_VER
-        if ('-' != psz[0])  // how about this instead
-            continue;
-#else
-        if (psz[0] != '-')  // why? This forces all -arg=xxx to be first
-            break;
-#endif
-        mapArgs[psz] = pszValue;
-        mapMultiArgs[psz].push_back(pszValue);
-    }
-
-    // New 0.6 features:
-    BOOST_FOREACH(const PAIRTYPE(string,string)& entry, mapArgs)
-    {
-        string name = entry.first;
-
-        //  interpret --foo as -foo (as long as both are not set)
-        if (name.find("--") == 0)
-        {
-            std::string singleDash(name.begin()+1, name.end());
-            if (mapArgs.count(singleDash) == 0)
-                mapArgs[singleDash] = entry.second;
-            name = singleDash;
-        }
-
-        // interpret -nofoo as -foo=0 (and -nofoo=0 as -foo=1) as long as -foo not set
-        InterpretNegativeSetting(name, mapArgs);
-    }
-}
-
-std::string GetArg(const std::string& strArg, const std::string& strDefault)
-{
-    if (mapArgs.count(strArg))
-        return mapArgs[strArg];
-    return strDefault;
-}
-
-int64_t GetArg(const std::string& strArg, int64_t nDefault)
-{
-    if (mapArgs.count(strArg))
-        return atoi64(mapArgs[strArg]);
-    return nDefault;
-}
-
-bool GetBoolArg(const std::string& strArg, bool fDefault)   // 2nd arg defaults to false
-{
-    if (mapArgs.count(strArg))                  // there is/are an argument(s)
-    {                                           // i.e an = sign
-        if (mapArgs[strArg].empty())            // if nothing
-            return true;                        // say true
-        // shouldn't we also test for true or false?!
-        return (atoi(mapArgs[strArg]) != 0);    // if integer not 0 then true
-    }
-    return fDefault;
-}
-
-bool SoftSetArg(const std::string& strArg, const std::string& strValue)
-{
-    if (mapArgs.count(strArg) || mapMultiArgs.count(strArg))
-        return false;
-    mapArgs[strArg] = strValue;
-    mapMultiArgs[strArg].push_back(strValue);
-
-    return true;
-}
-
-bool SoftSetBoolArg(const std::string& strArg, bool fValue)
-{
-    if (fValue)
-        return SoftSetArg(strArg, std::string("1"));
-    else
-        return SoftSetArg(strArg, std::string("0"));
 }
 
 int64_t DecodeDumpTime(const std::string& s)
@@ -1085,46 +990,41 @@ void LogStackTrace() {
     }
 }
 
-const boost::filesystem::path &GetDataDir(bool fTest_or_Main_Net_is_decided)    // defaults to true
+const fs::path &GetDataDir(bool fNetSpecific)
 {
-    namespace fs = boost::filesystem;
 
-    static fs::path CachedPathsArray[2];
-    static bool IsCachedArray[2];
-
-    fs::path &path = CachedPathsArray[ static_cast<int>(fTest_or_Main_Net_is_decided) ];
-
-    // This can be called during exceptions by printf, so we cache the
-    // value so we don't have to do memory allocations after that.
-    if (IsCachedArray[ static_cast<int>(fTest_or_Main_Net_is_decided) ] )
-        return path;
-
-    static CCriticalSection csPathCached;
     LOCK(csPathCached);
 
-    if ( mapArgs.count( "-datadir" ) ) 
-    {
-        path = fs::system_complete(mapArgs["-datadir"]);
-        if (!fs::is_directory( path )) 
-        {
+    fs::path &path = fNetSpecific ? pathCachedNetSpecific : pathCached;
+
+    // This can be called during exceptions by LogPrintf(), so we cache the
+    // value so we don't have to do memory allocations after that.
+    if (!path.empty())
+        return path;
+
+    if (gArgs.IsArgSet("-datadir")) {
+        path = fs::system_complete(gArgs.GetArg("-datadir", ""));
+        if (!fs::is_directory(path)) {
             path = "";
-            return path;                // is this a correct exit?
+            return path;
         }
-    }
-    else 
-    {
+    } else {
         path = GetDefaultDataDir();
     }
-    if (
-        fTest_or_Main_Net_is_decided &&
-        GetBoolArg("-testnet", false)   // this is known after config file is read  
-       )                                // or testnet was set on the command line
+    if (fNetSpecific && gArgs.GetBoolArg("-testnet", false))
         path /= "testnet";
 
-    fs::create_directory(path);
+    fs::create_directories(path);
 
-    IsCachedArray[ static_cast<int>(fTest_or_Main_Net_is_decided) ] = true;
     return path;
+}
+
+void ClearDatadirCache()
+{
+    LOCK(csPathCached);
+
+    pathCached = fs::path();
+    pathCachedNetSpecific = fs::path();
 }
 
 string randomStrGen(int length) {
@@ -1137,27 +1037,52 @@ string randomStrGen(int length) {
     return result;
 }
 
-boost::filesystem::path GetConfigFile()
+fs::path GetConfigFile(const std::string& confPath)
 {
-    boost::filesystem::path 
-        pathConfigFile(GetArg("-conf", "yacoin.conf"));
-
+    fs::path pathConfigFile(confPath);
     if (!pathConfigFile.is_complete())
-    {
-        bool 
-            fTest_or_Main_Net_is_decided = false;
+        pathConfigFile = GetDataDir(false) / pathConfigFile;
 
-        pathConfigFile = GetDataDir(fTest_or_Main_Net_is_decided) / pathConfigFile;
-    }
     return pathConfigFile;
 }
 
-static void createConf()
+void ArgsManager::ReadConfigFile(const std::string& confPath)
+{
+    fs::ifstream streamConfig(GetConfigFile(confPath));
+    if (!streamConfig.good())
+    {
+        createConf();
+        new(&streamConfig) fs::ifstream(GetConfigFile(confPath));
+        if(!streamConfig.good())
+            return;
+    }
+
+    {
+        LOCK(cs_args);
+        std::set<std::string> setOptions;
+        setOptions.insert("*");
+
+        for (boost::program_options::detail::config_file_iterator it(streamConfig, setOptions), end; it != end; ++it)
+        {
+            // Don't overwrite existing settings so command line settings override bitcoin.conf
+            std::string strKey = std::string("-") + it->string_key;
+            std::string strValue = it->value[0];
+            InterpretNegativeSetting(strKey, strValue);
+            if (mapArgs.count(strKey) == 0)
+                mapArgs[strKey] = strValue;
+            mapMultiArgs[strKey].push_back(strValue);
+        }
+    }
+    // If datadir is changed in .conf file:
+    ClearDatadirCache();
+}
+
+void createConf()
 {
     srand(time(NULL));
 
     ofstream pConf;
-    pConf.open(GetConfigFile().generic_string().c_str());
+    pConf.open(GetConfigFile(gArgs.GetArg("-conf", YACOIN_CONF_FILENAME)).generic_string().c_str());
     pConf << "rpcuser=user\nrpcpassword="
             + randomStrGen(15)
             + "\nrpcport=7687"
@@ -1171,41 +1096,10 @@ static void createConf()
     pConf.close();
 }
 
-void ReadConfigFile(map<string, string>& mapSettingsRet,
-                    map<string, vector<string> >& mapMultiSettingsRet)
-{
-    boost::filesystem::ifstream streamConfig(GetConfigFile());
-    if (!streamConfig.good())
-    {
-        createConf();
-        new(&streamConfig) boost::filesystem::ifstream(GetConfigFile());
-        if(!streamConfig.good())
-            return;
-    }
-
-    set<string> setOptions;
-    setOptions.insert("*");
-
-    for (boost::program_options::detail::config_file_iterator it(streamConfig, setOptions), end; 
-         it != end; 
-         ++it)
-    {
-        // Don't overwrite existing settings so command line settings override bitcoin.conf
-        string strKey = string("-") + it->string_key;
-        if (mapSettingsRet.count(strKey) == 0)
-        {
-            mapSettingsRet[strKey] = it->value[0];
-            // interpret nofoo=1 as foo=0 (and nofoo=0 as foo=1) as long as foo not set)
-            InterpretNegativeSetting(strKey, mapSettingsRet);
-        }
-        mapMultiSettingsRet[strKey].push_back(it->value[0]);
-    }
-}
-
 #ifndef WIN32
 fs::path GetPidFile()
 {
-    fs::path pathPidFile(GetArg("-pid", YACOIN_PID_FILENAME));
+    fs::path pathPidFile(gArgs.GetArg("-pid", YACOIN_PID_FILENAME));
     if (!pathPidFile.is_complete())
     {
         bool

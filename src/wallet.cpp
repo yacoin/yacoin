@@ -698,7 +698,7 @@ bool CWallet::AddToWallet(const CWalletTx& wtxIn)
         NotifyTransactionChanged(this, hash, fInsertedNew ? CT_NEW : CT_UPDATED);
         vMintingWalletUpdated.push_back(hash);
         // notify an external script when a wallet transaction comes in or is updated
-        std::string strCmd = GetArg("-walletnotify", "");
+        std::string strCmd = gArgs.GetArg("-walletnotify", "");
 
         if ( !strCmd.empty())
         {
@@ -2171,7 +2171,7 @@ bool CWallet::SelectCoinsMinConf(const CAmount &nTargetValue, int64_t nSpendTime
                 nValueRet += vValue[i].txout.nValue;
             }
 
-        if (fDebug && GetBoolArg("-printpriority"))
+        if (fDebug && gArgs.GetBoolArg("-printpriority"))
         {
             //// debug print
             printf("SelectCoins() best subset: ");
@@ -2492,7 +2492,7 @@ bool CWallet::SelectTokensMinConf(const CAmount& nTargetValue,
         nValueRet += vValue[i].second;
       }
 
-    if (fDebug && GetBoolArg("-printpriority")) {
+    if (fDebug && gArgs.GetBoolArg("-printpriority")) {
       //// debug print
       printf("SelectTokens() best subset: ");
       for (unsigned int i = 0; i < vValue.size(); i++)
@@ -3446,7 +3446,7 @@ bool CWallet::NewKeyPool(unsigned int nSize)
         if (nSize > 0)
             nKeys = nSize;
         else
-            nKeys = max< uint64_t>(GetArg("-keypool", 100), 0);
+            nKeys = max< uint64_t>(gArgs.GetArg("-keypool", 100), 0);
 
         for (uint64_t i = 0; i < nKeys; i++)
         {
@@ -3474,7 +3474,7 @@ bool CWallet::TopUpKeyPool(unsigned int nSize)
         if (nSize > 0)
             nTargetSize = nSize;
         else
-            nTargetSize = max< uint64_t>(GetArg("-keypool", 100), 0);
+            nTargetSize = max< uint64_t>(gArgs.GetArg("-keypool", 100), 0);
 
         while (setKeyPool.size() < (nTargetSize + 1))
         {
@@ -3513,7 +3513,7 @@ void CWallet::ReserveKeyFromKeyPool(int64_t& nIndex, CKeyPool& keypool)
         if (!HaveKey(keypool.vchPubKey.GetID()))
             throw runtime_error("ReserveKeyFromKeyPool() : unknown key in key pool");
         Yassert(keypool.vchPubKey.IsValid());
-        if (fDebug && GetBoolArg("-printkeypool"))
+        if (fDebug && gArgs.GetBoolArg("-printkeypool"))
             printf("keypool reserve %" PRId64 "\n", nIndex);
     }
 }

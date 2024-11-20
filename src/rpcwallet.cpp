@@ -2252,7 +2252,7 @@ Value keypoolrefill(const Array& params, bool fHelp)
             "should be replaced with the newly generated one."
             + HelpRequiringPassphrase());
 
-    unsigned int nSize = max<unsigned int>(GetArg("-keypool", 100), 0);
+    unsigned int nSize = max<unsigned int>(gArgs.GetArg("-keypool", 100), 0);
     if (params.size() > 0) {
         if (params[0].get_int() < 0)
             throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid parameter, expected valid size");
@@ -2279,7 +2279,7 @@ Value keypoolreset(const Array& params, bool fHelp)
             "should be replaced with the newly generated one."
             + HelpRequiringPassphrase());
 
-    unsigned int nSize = max<unsigned int>(GetArg("-keypool", 100), 0);
+    unsigned int nSize = max<unsigned int>(gArgs.GetArg("-keypool", 100), 0);
     if (params.size() > 0) {
         if (params[0].get_int() < 0)
             throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid parameter, expected valid size");
@@ -2602,19 +2602,19 @@ Value reservebalance(const Array& params, bool fHelp)
             nAmount = (nAmount / CENT) * CENT;  // round to cent
             if (nAmount < 0)
                 throw runtime_error("amount cannot be negative.\n");
-            mapArgs["-reservebalance"] = FormatMoney(nAmount).c_str();
+            gArgs.ForceSetArg("-reservebalance", FormatMoney(nAmount));
         }
         else
         {
             if (params.size() > 1)
                 throw runtime_error("cannot specify amount to turn off reserve.\n");
-            mapArgs["-reservebalance"] = "0";
+            gArgs.ForceSetArg("-reservebalance", "0");
         }
     }
 
     Object result;
     int64_t nReserveBalance = 0;
-    if (mapArgs.count("-reservebalance") && !ParseMoney(mapArgs["-reservebalance"], nReserveBalance))
+    if (gArgs.IsArgSet("-reservebalance") && !ParseMoney(gArgs.GetArg("-reservebalance", ""), nReserveBalance))
         throw runtime_error("invalid reserve balance amount\n");
     result.push_back(Pair("reserve", (nReserveBalance > 0)));
     result.push_back(Pair("amount", ValueFromAmount(nReserveBalance)));

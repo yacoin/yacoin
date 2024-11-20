@@ -143,7 +143,7 @@ int main(int argc, char *argv[])
     app.installEventFilter(new GUIUtil::ToolTipToRichTextFilter(TOOLTIP_WRAP_THRESHOLD, &app));
 
     // Command-line options take precedence:
-    ParseParameters(argc, argv);
+    gArgs.ParseParameters(argc, argv);
 
     // ... then bitcoin.conf:
     if (!boost::filesystem::is_directory(GetDataDir(false)))
@@ -151,16 +151,23 @@ int main(int argc, char *argv[])
         // This message can not be translated, as translation is not initialized yet
         // (which not yet possible because lang=XX can be overridden in bitcoin.conf in the data directory)
         QMessageBox::critical(0, "Yacoin",
-                              QString("Error: Specified data directory \"%1\" does not exist.").arg(QString::fromStdString(mapArgs["-datadir"])));
+                              QString("Error: Specified data directory \"%1\" does not exist.").arg(QString::fromStdString(gArgs.GetArg("-datadir", ""))));
         return 1;
     }
-    ReadConfigFile(mapArgs, mapMultiArgs);
+
+    try {
+        gArgs.ReadConfigFile(gArgs.GetArg("-conf", YACOIN_CONF_FILENAME));
+    } catch (const std::exception& e) {
+        QMessageBox::critical(0, QObject::tr(PACKAGE_NAME),
+                              QObject::tr("Error: Cannot parse configuration file: %1. Only use key=value syntax.").arg(e.what()));
+        return EXIT_FAILURE;
+    }
 
     // Application identification (must be set before OptionsModel is initialized,
     // as it is used to locate QSettings)
     app.setOrganizationName("Yacoin");
     app.setOrganizationDomain("yacoin.org");
-    if(GetBoolArg("-testnet")) // Separate UI settings for testnet
+    if(gArgs.GetBoolArg("-testnet")) // Separate UI settings for testnet
         app.setApplicationName("Yacoin-Qt-testnet");
     else
         app.setApplicationName("Yacoin-Qt");
@@ -169,7 +176,7 @@ int main(int argc, char *argv[])
     OptionsModel optionsModel;
 
     // Get desired locale (e.g. "de_DE") from command line or use system locale
-    QString lang_territory = QString::fromStdString(GetArg("-lang", QLocale::system().name().toStdString()));
+    QString lang_territory = QString::fromStdString(gArgs.GetArg("-lang", QLocale::system().name().toStdString()));
     QString lang = lang_territory;
     // Convert to "de" only by truncating "_DE"
     lang.truncate(lang_territory.lastIndexOf('_'));
@@ -205,7 +212,7 @@ int main(int argc, char *argv[])
 
     // Show help message immediately after parsing command-line options (for "-lang") and setting locale,
     // but before showing splash screen.
-    if (mapArgs.count("-?") || mapArgs.count("--h") || mapArgs.count("--help"))
+    if (gArgs.IsArgSet("-?") || gArgs.IsArgSet("-h") || gArgs.IsArgSet("-help"))
     {
         GUIUtil::HelpMessageBox help;
         help.showOrPrint();
@@ -217,7 +224,7 @@ int main(int argc, char *argv[])
 #else
     QSplashScreen splash(QPixmap(":/images/splash"), 0);
 #endif
-    if (GetBoolArg("-splash", true) && !GetBoolArg("-min"))
+    if (gArgs.GetBoolArg("-splash", true) && !gArgs.GetBoolArg("-min"))
     {
         splash.show();
         splash.move( 200, 200 );
@@ -253,7 +260,7 @@ int main(int argc, char *argv[])
                 window.setWalletModel(&walletModel);
 
                 // If -min option passed, start window minimized.
-                if(GetBoolArg("-min"))
+                if(gArgs.GetBoolArg("-min"))
                 {
                     window.showMinimized();
                 }

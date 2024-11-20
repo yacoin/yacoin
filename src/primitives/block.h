@@ -323,7 +323,7 @@ public:
 
             // Take last bit of block hash as entropy bit
             unsigned int nEntropyBit = ((GetHash().Get64()) & 1ULL);
-            if (fDebug && GetBoolArg("-printstakemodifier"))
+            if (fDebug && gArgs.GetBoolArg("-printstakemodifier"))
                 printf(
                         "GetStakeEntropyBit: nTime=%" PRId64 " \nhashBlock=%s\nnEntropyBit=%u\n",
                         nTime,

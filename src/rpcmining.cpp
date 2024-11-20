@@ -51,7 +51,7 @@ Value getgenerate(const Array& params, bool fHelp)
             "getgenerate\n"
             "Returns true or false.");
 
-    return GetBoolArg("-gen");
+    return gArgs.GetBoolArg("-gen");
 }
 
 Value setgenerate(const Array& params, bool fHelp)
@@ -69,11 +69,11 @@ Value setgenerate(const Array& params, bool fHelp)
     if (params.size() > 1)
     {
         int nGenProcLimit = params[1].get_int();
-        mapArgs["-genproclimit"] = itostr(nGenProcLimit);
+        gArgs.ForceSetArg("-genproclimit", itostr(nGenProcLimit));
         if (nGenProcLimit == 0)
             fGenerate = false;
     }
-    mapArgs["-gen"] = (fGenerate ? "1" : "0");
+    gArgs.ForceSetArg("-gen", (fGenerate ? "1" : "0"));
 
     GenerateYacoins(fGenerate, pwalletMain);
     return Value::null;
@@ -128,10 +128,10 @@ Value generatetoaddress(const Array& params, bool fHelp){
     //     std::string hash = mineSingleBlock(address, maxtries);
     //     res.push_back(hash);
     // }
-    mapArgs["-gen"] = "1";
-    mapArgs["-genproclimit"]="1";
+    gArgs.ForceSetArg("-gen", "1");
+    gArgs.ForceSetArg("-genproclimit", "1");
     GenerateYacoins(true, pwalletMain, nblocks);
-    mapArgs["-gen"] = "0";
+    gArgs.ForceSetArg("-gen", "0");
     return res;
 }
 
@@ -164,8 +164,8 @@ Value getmininginfo(const Array& params, bool fHelp)
     obj.push_back(Pair("netmhashps",     GetPoWMHashPS()));
     obj.push_back(Pair("netstakeweight", GetPoSKernelPS()));
     obj.push_back(Pair("errors",        GetWarnings("statusbar")));
-    obj.push_back(Pair("generate",      GetBoolArg("-gen")));
-    obj.push_back(Pair("genproclimit",  (int)GetArg("-genproclimit", -1)));
+    obj.push_back(Pair("generate",      gArgs.GetBoolArg("-gen")));
+    obj.push_back(Pair("genproclimit",  (int)gArgs.GetArg("-genproclimit", -1)));
     obj.push_back(Pair("hashespersec",  gethashespersec(params, false)));
     obj.push_back(Pair("pooledtx",      (Value_type)mempool.size()));
 

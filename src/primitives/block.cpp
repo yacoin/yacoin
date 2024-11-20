@@ -1206,7 +1206,7 @@ bool CBlock::ConnectBlock(CValidationState &state, CTxDB& txdb, CBlockIndex* pin
 
     // fees are not collected by proof-of-stake miners
     // fees are destroyed to compensate the entire network
-    if (fDebug && IsProofOfStake() && GetBoolArg("-printcreation"))
+    if (fDebug && IsProofOfStake() && gArgs.GetBoolArg("-printcreation"))
         printf("ConnectBlock() : destroy=%s nFees=%" PRId64 "\n", FormatMoney(nFees).c_str(), nFees);
 
     if (fJustCheck)
@@ -1281,7 +1281,7 @@ bool CBlock::GetCoinAge(::uint64_t& nCoinAge) const
 
     if (nCoinAge == 0) // block coin age minimum 1 coin-day
         nCoinAge = 1;
-    if (fDebug && GetBoolArg("-printcoinage"))
+    if (fDebug && gArgs.GetBoolArg("-printcoinage"))
         printf("block coin age total nCoinDays=%" PRId64 "\n", nCoinAge);
     return true;
 }

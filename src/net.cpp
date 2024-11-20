@@ -167,7 +167,7 @@ void AddOneShot(string strDest)
 
 unsigned short GetListenPort()
 {
-    return (unsigned short)(GetArg("-port", GetDefaultPort()));
+    return (unsigned short)(gArgs.GetArg("-port", GetDefaultPort()));
 }
 
 int GetMaxConnections()
@@ -175,7 +175,7 @@ int GetMaxConnections()
     int count;
 
     // Config'eth away..
-    count = GetArg("-maxconnections", DEFAULT_MAX_CONNECTIONS);
+    count = gArgs.GetArg("-maxconnections", DEFAULT_MAX_CONNECTIONS);
 
     // Ensure some level of sanity amount the max connection count.
     count = max(count, MIN_CONNECTIONS);
@@ -191,7 +191,7 @@ static int GetMaxOutboundConnections()
     int count;
 
     // What sayeth the config parameters?
-    count = GetArg("-maxoutbound", DEFAULT_OUTBOUND_CONNECTIONS);
+    count = gArgs.GetArg("-maxoutbound", DEFAULT_OUTBOUND_CONNECTIONS);
 
     // Did someone set it too low or too high?  Shame, shame..
     count = max(count, MIN_OUTBOUND_CONNECTIONS);
@@ -711,10 +711,10 @@ void CNode::PushVersion()
 
     if (addr.IsTor())
     {
-        if (mapArgs.count("-torname"))
+        if (gArgs.IsArgSet("-torname"))
         {
             // Our hidden service address
-            CService addrTorName(mapArgs["-torname"], GetListenPort());
+            CService addrTorName(gArgs.GetArg("-torname", ""), GetListenPort());
 
             if (addrTorName.IsValid())
             {
@@ -774,7 +774,7 @@ bool CNode::IsBanned(CNetAddr ip)
 }
 
 bool CNode::Ban(const CNetAddr &addr) {
-    int64_t banTime = GetTime()+GetArg("-bantime", nDEFAULT_BAN_TIME_in_seconds);  // Default 24-hour ban
+    int64_t banTime = GetTime()+gArgs.GetArg("-bantime", nDEFAULT_BAN_TIME_in_seconds);  // Default 24-hour ban
     {
         LOCK(cs_setBanned);
         if (setBanned[addr] < banTime)
@@ -1122,7 +1122,7 @@ void ThreadSocketHandler2(void *parg)
                 }
                 else
                 {
-                    // if (nInbound >= GetArg("-maxconnections", 125) -
+                    // if (nInbound >= gArgs.GetArg("-maxconnections", 125) -
                     // MAX_OUTBOUND_CONNECTIONS)
                     if (nInbound >= GetMaxConnections() - GetMaxOutboundConnections())
                     {
@@ -1972,12 +1972,12 @@ void ThreadOpenConnections2(void *parg)
 
     // what does this do with this weird unbounded for loop, I wonder?
     // what did it intend to do???????????
-    if (mapArgs.count("-connect") && mapMultiArgs["-connect"].size() > 0)
+    if (gArgs.IsArgSet("-connect") && gArgs.GetArgs("-connect").size() > 0)
     {
         for (::int64_t nLoop = 0;; ++nLoop) // can overflow??
         {
             ProcessOneShot();
-            BOOST_FOREACH (string strAddr, mapMultiArgs["-connect"])
+            for (const std::string& strAddr : gArgs.GetArgs("-connect"))
             {
                 CAddress addr;
                 // OpenNetworkConnection(addr, NULL, strAddr.c_str());
@@ -2055,7 +2055,7 @@ void ThreadOpenConnections2(void *parg)
         }
 
         // Add Tor nodes if we have connection with onion router
-        if (mapArgs.count("-tor"))
+        if (gArgs.IsArgSet("-tor"))
         {
             size_t Length = ARRAYLEN(pchTorSeed);
 
@@ -2185,7 +2185,7 @@ void ThreadOpenAddedConnections2(void *parg)
 
     {
         LOCK(cs_vAddedNodes);
-        vAddedNodes = mapMultiArgs["-addnode"];
+        vAddedNodes = gArgs.GetArgs("-addnode");
     }
 
     if (HaveNameProxy())
@@ -2710,7 +2710,7 @@ void StartNode(void *parg)
     {
         // initialize semaphore
         // int nMaxOutbound = min(MAX_OUTBOUND_CONNECTIONS,
-        // (int)GetArg("-maxconnections", 125));
+        // (int)gArgs.GetArg("-maxconnections", 125));
         int nMaxOutbound = min(GetMaxOutboundConnections(), GetMaxConnections());
         semOutbound = new CSemaphore(nMaxOutbound);
     }
@@ -2725,7 +2725,7 @@ void StartNode(void *parg)
     // Start threads
     //
 
-    if (!GetBoolArg("-dnsseed", true))
+    if (!gArgs.GetBoolArg("-dnsseed", true))
         printf("DNS seeding disabled\n");
     else if (!NewThread(ThreadDNSAddressSeed, NULL))
         printf("Error: NewThread(ThreadDNSAddressSeed) failed\n");
@@ -2737,7 +2737,7 @@ void StartNode(void *parg)
         MapPort();
 
     // Get addresses from IRC and advertise ours
-    if (!GetBoolArg("-irc", true))
+    if (!gArgs.GetBoolArg("-irc", true))
         printf("IRC seeding disabled\n");
     else if (!NewThread(ThreadIRCSeed, NULL))
         printf("Error: NewThread(ThreadIRCSeed) failed\n");
@@ -2763,7 +2763,7 @@ void StartNode(void *parg)
         printf("Error; NewThread(ThreadDumpAddress) failed\n");
 
     // Generate coins in the background
-    GenerateYacoins(GetBoolArg("-gen", false), pwalletMain);
+    GenerateYacoins(gArgs.GetBoolArg("-gen", false), pwalletMain);
 }
 
 bool StopNode()
