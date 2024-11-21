@@ -68,6 +68,7 @@ libyacoin_common_a_SOURCES= \
     crypto/chacha20.cpp \
     crypto/sha256.cpp \
     crypto/sha512.cpp \
+    crypto/ripemd160.cpp \
     compat/strnlen.cpp \
     primitives/transaction.cpp \
     primitives/block.cpp \
@@ -77,6 +78,8 @@ libyacoin_common_a_SOURCES= \
     dbwrapper.cpp \
     txdb-leveldb.cpp \
     alert.cpp \
+    addrdb.cpp \
+    hash.cpp \
     base58.cpp \
     version.cpp \
     checkpoints.cpp \

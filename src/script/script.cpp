@@ -8,18 +8,15 @@
     #include "msvc_warnings.push.h"
 #endif
 
+#include "script/script.h"
+#include "main.h"
+#include "tokens/tokens.h"
+
 #include <boost/foreach.hpp>
 #include <boost/tuple/tuple.hpp>
 
-#ifndef H_BITCOIN_SCRIPT
- #include "script/script.h"
-#endif
-
-#ifndef BITCOIN_MAIN_H
- #include "main.h"
-#endif
-
-#include "tokens/tokens.h"
+#include <openssl/ripemd.h>
+#include <openssl/sha.h>
 
 using namespace boost;
 

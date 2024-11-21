@@ -30,6 +30,7 @@
 #endif
 
 #include "policy/fees.h"
+#include <openssl/sha.h>
 
 using std::auto_ptr;
 using std::list;

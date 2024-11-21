@@ -219,14 +219,17 @@ HEADERS = $(wildcard *.h)
 
 OBJS= \
 obj/alert.o \
+obj/addrdb.o \
 obj/addrman.o \
 obj/tokentypes.o \
 obj/tokendb.o \
 obj/tokens.o \
+obj/hash.o \
 obj/siphash.o \
 obj/chacha20.o \
 obj/sha256.o \
 obj/sha512.o \
+obj/ripemd160.o \
 obj/cleanse.o \
 obj/base58.o \
 obj/bitcoinrpc.o \
@@ -352,6 +355,9 @@ obj/sha256.o: crypto/sha256.cpp
 	$(CXX) -c -frandom-seed=$@ $(CFLAGS) $(INCLUDEPATHS) -o $@ $<
 
 obj/sha512.o: crypto/sha512.cpp
+	$(CXX) -c -frandom-seed=$@ $(CFLAGS) $(INCLUDEPATHS) -o $@ $<
+
+obj/ripemd160.o: crypto/ripemd160.cpp
 	$(CXX) -c -frandom-seed=$@ $(CFLAGS) $(INCLUDEPATHS) -o $@ $<
 
 obj/strnlen.o: compat/strnlen.cpp

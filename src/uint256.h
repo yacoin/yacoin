@@ -381,7 +381,7 @@ public:
         return std::vector<unsigned char>(begin(), end());
     }
 
-    unsigned int size()
+    unsigned int size() const
     {
         return sizeof(pn);
     }
