@@ -578,12 +578,9 @@ namespace bt = boost::posix_time;
 
 bool fDebug = false;
 bool fDebugNet = false;
-bool fTestNetNewLogic = false;
-::int32_t nTestNetNewLogicBlockNumber;
 ::int32_t nMainnetNewLogicBlockNumber;
 ::int32_t nTokenSupportBlockNumber;
 unsigned char MAXIMUM_YAC1DOT0_N_FACTOR;
-::int32_t nYac20BlockNumberTime = 0;
 ::int64_t nYac10HardforkTime = 1619048730;
 // Epoch interval is a difficulty period. Right now on testnet, it is 21,000 blocks
 ::uint32_t nEpochInterval = 21000;
@@ -593,7 +590,6 @@ bool fShutdown = false;
 bool fDaemon = false;
 bool fServer = false;
 bool fTestNet = false;
-bool fUseOld044Rules = true;
 bool fNoListen = false;
 
 static int64_t nMockTime = 0;  // For unit testing
@@ -621,68 +617,6 @@ LockedPageManager LockedPageManager::instance;
 
 std::string GetDebugLogPathName(){
     return (GetDataDir() / "debug.log").string();
-}
-
-string vstrprintf(const char *format, va_list ap)
-{
-    char buffer[50000];
-    char* p = buffer;
-    int limit = sizeof(buffer);
-    int ret;
-    while (true)
-    {
-/*************
-#ifndef _MSC_VER
-        va_list arg_ptr;
-        va_copy(arg_ptr, ap);
-#else
-        va_list arg_ptr = ap;
-#endif
-// I think this old way is clearer, as it shows what MS is doing
-*************/
-        va_list arg_ptr;
-#ifdef _MSC_VER
-    #define va_copy(dest, src) (dest = src)
-#endif   
-        va_copy(arg_ptr, ap);
-
-#ifdef WIN32
-        ret = _vsnprintf(p, limit, format, arg_ptr);
-#else
-        ret = vsnprintf(p, limit, format, arg_ptr);
-#endif
-        va_end(arg_ptr);
-        if (ret >= 0 && ret < limit)
-            break;
-        if (p != buffer)
-            delete[] p;
-        limit *= 2;
-        p = new char[limit];
-        if (p == NULL)
-            throw std::bad_alloc();
-    }
-    string str(p, p+ret);
-    if (p != buffer)
-        delete[] p;
-    return str;
-}
-
-string real_strprintf(const char *format, int dummy, ...)
-{
-    va_list arg_ptr;
-    va_start(arg_ptr, dummy);
-    string str = vstrprintf(format, arg_ptr);
-    va_end(arg_ptr);
-    return str;
-}
-
-string real_strprintf(const std::string &format, int dummy, ...)
-{
-    va_list arg_ptr;
-    va_start(arg_ptr, dummy);
-    string str = vstrprintf(format.c_str(), arg_ptr);
-    va_end(arg_ptr);
-    return str;
 }
 
 void ParseString(const string& str, char c, vector<string>& v)
@@ -865,12 +799,6 @@ bool WildcardMatch(const char* psz, const char* mask)
 bool WildcardMatch(const string& str, const string& mask)
 {
     return WildcardMatch(str.c_str(), mask.c_str());
-}
-
-void LogException(std::exception* pex, const char* pszThread)
-{
-    std::string message = FormatException(pex, pszThread);
-    LogPrintf("\n%s", message);
 }
 
 void PrintException(std::exception* pex, const char* pszThread)

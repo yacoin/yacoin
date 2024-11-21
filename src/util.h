@@ -438,33 +438,17 @@ inline void Sleep(::int64_t n)
 }
 #endif
 
-/* This GNU C extension enables the compiler to check the format string against the parameters provided.
- * X is the number of the "format string" parameter, and Y is the number of the first variadic parameter.
- * Parameters count from 1.
- */
-#ifdef __GNUC__
-#define ATTR_WARN_PRINTF(X,Y) __attribute__((format(printf,X,Y)))
-#else
-#define ATTR_WARN_PRINTF(X,Y)
-#endif
-
 extern bool 
     fDebug,
     fDebugNet,
-    f1dot0OnThisBlockOrTx,
-    fTestNetNewLogic,
     fPrintToDebugLog,
     fRequestShutdown,
     fShutdown,
     fDaemon,
     fServer,
     fTestNet,
-    fUseOld044Rules,
     fNoListen;
-extern ::int32_t
-    nTestNetNewLogicBlockNumber,
-	nMainnetNewLogicBlockNumber,
-    nYac20BlockNumberTime;
+extern ::int32_t nMainnetNewLogicBlockNumber;
 extern ::int32_t nTokenSupportBlockNumber;
 extern ::uint32_t
     nDifficultyInterval,
@@ -478,24 +462,7 @@ extern unsigned char MAXIMUM_YAC1DOT0_N_FACTOR;
 extern void DoProgress( int nCount, int nTotalToScan, ::int64_t n64MsStartTime );
 #endif
 
-/*
-  Rationale for the real_strprintf / strprintf construction:
-    It is not allowed to use va_start with a pass-by-reference argument.
-    (C++ standard, 18.7, paragraph 3). Use a dummy argument to work around this, and use a
-    macro to keep similar semantics.
-*/
-
-/** Overload strprintf for char*, so that GCC format type warnings can be given */
-std::string ATTR_WARN_PRINTF(1,3) real_strprintf(const char *format, int dummy, ...);
-/** Overload strprintf for std::string, to be able to use it with _ (translation).
- * This will not support GCC format type warnings (-Wformat) so be careful.
- */
-std::string real_strprintf(const std::string &format, int dummy, ...);
-#define strprintf(format, ...) real_strprintf(format, 0, __VA_ARGS__)
-std::string vstrprintf(const char *format, va_list ap);
-
 extern unsigned long long getTotalSystemMemory( void );
-void LogException(std::exception* pex, const char* pszThread);
 void PrintException(std::exception* pex, const char* pszThread);
 void ParseString(const std::string& str, char c, std::vector<std::string>& v);
 std::string FormatMoney(::int64_t n, bool fPlus=false);
@@ -512,7 +479,6 @@ std::string GetDebugLogPathName();
 std::string FormatFullVersion();
 std::string FormatSubVersion(const std::string& name, int nClientVersion, const std::vector<std::string>& comments);
 void createConf();
-extern bool HaveWeSwitchedToNewLogicRules( bool &fUsingOld044Rules );   // in main.cpp
 
 inline int roundint(double d)
 {

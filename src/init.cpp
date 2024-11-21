@@ -675,8 +675,6 @@ bool AppInit2()
     else
         fDebugNet = gArgs.GetBoolArg("-debugnet");
 
-    fTestNetNewLogic = gArgs.GetBoolArg("-testnetNewLogic");
-
     bitdb.SetDetach(gArgs.GetBoolArg("-detachdb", false));
 
 #if !defined(WIN32) && !defined(QT_GUI)
@@ -806,11 +804,6 @@ bool AppInit2()
         ShrinkDebugFile();
     LogPrintf("\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n");
     LogPrintf("Yacoin version %s (%s)\n", FormatFullVersion(), CLIENT_DATE);
-
-    if (fDebug)
-    {
-        LogPrintf( "new logic flag is %s\n", fTestNetNewLogic? "true": "false" );
-    }
     LogPrintf("\n" );
 
 //    if (fDebug)
@@ -1240,10 +1233,8 @@ bool AppInit2()
     LogPrintf("Param fReindexOnlyHeaderSync = %d, fReindexBlockIndex = %d, fReindexToken = %d\n", fReindexOnlyHeaderSync, fReindexBlockIndex, fReindexToken);
 
     nMainnetNewLogicBlockNumber = gArgs.GetArg("-testnetNewLogicBlockNumber", mainnetNewLogicBlockNumber);
-    nTestNetNewLogicBlockNumber = gArgs.GetArg("-testnetNewLogicBlockNumber", testnetNewLogicBlockNumber);
     nTokenSupportBlockNumber = gArgs.GetArg("-tokenSupportBlockNumber", tokenSupportBlockNumber);
     LogPrintf("Param nMainnetNewLogicBlockNumber = %d\n",nMainnetNewLogicBlockNumber);
-    LogPrintf("Param testnetNewLogicBlockNumber = %d\n",nTestNetNewLogicBlockNumber);
 
     if (!bitdb.Open(GetDataDir()))
     {

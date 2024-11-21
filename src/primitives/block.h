@@ -27,7 +27,6 @@ static const int
 static const unsigned char MAXIMUM_N_FACTOR = 25;  //30; since uint32_t fails on 07 Feb 2106 06:28:15 GMT
                                                    //    when stored as an uint32_t in a block
                                                    //    so there is no point going past Nf = 25
-static const unsigned char YAC20_N_FACTOR = 16;
 static CCheckQueue<CScriptCheck> scriptcheckqueue(128);
 
 extern const ::int64_t
@@ -215,14 +214,6 @@ public:
 #else
                 nfactor = 4;
 #endif
-            }
-
-            if(
-               (0 != nYac20BlockNumberTime) &&
-               nTime >= (uint32_t)nYac20BlockNumberTime
-              )
-            {
-                nfactor = YAC20_N_FACTOR;
             }
 
             old_block_header oldBlock;
