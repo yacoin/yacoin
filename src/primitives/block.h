@@ -324,10 +324,10 @@ public:
             // Take last bit of block hash as entropy bit
             unsigned int nEntropyBit = ((GetHash().Get64()) & 1ULL);
             if (fDebug && gArgs.GetBoolArg("-printstakemodifier"))
-                printf(
+                LogPrintf(
                         "GetStakeEntropyBit: nTime=%" PRId64 " \nhashBlock=%s\nnEntropyBit=%u\n",
                         nTime,
-                        GetHash().ToString().c_str(),
+                        GetHash().ToString(),
                         nEntropyBit
                       );
             return nEntropyBit;
@@ -456,7 +456,7 @@ public:
 
     void print() const
     {
-        printf("CBlock(\n"
+        LogPrintf("CBlock(\n"
                 "hash=%s,\n"
                 "ver=%d,\n"
                 "hashPrevBlock=%s,\n"
@@ -467,25 +467,25 @@ public:
                 "vtx=%" PRIszu ",\n"
                 "vchBlockSig=%s\n"
                 ")\n",
-            GetHash().ToString().c_str(),
+            GetHash().ToString(),
             nVersion,
-            hashPrevBlock.ToString().c_str(),
-            hashMerkleRoot.ToString().c_str(),
+            hashPrevBlock.ToString(),
+            hashMerkleRoot.ToString(),
             nTime,
             nBits,
             nNonce,
             vtx.size(),
-            HexStr(vchBlockSig.begin(), vchBlockSig.end()).c_str()
+            HexStr(vchBlockSig.begin(), vchBlockSig.end())
               );
         for (unsigned int i = 0; i < vtx.size(); ++i)
         {
-            printf("  ");
+            LogPrintf("  ");
             vtx[i].print();
         }
-        printf("  vMerkleTree: ");
+        LogPrintf("  vMerkleTree: ");
         for (unsigned int i = 0; i < vMerkleTree.size(); ++i)
-            printf("%s ", vMerkleTree[i].ToString().substr(0,10).c_str());
-        printf("\n");
+            LogPrintf("%s ", vMerkleTree[i].ToString().substr(0,10));
+        LogPrintf("\n");
     }
 
     bool DisconnectBlock(CValidationState& state, CTxDB& txdb,

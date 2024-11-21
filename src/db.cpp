@@ -49,7 +49,7 @@ void CDBEnv::EnvShutdown()
     fDbEnvInit = false;
     int ret = dbenv.close(0);
     if (ret != 0)
-        printf("EnvShutdown exception: %s (%d)\n", DbEnv::strerror(ret), ret);
+        LogPrintf("EnvShutdown exception: %s (%d)\n", DbEnv::strerror(ret), ret);
     if (!fMockDb)
         DbEnv(0).remove(strPath.c_str(), 0);
 }
@@ -95,12 +95,12 @@ bool CDBEnv::Open(boost::filesystem::path pathEnv_)
         pathErrorFile = pathDataDir / "BerkeleyDB_wallet_ErrorFile.log";   // call it what it is
 #else
     filesystem::path pathErrorFile = pathDataDir / "db.log";
-    printf(
+    LogPrintf(
             "dbenv.open\n"
             "LogDir=%s\n"
             "ErrorFile=%s\n"
-            , pathLogDir.string().c_str()
-            , pathErrorFile.string().c_str()
+            , pathLogDir.string()
+            , pathErrorFile.string()
           );
 #endif
 
@@ -138,7 +138,7 @@ bool CDBEnv::Open(boost::filesystem::path pathEnv_)
     if (ret != 0)
         return error("CDB() : error %s (%d) opening database environment", DbEnv::strerror(ret), ret);
 #ifdef _MSC_VER
-    (void)printf(
+    LogPrintf(
         "\n"                // kind of important, so give it its own space
         "CDBEnv::Open()'ed successfully) on dbenv.open() the BerkeleyDB DbEnv wallet code"
         "\n"
@@ -149,9 +149,9 @@ bool CDBEnv::Open(boost::filesystem::path pathEnv_)
         "ErrorFile=[MainDir]/%s"  // was kind of a misnomer (maybe it was never fixed?)
         "\n"
         "",
-        pathEnv.string().c_str(),
-        pathLogDir.filename().string().c_str(),     // a bit tricky since it's a directory!
-        pathErrorFile.filename().string().c_str()
+        pathEnv.string(),
+        pathLogDir.filename().string(),     // a bit tricky since it's a directory!
+        pathErrorFile.filename().string()
                 );
 #endif
     fDbEnvInit = true;
@@ -168,7 +168,7 @@ bool CDBEnv::Open(boost::filesystem::path pathEnv_)
         nBlocks = nMaxLocks / 48768;
         nDeepReorg = (nBlocks - 1) / 2;
 
-        printf("Final lk_max_locks is %lu, sufficient for (worst case) %d block%s in a single transaction (up to a %d-deep reorganization)\n", (unsigned long)nMaxLocks, nBlocks, (nBlocks == 1) ? "" : "s", nDeepReorg);
+        LogPrintf("Final lk_max_locks is %lu, sufficient for (worst case) %d block%s in a single transaction (up to a %d-deep reorganization)\n", (unsigned long)nMaxLocks, nBlocks, (nBlocks == 1) ? "" : "s", nDeepReorg);
         if (nDeepReorg < 3)
         {
             if (nBlocks < 1)
@@ -177,7 +177,7 @@ bool CDBEnv::Open(boost::filesystem::path pathEnv_)
                 strMessage = strprintf(_("Warning: DB_CONFIG has set_lk_max_locks %lu, which may be too low for a common blockchain reorganization. If this limit is reached, Yacoin may stop working."), (unsigned long)nMaxLocks);
 
             strMiscWarning = strMessage;
-            printf("*** %s\n", strMessage.c_str());
+            LogPrintf("*** %s\n", strMessage);
         }
     }
 #endif
@@ -193,7 +193,7 @@ void CDBEnv::MakeMock()
     if (fShutdown)
         throw runtime_error("CDBEnv::MakeMock(): during shutdown");
 
-    printf("CDBEnv::MakeMock()\n");
+    LogPrintf("CDBEnv::MakeMock()\n");
 
     dbenv.set_cachesize(1, 0, 1);
     dbenv.set_lg_bsize(10485760*4);
@@ -250,7 +250,7 @@ bool CDBEnv::Salvage(std::string strFile, bool fAggressive,
     int result = db.verify(strFile.c_str(), NULL, &strDump, flags);
     if (result != 0)
     {
-        printf("ERROR: db salvage failed\n");
+        LogPrintf("ERROR: db salvage failed\n");
         return false;
     }
 
@@ -425,7 +425,7 @@ bool CDB::Rewrite(const string& strFile, const char* pszSkip)
                 bitdb.mapFileUseCount.erase(strFile);
 
                 bool fSuccess = true;
-                printf("Rewriting %s...\n", strFile.c_str());
+                LogPrintf("Rewriting %s...\n", strFile);
                 string strFileRes = strFile + ".rewrite";
                 { // surround usage of db with extra {}
                     CDB db(strFile.c_str(), "r");
@@ -439,7 +439,7 @@ bool CDB::Rewrite(const string& strFile, const char* pszSkip)
                                             0);
                     if (ret > 0)
                     {
-                        printf("Cannot create database file %s\n", strFileRes.c_str());
+                        LogPrintf("Cannot create database file %s\n", strFileRes);
                         fSuccess = false;
                     }
 
@@ -495,7 +495,7 @@ bool CDB::Rewrite(const string& strFile, const char* pszSkip)
                         fSuccess = false;
                 }
                 if (!fSuccess)
-                    printf("Rewriting of %s FAILED!\n", strFileRes.c_str());
+                    LogPrintf("Rewriting of %s FAILED!\n", strFileRes);
                 return fSuccess;
             }
         }
@@ -511,7 +511,7 @@ void CDBEnv::Flush(bool fShutdown)
     // Flush log data to the actual data file
     //  on all files that are not in use
     if (fDebug)
-        printf("Flush(%s)%s\n", fShutdown ? "true" : "false", fDbEnvInit ? "" : " db not started");
+        LogPrintf("Flush(%s)%s\n", fShutdown ? "true" : "false", fDbEnvInit ? "" : " db not started");
     if (!fDbEnvInit)
         return;
     {
@@ -521,25 +521,25 @@ void CDBEnv::Flush(bool fShutdown)
         {
             string strFile = (*mi).first;
             int nRefCount = (*mi).second;
-            printf("%s refcount=%d\n", strFile.c_str(), nRefCount);
+            LogPrintf("%s refcount=%d\n", strFile, nRefCount);
             if (nRefCount == 0)
             {
                 // Move log data to the dat file
                 CloseDb(strFile);
-                printf("%s checkpoint\n", strFile.c_str());
+                LogPrintf("%s checkpoint\n", strFile);
                 dbenv.txn_checkpoint(0, 0, 0);
                 if (!IsChainFile(strFile) || fDetachDB) {
-                    printf("%s detach\n", strFile.c_str());
+                    LogPrintf("%s detach\n", strFile);
                     if (!fMockDb)
                         dbenv.lsn_reset(strFile.c_str(), 0);
                 }
-                printf("%s closed\n", strFile.c_str());
+                LogPrintf("%s closed\n", strFile);
                 mapFileUseCount.erase(mi++);
             }
             else
                 mi++;
         }
-        printf(
+        LogPrintf(
                 "DBFlush(%s)%s ended %15" PRId64 "ms\n", 
                 fShutdown ? "true" : "false", 
                 fDbEnvInit ? "" : " db not started", 

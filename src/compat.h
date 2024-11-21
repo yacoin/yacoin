@@ -21,7 +21,6 @@
 #include <mswsock.h>
 #include <ws2tcpip.h>
 #include <cstdint>  // For uint32_t
-#include <cstdio>   // For printf
 #else
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -79,23 +78,7 @@ inline int myclosesocket(SOCKET& hSocket)
         return WSAENOTSOCK;
 #ifdef WIN32
     ++nHowManyValidCloses;
-    int 
-        ret = closesocket(hSocket);
-
-    if( fDebug )
-    {
-        if( ret != 0 )
-            (void)printf(
-                        "\n"
-                        "myclosesocket (count, valid %u, %u) returns %d"
-                        "\n"
-                        "\n"
-                        , nHowManyCloses
-                        , nHowManyValidCloses
-                        , ret
-                        );
-    }
-    //int ret = 0;    //closesocket(hSocket);
+    int ret = closesocket(hSocket);
 #else
     int ret = close(hSocket);
 #endif

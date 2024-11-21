@@ -425,9 +425,10 @@ public:
         // the key is the earliest time the request can be sent
         ::int64_t &nRequestTime = mapAlreadyAskedFor[inv];
         if (fDebugNet)
-            printf("askfor %s   %" PRId64 " (%s)\n", inv.ToString().c_str(),
-                   nRequestTime,
-                   DateTimeStrFormat("%H:%M:%S", nRequestTime / 1000000).c_str());
+          LogPrintf(
+              "askfor %s   %" PRId64 " (%s)\n", inv.ToString(),
+              nRequestTime,
+              DateTimeStrFormat("%H:%M:%S", nRequestTime / 1000000));
 
         // Make sure not to reuse time indexes to keep things in the same order
         ::int64_t nNow = GetTimeMicros() - 1000000;
@@ -450,7 +451,7 @@ public:
         vSend << CMessageHeader(pszCommand, 0);
         nMessageStart = (::uint32_t)vSend.size();
         if (fDebug)
-            printf("sending: %s to node %s", pszCommand, addrName.c_str());
+            LogPrintf("sending: %s to node %s\n", pszCommand, addrName);
     }
 
     void AbortMessage()
@@ -463,7 +464,7 @@ public:
         LEAVE_CRITICAL_SECTION(cs_vSend);
 
         if (fDebug)
-            printf("(aborted)\n");
+            LogPrintf("(aborted)\n");
     }
 
     void EndMessage()
@@ -471,7 +472,7 @@ public:
         if (gArgs.IsArgSet("-dropmessagestest") &&
             GetRand(atoi(gArgs.GetArg("-dropmessagestest", "0"))) == 0)
         {
-            printf("dropmessages DROPPING SEND MESSAGE\n");
+            LogPrintf("dropmessages DROPPING SEND MESSAGE\n");
             AbortMessage();
             return;
         }
@@ -498,7 +499,7 @@ public:
 
         if (fDebug)
         {
-            printf("(%d bytes)\n", nSize);
+            LogPrintf("(%d bytes)\n", nSize);
         }
 
         nHeaderStart = -1;

@@ -353,15 +353,6 @@ const int COINdecimalPower = 16;     // i.e. log10( COIN )
 #define UINTBEGIN(a)        ((::uint32_t*)&(a))
 #define CUINTBEGIN(a)        ((const ::uint32_t*)&(a))
 
-#ifndef THROW_WITH_STACKTRACE
-#define THROW_WITH_STACKTRACE(exception)  \
-{                                         \
-    LogStackTrace();                      \
-    throw (exception);                    \
-}
-void LogStackTrace();
-#endif
-
 /* Format characters for (s)size_t and ptrdiff_t */
 #if defined(_MSC_VER) || defined(__MSVCRT__)
 //#if defined(_MSC_VER)
@@ -457,7 +448,6 @@ inline void Sleep(::int64_t n)
 #define ATTR_WARN_PRINTF(X,Y)
 #endif
 
-//#define printf OutputDebugStringF
 extern bool 
     fDebug,
     fDebugNet,
@@ -488,8 +478,6 @@ extern unsigned char MAXIMUM_YAC1DOT0_N_FACTOR;
 extern void DoProgress( int nCount, int nTotalToScan, ::int64_t n64MsStartTime );
 #endif
 
-int ATTR_WARN_PRINTF(1,2) OutputDebugStringF(const char* pszFormat, ...);
-
 /*
   Rationale for the real_strprintf / strprintf construction:
     It is not allowed to use va_start with a pass-by-reference argument.
@@ -505,13 +493,6 @@ std::string ATTR_WARN_PRINTF(1,3) real_strprintf(const char *format, int dummy, 
 std::string real_strprintf(const std::string &format, int dummy, ...);
 #define strprintf(format, ...) real_strprintf(format, 0, __VA_ARGS__)
 std::string vstrprintf(const char *format, va_list ap);
-/* Redefine printf so that it directs output to debug.log
- *
- * Do this *after* defining the other printf-like functions, because otherwise the
- * __attribute__((format(printf,X,Y))) gets expanded to __attribute__((format(OutputDebugStringF,X,Y)))
- * which confuses gcc.
- */
-#define printf OutputDebugStringF
 
 extern unsigned long long getTotalSystemMemory( void );
 void LogException(std::exception* pex, const char* pszThread);
@@ -551,17 +532,6 @@ inline std::string leftTrim(std::string src, char chr)
         src.erase(0, pos);
 
     return src;
-}
-
-template<typename T>
-void PrintHex(const T pbegin, const T pend, const char* pszFormat="%s", bool fSpaces=true)
-{
-    printf(pszFormat, HexStr(pbegin, pend, fSpaces).c_str());
-}
-
-inline void PrintHex(const std::vector<unsigned char>& vch, const char* pszFormat="%s", bool fSpaces=true)
-{
-    printf(pszFormat, HexStr(vch, fSpaces).c_str());
 }
 
 template<typename T>

@@ -181,8 +181,6 @@ int GetMaxConnections()
     count = max(count, MIN_CONNECTIONS);
     count = min(count, MAX_CONNECTIONS);
 
-    // printf( "GetMaxConnections() = %d\n", count );
-
     return count;
 }
 
@@ -197,8 +195,6 @@ static int GetMaxOutboundConnections()
     count = max(count, MIN_OUTBOUND_CONNECTIONS);
     count = min(count, MAX_OUTBOUND_CONNECTIONS);
     count = min(count, GetMaxConnections());
-
-    // printf( "GetMaxOutboundConnections() = %d\n", count );
 
     return count;
 }
@@ -251,7 +247,7 @@ void clearLocalSocketError(SOCKET hSocket)
     if (SOCKET_ERROR ==
         getsockopt(hSocket, SOL_SOCKET, SO_ERROR, (char *)(&nRet), &nRetSize))
     {
-        printf("getsockopt( SO_ERROR ) failed with error code = %i\n",
+        LogPrintf("getsockopt( SO_ERROR ) failed with error code = %i\n",
                WSAGetLastError());
     }
 #else
@@ -301,7 +297,7 @@ bool RecvLine(SOCKET hSocket, string &strLine)
             if (nBytes == 0)
             {
                 // socket closed
-                printf("socket closed\n");
+                LogPrintf("socket closed\n");
                 return false;
             }
             else
@@ -309,7 +305,7 @@ bool RecvLine(SOCKET hSocket, string &strLine)
                 // socket error
                 int nErr = WSAGetLastError();
 
-                printf("recv failed: %d\n", nErr);
+                LogPrintf("recv failed: %d\n", nErr);
                 clearLocalSocketError(hSocket);
                 return false;
             }
@@ -357,7 +353,7 @@ bool AddLocal(const CService &addr, int nScore)
     if (IsLimited(addr))
         return false;
 
-    printf("AddLocal(%s,%i)\n", addr.ToString().c_str(), nScore);
+    LogPrintf("AddLocal(%s,%i)\n", addr.ToString(), nScore);
 
     {
         LOCK(cs_mapLocalHost);
@@ -452,9 +448,9 @@ bool GetMyExternalIP(CNetAddr &ipRet)
     if (rc >= 0)
     {
         ipRet = CNetAddr(mapped.sin_addr);
-        printf("GetExternalIPbySTUN(%" PRIu64
+        LogPrintf("GetExternalIPbySTUN(%" PRIu64
                ") returned %s in attempt %d; Server=%s\n",
-               rnd, ipRet.ToStringIP().c_str(), rc, srv);
+               rnd, ipRet.ToStringIP(), rc, srv);
         return true;
     }
     return false;
@@ -469,8 +465,8 @@ void ThreadGetMyExternalIP(void *parg)
 
     if (GetMyExternalIP(addrLocalHost))
     {
-        printf("GetMyExternalIP() returned %s\n",
-               addrLocalHost.ToStringIP().c_str());
+        LogPrintf("GetMyExternalIP() returned %s\n",
+               addrLocalHost.ToStringIP());
         AddLocal(addrLocalHost, LOCAL_HTTP);
     }
 }
@@ -542,25 +538,23 @@ CNode *ConnectNode(CAddress addrConnect, const char *pszDest,
     /// debug print
     if (fDebug)
     {
-        printf("trying connection ");
+        LogPrintf("trying connection ");
         if (pszDest)
         {
-            printf("%s\n", pszDest);
+            LogPrintf("%s\n", pszDest);
         }
         else
         {
-            printf("%s\n",
-                   strprintf(
-                       " %s, last seen = %s", addrConnect.ToString().c_str(),
-                       ((double)(GetAdjustedTime() - addrConnect.nTime) / 3600.0 > 24)
-                           ? "days"
-                           : strprintf("%.1lfhrs", (double)(GetAdjustedTime() -
-                                                            addrConnect.nTime) /
-                                                       3600.0)
-                                 .c_str())
-                       .c_str());
-            // printf( "%s lastseen=%.1fhrs\n", addrConnect.ToString().c_str(),
-            // (double)(GetAdjustedTime() - addrConnect.nTime)/3600.0 > 24 );
+          LogPrintf(
+              "%s\n",
+              strprintf(
+                  " %s, last seen = %s", addrConnect.ToString(),
+                  ((double)(GetAdjustedTime() - addrConnect.nTime) / 3600.0 >
+                   24)
+                      ? "days"
+                      : strprintf("%.1lfhrs", (double)(GetAdjustedTime() -
+                                                       addrConnect.nTime) /
+                                                  3600.0)));
         }
     }
     // Connect
@@ -572,22 +566,22 @@ CNode *ConnectNode(CAddress addrConnect, const char *pszDest,
         addrman.Attempt(addrConnect);
 
         /// debug print
-        printf("connected %s\n",
-               pszDest ? pszDest : addrConnect.ToString().c_str());
+        LogPrintf("connected %s\n",
+               pszDest ? pszDest : addrConnect.ToString());
 
         // Set to non-blocking
 #ifdef WIN32
         u_long nOne = 1;
         if (SOCKET_ERROR == ioctlsocket(hSocket, FIONBIO, &nOne))
         {
-            printf("ConnectSocket() : ioctlsocket non-blocking setting failed, error "
+            LogPrintf("ConnectSocket() : ioctlsocket non-blocking setting failed, error "
                    "%d\n",
                    WSAGetLastError());
             clearLocalSocketError(hSocket);
         }
 #else
         if (fcntl(hSocket, F_SETFL, O_NONBLOCK) == SOCKET_ERROR)
-            printf("ConnectSocket() : fcntl non-blocking setting failed, error %d\n",
+            LogPrintf("ConnectSocket() : fcntl non-blocking setting failed, error %d\n",
                    errno);
 #endif
 
@@ -643,12 +637,12 @@ void CNode::CloseSocketDisconnect()
     {
         int nErr = closesocket(hSocket);
 
-        printf("disconnecting node %s, lastsend = %s, lastrecv = %s, conntime = "
+        LogPrintf("disconnecting node %s, lastsend = %s, lastrecv = %s, conntime = "
                "%s, startingheight = %d\n",
                addrName.c_str(),
-               DateTimeStrFormat("%Y-%m-%d %H:%M:%S", nLastSend).c_str(),
-               DateTimeStrFormat("%Y-%m-%d %H:%M:%S", nLastRecv).c_str(),
-               DateTimeStrFormat("%Y-%m-%d %H:%M:%S", nTimeConnected).c_str(),
+               DateTimeStrFormat("%Y-%m-%d %H:%M:%S", nLastSend),
+               DateTimeStrFormat("%Y-%m-%d %H:%M:%S", nLastRecv),
+               DateTimeStrFormat("%Y-%m-%d %H:%M:%S", nTimeConnected),
                nStartingHeight);
         if (nErr)
         { // close socket errored!
@@ -679,14 +673,14 @@ void CNode::CloseSocketDisconnect()
                 // The socket is marked as nonblocking, but the l_onoff
                 // member of the linger structure is                     :
 
-                printf("(%s)", pc);
+                LogPrintf("(%s)\n", pc);
                 break;
             default:
                 break;
             }
 #endif
         }
-        printf("\n");
+        LogPrintf("\n");
         clearLocalSocketError(hSocket);
         hSocket = INVALID_SOCKET;
         vRecv.clear();
@@ -734,14 +728,15 @@ void CNode::PushVersion()
     }
 
     RAND_bytes((unsigned char *)&nLocalHostNonce, sizeof(nLocalHostNonce));
-    printf("\n"
-           "sending version message: version %d, blocks=%d,"
-           "\n"
-           "us=%s, them=%s, peer=%s"
-           "\n"
-           "\n",
-           PROTOCOL_VERSION, chainActive.Height(), addrMe.ToString().c_str(),
-           addrYou.ToString().c_str(), addr.ToString().c_str());
+    LogPrintf(
+        "\n"
+        "sending version message: version %d, blocks=%d,"
+        "\n"
+        "us=%s, them=%s, peer=%s"
+        "\n"
+        "\n",
+        PROTOCOL_VERSION, chainActive.Height(), addrMe.ToString(),
+        addrYou.ToString(), addr.ToString());
     PushMessage(
         "version", PROTOCOL_VERSION, nLocalServices, nTime, addrYou, addrMe,
         nLocalHostNonce,
@@ -824,7 +819,7 @@ void ThreadSocketHandler(void *parg)
         --vnThreadsRunning[THREAD_SOCKETHANDLER];
         throw; // support pthread_cancel()
     }
-    printf("ThreadSocketHandler exited\n");
+    LogPrintf("ThreadSocketHandler exited\n");
 }
 
 static void updatePreviousNodecountIf(vector<CNode *> &vNodes,
@@ -840,12 +835,12 @@ static void updatePreviousNodecountIf(vector<CNode *> &vNodes,
             sWhichWay = "up";
 
 #ifdef _MSC_VER
-        (void)printf("\n"
+        LogPrintf("\n"
                      "connection count %s from %d to %d"
                      "\n"
                      "\n"
                      "",
-                     sWhichWay.c_str(), nPrevNodeCount, nNewSize);
+                     sWhichWay, nPrevNodeCount, nNewSize);
 #endif
         nPrevNodeCount = nNewSize;
         uiInterface.NotifyNumConnectionsChanged(nNewSize);
@@ -894,7 +889,7 @@ static void updatePreviousNodecountIf(vector<CNode *> &vNodes,
 
 void ThreadSocketHandler2(void *parg)
 {
-    printf("ThreadSocketHandler2 started\n");
+    LogPrintf("ThreadSocketHandler2 started\n");
 
     list<CNode *> vNodesDisconnected;
 
@@ -907,8 +902,7 @@ void ThreadSocketHandler2(void *parg)
     while (true)
     {
         if (fDebug)
-            (void)printf("ThreadSocketHandler2 is looping"
-                         "\n");
+            LogPrintf("ThreadSocketHandler2 is looping\n");
         //
         // Disconnect nodes
         //
@@ -930,8 +924,8 @@ void ThreadSocketHandler2(void *parg)
                     // release outbound grant (if any)
                     pnode->grantOutbound.Release();
 
-                    printf("(Node %s) Disconnect unused node, pnode->fDisconnect = %d\n",
-                           pnode->addrName.c_str(), pnode->fDisconnect);
+                    LogPrintf("(Node %s) Disconnect unused node, pnode->fDisconnect = %d\n",
+                           pnode->addrName, pnode->fDisconnect);
                     pnode->CloseSocketDisconnect();
                     pnode->Cleanup();
 
@@ -1042,8 +1036,8 @@ void ThreadSocketHandler2(void *parg)
                     TRY_LOCK(pnode->cs_vSend, lockSend);
                     if (lockSend && !pnode->vSend.empty())
                     {
-                        printf("(Node %s) There is a message will be sent to node\n",
-                               pnode->addrName.c_str());
+                        LogPrintf("(Node %s) There is a message will be sent to node\n",
+                               pnode->addrName);
                         FD_SET(pnode->hSocket, &fdsetSend);
                     }
                 }
@@ -1063,7 +1057,7 @@ void ThreadSocketHandler2(void *parg)
             if (have_fds)
             {
                 int nErr = WSAGetLastError();
-                printf("socket select error %d\n", nErr);
+                LogPrintf("socket select error %d\n", nErr);
 
                 for (unsigned int i = 0; i <= hSocketMax; ++i)
                     FD_SET(i, &fdsetRecv);
@@ -1098,7 +1092,7 @@ void ThreadSocketHandler2(void *parg)
                 if (hSocket != INVALID_SOCKET)
                 {
                     if (!addr.SetSockAddr((const struct sockaddr *)&sockaddr))
-                        printf("Warning: Unknown socket family\n");
+                        LogPrintf("Warning: Unknown socket family\n");
                 }
 
                 int nInbound = 0; // does this mean false? Or something else??
@@ -1116,7 +1110,7 @@ void ThreadSocketHandler2(void *parg)
 
                     if (nErr != WSAEWOULDBLOCK)
                     {
-                        printf("socket error accept failed: %d\n", nErr);
+                        LogPrintf("socket error accept failed: %d\n", nErr);
                         clearLocalSocketError(hSocket);
                     }
                 }
@@ -1126,10 +1120,10 @@ void ThreadSocketHandler2(void *parg)
                     // MAX_OUTBOUND_CONNECTIONS)
                     if (nInbound >= GetMaxConnections() - GetMaxOutboundConnections())
                     {
-                        printf(
+                        LogPrintf(
                             "close connection %s due to reaching maximum connection, "
                             "GetMaxConnections() = %d, GetMaxOutboundConnections() = %d\n",
-                            addr.ToString().c_str(), GetMaxConnections(),
+                            addr.ToString(), GetMaxConnections(),
                             GetMaxOutboundConnections());
                         {
                             LOCK(cs_setservAddNodeAddresses);
@@ -1141,13 +1135,13 @@ void ThreadSocketHandler2(void *parg)
                     {
                         if (CNode::IsBanned(addr))
                         {
-                            printf("connection from %s dropped (banned)\n",
-                                   addr.ToString().c_str());
+                            LogPrintf("connection from %s dropped (banned)\n",
+                                   addr.ToString());
                             (void)closesocket(hSocket);
                         }
                         else
                         {
-                            printf("accepted connection %s\n", addr.ToString().c_str());
+                            LogPrintf("accepted connection %s\n", addr.ToString());
                             CNode *pnode = new CNode(hSocket, addr, "", true);
                             pnode->AddRef();
                             {
@@ -1198,12 +1192,15 @@ void ThreadSocketHandler2(void *parg)
                     if (nPos > ReceiveBufferSize())
                     {
                         if (!pnode->fDisconnect)
-                            printf("(Node %s) socket recv flood control disconnect (%" PRIszu
-                                   " bytes)\n",
-                                   pnode->addrName.c_str(), vRecv.size());
-                        printf("(Node %s) Close connection to node due to receive buffer "
-                               "overflow (%" PRIszu " bytes)\n",
-                               pnode->addrName.c_str(), vRecv.size());
+                          LogPrintf(
+                              "(Node %s) socket recv flood control disconnect "
+                              "(%" PRIszu " bytes)\n",
+                              pnode->addrName, vRecv.size());
+                        LogPrintf(
+                            "(Node %s) Close connection to node due to receive "
+                            "buffer "
+                            "overflow (%" PRIszu " bytes)\n",
+                            pnode->addrName, vRecv.size());
                         pnode->CloseSocketDisconnect();
                     }
                     else
@@ -1218,8 +1215,8 @@ void ThreadSocketHandler2(void *parg)
                         {
                             vRecv.resize(nPos + nBytes);
                             memcpy(&vRecv[nPos], pchBuf, nBytes);
-                            printf("(Node %s) Received %d bytes from node\n",
-                                   pnode->addrName.c_str(), nBytes);
+                            LogPrintf("(Node %s) Received %d bytes from node\n",
+                                   pnode->addrName, nBytes);
                             pnode->nLastRecv = GetTime();
                             pnode->nRecvBytes += nBytes;
                             pnode->RecordBytesRecv(nBytes);
@@ -1229,10 +1226,10 @@ void ThreadSocketHandler2(void *parg)
                             if (nBytes == 0)
                             { // socket closed gracefully
                                 if (!pnode->fDisconnect)
-                                    printf("socket closed\n");
-                                printf("(Node %s) Close connection to node gracefully (closed "
+                                    LogPrintf("socket closed\n");
+                                LogPrintf("(Node %s) Close connection to node gracefully (closed "
                                        "from remote)\n",
-                                       pnode->addrName.c_str());
+                                       pnode->addrName);
                                 pnode->CloseSocketDisconnect();
                             }
                             else
@@ -1242,7 +1239,7 @@ void ThreadSocketHandler2(void *parg)
                                     if (SOCKET_ERROR != nBytes)
                                     {
                                         // now here we have something really interesting!
-                                        printf("socket recv return error code %d\n", nBytes);
+                                        LogPrintf("socket recv return error code %d\n", nBytes);
                                     }
                                     int nErr = WSAGetLastError();
 
@@ -1267,7 +1264,7 @@ void ThreadSocketHandler2(void *parg)
                                         if (!pnode->fDisconnect) // socket recv error 10054
                                         {
 #ifdef WIN32
-                                            printf("socket recv error %d (%s)\n", nErr,
+                                            LogPrintf("socket recv error %d (%s)\n", nErr,
                                                    iGetLastErrorText(nErr)); //<<<<<<<<<<<<<<<<<< this
                                                                              //was the only unguarded
                                             // these are the error codes that cause a disconnect
@@ -1347,9 +1344,9 @@ void ThreadSocketHandler2(void *parg)
                                             }
 #endif
                                         }
-                                        printf("(Node %s) Close connection to node due to error "
+                                        LogPrintf("(Node %s) Close connection to node due to error "
                                                "code = %d (%s)\n",
-                                               pnode->addrName.c_str(), nErr, strerror(nErr));
+                                               pnode->addrName, nErr, strerror(nErr));
                                         pnode->CloseSocketDisconnect();
                                     }
                                     // the implication here is
@@ -1448,8 +1445,8 @@ void ThreadSocketHandler2(void *parg)
                                           MSG_NOSIGNAL | MSG_DONTWAIT);
                         if (nBytes > 0)
                         {
-                            printf("(Node %s) Sending successfully nBytes = %d\n",
-                                   pnode->addrName.c_str(), nBytes);
+                            LogPrintf("(Node %s) Sending successfully nBytes = %d\n",
+                                   pnode->addrName, nBytes);
                             vSend.erase(vSend.begin(), vSend.begin() + nBytes);
                             pnode->nLastSend = GetTime();
                             pnode->nSendBytes += nBytes;
@@ -1459,13 +1456,13 @@ void ThreadSocketHandler2(void *parg)
                         {
                             // error
                             int nErr = WSAGetLastError();
-                            printf("(Node %s) Sending failed with error code = %d (%s)\n",
-                                   pnode->addrName.c_str(), nErr, strerror(nErr));
+                            LogPrintf("(Node %s) Sending failed with error code = %d (%s)\n",
+                                   pnode->addrName, nErr, strerror(nErr));
                             if ((nErr != WSAEWOULDBLOCK) && (nErr != WSAEMSGSIZE) &&
                                 (nErr != WSAEINTR) && (nErr != WSAEINPROGRESS))
                             {
-                                printf("(Node %s) socket send error %d\n",
-                                       pnode->addrName.c_str(), nErr);
+                                LogPrintf("(Node %s) socket send error %d\n",
+                                       pnode->addrName, nErr);
                                 clearLocalSocketError(pnode->hSocket);
                                 pnode->CloseSocketDisconnect();
                             }
@@ -1491,8 +1488,8 @@ void ThreadSocketHandler2(void *parg)
                 {
                     if (pnode->nLastRecv == 0 || pnode->nLastSend == 0)
                     {
-                        printf("(Node %s) socket no message in first 60 seconds, %d %d\n",
-                               pnode->addrName.c_str(), pnode->nLastRecv != 0,
+                        LogPrintf("(Node %s) socket no message in first 60 seconds, %d %d\n",
+                               pnode->addrName, pnode->nLastRecv != 0,
                                pnode->nLastSend != 0);
                         pnode->fDisconnect = true;
                     }
@@ -1503,7 +1500,7 @@ void ThreadSocketHandler2(void *parg)
                             GetTime() - pnode->nLastSendEmpty > (90 * 60) // "
                         )
                         {
-                            printf("(Node %s) socket not sending\n", pnode->addrName.c_str());
+                            LogPrintf("(Node %s) socket not sending\n", pnode->addrName);
                             pnode->fDisconnect = true;
                         }
                         else
@@ -1511,8 +1508,7 @@ void ThreadSocketHandler2(void *parg)
                             if (GetTime() - pnode->nLastRecv >
                                 (90 * 60)) // is this 90 minutes?
                             {
-                                printf("(Node %s) socket inactivity timeout\n",
-                                       pnode->addrName.c_str());
+                                LogPrintf("(Node %s) socket inactivity timeout\n", pnode->addrName);
                                 pnode->fDisconnect = true;
                             }
                         }
@@ -1535,7 +1531,7 @@ void ThreadSocketHandler2(void *parg)
 #ifdef USE_UPNP
 void ThreadMapPort2(void *parg)
 {
-    printf("ThreadMapPort started\n");
+    LogPrintf("ThreadMapPort started\n");
 
     std::string port = strprintf("%u", GetListenPort());
     const char *multicastif = 0;
@@ -1565,16 +1561,16 @@ void ThreadMapPort2(void *parg)
             r = UPNP_GetExternalIPAddress(urls.controlURL, data.first.servicetype,
                                           externalIPAddress);
             if (r != UPNPCOMMAND_SUCCESS)
-                printf("UPnP: GetExternalIPAddress() returned %d\n", r);
+                LogPrintf("UPnP: GetExternalIPAddress() returned %d\n", r);
             else
             {
                 if (externalIPAddress[0])
                 {
-                    printf("UPnP: ExternalIPAddress = %s\n", externalIPAddress);
+                    LogPrintf("UPnP: ExternalIPAddress = %s\n", externalIPAddress);
                     AddLocal(CNetAddr(externalIPAddress), LOCAL_UPNP);
                 }
                 else
-                    printf("UPnP: GetExternalIPAddress failed.\n");
+                    LogPrintf("UPnP: GetExternalIPAddress failed.\n");
             }
         }
 
@@ -1592,10 +1588,10 @@ void ThreadMapPort2(void *parg)
 #endif
 
         if (r != UPNPCOMMAND_SUCCESS)
-            printf("AddPortMapping(%s, %s, %s) failed with code %d (%s)\n",
-                   port.c_str(), port.c_str(), lanaddr, r, strupnperror(r));
+            LogPrintf("AddPortMapping(%s, %s, %s) failed with code %d (%s)\n",
+                   port, port, lanaddr, r, strupnperror(r));
         else
-            printf("UPnP Port Mapping successful.\n");
+            LogPrintf("UPnP Port Mapping successful.\n");
         int i = 1;
         while (true)
         {
@@ -1603,7 +1599,7 @@ void ThreadMapPort2(void *parg)
             {
                 r = UPNP_DeletePortMapping(urls.controlURL, data.first.servicetype,
                                            port.c_str(), "TCP", 0);
-                printf("UPNP_DeletePortMapping() returned : %d\n", r);
+                LogPrintf("UPNP_DeletePortMapping() returned : %d\n", r);
                 freeUPNPDevlist(devlist);
                 devlist = 0;
                 FreeUPNPUrls(&urls);
@@ -1624,10 +1620,10 @@ void ThreadMapPort2(void *parg)
 #endif
 
                 if (r != UPNPCOMMAND_SUCCESS)
-                    printf("AddPortMapping(%s, %s, %s) failed with code %d (%s)\n",
-                           port.c_str(), port.c_str(), lanaddr, r, strupnperror(r));
+                    LogPrintf("AddPortMapping(%s, %s, %s) failed with code %d (%s)\n",
+                           port, port, lanaddr, r, strupnperror(r));
                 else
-                    printf("UPnP Port Mapping successful.\n");
+                    LogPrintf("UPnP Port Mapping successful.\n");
                 ;
             }
             Sleep(2000);
@@ -1636,7 +1632,7 @@ void ThreadMapPort2(void *parg)
     }
     else
     {
-        printf("No valid UPnP IGDs found\n");
+        LogPrintf("No valid UPnP IGDs found\n");
         freeUPNPDevlist(devlist);
         devlist = 0;
         if (r != 0)
@@ -1671,7 +1667,7 @@ void ThreadMapPort(void *parg)
         vnThreadsRunning[THREAD_UPNP]--;
         PrintException(NULL, "ThreadMapPort()");
     }
-    printf("ThreadMapPort exited\n");
+    LogPrintf("ThreadMapPort exited\n");
 }
 
 void MapPort()
@@ -1679,7 +1675,7 @@ void MapPort()
     if (fUseUPnP && vnThreadsRunning[THREAD_UPNP] < 1)
     {
         if (!NewThread(ThreadMapPort, NULL))
-            printf("Error: ThreadMapPort(ThreadMapPort) failed\n");
+            LogPrintf("Error: ThreadMapPort(ThreadMapPort) failed\n");
     }
 }
 #else
@@ -1724,17 +1720,17 @@ void ThreadDNSAddressSeed(void *parg)
         --vnThreadsRunning[THREAD_DNSSEED];
         throw; // support pthread_cancel()
     }
-    printf("ThreadDNSAddressSeed exited\n");
+    LogPrintf("ThreadDNSAddressSeed exited\n");
 }
 
 void ThreadDNSAddressSeed2(void *parg)
 {
-    printf("ThreadDNSAddressSeed2 started\n");
+    LogPrintf("ThreadDNSAddressSeed2 started\n");
     int found = 0;
 
     if (!fTestNet)
     {
-        printf("Loading addresses from DNS seeds (could take a while)\n");
+        LogPrintf("Loading addresses from DNS seeds (could take a while)\n");
 
         size_t Length = ARRAYLEN(strDNSSeed);
 
@@ -1769,7 +1765,7 @@ void ThreadDNSAddressSeed2(void *parg)
         }
     }
 
-    printf("%d addresses found from DNS seeds\n", found);
+    LogPrintf("%d addresses found from DNS seeds\n", found);
 }
 
 // YACOIN TODO update seeds
@@ -1884,7 +1880,7 @@ static void DumpAddresses()
     adb.Write(addrman);
 
     if (fDebug)
-        printf("Flushed %d addresses to peers.dat  %" PRId64 "ms\n", addrman.size(),
+        LogPrintf("Flushed %d addresses to peers.dat  %" PRId64 "ms\n", addrman.size(),
                GetTimeMillis() - nStart);
 }
 
@@ -1894,8 +1890,7 @@ void ThreadDumpAddress2(void *parg)
     while (!fShutdown)
     {
         if (fDebug)
-            (void)printf("ThreadDumpAddress2 is looping"
-                         "\n");
+            LogPrintf("ThreadDumpAddress2 is looping\n");
         DumpAddresses();
         --vnThreadsRunning[THREAD_DUMPADDRESS];
         Sleep(1 * nSecondsperMinute *
@@ -1918,7 +1913,7 @@ void ThreadDumpAddress(void *parg)
     {
         PrintException(&e, "ThreadDumpAddress()");
     }
-    printf("ThreadDumpAddress exited\n");
+    LogPrintf("ThreadDumpAddress exited\n");
 }
 
 void ThreadOpenConnections(void *parg)
@@ -1942,7 +1937,7 @@ void ThreadOpenConnections(void *parg)
         --vnThreadsRunning[THREAD_OPENCONNECTIONS];
         PrintException(NULL, "ThreadOpenConnections()");
     }
-    printf("ThreadOpenConnections exited\n");
+    LogPrintf("ThreadOpenConnections exited\n");
 }
 
 void static ProcessOneShot()
@@ -1966,7 +1961,7 @@ void static ProcessOneShot()
 
 void ThreadOpenConnections2(void *parg)
 {
-    printf("ThreadOpenConnections started\n");
+    LogPrintf("ThreadOpenConnections started\n");
 
     // Connect to specific addresses  How???
 
@@ -1985,11 +1980,11 @@ void ThreadOpenConnections2(void *parg)
                 fConnected = OpenNetworkConnection(addr, NULL, strAddr.c_str());
                 if (fConnected)
                 {
-                    printf(" connected\n");
+                    LogPrintf(" connected\n");
                 }
                 else
                 {
-                    printf(" not connected\n");
+                    LogPrintf(" not connected\n");
                 }
                 for (int i = 0; (i < 10) && (i < nLoop); ++i)
                 {
@@ -2009,7 +2004,7 @@ void ThreadOpenConnections2(void *parg)
     {
         if (fDebug && fPrintToConsole)
             if (0 == (++nLoopCounter % 100))
-                (void)printf(".01 ThreadOpenConnections2 is looping\n");
+                LogPrintf(".01 ThreadOpenConnections2 is looping\n");
         ProcessOneShot();
 
         ++vnThreadsRunning[THREAD_OPENCONNECTIONS];
@@ -2176,12 +2171,12 @@ void ThreadOpenAddedConnections(void *parg)
         --vnThreadsRunning[THREAD_ADDEDCONNECTIONS];
         PrintException(NULL, "ThreadOpenAddedConnections()");
     }
-    printf("ThreadOpenAddedConnections exited\n");
+    LogPrintf("ThreadOpenAddedConnections exited\n");
 }
 
 void ThreadOpenAddedConnections2(void *parg)
 {
-    printf("ThreadOpenAddedConnections2 started\n");
+    LogPrintf("ThreadOpenAddedConnections2 started\n");
 
     {
         LOCK(cs_vAddedNodes);
@@ -2219,7 +2214,7 @@ void ThreadOpenAddedConnections2(void *parg)
     for (::uint32_t i = 0; true; ++i) // for ever
     {
         if (fDebug && fPrintToConsole)
-            (void)printf("ThreadOpenAddedConnections2 is looping\n");
+            LogPrintf("ThreadOpenAddedConnections2 is looping\n");
         list<string> lAddresses(0);
         {
             LOCK(cs_vAddedNodes);
@@ -2389,19 +2384,19 @@ void ThreadMessageHandler(void *parg)
         --vnThreadsRunning[THREAD_MESSAGEHANDLER];
         PrintException(NULL, "ThreadMessageHandler()");
     }
-    printf("ThreadMessageHandler exited\n");
+    LogPrintf("ThreadMessageHandler exited\n");
 }
 
 void ThreadMessageHandler2(void *parg)
 {
-    printf("ThreadMessageHandler2 started\n");
+    LogPrintf("ThreadMessageHandler2 started\n");
     SetThreadPriority(THREAD_PRIORITY_BELOW_NORMAL);
     int nLoopCounter = 0;
     while (!fShutdown)
     {
         if (fDebug && nLoopCounter % 100 == 0)
         {
-            printf("ThreadMessageHandler2 is looping\n");
+            LogPrintf("ThreadMessageHandler2 is looping\n");
         }
         nLoopCounter++;
         vector<CNode *> vNodesCopy;
@@ -2434,8 +2429,7 @@ void ThreadMessageHandler2(void *parg)
             {
                 if (fDebug)
                 {
-                    (void)printf("ThreadMessageHandler2 is exiting(at 1)"
-                                 "\n");
+                    LogPrintf("ThreadMessageHandler2 is exiting(at 1)\n");
                 }
                 return;
             }
@@ -2449,8 +2443,7 @@ void ThreadMessageHandler2(void *parg)
             {
                 if (fDebug)
                 {
-                    (void)printf("ThreadMessageHandler2 is exiting(at 2)"
-                                 "\n");
+                    LogPrintf("ThreadMessageHandler2 is exiting(at 2)\n");
                 }
                 return;
             }
@@ -2474,8 +2467,7 @@ void ThreadMessageHandler2(void *parg)
         {
             if (fDebug)
             {
-                (void)printf("ThreadMessageHandler2 is exiting(at 3)"
-                             "\n");
+                LogPrintf("ThreadMessageHandler2 is exiting(at 3)\n");
             }
             return;
         }
@@ -2483,8 +2475,7 @@ void ThreadMessageHandler2(void *parg)
     }
     if (fDebug)
     {
-        (void)printf("ThreadMessageHandler2 is exiting"
-                     "\n");
+        LogPrintf("ThreadMessageHandler2 is exiting\n");
     }
 }
 
@@ -2507,7 +2498,7 @@ bool BindListenPort(const CService &addrBind, string &strError)
             strError = strprintf("Error: TCP/IP socket library failed to start "
                                  "(WSAStartup returned error %d)",
                                  ret);
-            printf("%s\n", strError.c_str());
+            LogPrintf("%s\n", strError);
             return false;
         }
 #endif
@@ -2523,7 +2514,7 @@ bool BindListenPort(const CService &addrBind, string &strError)
         {
             strError = strprintf("Error: bind address family for %s not supported",
                                  addrBind.ToString().c_str());
-            printf("%s\n", strError.c_str());
+            LogPrintf("%s\n", strError);
             return false;
         }
 
@@ -2534,7 +2525,7 @@ bool BindListenPort(const CService &addrBind, string &strError)
             strError = strprintf("Error: Couldn't open socket for incoming "
                                  "connections (socket returned error %d)",
                                  WSAGetLastError());
-            printf("%s\n", strError.c_str());
+            LogPrintf("%s\n", strError);
             clearLocalSocketError(hListenSocket);
             return false;
         }
@@ -2562,7 +2553,7 @@ bool BindListenPort(const CService &addrBind, string &strError)
             strError = strprintf("Error: Couldn't set properties on socket for "
                                  "incoming connections (error %d)",
                                  WSAGetLastError());
-            printf("%s\n", strError.c_str());
+            LogPrintf("%s\n", strError);
             clearLocalSocketError(hListenSocket);
             return false;
         }
@@ -2604,11 +2595,11 @@ bool BindListenPort(const CService &addrBind, string &strError)
                 strError = strprintf(_("Unable to bind to %s on this computer (bind "
                                        "returned error %d, %s)"),
                                      addrBind.ToString().c_str(), nErr, strerror(nErr));
-            printf("%s\n", strError.c_str());
+            LogPrintf("%s\n", strError);
             clearLocalSocketError(hListenSocket);
             return false;
         }
-        printf("Bound to %s\n", addrBind.ToString().c_str());
+        LogPrintf("Bound to %s\n", addrBind.ToString());
 
         // Listen for incoming connections
         if (listen(hListenSocket, SOMAXCONN) == SOCKET_ERROR)
@@ -2616,7 +2607,7 @@ bool BindListenPort(const CService &addrBind, string &strError)
             strError = strprintf("Error: Listening for incoming connections failed "
                                  "(listen returned error %d)",
                                  WSAGetLastError());
-            printf("%s\n", strError.c_str());
+            LogPrintf("%s\n", strError);
             clearLocalSocketError(hListenSocket);
             return false;
         }
@@ -2626,8 +2617,7 @@ bool BindListenPort(const CService &addrBind, string &strError)
         if (addrBind.IsRoutable() && fDiscover)
             AddLocal(addrBind, LOCAL_BIND);
 
-        printf("Socket %s initialized and listening\n",
-               addrBind.ToString().c_str());
+        LogPrintf("Socket %s initialized and listening\n", addrBind.ToString());
         return true;
     }
 }
@@ -2671,7 +2661,7 @@ static void Discover()
                 struct sockaddr_in *s4 = (struct sockaddr_in *)(ifa->ifa_addr);
                 CNetAddr addr(s4->sin_addr);
                 if (AddLocal(addr, LOCAL_IF))
-                    printf("IPv4 %s: %s\n", ifa->ifa_name, addr.ToString().c_str());
+                    LogPrintf("IPv4 %s: %s\n", ifa->ifa_name, addr.ToString());
             }
 #ifdef USE_IPV6
             else if (ifa->ifa_addr->sa_family == AF_INET6)
@@ -2679,7 +2669,7 @@ static void Discover()
                 struct sockaddr_in6 *s6 = (struct sockaddr_in6 *)(ifa->ifa_addr);
                 CNetAddr addr(s6->sin6_addr);
                 if (AddLocal(addr, LOCAL_IF))
-                    printf("IPv6 %s: %s\n", ifa->ifa_name, addr.ToString().c_str());
+                    LogPrintf("IPv6 %s: %s\n", ifa->ifa_name, addr.ToString());
             }
 #endif
         }
@@ -2726,41 +2716,41 @@ void StartNode(void *parg)
     //
 
     if (!gArgs.GetBoolArg("-dnsseed", true))
-        printf("DNS seeding disabled\n");
+        LogPrintf("DNS seeding disabled\n");
     else if (!NewThread(ThreadDNSAddressSeed, NULL))
-        printf("Error: NewThread(ThreadDNSAddressSeed) failed\n");
+        LogPrintf("Error: NewThread(ThreadDNSAddressSeed) failed\n");
 
     // Map ports with UPnP
     if (!fUseUPnP)
-        printf("UPNP port mapping is disabled\n");
+        LogPrintf("UPNP port mapping is disabled\n");
     else
         MapPort();
 
     // Get addresses from IRC and advertise ours
     if (!gArgs.GetBoolArg("-irc", true))
-        printf("IRC seeding disabled\n");
+        LogPrintf("IRC seeding disabled\n");
     else if (!NewThread(ThreadIRCSeed, NULL))
-        printf("Error: NewThread(ThreadIRCSeed) failed\n");
+        LogPrintf("Error: NewThread(ThreadIRCSeed) failed\n");
 
     // Send and receive from sockets, accept connections
     if (!NewThread(ThreadSocketHandler, NULL))
-        printf("Error: NewThread(ThreadSocketHandler) failed\n");
+        LogPrintf("Error: NewThread(ThreadSocketHandler) failed\n");
 
     // Initiate outbound connections from -addnode
     if (!NewThread(ThreadOpenAddedConnections, NULL))
-        printf("Error: NewThread(ThreadOpenAddedConnections) failed\n");
+        LogPrintf("Error: NewThread(ThreadOpenAddedConnections) failed\n");
 
     // Initiate outbound connections
     if (!NewThread(ThreadOpenConnections, NULL))
-        printf("Error: NewThread(ThreadOpenConnections) failed\n");
+        LogPrintf("Error: NewThread(ThreadOpenConnections) failed\n");
 
     // Process messages
     if (!NewThread(ThreadMessageHandler, NULL))
-        printf("Error: NewThread(ThreadMessageHandler) failed\n");
+        LogPrintf("Error: NewThread(ThreadMessageHandler) failed\n");
 
     // Dump network addresses
     if (!NewThread(ThreadDumpAddress, NULL))
-        printf("Error; NewThread(ThreadDumpAddress) failed\n");
+        LogPrintf("Error; NewThread(ThreadDumpAddress) failed\n");
 
     // Generate coins in the background
     GenerateYacoins(gArgs.GetBoolArg("-gen", false), pwalletMain);
@@ -2769,7 +2759,7 @@ void StartNode(void *parg)
 bool StopNode()
 {
     if (fDebug)
-        printf("StopNode()\n");
+        LogPrintf("StopNode()\n");
     fShutdown = true;
 
 #ifdef WIN32
@@ -2807,41 +2797,41 @@ bool StopNode()
     } while (true);
 
     if (vnThreadsRunning[THREAD_SOCKETHANDLER] > 0)
-        printf("ThreadSocketHandler still running\n");
+        LogPrintf("ThreadSocketHandler still running\n");
 
     if (vnThreadsRunning[THREAD_OPENCONNECTIONS] > 0)
-        printf("ThreadOpenConnections still running\n");
+        LogPrintf("ThreadOpenConnections still running\n");
 
     if (vnThreadsRunning[THREAD_MESSAGEHANDLER] > 0)
-        printf("ThreadMessageHandler still running\n");
+        LogPrintf("ThreadMessageHandler still running\n");
 
     if (vnThreadsRunning[THREAD_RPCLISTENER] > 0)
-        printf("ThreadRPCListener still running\n");
+        LogPrintf("ThreadRPCListener still running\n");
 
     if (vnThreadsRunning[THREAD_RPCHANDLER] > 0)
-        printf("ThreadsRPCServer still running\n");
+        LogPrintf("ThreadsRPCServer still running\n");
 #ifdef USE_UPNP
     if (vnThreadsRunning[THREAD_UPNP] > 0)
-        printf("ThreadMapPort still running\n");
+        LogPrintf("ThreadMapPort still running\n");
 #endif
 
     if (vnThreadsRunning[THREAD_DNSSEED] > 0)
-        printf("ThreadDNSAddressSeed still running\n");
+        LogPrintf("ThreadDNSAddressSeed still running\n");
 
     if (vnThreadsRunning[THREAD_ADDEDCONNECTIONS] > 0)
-        printf("ThreadOpenAddedConnections still running\n");
+        LogPrintf("ThreadOpenAddedConnections still running\n");
 
     if (vnThreadsRunning[THREAD_DUMPADDRESS] > 0)
-        printf("ThreadDumpAddresses still running\n");
+        LogPrintf("ThreadDumpAddresses still running\n");
 
     if (vnThreadsRunning[THREAD_MINTER] > 0)
-        printf("ThreadStakeMinter still running\n");
+        LogPrintf("ThreadStakeMinter still running\n");
 
     if (vnThreadsRunning[THREAD_SCRIPTCHECK] > 0)
-        printf("ThreadScriptCheck still running\n");
+        LogPrintf("ThreadScriptCheck still running\n");
 
     if (vnThreadsRunning[THREAD_HASHCALCULATION] > 0)
-        printf("ThreadHashCalculation still running\n");
+        LogPrintf("ThreadHashCalculation still running\n");
 
     while ((vnThreadsRunning[THREAD_MESSAGEHANDLER] > 0) ||
            (vnThreadsRunning[THREAD_RPCHANDLER] > 0) ||
@@ -2867,7 +2857,7 @@ public:
         {
 #ifdef _MSC_VER
             if (fPrintToConsole)
-                (void)printf("~CNetCleanup() destructor called...");
+                LogPrintf("~CNetCleanup() destructor called...\n");
 #endif
         }
         // Close sockets
@@ -2884,7 +2874,7 @@ public:
             {
                 if (closesocket(hListenSocket) == SOCKET_ERROR)
                 {
-                    printf("closesocket(hListenSocket) failed with error %d\n",
+                    LogPrintf("closesocket(hListenSocket) failed with error %d\n",
                            WSAGetLastError());
                     clearLocalSocketError(hListenSocket); //<<<<<<<<<<<<<only unguarded
                 }
@@ -2901,7 +2891,7 @@ public:
         {
 #ifdef _MSC_VER
             if (fPrintToConsole)
-                (void)printf(" done\n");
+                LogPrintf(" done\n");
 #endif
             Sleep(2 *
                   nMillisecondsPerSecond); // 2 seconds just to see the

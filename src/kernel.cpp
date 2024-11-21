@@ -175,7 +175,7 @@ static bool SelectBlockFromCandidates(
         }
     }
     if (fDebug && gArgs.GetBoolArg("-printstakemodifier"))
-        printf("SelectBlockFromCandidates: selection hash=%s\n", hashBest.ToString().c_str());
+        LogPrintf("SelectBlockFromCandidates: selection hash=%s\n", hashBest.ToString());
     return fSelected;
 }
 
@@ -215,13 +215,19 @@ bool ComputeNextStakeModifier(const CBlockIndex* pindexCurrent, uint64_t& nStake
         return error("ComputeNextStakeModifier: unable to get last modifier");
     if (fDebug)
     {
-        printf("ComputeNextStakeModifier: prev modifier=0x%016" PRIx64 " time=%s epoch=%u\n", nStakeModifier, DateTimeStrFormat(nModifierTime).c_str(), (unsigned int)nModifierTime);
+      LogPrintf("ComputeNextStakeModifier: prev modifier=0x%016" PRIx64
+                " time=%s epoch=%u\n",
+                nStakeModifier, DateTimeStrFormat(nModifierTime),
+                (unsigned int)nModifierTime);
     }
     if (nModifierTime / nModifierInterval >= pindexPrev->GetBlockTime() / nModifierInterval)
     {
         if (fDebug)
         {
-            printf("ComputeNextStakeModifier: no new interval keep current modifier: pindexPrev nHeight=%d nTime=%u\n", pindexPrev->nHeight, (unsigned int)pindexPrev->GetBlockTime());
+          LogPrintf(
+              "ComputeNextStakeModifier: no new interval keep current "
+              "modifier: pindexPrev nHeight=%d nTime=%u\n",
+              pindexPrev->nHeight, (unsigned int)pindexPrev->GetBlockTime());
         }
         return true;
     }
@@ -232,7 +238,11 @@ bool ComputeNextStakeModifier(const CBlockIndex* pindexCurrent, uint64_t& nStake
         {
             if (fDebug)
             {
-                printf("ComputeNextStakeModifier: no new interval keep current modifier: pindexCurrent nHeight=%d nTime=%u\n", pindexCurrent->nHeight, (unsigned int)pindexCurrent->GetBlockTime());
+              LogPrintf(
+                  "ComputeNextStakeModifier: no new interval keep current "
+                  "modifier: pindexCurrent nHeight=%d nTime=%u\n",
+                  pindexCurrent->nHeight,
+                  (unsigned int)pindexCurrent->GetBlockTime());
             }
             return true;
         }
@@ -240,7 +250,13 @@ bool ComputeNextStakeModifier(const CBlockIndex* pindexCurrent, uint64_t& nStake
         {
             if (fDebug)
             {
-                printf("ComputeNextStakeModifier: old modifier at block %s not meeting fixed modifier interval: pindexCurrent nHeight=%d nTime=%u\n", pindexCurrent->GetBlockHash().ToString().c_str(), pindexCurrent->nHeight, (unsigned int)pindexCurrent->GetBlockTime());
+              LogPrintf(
+                  "ComputeNextStakeModifier: old modifier at block %s not "
+                  "meeting fixed modifier interval: pindexCurrent nHeight=%d "
+                  "nTime=%u\n",
+                  pindexCurrent->GetBlockHash().ToString(),
+                  pindexCurrent->nHeight,
+                  (unsigned int)pindexCurrent->GetBlockTime());
             }
         }
     }
@@ -276,7 +292,11 @@ bool ComputeNextStakeModifier(const CBlockIndex* pindexCurrent, uint64_t& nStake
         // add the selected block from candidates to selected list
         mapSelectedBlocks.insert(make_pair(pindex->GetBlockHash(), pindex));
         if (fDebug && gArgs.GetBoolArg("-printstakemodifier"))
-            printf("ComputeNextStakeModifier: selected round %d stop=%s height=%d bit=%d\n", nRound, DateTimeStrFormat(nSelectionIntervalStop).c_str(), pindex->nHeight, pindex->GetStakeEntropyBit());
+          LogPrintf(
+              "ComputeNextStakeModifier: selected round %d stop=%s height=%d "
+              "bit=%d\n",
+              nRound, DateTimeStrFormat(nSelectionIntervalStop),
+              pindex->nHeight, pindex->GetStakeEntropyBit());
     }
 
     // Print selection map for visualization of the selected blocks
@@ -299,11 +319,17 @@ bool ComputeNextStakeModifier(const CBlockIndex* pindexCurrent, uint64_t& nStake
             // 'W' indicates selected proof-of-work blocks
             strSelectionMap.replace(item.second->nHeight - nHeightFirstCandidate, 1, item.second->IsProofOfStake()? "S" : "W");
         }
-        printf("ComputeNextStakeModifier: selection height [%d, %d] map %s\n", nHeightFirstCandidate, pindexPrev->nHeight, strSelectionMap.c_str());
+        LogPrintf(
+            "ComputeNextStakeModifier: selection height [%d, %d] map %s\n",
+            nHeightFirstCandidate, pindexPrev->nHeight,
+            strSelectionMap);
     }
     if (fDebug)
     {
-        printf("ComputeNextStakeModifier: new modifier=0x%016" PRIx64 " time=%s\n", nStakeModifierNew, DateTimeStrFormat(pindexPrev->GetBlockTime()).c_str());
+      LogPrintf("ComputeNextStakeModifier: new modifier=0x%016" PRIx64
+                " time=%s\n",
+                nStakeModifierNew,
+                DateTimeStrFormat(pindexPrev->GetBlockTime()));
     }
 
     nStakeModifier = nStakeModifierNew;
@@ -495,7 +521,7 @@ bool CheckStakeKernelHash(
     hashProofOfStake = Hash(ss.begin(), ss.end());
     if (fPrintProofOfStake)
     {
-        printf(
+        LogPrintf(
                 "CheckStakeKernelHash (1) : using modifier 0x%016" PRIx64 " "
                 "at height=%d "
                 "timestamp=%s "
@@ -505,11 +531,11 @@ bool CheckStakeKernelHash(
                 "",
             nStakeModifier, 
             nStakeModifierHeight,
-            DateTimeStrFormat(nStakeModifierTime).c_str(),
+            DateTimeStrFormat(nStakeModifierTime),
             mapBlockIndex[blockFrom.GetHash()]->nHeight,
-            DateTimeStrFormat(blockFrom.GetBlockTime()).c_str()
+            DateTimeStrFormat(blockFrom.GetBlockTime())
               );
-        printf(
+        LogPrintf(
             "CheckStakeKernelHash (1) : "     //check protocol=%s "
             "modifier=0x%016" PRIx64 " "
             "nTimeBlockFrom=%u "
@@ -526,7 +552,7 @@ bool CheckStakeKernelHash(
             txPrev.nTime, 
             prevout.COutPointGet_n(), 
             nTimeTx,
-            hashProofOfStake.ToString().c_str());
+            hashProofOfStake.ToString());
     }
 
     // Now check if proof-of-stake hash meets target protocol
@@ -536,7 +562,7 @@ bool CheckStakeKernelHash(
         return false;
     if (fDebug)
     {
-        printf(
+        LogPrintf(
             "CheckStakeKernelHash (2) (good): using modifier 0x%016" PRIx64 " "
             "at height=%d "
             "timestamp=%s "
@@ -545,10 +571,10 @@ bool CheckStakeKernelHash(
             "\n",
             nStakeModifier, 
             nStakeModifierHeight, 
-            DateTimeStrFormat(nStakeModifierTime).c_str(),
+            DateTimeStrFormat(nStakeModifierTime),
             mapBlockIndex[blockFrom.GetHash()]->nHeight,
-            DateTimeStrFormat(blockFrom.GetBlockTime()).c_str());
-        printf(
+            DateTimeStrFormat(blockFrom.GetBlockTime()));
+        LogPrintf(
             "CheckStakeKernelHash (2) (good): " // pass protocol=%s "
             "modifier=0x%016" PRIx64 " "
             "nTimeBlockFrom=%u "
@@ -565,7 +591,7 @@ bool CheckStakeKernelHash(
             txPrev.nTime, 
             prevout.COutPointGet_n(), 
             nTimeTx,
-            hashProofOfStake.ToString().c_str());
+            hashProofOfStake.ToString());
     }
     return true;
 }
@@ -660,7 +686,7 @@ bool CheckStakeKernelHash(
 
     if (fPrintProofOfStake)
     {
-        printf("CheckStakeKernelHash (a) : using modifier 0x%016" PRIx64 
+        LogPrintf("CheckStakeKernelHash (a) : using modifier 0x%016" PRIx64
             "\n"
             " at height=%d"
             " timestamp=%s"
@@ -670,11 +696,11 @@ bool CheckStakeKernelHash(
             "\n"
             , nStakeModifier
             , nStakeModifierHeight
-            , DateTimeStrFormat(nStakeModifierTime).c_str()
+            , DateTimeStrFormat(nStakeModifierTime)
             , mapBlockIndex[hashBlockFrom]->nHeight
-            , DateTimeStrFormat(blockFrom.GetBlockTime()).c_str()
+            , DateTimeStrFormat(blockFrom.GetBlockTime())
               );
-        printf(
+        LogPrintf(
             "CheckStakeKernelHash (a) : check modifier=0x%016" PRIx64 
             "\n"
             " nTimeBlockFrom=%u"
@@ -693,7 +719,7 @@ bool CheckStakeKernelHash(
             , txPrev.nTime
             , prevout.COutPointGet_n()
             , nTimeTx
-            , hashProofOfStake.ToString().c_str()
+            , hashProofOfStake.ToString()
               );
     }
 
@@ -704,7 +730,7 @@ bool CheckStakeKernelHash(
         return false;
     if (fDebug && !fPrintProofOfStake)
     {
-        printf(
+        LogPrintf(
             "CheckStakeKernelHash (b) : using modifier 0x%016" PRIx64 " "
             "\n"
             "at height=%d "
@@ -715,11 +741,11 @@ bool CheckStakeKernelHash(
             "\n"
             , nStakeModifier
             , nStakeModifierHeight
-            , DateTimeStrFormat(nStakeModifierTime).c_str()
+            , DateTimeStrFormat(nStakeModifierTime)
             , mapBlockIndex[hashBlockFrom]->nHeight
-            , DateTimeStrFormat(blockFrom.GetBlockTime()).c_str()
+            , DateTimeStrFormat(blockFrom.GetBlockTime())
               );
-        printf(
+        LogPrintf(
             "CheckStakeKernelHash (b) : pass modifier=0x%016" PRIx64 " "
             "\n"
             "nTimeBlockFrom=%u "
@@ -738,7 +764,7 @@ bool CheckStakeKernelHash(
             , txPrev.nTime
             , prevout.COutPointGet_n()
             , nTimeTx
-            , hashProofOfStake.ToString().c_str()
+            , hashProofOfStake.ToString()
               );
     }
     targetProofOfStake = (bnCoinDayWeight * bnTargetPerCoinDay).getuint256();
@@ -812,7 +838,7 @@ bool ScanForStakeKernelHash(MetaMap &mapMeta, uint32_t nBits, uint32_t nTime, ui
             if (bnTargetProofOfStake >= CBigNum(hashProofOfStake))
             {
                 if (fDebug)
-                    printf("nStakeModifier=0x%016" PRIx64 
+                    LogPrintf("nStakeModifier=0x%016" PRIx64
                            ", nBlockTime=%u nTxOffset=%u nTxPrevTime=%" PRId64 " "
                            "nVout=%u nTimeTx=%u hashProofOfStake=%s Success=true\n",
                             nStakeModifier,
@@ -821,7 +847,7 @@ bool ScanForStakeKernelHash(MetaMap &mapMeta, uint32_t nBits, uint32_t nTime, ui
                             pcoin.first->nTime,
                             pcoin.second,
                             nTimeTx,
-                            hashProofOfStake.GetHex().c_str()
+                            hashProofOfStake.GetHex()
                           );
 
                 kernelcoin = pcoin;
@@ -829,12 +855,12 @@ bool ScanForStakeKernelHash(MetaMap &mapMeta, uint32_t nBits, uint32_t nTime, ui
             }
 
             if (fDebug)
-                printf("nStakeModifier=0x%016" PRIx64 
+                LogPrintf("nStakeModifier=0x%016" PRIx64
                        ", nBlockTime=%u nTxOffset=%u nTxPrevTime=%" PRId64 " nTxNumber=%u "
                        "nTimeTx=%u hashProofOfStake=%s Success=false\n",
                         nStakeModifier,
                         nBlockTime, nTxOffset, pcoin.first->nTime, pcoin.second,
-                        nTimeTx, hashProofOfStake.GetHex().c_str()
+                        nTimeTx, hashProofOfStake.GetHex()
                       );
         }
     }

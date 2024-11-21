@@ -169,16 +169,16 @@ CBlockIndex* CBlockHeader::AddToBlockIndex()
     CTxDB txdb;
     if (!txdb.TxnBegin())
     {
-        printf("AddToBlockIndex(): TxnBegin failed\n");
+        LogPrintf("AddToBlockIndex(): TxnBegin failed\n");
     }
     txdb.WriteBlockIndex(CDiskBlockIndex(pindexNew));
     if (fStoreBlockHashToDb && !txdb.WriteBlockHash(CDiskBlockIndex(pindexNew)))
     {
-        printf("AddToBlockIndex(): Can't WriteBlockHash\n");
+        LogPrintf("AddToBlockIndex(): Can't WriteBlockHash\n");
     }
     if (!txdb.TxnCommit())
     {
-        printf("AddToBlockIndex(): TxnCommit failed\n");
+        LogPrintf("AddToBlockIndex(): TxnCommit failed\n");
     }
 
     return pindexNew;
@@ -209,7 +209,7 @@ bool CBlockHeader::CheckBlockHeader(CValidationState& state, bool fCheckPOW) con
 
         // Check timestamp
         if (GetBlockTime() > FutureDrift(GetAdjustedTime())){
-            printf("Block timestamp in future: blocktime %d futuredrift %d",GetBlockTime(),FutureDrift(GetAdjustedTime()));
+            LogPrintf("Block timestamp in future: blocktime %d futuredrift %d\n",GetBlockTime(),FutureDrift(GetAdjustedTime()));
             return error("CheckBlockHeader () : block timestamp too far in the future");
         }
     }
@@ -295,13 +295,13 @@ bool CBlock::CheckBlock(CValidationState &state, bool fCheckPOW, bool fCheckMerk
         // NovaCoin: check proof-of-stake block signature
         if (fCheckSig && !CheckBlockSignature())
         {
-            printf( "\n" );
-            printf(
+            LogPrintf( "\n" );
+            LogPrintf(
                 "bad PoS block signature, in block:"
                 "\n"
                   );
             print();
-            printf( "\n" );
+            LogPrintf( "\n" );
 
             return state.DoS(100, error("CheckBlock () : bad proof-of-stake block signature"));
         }
@@ -513,7 +513,7 @@ bool CBlock::ReadFromDisk(unsigned int nFile, unsigned int nBlockPos,
     CTxDB txdb("r");
     if (fStoreBlockHashToDb && !txdb.ReadBlockHash(nFile, nBlockPos, blockHash))
     {
-        printf("CBlock::ReadFromDisk(): can't read block hash at file = %d, block pos = %d\n", nFile, nBlockPos);
+        LogPrintf("CBlock::ReadFromDisk(): can't read block hash at file = %d, block pos = %d\n", nFile, nBlockPos);
     }
     // Check the header
     if (fReadTransactions && IsProofOfWork()
@@ -532,7 +532,7 @@ bool CBlock::DisconnectBlock(CValidationState& state, CTxDB& txdb,
                              CBlockIndex* pindex, CTokensCache* tokensCache,
                              bool ignoreAddressIndex)
 {
-    printf("CBlock::DisconnectBlock, disconnect block (height: %d, hash: %s)\n", pindex->nHeight, GetHash().GetHex().c_str());
+    LogPrintf("CBlock::DisconnectBlock, disconnect block (height: %d, hash: %s)\n", pindex->nHeight, GetHash().GetHex());
     /** YAC_TOKEN START */
     std::vector<std::pair<std::string, CBlockTokenUndo> > vUndoData;
     if (!ptokensdb->ReadBlockUndoTokenData(this->GetHash(), vUndoData)) {
@@ -841,7 +841,7 @@ bool CBlock::DisconnectBlock(CValidationState& state, CTxDB& txdb,
             return error("DisconnectBlock() : WriteBlockIndex failed");
         if (fStoreBlockHashToDb && !txdb.WriteBlockHash(blockindexPrev))
         {
-            printf("CBlock::DisconnectBlock(): Can't WriteBlockHash\n");
+            LogPrintf("CBlock::DisconnectBlock(): Can't WriteBlockHash\n");
             return error("DisconnectBlock() : WriteBlockHash failed");
         }
     }
@@ -855,7 +855,7 @@ bool CBlock::DisconnectBlock(CValidationState& state, CTxDB& txdb,
 
 bool CBlock::ConnectBlock(CValidationState &state, CTxDB& txdb, CBlockIndex* pindex, CTokensCache* tokensCache, bool fJustCheck, bool ignoreAddressIndex)
 {
-    printf("CBlock::ConnectBlock, connect block (height: %d, hash: %s)\n", pindex->nHeight, GetHash().GetHex().c_str());
+    LogPrintf("CBlock::ConnectBlock, connect block (height: %d, hash: %s)\n", pindex->nHeight, GetHash().GetHex());
     // Check it again in case a previous version let a bad block in, but skip BlockSig checking
     if (!CheckBlock(state, !fJustCheck, !fJustCheck, false))
         return false;
@@ -938,7 +938,7 @@ bool CBlock::ConnectBlock(CValidationState &state, CTxDB& txdb, CBlockIndex* pin
                 for (auto out : tx.vout)
                     if (out.scriptPubKey.IsTokenScript())
                     {
-                        printf("WARNING: Received Block with tx that contained an token when tokens wasn't active\n");
+                        LogPrintf("WARNING: Received Block with tx that contained an token when tokens wasn't active\n");
                     }
             }
 
@@ -1176,7 +1176,7 @@ bool CBlock::ConnectBlock(CValidationState &state, CTxDB& txdb, CBlockIndex* pin
 //_____________________ this is new code here
     if (!control.Wait())
     {
-        (void)printf( "\nDoS ban of whom?\n\n" );   //maybe all nodes?
+        LogPrintf( "\nDoS ban of whom?\n\n" );   //maybe all nodes?
         return state.DoS(100, false);     // a direct ban
     }
 
@@ -1200,14 +1200,14 @@ bool CBlock::ConnectBlock(CValidationState &state, CTxDB& txdb, CBlockIndex* pin
         return error("Connect() : WriteBlockIndex for pindex failed");
     if (fStoreBlockHashToDb && !txdb.WriteBlockHash(CDiskBlockIndex(pindex)))
     {
-        printf("Connect(): Can't WriteBlockHash\n");
+        LogPrintf("Connect(): Can't WriteBlockHash\n");
         return error("Connect() : WriteBlockHash failed");
     }
 
     // fees are not collected by proof-of-stake miners
     // fees are destroyed to compensate the entire network
     if (fDebug && IsProofOfStake() && gArgs.GetBoolArg("-printcreation"))
-        printf("ConnectBlock() : destroy=%s nFees=%" PRId64 "\n", FormatMoney(nFees).c_str(), nFees);
+        LogPrintf("ConnectBlock() : destroy=%s nFees=%" PRId64 "\n", FormatMoney(nFees), nFees);
 
     if (fJustCheck)
         return true;
@@ -1247,7 +1247,7 @@ bool CBlock::ConnectBlock(CValidationState &state, CTxDB& txdb, CBlockIndex* pin
             return error("ConnectBlock() : WriteBlockIndex failed");
         if (fStoreBlockHashToDb && !txdb.WriteBlockHash(blockindexPrev))
         {
-            printf("ConnectBlock(): Can't WriteBlockHash\n");
+            LogPrintf("ConnectBlock(): Can't WriteBlockHash\n");
             return error("ConnectBlock() : WriteBlockHash failed");
         }
     }
@@ -1282,7 +1282,7 @@ bool CBlock::GetCoinAge(::uint64_t& nCoinAge) const
     if (nCoinAge == 0) // block coin age minimum 1 coin-day
         nCoinAge = 1;
     if (fDebug && gArgs.GetBoolArg("-printcoinage"))
-        printf("block coin age total nCoinDays=%" PRId64 "\n", nCoinAge);
+        LogPrintf("block coin age total nCoinDays=%" PRId64 "\n", nCoinAge);
     return true;
 }
 
@@ -1312,7 +1312,7 @@ bool CBlock::ReceivedBlockTransactions(CValidationState &state, unsigned int nFi
     CTxDB txdb;
     if (!txdb.TxnBegin())
     {
-        printf("AddToBlockIndex(): TxnBegin failed\n");
+        LogPrintf("AddToBlockIndex(): TxnBegin failed\n");
         return false;
     }
 
@@ -1347,12 +1347,12 @@ bool CBlock::ReceivedBlockTransactions(CValidationState &state, unsigned int nFi
 
                 pindex->nStakeModifierChecksum = GetStakeModifierChecksum(pindex);
                 if (!CheckStakeModifierCheckpoints(pindex->nHeight, pindex->nStakeModifierChecksum))
-                    printf("AcceptBlock() : Rejected by stake modifier checkpoint height=%d, modifier=0x%016\n" PRIx64, pindex->nHeight, nStakeModifier);
+                    LogPrintf("AcceptBlock() : Rejected by stake modifier checkpoint height=%d, modifier=0x%016\n" PRIx64, pindex->nHeight, nStakeModifier);
             }
 
             if (fStoreBlockHashToDb && !txdb.WriteBlockHash(CDiskBlockIndex(pindex)))
             {
-                printf("AddToBlockIndex(): Can't WriteBlockHash\n");
+                LogPrintf("AddToBlockIndex(): Can't WriteBlockHash\n");
             }
         }
     } else {
@@ -1362,14 +1362,14 @@ bool CBlock::ReceivedBlockTransactions(CValidationState &state, unsigned int nFi
         txdb.WriteBlockIndex(CDiskBlockIndex(pindexNew));
         if (fStoreBlockHashToDb && !txdb.WriteBlockHash(CDiskBlockIndex(pindexNew)))
         {
-            printf("AddToBlockIndex(): Can't WriteBlockHash\n");
+            LogPrintf("AddToBlockIndex(): Can't WriteBlockHash\n");
         }
     }
 
     // Write to disk block index
     if (!txdb.TxnCommit())
     {
-        printf("AddToBlockIndex(): TxnCommit failed\n");
+        LogPrintf("AddToBlockIndex(): TxnCommit failed\n");
         return false;
     }
 
@@ -1437,7 +1437,7 @@ bool CBlock::SignBlock044(const CKeyStore& keystore)
         }
     }
 
-    printf("Sign failed\n");
+    LogPrintf("Sign failed\n");
     return false;
 }
 

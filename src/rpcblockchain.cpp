@@ -244,7 +244,7 @@ double doGetYACprice()
     }
     if (fPrintToConsole) 
     {
-        printf(
+        LogPrintf(
                 "\n"
                 "b/y %.8lf"
                 "\n"
@@ -272,7 +272,7 @@ double doGetYACprice()
     dUSDperYACprice = dBTCtoYACprice * dUSDtoBTCprice;
     if (fPrintToConsole) 
     {
-        printf(
+        LogPrintf(
                 "b/y %lf, $/b %lf, $/y = %lf"
                 "\n"
                 , dBTCtoYACprice
@@ -306,12 +306,12 @@ Value getYACprice(const Array& params, bool fHelp)
     }
     catch( std::exception &e )
     {
-        printf( "%s\n", (string("error: ") + e.what()).c_str() );
+        LogPrintf( "%s\n", (string("error: ") + e.what()));
         sTemp = "";
     }
     catch (...)
     {
-        printf( "%s\n", "unknown error?" );
+        LogPrintf( "%s\n", "unknown error?" );
         sTemp = "";
     }
     return sTemp;
@@ -455,11 +455,7 @@ Value getcurrentblockandtime(const Array& params, bool fHelp)
 # ifdef _MSC_VER
     asctime_s( buff, sizeof(buff), &aTimeStruct );
     buff[ 24 ] = '\0';      // let's wipe out the \n
-    printf( //"Local Time: "
-            "%s"
-            "\n"
-            ""
-            , buff );
+    LogPrintf("%s\n", buff );
 
     std::string
         strS = strprintf(
@@ -478,11 +474,7 @@ Value getcurrentblockandtime(const Array& params, bool fHelp)
     pbuff = asctime( &aTimeStruct );
     if( '\n' == pbuff[ 24 ] )
         pbuff[ 24 ] = '\0';
-    printf( //"Local Time: "
-            "%s"
-            "\n"
-            ""
-            , pbuff );
+    LogPrintf("%s\n", pbuff);
     strS = strprintf(
                      "%d %s (local %s)"
                      "\n"

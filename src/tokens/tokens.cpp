@@ -2040,7 +2040,7 @@ bool CTokensCache::CheckIfTokenExists(const std::string& name, bool fForceDuplic
             return true;
         }
         else {
-            printf("%s : Found token %s in setNewTokensToAdd but force duplicate check wasn't true\n", __func__, name);
+            LogPrintf("%s : Found token %s in setNewTokensToAdd but force duplicate check wasn't true\n", __func__, name);
         }
     }
 
@@ -2049,7 +2049,7 @@ bool CTokensCache::CheckIfTokenExists(const std::string& name, bool fForceDuplic
             return true;
         }
         else {
-            printf("%s : Found token %s in setNewTokensToAdd but force duplicate check wasn't true\n", __func__, name);
+            LogPrintf("%s : Found token %s in setNewTokensToAdd but force duplicate check wasn't true\n", __func__, name);
         }
     }
 
@@ -2060,7 +2060,7 @@ bool CTokensCache::CheckIfTokenExists(const std::string& name, bool fForceDuplic
                 return true;
             }
             else {
-                printf("%s : Found token %s in ptokensCache but force duplicate check wasn't true\n", __func__, name);
+                LogPrintf("%s : Found token %s in ptokensCache but force duplicate check wasn't true\n", __func__, name);
             }
         } else {
             if (ptokensdb) {
@@ -2073,7 +2073,7 @@ bool CTokensCache::CheckIfTokenExists(const std::string& name, bool fForceDuplic
                         return true;
                     }
                     else {
-                        printf("%s : Found token %s in ptokensdb but force duplicate check wasn't true\n", __func__, name);
+                        LogPrintf("%s : Found token %s in ptokensdb but force duplicate check wasn't true\n", __func__, name);
                     }
                 }
             }
@@ -2110,13 +2110,13 @@ bool CTokensCache::GetTokenMetaDataIfExists(const std::string &name, CNewToken &
 
     // Check the dirty caches first and see if it was recently added or removed
     if (setNewTokensToRemove.count(cachedToken)) {
-        printf("%s : Found in new tokens to Remove - Returning False\n", __func__);
+        LogPrintf("%s : Found in new tokens to Remove - Returning False\n", __func__);
         return false;
     }
 
     // Check the dirty caches first and see if it was recently added or removed
     if (ptokens->setNewTokensToRemove.count(cachedToken)) {
-        printf("%s : Found in new tokens to Remove - Returning False\n", __func__);
+        LogPrintf("%s : Found in new tokens to Remove - Returning False\n", __func__);
         return false;
     }
 
@@ -2161,7 +2161,7 @@ bool CTokensCache::GetTokenMetaDataIfExists(const std::string &name, CNewToken &
         }
     }
 
-    printf("%s : Didn't find token meta data anywhere. Returning False\n", __func__);
+    LogPrintf("%s : Didn't find token meta data anywhere. Returning False\n", __func__);
     return false;
 }
 
@@ -2215,7 +2215,7 @@ bool GetTokenData(const CScript& script, CTokenOutputEntry& data)
             data.tokenName = transfer.strName;
             return true;
         } else {
-            printf("Failed to get transfer from script\n");
+            LogPrintf("Failed to get transfer from script\n");
         }
     } else if (type == TX_NEW_TOKEN && fIsOwner) {
         if (OwnerTokenFromScript(script, tokenName, address)) {
@@ -2260,7 +2260,7 @@ bool CheckIssueLockTx(const CTxOut& txOut, const ETokenType& type, const int num
     uint32_t lockDuration = 0;
     if (!ExtractLockDuration(txOut.scriptPubKey, lockDuration))
     {
-        printf("CheckIssueLockTx(), Can't get lock duration from scriptPubKey\n");
+        LogPrintf("CheckIssueLockTx(), Can't get lock duration from scriptPubKey\n");
         return false;
     }
 
@@ -2289,7 +2289,7 @@ bool CheckReissueLockTx(const CTxOut& txOut)
     uint32_t lockDuration = 0;
     if (!ExtractLockDuration(txOut.scriptPubKey, lockDuration))
     {
-        printf("CheckReissueLockTx(), Can't get lock duration from scriptPubKey\n");
+        LogPrintf("CheckReissueLockTx(), Can't get lock duration from scriptPubKey\n");
         return false;
     }
 
@@ -2946,7 +2946,7 @@ bool ParseTokenScript(CScript scriptPubKey, uint160 &hashBytes, std::string &tok
                     tokenAmount = OWNER_TOKEN_AMOUNT;
                     isToken = true;
                 } else {
-                    printf("%s : Couldn't get new owner token from script: %s", __func__, HexStr(scriptPubKey));
+                    LogPrintf("%s : Couldn't get new owner token from script: %s\n", __func__, HexStr(scriptPubKey));
                 }
             } else {
                 CNewToken token;
@@ -2955,7 +2955,7 @@ bool ParseTokenScript(CScript scriptPubKey, uint160 &hashBytes, std::string &tok
                     tokenAmount = token.nAmount;
                     isToken = true;
                 } else {
-                    printf("%s : Couldn't get new token from script: %s", __func__, HexStr(scriptPubKey));
+                    LogPrintf("%s : Couldn't get new token from script: %s\n", __func__, HexStr(scriptPubKey));
                 }
             }
         } else if (nType == TX_REISSUE_TOKEN) {
@@ -2965,7 +2965,7 @@ bool ParseTokenScript(CScript scriptPubKey, uint160 &hashBytes, std::string &tok
                 tokenAmount = token.nAmount;
                 isToken = true;
             } else {
-                printf("%s : Couldn't get reissue token from script: %s", __func__, HexStr(scriptPubKey));
+                LogPrintf("%s : Couldn't get reissue token from script: %s\n", __func__, HexStr(scriptPubKey));
             }
         } else if (nType == TX_TRANSFER_TOKEN) {
             CTokenTransfer token;
@@ -2974,16 +2974,16 @@ bool ParseTokenScript(CScript scriptPubKey, uint160 &hashBytes, std::string &tok
                 tokenAmount = token.nAmount;
                 isToken = true;
             } else {
-                printf("%s : Couldn't get transfer token from script: %s", __func__, HexStr(scriptPubKey));
+                LogPrintf("%s : Couldn't get transfer token from script: %s\n", __func__, HexStr(scriptPubKey));
             }
         } else {
-            printf("%s : Unsupported token type: %s", __func__, nType);
+            LogPrintf("%s : Unsupported token type: %s\n", __func__, nType);
         }
     } else {
-//        printf("%s : Found no token in script: %s", __func__, HexStr(scriptPubKey));
+//        LogPrintf("%s : Found no token in script: %s\n", __func__, HexStr(scriptPubKey));
     }
     if (isToken) {
-//        printf("%s : Found tokens in script at address %s : %s (%s)", __func__, _strAddress, tokenName, tokenAmount);
+//        LogPrintf("%s : Found tokens in script at address %s : %s (%s)\n", __func__, _strAddress, tokenName, tokenAmount);
         hashBytes = uint160(std::vector <unsigned char>(scriptPubKey.begin()+3, scriptPubKey.begin()+23));
         return true;
     }

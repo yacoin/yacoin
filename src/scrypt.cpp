@@ -137,12 +137,12 @@ bool scrypt_hash(
       )
     {
         scryptHash.mEnd.stamp();
-        printf("scrypt_hash(): Total time = %lu (us), Nfactor = %d\n",
+        LogPrintf("scrypt_hash(): Total time = %lu (us), Nfactor = %d\n",
                 scryptHash.getExecutionTime(), Nfactor);
         return true;
     }
     scryptHash.mEnd.stamp();
-    printf("scrypt_hash(): Total time = %lu (us), Nfactor = %d\n",
+    LogPrintf("scrypt_hash(): Total time = %lu (us), Nfactor = %d\n",
             scryptHash.getExecutionTime(), Nfactor);
     return false;
 }
@@ -266,13 +266,6 @@ const ::uint32_t
     }
 
     highestZeroBitsSet <<= 1;
-// #ifdef Yac1dot0
-//     (void)printf(
-//                  "test mask %02x\n"
-//                  ""
-//                  , nMask
-//                 );
-// #endif
     size_t
         nHeaderSize;
 
@@ -311,7 +304,7 @@ const ::uint32_t
         {               // really we should hash for a while, then check
 #ifdef Yac1dot0
     #ifdef _DEBUG
-            (void)printf(
+            LogPrintf(
                          "hash count is %d\n"
                          ""
                          , hash_count

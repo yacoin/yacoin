@@ -492,7 +492,7 @@ bool CKey::Verify(uint256 hash, const std::vector<unsigned char>& vchSig)
     {
         if (vchSig.empty())
         {
-            printf( "\n\aECDSA signature verify called with nul argument?\n\n" );
+            LogPrintf( "\n\aECDSA signature verify called with nul argument?\n\n" );
         }
         const int
             nECDSAgood = 1,
@@ -512,12 +512,10 @@ bool CKey::Verify(uint256 hash, const std::vector<unsigned char>& vchSig)
             case nECDSAgood:
                 return true;
             case nECDSAbad:
-                //printf( "\n\aECDSA signature verify FAILED?\n\n" );
-                //(void)MessageBeep( MB_ICONERROR );
+                LogPrintf( "\n\aECDSA signature verify FAILED?\n\n" );
                 return false;
             case nECDSAerror:
-                //printf( "\n\aECDSA signature verify ERRORED?\n\n" );
-                //(void)MessageBeep( MB_ICONERROR );
+                LogPrintf( "\n\aECDSA signature verify ERRORED?\n\n" );
                 return false;
             default:
                 return false;

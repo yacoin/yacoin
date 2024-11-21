@@ -170,7 +170,7 @@ instance_of_cinit;
  * It breaks because it may be called by global destructors during shutdown.
  * Since the order of destruction of static/global objects is undefined,
  * defining a mutex as a global object doesn't work (the mutex gets
- * destroyed, and then some later destructor calls OutputDebugStringF,
+ * destroyed, and then some later destructor calls LogPrintStr,
  * maybe indirectly, and you get a core dump at shutdown trying to lock
  * the mutex).
  */
@@ -623,101 +623,6 @@ std::string GetDebugLogPathName(){
     return (GetDataDir() / "debug.log").string();
 }
 
-inline int OutputDebugStringF(const char* pszFormat, ...)
-{
-    int ret = 0;
-    if (fPrintToConsole)
-    {
-        // print to console
-        va_list arg_ptr;
-        va_start(arg_ptr, pszFormat);
-        ret = vprintf(pszFormat, arg_ptr);
-        va_end(arg_ptr);
-    }
-    else if (!fPrintToDebugLog)
-    {
-        // print to debug.log
-
-        if (!fileout)
-        {
-            boost::filesystem::path pathDebug = GetDataDir() / "debug.log"; // not clear if fTestNet is set yet?
-            fileout = fopen(pathDebug.string().c_str(), "a");
-            if (fileout) 
-                setbuf(fileout, NULL); // unbuffered
-        }
-        if (fileout)
-        {
-            static bool fStartedNewLine = true;
-
-            // This routine may be called by global destructors during shutdown.
-            // Since the order of destruction of static/global objects is undefined,
-            // allocate mutexDebugLog on the heap the first time this routine
-            // is called to avoid crashes during shutdown.
-            static boost::mutex
-                * mutexDebugLog = NULL;
-            if (mutexDebugLog == NULL) 
-                mutexDebugLog = new boost::mutex();
-            boost::mutex::scoped_lock 
-                scoped_lock(*mutexDebugLog);
-
-            // reopen the log file, if requested
-            if (fReopenDebugLog) 
-            {
-                fReopenDebugLog = false;
-                boost::filesystem::path 
-                    pathDebug = GetDataDir() / "debug.log";     // again, fTestNet
-                if (freopen(pathDebug.string().c_str(),"a",fileout) != NULL)
-                    setbuf(fileout, NULL); // unbuffered
-            }
-
-            // Debug print useful for profiling
-            if (fLogTimestamps && fStartedNewLine)
-            {
-                if(nMockTime == 0)
-                    fprintf(fileout, "%s ", DateTimeStrFormat("%x %H:%M:%S", GetTime()).c_str());
-                else
-                    fprintf(fileout, "Mock %s Real %s ",DateTimeStrFormat("%x %H:%M:%S", GetTime()).c_str(), DateTimeStrFormat("%x %H:%M:%S", time(NULL)).c_str());
-            }
-            if (pszFormat[strlen(pszFormat) - 1] == '\n')
-                fStartedNewLine = true;
-            else
-                fStartedNewLine = false;
-
-            va_list arg_ptr;
-            va_start(arg_ptr, pszFormat);
-            ret = vfprintf(fileout, pszFormat, arg_ptr);
-            va_end(arg_ptr);
-        }
-    }
-
-#ifdef WIN32
-    if (fPrintToDebugLog)
-    {
-        static CCriticalSection cs_OutputDebugStringF;
-
-        // accumulate and output a line at a time
-        {
-            LOCK(cs_OutputDebugStringF);
-            static std::string buffer;
-
-            va_list arg_ptr;
-            va_start(arg_ptr, pszFormat);
-            buffer += vstrprintf(pszFormat, arg_ptr);
-            va_end(arg_ptr);
-
-            int line_start = 0, line_end;
-            while((line_end = buffer.find('\n', line_start)) != -1)
-            {
-                OutputDebugStringA(buffer.substr(line_start, line_end - line_start).c_str());
-                line_start = line_end + 1;
-            }
-            buffer.erase(0, line_start);
-        }
-    }
-#endif
-    return ret;
-}
-
 string vstrprintf(const char *format, va_list ap)
 {
     char buffer[50000];
@@ -965,29 +870,16 @@ bool WildcardMatch(const string& str, const string& mask)
 void LogException(std::exception* pex, const char* pszThread)
 {
     std::string message = FormatException(pex, pszThread);
-    printf("\n%s", message.c_str());
+    LogPrintf("\n%s", message);
 }
 
 void PrintException(std::exception* pex, const char* pszThread)
 {
     std::string message = FormatException(pex, pszThread);
-    printf("\n\n************************\n%s\n", message.c_str());
+    LogPrintf("\n\n************************\n%s\n", message);
     fprintf(stderr, "\n\n************************\n%s\n", message.c_str());
     strMiscWarning = message;
     throw;
-}
-
-void LogStackTrace() {
-    printf("\n\n******* exception encountered *******\n");
-    if (fileout)
-    {
-#if !defined(WIN32) && !defined(ANDROID)
-        void* pszBuffer[32];
-        size_t size;
-        size = backtrace(pszBuffer, 32);
-        backtrace_symbols_fd(pszBuffer, size, fileno(fileout));
-#endif
-    }
 }
 
 const fs::path &GetDataDir(bool fNetSpecific)
@@ -1409,7 +1301,7 @@ bool NewThread(void(*pfn)(void*), void* parg)
     {
         boost::thread(pfn, parg); // thread detaches when out of scope
     } catch(boost::thread_resource_error &e) {
-        printf("Error creating thread: %s\n", e.what());
+        LogPrintf("Error creating thread: %s\n", e.what());
         return false;
     }
     return true;
@@ -1463,9 +1355,8 @@ void
     {
         if( 0 == nCount )       // first time
         {
-            (void)printf(
-                    "%6d "
-                    ""
+            LogPrintf(
+                    "%6d\n"
                     , nCount
                         );
     #ifdef QT_GUI
@@ -1496,9 +1387,9 @@ void
                     ( n64MsEstimatedTotalTime + n64MsStartTime - GetTimeMillis() ) / 1000;
             }
             if (fPrintToConsole)
-                (void)printf(
+                LogPrintf(
                             "%6d "
-                            "%2.2f%% "
+                            "%2.2f%% \n"
                             ""
                             , nCount
                             , floorf( float(nCount * 10000.0 / nTotalToScan) ) / 100
@@ -1534,9 +1425,8 @@ void
                         nHours = nMinutes / nMinutesPerHour;
                         nMinutes %= nMinutesPerHour;
                         if (fPrintToConsole)
-                            (void)printf(
-                                        "~%d:%02d:%02d hrs:min:sec"
-                                        ""
+                            LogPrintf(
+                                        "~%d:%02d:%02d hrs:min:sec\n"
                                         ,
                                         (int)nHours,
                                         (int)nMinutes,
@@ -1564,7 +1454,7 @@ void
                     else    // there are only minutes
                     {
                         if (fPrintToConsole)
-                            (void)printf(
+                            LogPrintf(
                                         "~%2d:%02d min:sec      "
                                         "\r"
                                         ""
@@ -1595,9 +1485,8 @@ void
                 {
                     nSeconds = n64SecondsEstimatedTotalTime;
                     if (fPrintToConsole)
-                        (void)printf(
-                                    "~%2d sec       "
-                                    ""
+                        LogPrintf(
+                                    "~%2d sec \n"
                                     ,
                                     (int)nSeconds
                                     );
@@ -1620,7 +1509,7 @@ void
                 }
             }
         }
-        (void)printf( "\r" );
+        LogPrintf( "\r" );
     }
 }
 //_____________________________________________________________________________

@@ -1170,7 +1170,7 @@ uint256 SignatureHash(CScript scriptCode, const CTransaction& txTo, unsigned int
 {
     if (nIn >= txTo.vin.size())
     {
-        printf("ERROR: SignatureHash() : nIn=%d out of range\n", nIn);
+        LogPrintf("ERROR: SignatureHash() : nIn=%d out of range\n", nIn);
         return 1;
     }
     CTransaction txTmp(txTo);
@@ -1201,7 +1201,7 @@ uint256 SignatureHash(CScript scriptCode, const CTransaction& txTo, unsigned int
         unsigned int nOut = nIn;
         if (nOut >= txTmp.vout.size())
         {
-            printf("ERROR: SignatureHash() : nOut=%d out of range\n", nOut);
+            LogPrintf("ERROR: SignatureHash() : nOut=%d out of range\n", nOut);
             return 1;
         }
         txTmp.vout.resize(nOut+1);
@@ -1358,7 +1358,7 @@ bool CheckLockTime(const CTransaction& txTo, unsigned int nIn, const CScriptNum&
     // We want to compare apples to apples, so fail the script
     // unless the type of nLockTime being tested is the same as
     // the nLockTime in the transaction.
-    printf("CheckLockTime(), locktime of cltv address = %d, transaction time = %d\n", nLockTime, txTo.nLockTime);
+    LogPrintf("CheckLockTime(), locktime of cltv address = %d, transaction time = %d\n", nLockTime.getint(), txTo.nLockTime);
     if (!(
         (txTo.nLockTime <  LOCKTIME_THRESHOLD && nLockTime <  LOCKTIME_THRESHOLD) ||
         (txTo.nLockTime >= LOCKTIME_THRESHOLD && nLockTime >= LOCKTIME_THRESHOLD)
@@ -1369,7 +1369,7 @@ bool CheckLockTime(const CTransaction& txTo, unsigned int nIn, const CScriptNum&
     // comparison is a simple numeric one.
     if (nLockTime > (int64_t)txTo.nLockTime)
     {
-        printf("CheckLockTime(), coins are still being locked, can't use them until reaching lock time\n");
+        LogPrintf("CheckLockTime(), coins are still being locked, can't use them until reaching lock time\n");
         return false;
     }
 
@@ -1413,7 +1413,7 @@ bool CheckSequence(const CTransaction& txTo, unsigned int nIn, const CScriptNum&
     const int64_t txToSequenceMasked = txToSequence & nLockTimeMask;
     const CScriptNum nSequenceMasked = nSequence & nLockTimeMask;
 
-    printf("CheckLockTime(), sequence of csv address = %d, sequence number of the input = %ld\n", nSequence, txToSequence);
+    LogPrintf("CheckLockTime(), sequence of csv address = %d, sequence number of the input = %ld\n", nSequence.getint(), txToSequence);
 
     // There are two kinds of nSequence: lock-by-blockheight
     // and lock-by-blocktime, distinguished by whether
@@ -1434,7 +1434,7 @@ bool CheckSequence(const CTransaction& txTo, unsigned int nIn, const CScriptNum&
     // comparison is a simple numeric one.
     if (nSequenceMasked > txToSequenceMasked)
     {
-        printf("CheckSequence(), coins are still being locked, can't use them until reaching lock time\n");
+        LogPrintf("CheckSequence(), coins are still being locked, can't use them until reaching lock time\n");
         return false;
     }
 
@@ -1869,7 +1869,7 @@ bool IsSpendableTimelockUTXO(const CKeyStore &keystore,
 		retType = whichType;
 	    if (!ExtractLockDuration(scriptPubKey, retLockDur))
 	    {
-	        printf("IsSpendableTimelockUTXO(), Can't get lock duration from scriptPubKey\n");
+	        LogPrintf("IsSpendableTimelockUTXO(), Can't get lock duration from scriptPubKey\n");
 	    }
 		if (keystore.HaveKey(keyID))
 		{
@@ -1884,7 +1884,7 @@ bool IsSpendableTimelockUTXO(const CKeyStore &keystore,
         retType = whichType;
         if (!ExtractLockDuration(scriptPubKey, retLockDur))
         {
-            printf("IsSpendableTimelockUTXO(), Can't get lock duration from scriptPubKey\n");
+            LogPrintf("IsSpendableTimelockUTXO(), Can't get lock duration from scriptPubKey\n");
         }
         if (keystore.HaveKey(keyID))
         {

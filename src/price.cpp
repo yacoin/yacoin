@@ -166,7 +166,7 @@ bool recvAline( SOCKET &hSocket, string & strLine )
             {   // socket error
                 int 
                     nErr = WSAGetLastError();
-                printf("recv failed: error %d\n", nErr);
+                LogPrintf("recv failed: error %d\n", nErr);
                 clearLocalSocketError( hSocket );
                 return false;
             }
@@ -207,18 +207,18 @@ static bool read_in_new_provider( std::string sKey, std::vector< CProvider > & v
 
         if( fPrintToConsole )
         {
-            printf( "scan string: %s\n", sTemp.c_str() );
+            LogPrintf( "scan string: %s\n", sTemp);
         }
-        printf( "received provider string:\n" );
+        LogPrintf( "received provider string:\n" );
         {
-            printf( "%s\n", sProvider.c_str() );
+            LogPrintf( "%s\n", sProvider);
         }
         if( nArbitrayUrlArgumentLength < (int)sProvider.length() )
         {   // could be trouble
             if( fPrintToConsole )
             {
-                printf( "scan string: %s\n", sTemp.c_str() );
-                printf( "Error: Probably too long?\n" );
+                LogPrintf( "scan string: %s\n", sTemp);
+                LogPrintf( "Error: Probably too long?\n" );
             }
             return false;
         }
@@ -252,13 +252,13 @@ static bool read_in_new_provider( std::string sKey, std::vector< CProvider > & v
           //nIndexBtcToYac = 0;
             if( fPrintToConsole )
             {
-                printf( "adding new provider:"
+                LogPrintf( "adding new provider:"
                         "\n"
                         "%s\n%s\n%s\n%d\n%d"
                         "\n",
-                        cNewProvider.sDomain.c_str(),
-                        cNewProvider.sPriceRatioKey.c_str(),
-                        cNewProvider.sApi.c_str(),
+                        cNewProvider.sDomain,
+                        cNewProvider.sPriceRatioKey,
+                        cNewProvider.sApi,
                         cNewProvider.nOffset,
                         cNewProvider.nPort 
                       );
@@ -267,12 +267,7 @@ static bool read_in_new_provider( std::string sKey, std::vector< CProvider > & v
         }
         else
         {
-            printf( "error parsing configuration file for provider, found string:"
-                   "\n"
-                   "%s"
-                   "\n",
-                   sProvider.c_str()
-                  );
+            LogPrintf( "error parsing configuration file for provider, found string:\n %s\n", sProvider);
         }
     }
     return false;
@@ -666,7 +661,7 @@ static void
     }
     catch( std::exception &e )
     {
-        printf( "%s\n", (string("error: ") + e.what()).c_str() );
+        LogPrintf( "%s\n", (string("error: ") + e.what()));
     }
 //#endif
 }
@@ -772,9 +767,9 @@ public:
                 Socket = 0;
 #endif
               //throw runtime_error(
-                (void)printf(
+                LogPrintf(
                         "getYACprice\n"
-                        "Could not connect?"
+                        "Could not connect?\n"
                             );
             }
             SocketCopy = Socket;        // success
@@ -797,9 +792,9 @@ public:
             Socket = 0;
 #endif
          // throw runtime_error(
-            (void)printf(
+            LogPrintf(
                          "getYACprice\n"
-                         "Network is down?"
+                         "Network is down?\n"
                         );
         }
     }
@@ -884,7 +879,7 @@ static bool GetMyExternalWebPage(
             }
             if (nBytesSent != nUrlLength )
             {
-                printf(
+                LogPrintf(
                         "send() error: only sent %d of %d?"
                         "\n", 
                         nBytesSent,
@@ -961,18 +956,18 @@ static bool GetMyExternalWebPage(
         }
         catch( std::exception &e )
         {
-            printf( "%s\n", (string("error: ") + e.what()).c_str() );
+            LogPrintf( "%s\n", (string("error: ") + e.what()));
         }
     }
     if ( 0 < strBuffer.size() )
     {
         if (fPrintToConsole) 
         {
-            printf(
+            LogPrintf(
                     "GetMyExternalWebPage() received:\n"
                     "%s"
                     "\n", 
-                    strBuffer.c_str()
+                    strBuffer
                   );
         }
         if( dPrice > 0.0 )
@@ -1043,7 +1038,7 @@ static bool GetExternalWebPage(
     {
         string
             sfb = strprintf( "Command:\n%s\n", sUrl.c_str() );
-        printf( "%s", sfb.c_str() );
+        LogPrintf("%s\n", sfb);
     }
     const char
         *pszTheFullUrl = sUrl.c_str();
@@ -1082,7 +1077,7 @@ bool GetMyExternalWebPage1( int & nIndexBtcToYac, string & strBuffer, double & d
             {
                 if( fPrintToConsole )
                 {
-                    printf(
+                    LogPrintf(
                             "\n"
                             "y/b = %lf"
                             "\n"

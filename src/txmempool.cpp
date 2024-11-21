@@ -392,7 +392,7 @@ void CTxMemPool::PrioritiseTransaction(const uint256& hash, const CAmount& nFeeD
             ++nTransactionsUpdated;
         }
     }
-    printf("PrioritiseTransaction: %s feerate += %s\n", hash.ToString(), FormatMoney(nFeeDelta));
+    LogPrintf("PrioritiseTransaction: %s feerate += %s\n", hash.ToString(), FormatMoney(nFeeDelta));
 }
 
 void CTxMemPool::ApplyDelta(const uint256 hash, CAmount &nFeeDelta) const
@@ -816,7 +816,7 @@ bool CTxMemPool::accept(CValidationState &state, CTxDB& txdb, const CTransaction
     if (!AreTokensDeployed()) {
         for (auto out : tx.vout) {
             if (out.scriptPubKey.IsTokenScript())
-                printf("WARNING: bad-txns-contained-token-when-not-active\n");
+                LogPrintf("WARNING: bad-txns-contained-token-when-not-active\n");
         }
     }
 
@@ -1074,8 +1074,8 @@ bool CTxMemPool::accept(CValidationState &state, CTxDB& txdb, const CTransaction
 //    if (ptxOld)
 //        EraseFromWallets(ptxOld->GetHash());
 
-    printf("CTxMemPool::accept() : accepted %s (poolsz %" PRIszu ")\n",
-           hash.ToString().substr(0,10).c_str(),
+    LogPrintf("CTxMemPool::accept() : accepted %s (poolsz %" PRIszu ")\n",
+           hash.ToString().substr(0,10),
            mapTx.size());
 #ifdef QT_GUI
     {
@@ -1243,7 +1243,7 @@ void CTxMemPool::removeForReorg(unsigned int nMemPoolHeight, int flags)
             CTxDB txdb;
             if (!tx.FetchInputs(stateDummy, txdb, mapUnused, false, false, mapInputs, fInvalid))
             {
-                printf("TxMemPool::removeForReorg : Can't FetchInputs for tx %s\n", tx.GetHash().ToString().substr(0,10).c_str());
+                LogPrintf("TxMemPool::removeForReorg : Can't FetchInputs for tx %s\n", tx.GetHash().ToString().substr(0,10));
                 continue;
             }
 

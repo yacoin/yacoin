@@ -116,16 +116,15 @@ protected:
                     return false;
                 // Some unexpected error.
 #ifdef _MSC_VER
-                printf(
+                LogPrintf(
                     "\n"
                     "LevelDB (part1) read failure, status: "
                     "%s"
                     "\n"
                     "",
-                    status.ToString().c_str()
-                      );
+                    status.ToString());
 #else
-                printf("LevelDB read failure: %s\n", status.ToString().c_str());
+                LogPrintf("LevelDB read failure: %s\n", status.ToString());
 #endif
                 return false;
             }
@@ -144,7 +143,7 @@ protected:
         catch (std::exception &e)
         {
 #ifdef _MSC_VER
-            printf(
+            LogPrintf(
                     "\n"
                     "LevelDB (part2) read failure(?): "
                     "%s"
@@ -180,7 +179,7 @@ protected:
         }
         leveldb::Status status = pdb->Put(leveldb::WriteOptions(), ssKey.str(), ssValue.str());
         if (!status.ok()) {
-            printf("LevelDB write failure: %s\n", status.ToString().c_str());
+            LogPrintf("LevelDB write failure: %s\n", status.ToString());
             return false;
         }
         return true;

@@ -13,8 +13,6 @@
  #include "bitcoinrpc.h"
 #endif
 
-#define printf OutputDebugStringF
-
 using namespace json_spirit;
 
 using std::runtime_error;
@@ -250,7 +248,7 @@ Value dumpwallet(const Array& params, bool fHelp)
 
 Value getwalletinfo(const Array& params, bool fHelp)
 {
-    printf("rpc.getwalletinfo\n");
+    LogPrintf("rpc.getwalletinfo\n");
     if (fHelp)
         throw runtime_error(
             "getwalletinfo\n"

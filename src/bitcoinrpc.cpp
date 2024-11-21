@@ -20,7 +20,6 @@
     #include <boost/iostreams/stream.hpp>
     #include <boost/algorithm/string.hpp>
     #include <boost/asio/ssl.hpp>
-    //#define printf OutputDebugStringF
 #else
 #include "init.h"
 #include "util.h"
@@ -45,7 +44,6 @@
 #include <boost/shared_ptr.hpp>
 #include <list>
 
-//#define printf OutputDebugStringF
 #endif
 
 using namespace boost;
@@ -704,7 +702,7 @@ void ThreadRPCServer(void* parg)
         vnThreadsRunning[THREAD_RPCLISTENER]--;
         PrintException(NULL, "ThreadRPCServer()");
     }
-    printf("ThreadRPCServer exited\n");
+    LogPrintf("ThreadRPCServer exited\n");
 }
 
 // Forward declaration required for RPCListen
@@ -776,7 +774,7 @@ static void RPCAcceptHandler(boost::shared_ptr< basic_socket_acceptor<Protocol, 
 
     // start HTTP client thread
     else if (!NewThread(ThreadRPCServer3, conn)) {
-        printf("Failed to create RPC server client thread\n");
+        LogPrintf("Failed to create RPC server client thread\n");
         delete conn;
     }
 
@@ -785,7 +783,7 @@ static void RPCAcceptHandler(boost::shared_ptr< basic_socket_acceptor<Protocol, 
 
 void ThreadRPCServer2(void* parg)
 {
-    printf("ThreadRPCServer2 started\n");
+    LogPrintf("ThreadRPCServer2 started\n");
 
     strRPCUserColonPass = gArgs.GetArg("-rpcuser", "") + ":" + gArgs.GetArg("-rpcpassword", "");
     if (gArgs.GetArg("-rpcpassword", "") == "")
@@ -829,9 +827,9 @@ void ThreadRPCServer2(void* parg)
         if (filesystem::exists(pathCertFile))
             context.use_certificate_chain_file(pathCertFile.string());
         else
-            printf("ThreadRPCServer2 ERROR: missing server certificate file %s\n",
-                   pathCertFile.string().c_str()
-                  );
+          LogPrintf(
+              "ThreadRPCServer2 ERROR: missing server certificate file %s\n",
+              pathCertFile.string());
 
         filesystem::path
             pathPKFile(gArgs.GetArg("-rpcsslprivatekeyfile", "server.pem"));
@@ -840,9 +838,9 @@ void ThreadRPCServer2(void* parg)
         if (filesystem::exists(pathPKFile))
             context.use_private_key_file(pathPKFile.string(), ssl::context::pem); // causes exceptions???
         else
-            printf("ThreadRPCServer2 ERROR: missing server private key file %s\n",
-                   pathPKFile.string().c_str()
-                  );
+          LogPrintf(
+              "ThreadRPCServer2 ERROR: missing server private key file %s\n",
+              pathPKFile.string());
 
         string
             strCiphers = gArgs.GetArg("-rpcsslciphers", "TLSv1+HIGH:!SSLv2:!aNULL:!eNULL:!AH:!3DES:@STRENGTH");
@@ -974,12 +972,7 @@ void JSONRequest::parse(const Value& valRequest)
     if (valMethod.type() != str_type)
         throw JSONRPCError(RPC_INVALID_REQUEST, "Method must be a string");
     strMethod = valMethod.get_str();
-//    if (
-//        strMethod != "getwork" &&
-//        strMethod != "getworkex" &&
-//        strMethod != "getblocktemplate"
-//       )
-    printf("ThreadRPCServer method=%s\n", strMethod.c_str());
+    LogPrintf("ThreadRPCServer method=%s\n", strMethod);
 
     // Parse params
     Value valParams = find_value(request, "params");
@@ -1074,7 +1067,7 @@ void ThreadRPCServer3(void* parg)
         }
         if (!HTTPAuthorized(mapHeaders))
         {
-            printf("ThreadRPCServer3 incorrect password attempt from %s\n", conn->peer_address_to_string().c_str());
+            LogPrintf("ThreadRPCServer3 incorrect password attempt from %s\n", conn->peer_address_to_string());
             /* Deter brute-forcing short passwords.
                If this results in a DOS the user really
                shouldn't have their RPC port exposed.*/
@@ -1622,7 +1615,7 @@ int main(int argc, char *argv[])
     {
         if (argc >= 2 && string(argv[1]) == "-server")
         {
-            printf("server ready\n");
+            LogPrintf("server ready\n");
             ThreadRPCServer(NULL);
         }
         else

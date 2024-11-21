@@ -80,7 +80,7 @@ void ExitTimeout(void* parg)
 #ifdef WIN32
     if (fDebug)
         if (fPrintToConsole)
-            printf("2 sec timeout for unknown reason!?\n");
+            LogPrintf("2 sec timeout for unknown reason!?\n");
     Sleep(2 * 1000);
 #endif
 }
@@ -102,7 +102,7 @@ static bool
 void Shutdown(void* parg)
 {
     if (fDebug)
-        printf("Shutdown : In progress...\n");
+        LogPrintf("Shutdown : In progress...\n");
     
     static CCriticalSection 
         cs_Shutdown;
@@ -146,14 +146,14 @@ void Shutdown(void* parg)
         CloseWallets();
         if (fDebug)
             if (fPrintToConsole)
-                printf("wallet unregistered\n");
+                LogPrintf("wallet unregistered\n");
         NewThread(ExitTimeout, NULL);
         if (fDebug)
             if (fPrintToConsole)
-                printf("exit thread started\n");
+                LogPrintf("exit thread started\n");
         Sleep(50);
         if (fDebug)
-            printf("Yacoin exited\n\n");
+            LogPrintf("Yacoin exited\n\n");
         fExit = true;
 #ifndef QT_GUI
         // ensure non-UI client gets exited here, but let yacoin-qt reach 'return 0;' in bitcoin.cpp
@@ -553,7 +553,7 @@ bool AppInit2()
         fWeShouldBeConcerned = false;    // success
     else                        //exigency of wincon.h
     {    //    // we failed!
-        (void)printf(
+        LogPrintf(
                     "\n"
                     "Windows CCH failed?"
                     "\n"
@@ -697,10 +697,13 @@ bool AppInit2()
 #else
     fPrintToConsole = false;
 #endif
-    fPrintToDebugLog = gArgs.GetBoolArg("-printtodebugger");
+    fPrintToDebugLog = gArgs.GetBoolArg("-printtodebugger", true);
     fLogTimestamps = gArgs.GetBoolArg("-logtimestamps", DEFAULT_LOGTIMESTAMPS);
     fLogTimeMicros = gArgs.GetBoolArg("-logtimemicros", DEFAULT_LOGTIMEMICROS);
+    LogPrintf("fPrintToConsole = %d, fPrintToDebugLog = %d\n", fPrintToConsole, fPrintToDebugLog);
 
+    if (fPrintToDebugLog)
+        OpenDebugLog();
 
     nEpochInterval = (::uint32_t)(gArgs.GetArg("-epochinterval", 21000));
     nDifficultyInterval = nEpochInterval;
@@ -801,38 +804,38 @@ bool AppInit2()
 
     if (gArgs.GetBoolArg("-shrinkdebugfile", !fDebug))
         ShrinkDebugFile();
-    printf("\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n");
-    printf("Yacoin version %s (%s)\n", FormatFullVersion().c_str(), CLIENT_DATE.c_str());
+    LogPrintf("\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n");
+    LogPrintf("Yacoin version %s (%s)\n", FormatFullVersion(), CLIENT_DATE);
 
     if (fDebug)
     {
-        (void)printf( "new logic flag is %s\n", fTestNetNewLogic? "true": "false" );
+        LogPrintf( "new logic flag is %s\n", fTestNetNewLogic? "true": "false" );
     }
-    printf("\n" );
+    LogPrintf("\n" );
 
 //    if (fDebug)
     {
 #if defined( USE_IPV6 )
-        (void)printf( "USE_IPV6 is defined\n" );
+        LogPrintf( "USE_IPV6 is defined\n" );
 #endif
 #if defined( USE_ASM )
-        (void)printf( "USE_ASM is defined\n" );
+        LogPrintf( "USE_ASM is defined\n" );
 #endif
 #if defined( USE_UPNP )
-        (void)printf( "USE_UPNP is defined\n" );
+        LogPrintf( "USE_UPNP is defined\n" );
 #endif
 #if defined( USE_LEVELDB )
-        (void)printf( "USE_LEVELDB is defined\n" );
+        LogPrintf( "USE_LEVELDB is defined\n" );
 #endif
     }
-    printf("Using Boost version %1d.%d.%d\n",         // miiill (most, insignificant, least) digits
+    LogPrintf("Using Boost version %1d.%d.%d\n",         // miiill (most, insignificant, least) digits
             BOOST_VERSION / 100000,
             (BOOST_VERSION / 100) % 1000,
             BOOST_VERSION % 100
           );
 #ifdef _MSC_VER
-    printf("Using Boost MSVC version %d\n", BOOST_MSVC );
-    printf("Using Boost MSVC full version %d.%d build %d\n",        // VVM MPP PPP
+    LogPrintf("Using Boost MSVC version %d\n", BOOST_MSVC );
+    LogPrintf("Using Boost MSVC full version %d.%d build %d\n",        // VVM MPP PPP
             BOOST_MSVC_FULL_VER / 10000000,
             ( BOOST_MSVC_FULL_VER / 100000 ) % 100,
             BOOST_MSVC_FULL_VER % 100000
@@ -844,7 +847,7 @@ bool AppInit2()
     //               __GNUC_MINOR__ * 100 + 
     //               __GNUC_PATCHLEVEL__
 
-    printf("Using Boost GCC full version %d.2d build %d\n",        //AAIIpp
+    LogPrintf("Using Boost GCC full version %d.%d build %d\n",        //AAIIpp
             // __GNUC__,
             BOOST_GCC / 10000,
 
@@ -857,24 +860,24 @@ bool AppInit2()
 #endif
 
 #ifdef BOOST_WINDOWS
-    printf("Windows platform is available to Boost\n" );
+    LogPrintf("Windows platform is available to Boost\n" );
 #endif
 
 #ifdef _MSC_VER
     #ifdef _DEBUG
-        printf("Boost is using the %s compiler\n", BOOST_COMPILER );
-        printf("Boost is using the %s standard library\n", BOOST_STDLIB );
-        printf("Boost is using the %s platform\n", BOOST_PLATFORM );
+        LogPrintf("Boost is using the %s compiler\n", BOOST_COMPILER );
+        LogPrintf("Boost is using the %s standard library\n", BOOST_STDLIB );
+        LogPrintf("Boost is using the %s platform\n", BOOST_PLATFORM );
     #endif
 #else
-    printf("Boost is using the %s compiler\n", BOOST_COMPILER );
-    printf("Boost is using the %s standard library\n", BOOST_STDLIB );
-    printf("Boost is using the %s platform\n", BOOST_PLATFORM );
+    LogPrintf("Boost is using the %s compiler\n", BOOST_COMPILER );
+    LogPrintf("Boost is using the %s standard library\n", BOOST_STDLIB );
+    LogPrintf("Boost is using the %s platform\n", BOOST_PLATFORM );
 #endif
-    printf("\n" );
+    LogPrintf("\n" );
 
 #ifdef USE_LEVELDB
-    printf(
+    LogPrintf(
             "\n"
             "Using levelDB version %d.%d"
             "\n"
@@ -882,7 +885,7 @@ bool AppInit2()
             leveldb::kMajorVersion,
             leveldb::kMinorVersion
           );
-    printf("\n");
+    LogPrintf("\n");
 #endif
 
     int
@@ -891,19 +894,19 @@ bool AppInit2()
         nBdbPatch;
 
     (void)db_version( &nBdbMajor, &nBdbMinor, &nBdbPatch );
-    (void)printf("Using BerkeleyDB version %d.%d.%d\n", 
+    LogPrintf("Using BerkeleyDB version %d.%d.%d\n",
                 nBdbMajor,
                 nBdbMinor,
                 nBdbPatch
                 );
-    printf("\n");
+    LogPrintf("\n");
 
-    printf("Using OpenSSL version %s\n", SSLeay_version(SSLEAY_VERSION));
+    LogPrintf("Using OpenSSL version %s\n", SSLeay_version(SSLEAY_VERSION));
 
     if (fDebug)
     {
     #ifdef WIN32
-        (void)printf(
+        LogPrintf(
                      "\n"
                      "wallet is \n"
                      "\"%s\""
@@ -922,9 +925,9 @@ bool AppInit2()
         fNewerOpenSSL = true;
 
     if (!fLogTimestamps)
-        printf("Startup time: %s\n", DateTimeStrFormat("%x %H:%M:%S", GetTime()).c_str());
-    printf("The Default data directory is %s\n", GetDefaultDataDir().string().c_str());
-    printf("Using data directory %s\n", strDataDir.c_str());
+        LogPrintf("Startup time: %s\n", DateTimeStrFormat("%x %H:%M:%S", GetTime()));
+    LogPrintf("The Default data directory is %s\n", GetDefaultDataDir().string());
+    LogPrintf("Using data directory %s\n", strDataDir);
     std::ostringstream 
         strErrors;
 
@@ -933,14 +936,14 @@ bool AppInit2()
 
     if (nScriptCheckThreads) 
     {
-        printf("Using %u threads for script verification\n", nScriptCheckThreads);
+        LogPrintf("Using %u threads for script verification\n", nScriptCheckThreads);
         for (int i=0; i<nScriptCheckThreads-1; ++i)
             NewThread(ThreadScriptCheck, NULL);
     }
 
     if (nHashCalcThreads)
     {
-        printf("Using %u threads for hash calculation\n", nHashCalcThreads);
+        LogPrintf("Using %u threads for hash calculation\n", nHashCalcThreads);
         for (int i=0; i<nHashCalcThreads-1; ++i)
             NewThread(ThreadHashCalculation, NULL);
     }
@@ -1001,7 +1004,7 @@ bool AppInit2()
                                  "(WSAStartup returned error %d)", 
                                  ret
                                 );
-        printf("%s\n", strError.c_str());
+        LogPrintf("%s\n", strError);
     }
     if (
         (2 != LOBYTE( wsadata.wVersion )) ||
@@ -1013,7 +1016,7 @@ bool AppInit2()
     WSACleanup( );
     string
         strError = "Error: TCP/IP socket library isn't 2.2 or greater?";
-    printf("%s\n", strError.c_str());
+    LogPrintf("%s\n", strError);
     return InitError(_("Error: TCP/IP socket library isn't 2.2 or greater?"));
     }
 
@@ -1092,7 +1095,7 @@ bool AppInit2()
         fDiscover = fNameLookup = fUseUPnP = false;
         gArgs.SoftSetBoolArg("-irc", false);
         gArgs.SoftSetBoolArg("-dnsseed", false);
-        printf(
+        LogPrintf(
                "strange ini path?\n"
               );
     }
@@ -1184,7 +1187,7 @@ bool AppInit2()
     // ********************************************************* Step 7 was Step 8: load wallet
 
     uiInterface.InitMessage(_("<b>Loading wallet...</b>"));
-    printf("Loading wallet...\n");
+    LogPrintf("Loading wallet...\n");
     nStart = GetTimeMillis();
     bool fFirstRun = true;
     pwalletMain = new CWallet(strWalletFileName);
@@ -1204,7 +1207,7 @@ bool AppInit2()
         else if (nLoadWalletRet == DB_NEED_REWRITE)
         {
             strErrors << _("Wallet needed to be rewritten: restart Yacoin to complete") << "\n";
-            printf("%s", strErrors.str().c_str());
+            LogPrintf("%s\n", strErrors.str());
             return InitError(strErrors.str());
         }
         else
@@ -1216,12 +1219,12 @@ bool AppInit2()
         int nMaxVersion = (int)(gArgs.GetArg("-upgradewallet", 0));
         if (nMaxVersion == 0) // the -upgradewallet without argument case
         {
-            printf("Performing wallet upgrade to %i\n", FEATURE_LATEST);
+            LogPrintf("Performing wallet upgrade to %i\n", FEATURE_LATEST);
             nMaxVersion = CLIENT_VERSION;
             pwalletMain->SetMinVersion(FEATURE_LATEST); // permanently upgrade the wallet immediately
         }
         else
-            printf("Allowing wallet upgrade up to %i\n", nMaxVersion);
+            LogPrintf("Allowing wallet upgrade up to %i\n", nMaxVersion);
         if (nMaxVersion < pwalletMain->GetVersion())
             strErrors << _("Cannot downgrade wallet") << "\n";
         pwalletMain->SetMaxVersion(nMaxVersion);
@@ -1234,13 +1237,13 @@ bool AppInit2()
     {
         fReindexToken = gArgs.GetBoolArg("-reindex-token", false);
     }
-    printf("Param fReindexOnlyHeaderSync = %d, fReindexBlockIndex = %d, fReindexToken = %d\n", fReindexOnlyHeaderSync, fReindexBlockIndex, fReindexToken);
+    LogPrintf("Param fReindexOnlyHeaderSync = %d, fReindexBlockIndex = %d, fReindexToken = %d\n", fReindexOnlyHeaderSync, fReindexBlockIndex, fReindexToken);
 
     nMainnetNewLogicBlockNumber = gArgs.GetArg("-testnetNewLogicBlockNumber", mainnetNewLogicBlockNumber);
     nTestNetNewLogicBlockNumber = gArgs.GetArg("-testnetNewLogicBlockNumber", testnetNewLogicBlockNumber);
     nTokenSupportBlockNumber = gArgs.GetArg("-tokenSupportBlockNumber", tokenSupportBlockNumber);
-    printf("Param nMainnetNewLogicBlockNumber = %d\n",nMainnetNewLogicBlockNumber);
-    printf("Param testnetNewLogicBlockNumber = %d\n",nTestNetNewLogicBlockNumber);
+    LogPrintf("Param nMainnetNewLogicBlockNumber = %d\n",nMainnetNewLogicBlockNumber);
+    LogPrintf("Param testnetNewLogicBlockNumber = %d\n",nTestNetNewLogicBlockNumber);
 
     if (!bitdb.Open(GetDataDir()))
     {
@@ -1259,10 +1262,10 @@ bool AppInit2()
     }
 
     MAXIMUM_YAC1DOT0_N_FACTOR = gArgs.GetArg("-nFactorAtHardfork", 21);
-    printf("Param nFactorAtHardfork = %d\n", MAXIMUM_YAC1DOT0_N_FACTOR);
+    LogPrintf("Param nFactorAtHardfork = %d\n", MAXIMUM_YAC1DOT0_N_FACTOR);
 
     std::string additionalInfo = fReindexBlockIndex ? "(reindex block index)" : fReindexToken ? "(reindex token)" : "";
-    printf("Loading block index %s ...\n", additionalInfo.c_str());
+    LogPrintf("Loading block index %s ...\n", additionalInfo);
     bool fLoaded = false;
     bool fReindex = fReindexBlockIndex || fReindexToken;
     while (!fLoaded) 
@@ -1297,9 +1300,9 @@ bool AppInit2()
                     }
 
                     if (!ptokensdb->ReadReissuedMempoolState())
-                        printf("Database failed to load last Reissued Mempool State. Will have to start from empty state\n");
+                        LogPrintf("Database failed to load last Reissued Mempool State. Will have to start from empty state\n");
 
-                    printf("Successfully loaded tokens from database.\nCache of tokens size: %d\n",
+                    LogPrintf("Successfully loaded tokens from database.\nCache of tokens size: %d\n",
                               ptokensCache->Size());
                 }
                 /** YAC_TOKEN END */
@@ -1350,15 +1353,15 @@ bool AppInit2()
     // As the program has not fully started yet, Shutdown() is possibly overkill.
     if (fRequestShutdown)
     {
-        printf("Shutdown requested. Exiting.\n");
+        LogPrintf("Shutdown requested. Exiting.\n");
         return false;
     }
-    printf(" block index %15" PRId64 "ms\n", GetTimeMillis() - nStart);
+    LogPrintf(" block index %15" PRId64 "ms\n", GetTimeMillis() - nStart);
 
     if (fDebug)
     {
 #ifdef WIN32
-        (void)printf(
+        LogPrintf(
                      "\n"
                      "nMainnetNewLogicBlockNumber is \n"
                      "%d"
@@ -1388,12 +1391,12 @@ bool AppInit2()
                 block.ReadFromDisk(pindex);
                 block.BuildMerkleTree();
                 block.print();
-                printf("\n");
+                LogPrintf("\n");
                 nFound++;
             }
         }
         if (nFound == 0)
-            printf("No blocks matching %s were found\n", strMatch.c_str());
+            LogPrintf("No blocks matching %s were found\n", strMatch);
         return false;
     }
 
@@ -1411,8 +1414,8 @@ bool AppInit2()
             strErrors << _("Cannot write default address") << "\n";
     }
 
-    printf("%s", strErrors.str().c_str());
-    printf(" wallet      %15" PRId64 "ms\n", GetTimeMillis() - nStart);
+    LogPrintf("%s\n", strErrors.str());
+    LogPrintf(" wallet      %15" PRId64 "ms\n", GetTimeMillis() - nStart);
 
     RegisterWallet(pwalletMain);
 
@@ -1431,7 +1434,7 @@ bool AppInit2()
     if (chainActive.Tip() != pindexRescan && chainActive.Tip() && pindexRescan && chainActive.Tip()->nHeight > pindexRescan->nHeight)
     {
         uiInterface.InitMessage(_("<b>Please wait, rescanning blocks...</b>"));
-        printf("Rescanning last %i blocks (from block %i)...\n", chainActive.Tip()->nHeight - pindexRescan->nHeight, pindexRescan->nHeight);
+        LogPrintf("Rescanning last %i blocks (from block %i)...\n", chainActive.Tip()->nHeight - pindexRescan->nHeight, pindexRescan->nHeight);
         nStart = GetTimeMillis();
 #ifdef WIN32
         int
@@ -1445,7 +1448,7 @@ bool AppInit2()
 #else
         pwalletMain->ScanForWalletTransactions(pindexRescan, true);
 #endif
-        printf(" rescan      %15" PRId64 "ms\n", GetTimeMillis() - nStart);
+        LogPrintf(" rescan      %15" PRId64 "ms\n", GetTimeMillis() - nStart);
     }
 
     // ********************************************************* Step 9: import blocks
@@ -1460,12 +1463,12 @@ bool AppInit2()
             FILE *file = OpenBlockFile(pos.nFile, pos.nPos, "rb");
             if (!file)
                 break; // This error is logged in OpenBlockFile
-            printf("Reindexing block file blk%04u.dat...\n", (unsigned int)nFile);
+            LogPrintf("Reindexing block file blk%04u.dat...\n", (unsigned int)nFile);
             LoadExternalBlockFile(file, &pos);
             nFile++;
         }
         fReindex = false;
-        printf("Reindexing finished\n");
+        LogPrintf("Reindexing finished\n");
     }
 
     if (gArgs.IsArgSet("-loadblock"))
@@ -1495,16 +1498,16 @@ bool AppInit2()
     // ********************************************************* Step 10: load peers
 
     uiInterface.InitMessage(_("<b>Loading addresses...</b>"));
-    printf("Loading addresses...\n");
+    LogPrintf("Loading addresses...\n");
     nStart = GetTimeMillis();
 
     {
         CAddrDB adb;    // does a GetDataDir() in ctor for "peers.dat"
         if (!adb.Read(addrman))
-            printf("Invalid or missing peers.dat; recreating\n");
+            LogPrintf("Invalid or missing peers.dat; recreating\n");
     }
 
-    printf("Loaded %i addresses from peers.dat  %" PRId64 "ms\n",
+    LogPrintf("Loaded %i addresses from peers.dat  %" PRId64 "ms\n",
            addrman.size(), GetTimeMillis() - nStart);
 
     // ********************************************************* Step 11: start node
@@ -1515,7 +1518,7 @@ bool AppInit2()
     if( fDebug )
     {
 #ifdef WIN32
-        (void)printf(
+        LogPrintf(
                     "physical mem available = %llu"
                     "\n"
                     , getTotalSystemMemory()
@@ -1526,11 +1529,11 @@ bool AppInit2()
     RandAddSeedPerfmon();
 
     //// debug print
-    printf("mapBlockIndex.size() = %" PRIszu "\n",   mapBlockIndex.size());
-    printf("chainActive.Height() = %d\n",                     chainActive.Height());
-    printf("setKeyPool.size() = %" PRIszu "\n",      pwalletMain->setKeyPool.size());
-    printf("mapWallet.size() = %" PRIszu " transactions\n",       pwalletMain->mapWallet.size());
-    printf("mapAddressBook.size() = %" PRIszu "\n",  pwalletMain->mapAddressBook.size());
+    LogPrintf("mapBlockIndex.size() = %" PRIszu "\n",   mapBlockIndex.size());
+    LogPrintf("chainActive.Height() = %d\n",                     chainActive.Height());
+    LogPrintf("setKeyPool.size() = %" PRIszu "\n",      pwalletMain->setKeyPool.size());
+    LogPrintf("mapWallet.size() = %" PRIszu " transactions\n",       pwalletMain->mapWallet.size());
+    LogPrintf("mapAddressBook.size() = %" PRIszu "\n",  pwalletMain->mapAddressBook.size());
 
 
     if (!NewThread(StartNode, NULL))
@@ -1542,7 +1545,7 @@ bool AppInit2()
     // ********************************************************* Step 12: finished
 
     uiInterface.InitMessage(_("<b>Done loading</b>"));
-    printf("Done loading\n");
+    LogPrintf("Done loading\n");
 
     if (!strErrors.str().empty())
         return InitError(strErrors.str());
@@ -1550,7 +1553,7 @@ bool AppInit2()
     //Yassert( false );   //test
 #ifdef _MSC_VER
     #ifdef _DEBUG
-        printf("\a" );    // just to call me back after a long debug startup!
+        LogPrintf("\a\n" );    // just to call me back after a long debug startup!
     #endif
 #endif
      // Add wallet transactions that aren't already in a block to mapTransactions
