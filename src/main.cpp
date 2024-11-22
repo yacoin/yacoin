@@ -4663,7 +4663,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
                 "more getheaders (%d) to end to peer=%s (startheight:%d), "
                 "current best header has height = %d\n",
                 pindexLast->nHeight, pfrom->addrName,
-                pfrom->nStartingHeight);
+                pfrom->nStartingHeight, pindexBestHeader->nHeight);
             pfrom->PushMessage("getheaders", chainActive.GetLocator(pindexLast),
                                uint256(0), pindexBestHeader->nHeight);
         }

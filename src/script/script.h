@@ -16,7 +16,6 @@
 #include "prevector.h"
 
 typedef std::vector< ::uint8_t> valtype;
-typedef prevector<28, unsigned char> CScriptBase;
 
 class CTransaction;
 class CTxOut;
@@ -448,8 +447,10 @@ std::vector<unsigned char> ToByteVector(const T& in)
     return std::vector<unsigned char>(in.begin(), in.end());
 }
 
+typedef std::vector< ::uint8_t> CScriptBase;
+
 /** Serialized script, used inside transaction inputs and outputs */
-class CScript : public std::vector< ::uint8_t>
+class CScript : public CScriptBase
 {
 protected:
     CScript& push_int64(::int64_t n)
@@ -490,7 +491,7 @@ public:
 
     template <typename Stream, typename Operation>
     inline void SerializationOp(Stream& s, Operation ser_action) {
-        READWRITE(*this);
+        READWRITE(static_cast<CScriptBase&>(*this));
     }
 
     CScript& operator+=(const CScript& b)

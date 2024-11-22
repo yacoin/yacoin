@@ -462,7 +462,9 @@ public:
 
     template <typename Stream, typename Operation>
     inline void SerializationOp(Stream& s, Operation ser_action) {
-        READWRITE(FLATDATA(*this)); 
+        READWRITE(nFile);
+        READWRITE(nBlockPos);
+        READWRITE(nTxPos);
     }
 
     void SetNull() { nFile = (unsigned int) -1; nBlockPos = 0; nTxPos = 0; }
