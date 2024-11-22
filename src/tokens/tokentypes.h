@@ -39,7 +39,7 @@ const char TXID_NOTIFIER = 0x54;
 const char IPFS_SHA2_256_LEN = 0x20;
 
 template <typename Stream, typename Operation>
-bool ReadWriteTokenHash(Stream &s, Operation ser_action, std::string &strIPFSHash, int nType, int nVersion)
+bool ReadWriteTokenHash(Stream &s, Operation ser_action, std::string &strIPFSHash)
 {
     // assuming 34-byte IPFS SHA2-256 decoded hash (0x12, 0x20, 32 more bytes)
     if (ser_action.ForRead())
@@ -47,9 +47,9 @@ bool ReadWriteTokenHash(Stream &s, Operation ser_action, std::string &strIPFSHas
         strIPFSHash = "";
         if (!s.empty() and s.size() >= 33) {
             char _sha2_256;
-            ::Unserialize(s, _sha2_256, nType, nVersion);
+            ::Unserialize(s, _sha2_256);
             std::basic_string<char> hash;
-            ::Unserialize(s, hash, nType, nVersion);
+            ::Unserialize(s, hash);
 
             std::ostringstream os;
 
@@ -65,12 +65,12 @@ bool ReadWriteTokenHash(Stream &s, Operation ser_action, std::string &strIPFSHas
     else
     {
         if (strIPFSHash.length() == 34) {
-            ::Serialize(s, IPFS_SHA2_256, nType, nVersion);
-            ::Serialize(s, strIPFSHash.substr(2), nType, nVersion);
+            ::Serialize(s, IPFS_SHA2_256);
+            ::Serialize(s, strIPFSHash.substr(2));
             return true;
         } else if (strIPFSHash.length() == 32) {
-            ::Serialize(s, TXID_NOTIFIER, nType, nVersion);
-            ::Serialize(s, strIPFSHash, nType, nVersion);
+            ::Serialize(s, TXID_NOTIFIER);
+            ::Serialize(s, strIPFSHash);
             return true;
         }
     }
@@ -117,16 +117,15 @@ public:
     ADD_SERIALIZE_METHODS;
 
     template <typename Stream, typename Operation>
-    inline void SerializationOp(Stream& s, Operation ser_action, int nType, int nVersion)
+    inline void SerializationOp(Stream& s, Operation ser_action)
     {
-        unsigned int nSerSize = 0;
         READWRITE(strName);
         READWRITE(nAmount);
         READWRITE(units);
         READWRITE(nReissuable);
         READWRITE(nHasIPFS);
         if (nHasIPFS == 1) {
-            ReadWriteTokenHash(s, ser_action, strIPFSHash, nType, nVersion);
+            ReadWriteTokenHash(s, ser_action, strIPFSHash);
         }
     }
 };
@@ -160,9 +159,8 @@ public:
     ADD_SERIALIZE_METHODS;
 
     template <typename Stream, typename Operation>
-    inline void SerializationOp(Stream& s, Operation ser_action, int nType, int nVersion)
+    inline void SerializationOp(Stream& s, Operation ser_action)
     {
-        unsigned int nSerSize = 0;
         READWRITE(token);
         READWRITE(nHeight);
         READWRITE(blockHash);
@@ -190,9 +188,8 @@ public:
     ADD_SERIALIZE_METHODS;
 
     template <typename Stream, typename Operation>
-    inline void SerializationOp(Stream& s, Operation ser_action, int nType, int nVersion)
+    inline void SerializationOp(Stream& s, Operation ser_action)
     {
-        unsigned int nSerSize = 0;
         READWRITE(strName);
         READWRITE(nAmount);
     }
@@ -226,14 +223,13 @@ public:
     ADD_SERIALIZE_METHODS;
 
     template <typename Stream, typename Operation>
-    inline void SerializationOp(Stream& s, Operation ser_action, int nType, int nVersion)
+    inline void SerializationOp(Stream& s, Operation ser_action)
     {
-        unsigned int nSerSize = 0;
         READWRITE(strName);
         READWRITE(nAmount);
         READWRITE(nUnits);
         READWRITE(nReissuable);
-        ReadWriteTokenHash(s, ser_action, strIPFSHash, nType, nVersion);
+        ReadWriteTokenHash(s, ser_action, strIPFSHash);
     }
 
     CReissueToken(const std::string& strTokenName, const CAmount& nAmount, const int& nUnits, const int& nReissuable, const std::string& strIPFSHash);

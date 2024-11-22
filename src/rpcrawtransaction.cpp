@@ -21,6 +21,7 @@
 #ifndef BITCOIN_INIT_H
  #include "init.h"
 #endif
+#include "streams.h"
 
 using namespace boost;
 using namespace boost::assign;

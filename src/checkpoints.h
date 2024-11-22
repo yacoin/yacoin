@@ -74,12 +74,13 @@ public:
     int nVersion;
     uint256 hashCheckpoint;      // checkpoint block
 
-    IMPLEMENT_SERIALIZE
-    (
+    ADD_SERIALIZE_METHODS;
+
+    template <typename Stream, typename Operation>
+    inline void SerializationOp(Stream& s, Operation ser_action) {
         READWRITE(this->nVersion);
-        nVersion = this->nVersion;
         READWRITE(hashCheckpoint);
-    )
+    }
 
     void SetNull()
     {
@@ -118,11 +119,13 @@ public:
         SetNull();
     }
 
-    IMPLEMENT_SERIALIZE
-    (
+    ADD_SERIALIZE_METHODS;
+
+    template <typename Stream, typename Operation>
+    inline void SerializationOp(Stream& s, Operation ser_action) {
         READWRITE(vchMsg);
         READWRITE(vchSig);
-    )
+    }
 
     void SetNull()
     {

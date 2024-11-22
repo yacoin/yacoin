@@ -48,6 +48,7 @@
 //#include "utilmoneystr.h" -> replaced with util.h
 //#include "coins.h" -> not have coinsview
 #include "LibBoolEE.h"
+#include "streams.h"
 
 #define SIX_MONTHS 15780000 // Six months worth of seconds
 

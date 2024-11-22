@@ -81,8 +81,8 @@ bool CTransaction::ReadFromDisk(COutPoint prevout)
 bool CTransaction::ReadFromDisk(CDiskTxPos pos, FILE** pfileRet)
 {
   //CAutoFile filein = CAutoFile(OpenBlockFile(pos.nFile, 0, pfileRet ? "rb+" : "rb"), SER_DISK, CLIENT_VERSION);
-    CAutoFile filein = CAutoFile(OpenBlockFile(pos.Get_CDiskTxPos_nFile(), 0, pfileRet ? "rb+" : "rb"), SER_DISK, CLIENT_VERSION);
-    if (!filein)
+    CAutoFile filein(OpenBlockFile(pos.Get_CDiskTxPos_nFile(), 0, pfileRet ? "rb+" : "rb"), SER_DISK, CLIENT_VERSION);
+    if (filein.IsNull())
         return error("CTransaction::ReadFromDisk() : OpenBlockFile failed");
 
     // Read transaction
@@ -813,7 +813,7 @@ bool CTransaction::ConnectInputs(CValidationState &state,
 
             unsigned int
                 nTxSize = (nTime > VALIDATION_SWITCH_TIME || fTestNet) ?
-                          GetSerializeSize(SER_NETWORK, PROTOCOL_VERSION) : 0;
+                          ::GetSerializeSize(*this, SER_NETWORK, PROTOCOL_VERSION) : 0;
 
             ::int64_t
                 nReward = GetValueOut() - nValueIn;

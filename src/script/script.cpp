@@ -11,6 +11,7 @@
 #include "script/script.h"
 #include "main.h"
 #include "tokens/tokens.h"
+#include "streams.h"
 
 #include <boost/foreach.hpp>
 #include <boost/tuple/tuple.hpp>

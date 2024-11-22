@@ -21,6 +21,7 @@
 #endif
 
 #include "coincontrol.h"
+#include "streams.h"
 #include <sstream>
 
 using namespace json_spirit;

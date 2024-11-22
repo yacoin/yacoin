@@ -220,12 +220,12 @@ bool CBlockHeader::CheckBlockHeader(CValidationState& state, bool fCheckPOW) con
 bool CBlock::WriteToDisk(unsigned int& nFileRet, unsigned int& nBlockPosRet)
 {
     // Open history file to append
-    CAutoFile fileout = CAutoFile(AppendBlockFile(nFileRet), SER_DISK, CLIENT_VERSION);
-    if (!fileout)
+    CAutoFile fileout(AppendBlockFile(nFileRet), SER_DISK, CLIENT_VERSION);
+    if (fileout.IsNull())
         return error("CBlock::WriteToDisk() : AppendBlockFile failed");
 
     // Write index header
-    unsigned int nSize = fileout.GetSerializeSize(*this);
+    unsigned int nSize = ::GetSerializeSize(fileout, *this);
     fileout << FLATDATA(pchMessageStart) << nSize;
 
     // Write block
@@ -491,13 +491,12 @@ bool CBlock::ReadFromDisk(unsigned int nFile, unsigned int nBlockPos,
 {
     SetNull();
 
+    int nType = fReadTransactions ? SER_DISK : SER_DISK | SER_BLOCKHEADERONLY;
     // Open history file to read
-    CAutoFile filein = CAutoFile(OpenBlockFile(nFile, nBlockPos, "rb"),
-            SER_DISK, CLIENT_VERSION);
-    if (!filein)
+    CAutoFile filein(OpenBlockFile(nFile, nBlockPos, "rb"),
+            nType, CLIENT_VERSION);
+    if (filein.IsNull())
         return error("CBlock::ReadFromDisk() : OpenBlockFile failed");
-    if (!fReadTransactions)
-        filein.nType |= SER_BLOCKHEADERONLY;
 
     // Read block
     try {

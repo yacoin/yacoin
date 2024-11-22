@@ -18,6 +18,7 @@
 #ifndef BITCOIN_WALLET_H
  #include "wallet.h"
 #endif
+#include "streams.h"
 
 using namespace json_spirit;
 

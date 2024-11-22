@@ -79,10 +79,11 @@ public:
         SetNull();
     }
 
-    IMPLEMENT_SERIALIZE
-    (
+    ADD_SERIALIZE_METHODS;
+
+    template <typename Stream, typename Operation>
+    inline void SerializationOp(Stream& s, Operation ser_action) {
         READWRITE(this->nVersion);
-        nVersion = this->nVersion;
         READWRITE(hashPrevBlock);
         READWRITE(hashMerkleRoot);
         // nTime is extended to 64-bit since yacoin 1.0.0
@@ -104,7 +105,7 @@ public:
         previousBlockHeader.timestamp = nTime;
         previousBlockHeader.bits = nBits;
         previousBlockHeader.nonce = nNonce;
-    )
+    }
 
     void SetNull();
 
@@ -352,21 +353,23 @@ public:
         *((CBlockHeader*)this) = blockHeader;
     }
 
-    IMPLEMENT_SERIALIZE
-    (
+    ADD_SERIALIZE_METHODS;
+
+    template <typename Stream, typename Operation>
+    inline void SerializationOp(Stream& s, Operation ser_action) {
         READWRITE(*(CBlockHeader*)this);
         // ConnectBlock depends on vtx following header to generate CDiskTxPos
-        if (!(nType & (SER_GETHASH|SER_BLOCKHEADERONLY)))
+        if (!(s.GetType() & (SER_GETHASH|SER_BLOCKHEADERONLY)))
         {
             READWRITE(vtx);
             READWRITE(vchBlockSig);
         }
-        else if (fRead)
+        else if (ser_action.ForRead())
         {
             const_cast<CBlock*>(this)->vtx.clear();
             const_cast<CBlock*>(this)->vchBlockSig.clear();
         }
-    )
+    }
 
     void SetNull()
     {
@@ -516,12 +519,15 @@ public:
         vHave = vHaveIn;
     }
 
-    IMPLEMENT_SERIALIZE
-    (
-        if (!(nType & SER_GETHASH))
-            READWRITE(nVersion);
+    ADD_SERIALIZE_METHODS;
+
+    template <typename Stream, typename Operation>
+    inline void SerializationOp(Stream& s, Operation ser_action) {
+        int _nVersion = s.GetVersion();
+        if (!(s.GetType() & SER_GETHASH))
+            READWRITE(_nVersion);
         READWRITE(vHave);
-    )
+    }
 
     void SetNull()
     {
@@ -542,8 +548,7 @@ struct CDiskBlockPos
     ADD_SERIALIZE_METHODS;
 
     template <typename Stream, typename Operation>
-    inline void SerializationOp(Stream& s, Operation ser_action, int nType, int nVersion) {
-        unsigned int nSerSize = 0;
+    inline void SerializationOp(Stream& s, Operation ser_action) {
         READWRITE(nFile);
         READWRITE(nPos);
     }

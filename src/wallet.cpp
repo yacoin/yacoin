@@ -283,11 +283,14 @@ void CWallet::SetBestChain(const CBlockLocator& loc)
 class CCorruptAddress
 {
 public:
-    IMPLEMENT_SERIALIZE
-    (
-        if (nType & SER_DISK)
-            READWRITE(nVersion);
-    )
+    ADD_SERIALIZE_METHODS;
+
+    template <typename Stream, typename Operation>
+    inline void SerializationOp(Stream& s, Operation ser_action) {
+        int _nVersion = s.GetVersion();
+        if (s.GetType() & SER_DISK)
+            READWRITE(_nVersion);
+    }
 };
 
 bool CWallet::SetMinVersion(enum WalletFeature nVersion, CWalletDB* pwalletdbIn, bool fExplicit)

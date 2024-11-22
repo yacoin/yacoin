@@ -45,14 +45,15 @@ private:
 
 public:
 
-    IMPLEMENT_SERIALIZE
-    (
-        CAddress* pthis = (CAddress*)(this);
-        READWRITE(*pthis);
+    ADD_SERIALIZE_METHODS;
+
+    template <typename Stream, typename Operation>
+    inline void SerializationOp(Stream& s, Operation ser_action) {
+        READWRITE(*(CAddress*)this);
         READWRITE(source);
         READWRITE(nLastSuccess);
         READWRITE(nAttempts);
-    )
+    }
 
     void Init()
     {
@@ -248,8 +249,10 @@ protected:
 public:
 
 #ifndef _MSC_VER 
-    IMPLEMENT_SERIALIZE
-    (({
+    ADD_SERIALIZE_METHODS;
+
+    template <typename Stream, typename Operation>
+    inline void SerializationOp(Stream& s, Operation ser_action) {
         // serialized format:
         // * version byte (currently 0)
         // * nKey
@@ -279,7 +282,7 @@ public:
             READWRITE(nTried);
 
             CAddrMan *am = const_cast<CAddrMan*>(this);
-            if (fWrite)
+            if (!ser_action.ForRead())
             {
                 int nUBuckets = ADDRMAN_NEW_BUCKET_COUNT;
                 READWRITE(nUBuckets);
@@ -380,10 +383,12 @@ public:
                 }
             }
         }
-    });)
+    }
 #else
-    IMPLEMENT_SERIALIZE
-            (
+    ADD_SERIALIZE_METHODS;
+
+    template <typename Stream, typename Operation>
+    inline void SerializationOp(Stream& s, Operation ser_action) {
             LOCK(cs);
                 unsigned char 
                     nVersion = 0;
@@ -396,7 +401,7 @@ public:
                 CAddrMan 
                     *am = const_cast<CAddrMan*>(this);
 
-                if (fWrite)
+                if (!ser_action.ForRead())
                 {
                     int 
                         nUBuckets = ADDRMAN_NEW_BUCKET_COUNT;
@@ -555,7 +560,7 @@ public:
                         }
                     }
                 }
-            )
+    }
 
 #endif  //_MSC_VER
     CAddrMan() : vRandom(0), vvTried(ADDRMAN_TRIED_BUCKET_COUNT, std::vector<int>(0)), vvNew(ADDRMAN_NEW_BUCKET_COUNT, std::set<int>())

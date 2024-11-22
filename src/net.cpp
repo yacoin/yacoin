@@ -738,7 +738,7 @@ void CNode::PushVersion()
         PROTOCOL_VERSION, chainActive.Height(), addrMe.ToString(),
         addrYou.ToString(), addr.ToString());
     PushMessage(
-        "version", PROTOCOL_VERSION, nLocalServices, nTime, addrYou, addrMe,
+        "version", PROTOCOL_VERSION, (uint64_t)nLocalServices, nTime, addrYou, addrMe,
         nLocalHostNonce,
         FormatSubVersion(CLIENT_NAME, CLIENT_VERSION, std::vector<string>()),
         chainActive.Height());

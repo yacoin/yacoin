@@ -9,6 +9,8 @@
 #ifndef YACOIN_DBWRAPPER_H
 #define YACOIN_DBWRAPPER_H
 
+#include "streams.h"
+
 #include <map>
 #include <string>
 #include <vector>

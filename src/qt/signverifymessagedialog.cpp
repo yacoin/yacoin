@@ -10,6 +10,7 @@
 #include "optionsmodel.h"
 #include "walletmodel.h"
 #include "wallet.h"
+#include "streams.h"
 
 #include <string>
 #include <vector>

@@ -13,6 +13,7 @@
 #ifndef _BITCOINRPC_H_
  #include "bitcoinrpc.h"
 #endif
+#include "streams.h"
 
 using namespace json_spirit;
 

@@ -8,6 +8,7 @@
 #ifndef BITCOIN_MAIN_H
  #include "main.h"
 #endif
+#include "streams.h"
 
 #include <map>
 #include <string>

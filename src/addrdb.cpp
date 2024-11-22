@@ -14,6 +14,7 @@
 #include "serialize.h"
 #include "tinyformat.h"
 #include "util.h"
+#include "streams.h"
 
 namespace {
 

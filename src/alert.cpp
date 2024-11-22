@@ -27,6 +27,7 @@
 #ifndef BITCOIN_UI_INTERFACE_H
  #include "ui_interface.h"
 #endif
+#include "streams.h"
 
 using std::make_pair;
 using std::map;

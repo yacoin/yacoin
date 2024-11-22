@@ -51,6 +51,7 @@
 
 #include "reverse_iterator.h"
 #include "random.h"
+#include "streams.h"
 
 using namespace boost;
 
@@ -1138,7 +1139,7 @@ bool AddOrphanTx(const CTransaction& tx)
     // 10,000 orphans, each of which is at most 5,000 bytes big is
     // at most 500 megabytes of orphans:
 
-    size_t nSize = tx.GetSerializeSize(SER_NETWORK, CTransaction::CURRENT_VERSION_of_Tx);
+    size_t nSize = ::GetSerializeSize(tx, SER_NETWORK, CTransaction::CURRENT_VERSION_of_Tx);
 
     if (nSize > 5000)
     {

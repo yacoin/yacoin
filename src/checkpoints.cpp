@@ -15,6 +15,7 @@
 #ifndef BITCOIN_TXDB_H
  #include "txdb.h"
 #endif
+#include "streams.h"
 
 namespace Checkpoints
 {

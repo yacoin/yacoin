@@ -24,6 +24,7 @@
 #ifndef WIN32
 #include "sys/stat.h"
 #endif
+#include "streams.h"
 
 using namespace boost;
 

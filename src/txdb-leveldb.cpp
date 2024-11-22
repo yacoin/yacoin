@@ -12,6 +12,7 @@
 #include "checkpoints.h"
 #include "txdb.h"
 #include "kernel.h"
+#include "streams.h"
 
 #include <map>
 #include <string>
