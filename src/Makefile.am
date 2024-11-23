@@ -69,6 +69,7 @@ libyacoin_common_a_SOURCES= \
     crypto/sha256.cpp \
     crypto/sha512.cpp \
     crypto/ripemd160.cpp \
+    crypto/hmac_sha512.cpp \
     compat/strnlen.cpp \
     primitives/transaction.cpp \
     primitives/block.cpp \
