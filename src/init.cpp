@@ -14,7 +14,7 @@
 #endif
 
 #ifndef BITCOIN_TXDB_H
- #include "txdb.h"
+ #include "txdb-leveldb.h"
 #endif
 
 #ifndef _BITCOINRPC_H_
@@ -817,9 +817,6 @@ bool AppInit2()
 #if defined( USE_UPNP )
         LogPrintf( "USE_UPNP is defined\n" );
 #endif
-#if defined( USE_LEVELDB )
-        LogPrintf( "USE_LEVELDB is defined\n" );
-#endif
     }
     LogPrintf("Using Boost version %1d.%d.%d\n",         // miiill (most, insignificant, least) digits
             BOOST_VERSION / 100000,
@@ -869,7 +866,6 @@ bool AppInit2()
 #endif
     LogPrintf("\n" );
 
-#ifdef USE_LEVELDB
     LogPrintf(
             "\n"
             "Using levelDB version %d.%d"
@@ -879,7 +875,6 @@ bool AppInit2()
             leveldb::kMinorVersion
           );
     LogPrintf("\n");
-#endif
 
     int
         nBdbMajor,

@@ -5,7 +5,6 @@
 
 #ifndef BITCOIN_LEVELDB_H
 #define BITCOIN_LEVELDB_H
-#ifdef USE_LEVELDB
 class CDiskBlockIndex;
 
 #include "addressindex.h"
@@ -61,5 +60,4 @@ public:
     bool BuildMapHash();
 };
 
-#endif
 #endif // BITCOIN_DB_H

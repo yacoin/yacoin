@@ -21,7 +21,7 @@
 #endif
 
 #ifndef BITCOIN_TXDB_H
- #include "txdb.h"
+ #include "txdb-leveldb.h"
 #endif
 
 #ifndef BITCOIN_INIT_H
@@ -3499,10 +3499,6 @@ bool LoadBlockIndex(bool fAllowNew)
             if (!txdb.WriteModifierUpgradeTime(nModifierUpgradeTime))
                 return error("LoadBlockIndex() : failed to write upgrade info");
         }
-
-#ifndef USE_LEVELDB
-        txdb.Close();
-#endif
     }
 
     return true;

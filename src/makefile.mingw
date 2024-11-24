@@ -182,17 +182,7 @@ endif
 #
 # LevelDB support, with mingw shlwapi lib must come at the end! (Why?)
 #
-ifdef USE_LEVELDB
 DEFS += -DUSE_LEVELDB
-#leveldb/libleveldb.a:
-#	cd leveldb; TARGET_OS=NATIVE_WINDOWS make libleveldb.a libmemenv.a; cd ..
-#obj/txdb-leveldb.o	: txdb-leveldb.cpp
-#	g++ -c $(CFLAGS) -MMD -o $@ $<
-#	@echo TEST LEVELDB $(DEFS)
-else
-obj/txdb-bdb.o	: txdb-bdb.cpp
-	$(CC) -c $(CFLAGS) -MMD -o $@ $<
-endif
 ######################
 
 LIBS += \
@@ -280,7 +270,6 @@ obj/stun.o \
 obj/sync.o \
 obj/strnlen.o \
 obj/transaction.o \
-obj/txdb-bdb.o \
 obj/dbwrapper.o \
 obj/txdb-leveldb.o \
 obj/util.o \
@@ -303,21 +292,13 @@ test check: test_yacoin.exe FORCE
 # None of this code below works! At all!!
 # I built leveldb libraries from the Qt build, which does work!
 
-ifdef USE_LEVELDB
- #SOURCES += src/txdb-leveldb.cpp  
- #OBJS += obj/txdb-leveldb.o
+#SOURCES += src/txdb-leveldb.cpp  
+#OBJS += obj/txdb-leveldb.o
 leveldb/libleveldb.a:
 	cd leveldb; TARGET_OS=NATIVE_WINDOWS make libleveldb.a libmemenv.a; cd ..
 #obj/txdb-leveldb.o	: txdb-leveldb.cpp
 #	$(CXX) -c -frandom-seed=$@ $(CFLAGS) $(INCLUDEPATHS) -o $@ $<
 # @echo TEST LEVELDB $(DEFS)
-else
- #SOURCES += src/txdb-bdb.cpp
- #OBJS += obj/txdb-bdb.o
- #obj/txdb-bdb.o	: txdb-bdb.cpp
-#	$(CXX) -c -frandom-seed=$@ $(CFLAGS) $(INCLUDEPATHS) -o $@ $<
-# @echo TEST BDB $(DEFS)	
-endif
 ######################
 #.genjane:
 #	touch .genjane; gcc -c -O3 -DSCRYPT_CHACHA -DSCRYPT_KECCAK512 -DSCRYPT_CHOOSE_COMPILETIME -o obj/scrypt-jane.o scrypt-jane/scrypt-jane.c

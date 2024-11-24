@@ -6,7 +6,7 @@
 
 #include "tokens/tokens.h"
 #include "primitives/transaction.h"
-#include "txdb.h"
+#include "txdb-leveldb.h"
 #include "wallet.h"
 #include "policy/fees.h"
 

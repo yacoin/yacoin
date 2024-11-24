@@ -14,7 +14,7 @@
 #endif
 
 #ifndef BITCOIN_TXDB_H
- #include "txdb.h"
+ #include "txdb-leveldb.h"
 #endif
 #include "streams.h"
 
@@ -884,10 +884,6 @@ bool CheckProofOfStake(CValidationState &state, const CTransaction& tx, unsigned
     CTxIndex txindex;
     if (!txPrev.ReadFromDisk(txdb, txin.prevout, txindex))
         return state.DoS(1, error("CheckProofOfStake() : INFO: read txPrev failed"));  // previous transaction not in main chain, may occur during initial download
-
-#ifndef USE_LEVELDB
-    txdb.Close();
-#endif
 
     // Verify signature
     if (!VerifySignature(txPrev, tx, 0, MANDATORY_SCRIPT_VERIFY_FLAGS, 0))

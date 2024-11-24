@@ -14,7 +14,7 @@
 #include "coincontrol.h"
 #include "init.h"
 #include "script/script.h"
-#include "txdb.h"
+#include "txdb-leveldb.h"
 #include "wallet.h"
 
 #include <boost/assign/list_of.hpp>

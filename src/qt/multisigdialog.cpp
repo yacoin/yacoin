@@ -19,12 +19,7 @@
 #include "wallet.h"
 #include "walletmodel.h"
 #include "streams.h"
-
-#ifdef USE_LEVELDB
 #include "txdb-leveldb.h"
-#else
-#include "txdb-bdb.h"
-#endif
 
 MultisigDialog::MultisigDialog(QWidget *parent) : QWidget(parent), ui(new Ui::MultisigDialog), model(0)
 {

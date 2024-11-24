@@ -186,7 +186,7 @@ HEADERS += \
     src/key.h \
     src/db.h \
     src/dbwrapper.h \
-    src/txdb.h \
+    src/txdb-leveldb.h \
     src/tinyformat.h \
     src/walletdb.h \
     src/script/script.h \
@@ -244,7 +244,6 @@ HEADERS += \
     src/qt/multisigdialog.h
 
 #    src/txdb-leveldb.cpp \
-#    src/txdb-bdb.cpp \
 
 SOURCES += src/qt/bitcoin.cpp src/qt/bitcoingui.cpp \
     src/qt/transactiontablemodel.cpp \

@@ -7,7 +7,7 @@
 #include "addressindex.h"
 #include "tokens/tokendb.h"
 #include "primitives/block.h"
-#include "txdb.h"
+#include "txdb-leveldb.h"
 #include "checkpoints.h"
 #include "kernel.h"
 #include "wallet.h"

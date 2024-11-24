@@ -13,7 +13,7 @@
 #endif
 
 #ifndef BITCOIN_TXDB_H
- #include "txdb.h"
+ #include "txdb-leveldb.h"
 #endif
 #include "streams.h"
 
@@ -209,10 +209,6 @@ namespace Checkpoints
         }
         if (!txdb.TxnCommit())
             return error("WriteSyncCheckpoint(): failed to commit to db sync checkpoint %s", hashCheckpoint.ToString().c_str());
-
-#ifndef USE_LEVELDB
-        txdb.Close();
-#endif
 
         Checkpoints::hashSyncCheckpoint = hashCheckpoint;
         return true;

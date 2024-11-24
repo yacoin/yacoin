@@ -1,6 +1,6 @@
 #include "wallet.h"
 #include "validation.h"
-#include "txdb.h"
+#include "txdb-leveldb.h"
 #include "tokens/tokens.h"
 #ifdef QT_GUI
  #include "explorer.h"
