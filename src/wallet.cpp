@@ -25,6 +25,7 @@
 #endif
 
 #include "random.h"
+#include "net_processing.h"
 #include <boost/algorithm/string/replace.hpp>
 
 using std::list;
@@ -1138,7 +1139,7 @@ void CWalletTx::AddSupportingTransactions(CTxDB& txdb)
                 {
                     tx = *mapWalletPrev[hash];
                 }
-                else if (!fClient && txdb.ReadDiskTx(hash, tx))
+                else if (txdb.ReadDiskTx(hash, tx))
                 {
                     ;
                 }
@@ -1469,22 +1470,23 @@ void CWallet::ReacceptWalletTransactions()
 
 void CWalletTx::RelayWalletTransaction(CTxDB& txdb)
 {
-    BOOST_FOREACH(const CMerkleTx& tx, vtxPrev)
+    for (const CMerkleTx& tx : vtxPrev)
     {
         if (!(tx.IsCoinBase() || tx.IsCoinStake()))
         {
             uint256 hash = tx.GetHash();
             if (!txdb.ContainsTx(hash))
-                RelayTransaction((CTransaction)tx, hash);
+                RelayTransaction(tx, g_connman.get());
         }
     }
+
     if (!(IsCoinBase() || IsCoinStake()))
     {
         uint256 hash = GetHash();
         if (!txdb.ContainsTx(hash))
         {
             LogPrintf("Relaying wtx %s\n", hash.ToString().substr(0,10));
-            RelayTransaction((CTransaction)*this, hash);
+            RelayTransaction(*this, g_connman.get());
         }
     }
 }

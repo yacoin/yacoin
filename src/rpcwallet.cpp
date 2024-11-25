@@ -230,7 +230,12 @@ Value getinfo(const Array& params, bool fHelp)
     obj.push_back(Pair("moneysupply",   ValueFromAmount(chainActive.Tip()->nMoneySupply)));
     obj.push_back(Pair("connections",   (int)vNodes.size()));
     obj.push_back(Pair("proxy",         (proxy.first.IsValid() ? proxy.first.ToStringIPPort() : string())));
-    obj.push_back(Pair("ip",            addrSeenByPeer.ToStringIP()));
+    for (const std::pair<CNetAddr, LocalServiceInfo> &item : mapLocalHost)
+    {
+        obj.push_back(Pair("ip", item.first.ToString()));
+        obj.push_back(Pair("port", item.second.nPort));
+        obj.push_back(Pair("score", item.second.nScore));
+    }
 
     diff.push_back(Pair("proof-of-work",  GetDifficulty()));
     diff.push_back(Pair("proof-of-stake", GetDifficulty(GetLastBlockIndex(chainActive.Tip(), true))));

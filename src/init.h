@@ -9,6 +9,13 @@
  #include "wallet.h"
 #endif
 
+class CScheduler;
+
+namespace boost
+{
+class thread_group;
+} // namespace boost
+
 extern ::int64_t 
     nLongAverageBP2000,
     nLongAverageBP1000,
@@ -18,9 +25,12 @@ extern ::int64_t
 
 extern CWallet* pwalletMain;
 extern std::string strWalletFileName;
+
+/** Interrupt threads */
+void Interrupt(boost::thread_group& threadGroup);
 void StartShutdown();
 void Shutdown(void* parg);
-bool AppInit2();
+bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler);
 std::string HelpMessage();
 
 #endif

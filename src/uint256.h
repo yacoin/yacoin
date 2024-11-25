@@ -5,6 +5,8 @@
 #ifndef BITCOIN_UINT256_H
 #define BITCOIN_UINT256_H
 
+#include "crypto/common.h"
+
 #include <limits.h>
 #include <stdio.h>
 #include <string.h>
@@ -386,6 +388,11 @@ public:
         return sizeof(pn);
     }
 
+    uint64_t GetUint64(int pos) const
+    {
+        return Get64(0);
+    }
+
     ::uint64_t Get64(int n=0) const
     {
         return pn[2*n] | (::uint64_t)pn[2*n+1] << 32;
@@ -591,6 +598,16 @@ public:
             memcpy(pn, &vch[0], sizeof(pn));
         else
             *this = 0;
+    }
+
+    /** A cheap hash function that just returns 64 bits from the result, it can be
+     * used when the contents are considered uniformly random. It is not appropriate
+     * when the value can easily be influenced from outside as e.g. a network adversary could
+     * provide values to trigger worst-case behavior.
+     */
+    uint64_t GetCheapHash() const
+    {
+        return ReadLE64((unsigned char*)&pn);
     }
 };
 

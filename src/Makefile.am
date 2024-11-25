@@ -74,6 +74,8 @@ libyacoin_common_a_SOURCES= \
     primitives/transaction.cpp \
     primitives/block.cpp \
     consensus/consensus.cpp \
+    merkleblock.cpp \
+    blockencodings.cpp \
     policy/feerate.cpp \
     policy/fees.cpp \
     support/cleanse.cpp \
@@ -86,13 +88,16 @@ libyacoin_common_a_SOURCES= \
     checkpoints.cpp \
     netbase.cpp \
     addrman.cpp \
+    addrdb.cpp \
+    bloom.cpp \
+    threadinterrupt.cpp \
     crypter.cpp \
     key.cpp \
     db.cpp \
     fs.cpp \
-    irc.cpp \
     validationinterface.cpp \
     scheduler.cpp \
+    torcontrol.cpp \
     random.cpp \
     keystore.cpp \
     kernelrecord.cpp \
@@ -102,6 +107,7 @@ libyacoin_common_a_SOURCES= \
     main.cpp \
     net.cpp \
     arith_uint256.cpp \
+    net_processing.cpp \
     protocol.cpp \
     bitcoinrpc.cpp \
     price.cpp \

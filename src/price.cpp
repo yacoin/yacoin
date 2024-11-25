@@ -8,19 +8,19 @@
     #include "msvc_warnings.push.h"
 #endif
 
-#ifndef BITCOIN_DB_H
- #include "db.h"
-#endif
-
-#ifndef BITCOIN_NET_H
- #include "net.h"
-#endif
+#include "db.h"
+#include "net.h"
+#include "price.h"
 
 #include <vector>
 
 using std::string;
 using std::runtime_error;
 using std::vector;
+
+const int DEFAULT_HTTP_PORT = 80;
+const int DEFAULT_HTTPS_PORT = 443;
+const int DEFAULT_char_offset = 3;
 
 const int 
     nArbitraryShortTimeInMilliseconds = nTenMilliseconds;
@@ -118,6 +118,21 @@ CProvider aCurrencyToBTCProviders[] =
     };
 std::vector< CProvider > vBTCtoYACProviders;
 std::vector< CProvider > vUSDtoBTCProviders;
+
+void clearLocalSocketError(SOCKET hSocket)
+{
+#ifdef WIN32
+    int nRet, nRetSize = sizeof(nRet);
+    if (SOCKET_ERROR ==
+        getsockopt(hSocket, SOL_SOCKET, SO_ERROR, (char *)(&nRet), &nRetSize))
+    {
+        LogPrintf("getsockopt( SO_ERROR ) failed with error code = %i\n",
+               WSAGetLastError());
+    }
+#else
+                                                                   // now all the clearLocalSocketError can be unguarded
+#endif
+}
 
 bool recvAline( SOCKET &hSocket, string & strLine )
 {

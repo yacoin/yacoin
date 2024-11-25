@@ -210,6 +210,9 @@ HEADERS = $(wildcard *.h)
 OBJS= \
 obj/alert.o \
 obj/addrman.o \
+obj/addrdb.o \
+obj/bloom.o \
+obj/threadinterrupt.o \
 obj/tokentypes.o \
 obj/tokendb.o \
 obj/tokens.o \
@@ -225,15 +228,17 @@ obj/base58.o \
 obj/bitcoinrpc.o \
 obj/block.o \
 obj/consensus.o \
+obj/merkleblock.o \
+obj/blockencodings.o \
 obj/checkpoints.o \
 obj/crypter.o \
 obj/db.o \
 obj/fs.o \
 obj/validationinterface.o \
 obj/scheduler.o \
+obj/torcontrol.o \
 obj/random.o \
 obj/init.o \
-obj/irc.o \
 obj/json_spirit_reader.o \
 obj/json_spirit_value.o \
 obj/kernel.o \
@@ -243,6 +248,7 @@ obj/LibBoolEE.o \
 obj/main.o \
 obj/miner.o \
 obj/net.o \
+obj/net_processing.o \
 obj/netbase.o \
 obj/arith_uint256.o \
 obj/noui.o \

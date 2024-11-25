@@ -10,6 +10,7 @@
 #include <stdint.h>
 #include <map>
 #include "primitives/block.h"
+#include "validation.h"
 
 enum GetMaxSize_mode
 {
@@ -88,9 +89,9 @@ public:
 };
 /** The currently-connected chain of blocks. */
 extern CChain chainActive;
-extern std::map<uint256, CBlockIndex*> mapBlockIndex;
+extern BlockMap mapBlockIndex;
 
-::uint64_t GetMaxSize(enum GetMaxSize_mode mode);
+extern ::uint64_t GetMaxSize(enum GetMaxSize_mode mode);
 extern ::int64_t GetProofOfWorkReward(unsigned int nBits=0, ::int64_t nFees=0, unsigned int nHeight=0);
 
 #endif // BITCOIN_CONSENSUS_CONSENSUS_H

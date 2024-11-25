@@ -76,6 +76,10 @@ const static std::string allNetMessageTypes[] = {
     NetMsgType::BLOCKTXN,
 };
 const static std::vector<std::string> allNetMessageTypesVec(allNetMessageTypes, allNetMessageTypes+ARRAYLEN(allNetMessageTypes));
+// The message start string is designed to be unlikely to occur in normal data.
+// The characters are rarely used upper ASCII, not valid as UTF-8, and produce
+// a large 4-byte int at any alignment.
+unsigned char pchMessageStart[4] = { 0xd9, 0xe6, 0xe7, 0xe5 };
 
 CMessageHeader::CMessageHeader()
 {

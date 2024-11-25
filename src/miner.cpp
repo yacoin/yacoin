@@ -635,7 +635,7 @@ bool CheckWork(CBlock* pblock, CWallet& wallet, CReserveKey& reservekey) {
   // Process this block the same as if we had received it from another node
   MeasureTime processBlock;
   CValidationState state;
-  if (!ProcessBlock(state, NULL, pblock)) {
+  if (!ProcessBlock(state, pblock, true, nullptr)) {
     processBlock.mEnd.stamp();
     LogPrintf("CheckWork(), total time for ProcessBlock = %lu us\n",
            processBlock.getExecutionTime());

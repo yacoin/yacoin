@@ -52,7 +52,7 @@
 int64_t GetStartupTime();
 
 static const bool DEFAULT_LOGTIMEMICROS = false;
-static const bool DEFAULT_LOGIPS        = false;
+static const bool DEFAULT_LOGIPS        = true;
 static const bool DEFAULT_LOGTIMESTAMPS = true;
 
 /** Signals for translation. */
@@ -313,7 +313,7 @@ void RenameThread(const char* name);
  */
 template <typename Callable> void TraceThread(const char* name,  Callable func)
 {
-    std::string s = strprintf("bitcoin-%s", name);
+    std::string s = strprintf("yacoin-%s", name);
     RenameThread(s.c_str());
     try
     {
@@ -446,8 +446,7 @@ extern bool
     fShutdown,
     fDaemon,
     fServer,
-    fTestNet,
-    fNoListen;
+    fTestNet;
 extern ::int32_t nMainnetNewLogicBlockNumber;
 extern ::int32_t nTokenSupportBlockNumber;
 extern ::uint32_t

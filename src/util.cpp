@@ -590,7 +590,6 @@ bool fShutdown = false;
 bool fDaemon = false;
 bool fServer = false;
 bool fTestNet = false;
-bool fNoListen = false;
 
 static int64_t nMockTime = 0;  // For unit testing
 

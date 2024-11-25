@@ -55,7 +55,6 @@
  #include "version.h"
 #endif
 
-/* TACA: NEW CODE BEGIN */
 static const unsigned int MAX_SIZE = 0x02000000;
 
 /**
@@ -196,8 +195,6 @@ enum
 
 };
 
-// TODO: Remove this one
-//#define READWRITE(obj)      (nSerSize += ::SerReadWrite(s, (obj), nType, nVersion, ser_action))
 #define READWRITE(obj)      (::SerReadWrite(s, (obj), ser_action))
 #define READWRITEMANY(...)      (::SerReadWriteMany(s, ser_action, __VA_ARGS__))
 
@@ -457,6 +454,53 @@ public:
     template<typename Stream>
     void Unserialize(Stream& s) {
         n = ReadVarInt<Stream,I>(s);
+    }
+};
+
+class CCompactSize
+{
+protected:
+    uint64_t &n;
+public:
+    CCompactSize(uint64_t& nIn) : n(nIn) { }
+
+    template<typename Stream>
+    void Serialize(Stream &s) const {
+        WriteCompactSize<Stream>(s, n);
+    }
+
+    template<typename Stream>
+    void Unserialize(Stream& s) {
+        n = ReadCompactSize<Stream>(s);
+    }
+};
+
+template<size_t Limit>
+class LimitedString
+{
+protected:
+    std::string& string;
+public:
+    LimitedString(std::string& _string) : string(_string) {}
+
+    template<typename Stream>
+    void Unserialize(Stream& s)
+    {
+        size_t size = ReadCompactSize(s);
+        if (size > Limit) {
+            throw std::ios_base::failure("String length limit exceeded");
+        }
+        string.resize(size);
+        if (size != 0)
+            s.read((char*)string.data(), size);
+    }
+
+    template<typename Stream>
+    void Serialize(Stream& s) const
+    {
+        WriteCompactSize(s, string.size());
+        if (!string.empty())
+            s.write((char*)string.data(), string.size());
     }
 };
 
@@ -930,8 +974,6 @@ size_t GetSerializeSize(const S& s, const T& t)
 {
     return (CSizeComputer(s.GetType(), s.GetVersion()) << t).size();
 }
-
-/* TACA: NEW CODE END */
 
 class CScript;
 

@@ -23,6 +23,8 @@ class CBlockIndex;
 typedef std::map<uint256, std::pair<CTxIndex, CTransaction> > MapPrevTx;
 FILE* OpenBlockFile(unsigned int nFile, unsigned int nBlockPos, const char* pszMode="rb");
 
+static const int SERIALIZE_TRANSACTION_NO_WITNESS = 0x40000000;
+
 /** An inpoint - a combination of a transaction and an index n into its vin */
 class CInPoint
 {

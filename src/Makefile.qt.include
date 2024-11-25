@@ -248,6 +248,8 @@ BITCOIN_QT_CPP = \
   primitives/transaction.cpp \
   primitives/block.cpp \
   consensus/consensus.cpp \
+  merkleblock.cpp \
+  blockencodings.cpp \
   policy/feerate.cpp \
   policy/fees.cpp \
   support/cleanse.cpp \
@@ -261,14 +263,17 @@ BITCOIN_QT_CPP = \
   checkpoints.cpp \
   netbase.cpp \
   addrman.cpp \
+  addrdb.cpp \
+  bloom.cpp \
+  threadinterrupt.cpp \
   crypter.cpp \
   key.cpp \
   db.cpp \
   fs.cpp \
   validationinterface.cpp \
   scheduler.cpp \
+  torcontrol.cpp \
   random.cpp \
-  irc.cpp \
   keystore.cpp \
   kernelrecord.cpp \
   LibBoolEE.cpp \
@@ -277,6 +282,7 @@ BITCOIN_QT_CPP = \
   main.cpp \
   net.cpp \
   arith_uint256.cpp \
+  net_processing.cpp \
   protocol.cpp \
   bitcoinrpc.cpp \
   price.cpp \

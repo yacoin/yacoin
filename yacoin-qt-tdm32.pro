@@ -151,6 +151,9 @@ HEADERS += \
     src/kernelrecord.h \
     src/alert.h \
     src/addrman.h \
+    src/addrdb.h \
+    src/bloom.h \
+    src/threadinterrupt.h \
     src/addressindex.h \
     src/base58.h \
     src/bignum.h \
@@ -160,6 +163,7 @@ HEADERS += \
     src/coins.h \
     src/indirectmap.h \
     src/LibBoolEE.h \
+    src/limitedmap.h \
     src/sync.h \
     src/util.h \
     src/utilstrencodings.h \
@@ -176,12 +180,15 @@ HEADERS += \
     src/prevector.h \
     src/serialize.h \
     src/strlcpy.h \
+    src/scheduler.h \
+    src/torcontrol.h \
     src/main.h \
     src/memusage.h \
     src/miner.h \
     src/random_nonce.h \
     src/net.h \
     src/arith_uint256.h \
+    src/net_processing.h \
     src/ministun.h \
     src/key.h \
     src/db.h \
@@ -191,7 +198,6 @@ HEADERS += \
     src/walletdb.h \
     src/script/script.h \
     src/init.h \
-    src/irc.h \
     src/mruset.h \
     src/compat/endian.h \
     src/compat/byteswap.h \
@@ -282,16 +288,20 @@ SOURCES += src/qt/bitcoin.cpp src/qt/bitcoingui.cpp \
     src/init.cpp \
     src/net.cpp \
     src/arith_uint256.cpp \
+    src/net_processing.cpp \
     src/price.cpp \
     src/random_nonce.cpp \
     src/stun.cpp \
-    src/irc.cpp \
     src/checkpoints.cpp \
     src/addrman.cpp \
+    src/addrdb.cpp \
+    src/bloom.cpp \
+    src/threadinterrupt.cpp \
     src/db.cpp \
     src/fs.cpp \
     src/validationinterface.cpp \
     src/scheduler.cpp \
+    src/torcontrol.cpp \
     src/random.cpp \
     src/dbwrapper.cpp \
     src/walletdb.cpp \
@@ -302,6 +312,8 @@ SOURCES += src/qt/bitcoin.cpp src/qt/bitcoingui.cpp \
     src/primitives/transaction.cpp \
     src/primitives/block.cpp \
     src/consensus/consensus.cpp \
+    src/merkleblock.cpp \
+    src/blockencodings.cpp \
     src/policy/feerate.cpp \
     src/policy/fees.cpp \
     src/crypto/siphash.cpp \

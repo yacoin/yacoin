@@ -45,20 +45,17 @@ CTxDB::CTxDB(const char *pszMode, bool fWipe) :
 
 bool CTxDB::ReadTxIndex(uint256 hash, CTxIndex &txindex)
 {
-    Yassert(!fClient);
     txindex.SetNull();
     return Read(make_pair(string("tx"), hash), txindex);
 }
 
 bool CTxDB::UpdateTxIndex(uint256 hash, const CTxIndex &txindex)
 {
-    Yassert(!fClient);
     return Write(make_pair(string("tx"), hash), txindex);
 }
 
 bool CTxDB::AddTxIndex(const CTransaction &tx, const CDiskTxPos &pos, int nHeight)
 {
-    Yassert(!fClient);
     // Add to tx index
     uint256 hash = tx.GetHash();
     CTxIndex txindex(pos, tx.vout.size());
@@ -67,7 +64,6 @@ bool CTxDB::AddTxIndex(const CTransaction &tx, const CDiskTxPos &pos, int nHeigh
 
 bool CTxDB::EraseTxIndex(const CTransaction &tx)
 {
-    Yassert(!fClient);
     uint256 hash = tx.GetHash();
 
     return Erase(make_pair(string("tx"), hash));
@@ -219,13 +215,11 @@ bool CTxDB::ReadAddressIndex(uint160 addressHash, int type,
 
 bool CTxDB::ContainsTx(uint256 hash)
 {
-    Yassert(!fClient);
     return Exists(make_pair(string("tx"), hash));
 }
 
 bool CTxDB::ReadDiskTx(uint256 hash, CTransaction &tx, CTxIndex &txindex)
 {
-    Yassert(!fClient);
     tx.SetNull();
     if (!ReadTxIndex(hash, txindex))
         return false;

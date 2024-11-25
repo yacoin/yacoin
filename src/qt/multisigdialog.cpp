@@ -20,6 +20,7 @@
 #include "walletmodel.h"
 #include "streams.h"
 #include "txdb-leveldb.h"
+#include "net_processing.h"
 
 MultisigDialog::MultisigDialog(QWidget *parent) : QWidget(parent), ui(new Ui::MultisigDialog), model(0)
 {
@@ -558,7 +559,7 @@ void MultisigDialog::on_sendTransactionButton_clicked()
     return;
     SyncWithWallets(tx, NULL, true);
     //(CInv(MSG_TX, txHash), tx);
-    RelayTransaction(tx, txHash);
+    RelayTransaction(tx, g_connman.get());
 }
 
 MultisigInputEntry * MultisigDialog::addInput()

@@ -6,30 +6,16 @@
 #define BITCOIN_MAIN_H
 
 #include <algorithm>
+#include <list>
+#include <map>
+#include <boost/filesystem.hpp>
 
-#ifndef BITCOIN_TIMESTAMPS_H
- #include "timestamps.h"
-#endif
-
-#ifndef BITCOIN_BIGNUM_H
- #include "bignum.h"
-#endif
-
-#ifndef BITCOIN_SYNC_H
- #include "sync.h"
-#endif
-
-#ifndef BITCOIN_NET_H
- #include "net.h"
-#endif
-
-#ifndef H_BITCOIN_SCRIPT
- #include "script/script.h"
-#endif
-
-#ifndef SCRYPT_H
- #include "scrypt.h"
-#endif
+#include "timestamps.h"
+#include "bignum.h"
+#include "sync.h"
+#include "net.h"
+#include "script/script.h"
+#include "scrypt.h"
 
 #include "primitives/transaction.h"
 #include "primitives/block.h"
@@ -39,12 +25,11 @@
 #include "tokens/tokens.h"
 #include "amount.h"
 #include "policy/fees.h"
-#include <list>
-#include <map>
-#include <boost/filesystem.hpp>
-#include <txmempool.h>
-#include <validation.h>
+
 #include "consensus/consensus.h"
+#include "txmempool.h"
+#include "validation.h"
+#include "arith_uint256.h"
 
 class CWallet;
 class CBlock;
@@ -106,7 +91,6 @@ boost::filesystem::path GetBlockPosFilename(const CDiskBlockPos &pos, const char
 // END OF FUNCTIONS USED FOR TOKEN MANAGEMENT SYSTEM
 //
 
-
 //
 // Global state
 //
@@ -117,8 +101,21 @@ extern int
     nStatisticsNumberOfBlocks100,
     nStatisticsNumberOfBlocks;
 
+const ::uint32_t
+    nAverageBlocksPerMinute = 1,
+    nNumberOfDaysPerYear = 365,
+    nNumberOfBlocksPerYear =
+        (nAverageBlocksPerMinute * nMinutesperHour * nHoursPerDay *
+         nNumberOfDaysPerYear) + // that 1/4 of a day for leap years
+        (nAverageBlocksPerMinute * nMinutesperHour * (nHoursPerDay / 4));
+extern ::int64_t nUpTimeStart;
+
+// PoS constants
+extern const unsigned int nStakeMaxAge, nOnedayOfAverageBlocks;
+extern unsigned int nStakeMinAge, nStakeTargetSpacing, nModifierInterval, nPoWTargetSpacing;
+
+const double nInflation = 0.02; // 2%
 static const unsigned int MAX_ORPHAN_TRANSACTIONS = 10000;
-static const unsigned int MAX_INV_SZ = 50000;
 /** Maxiumum number of signature check operations in an IsStandard() P2SH script */
 static const unsigned int MAX_P2SH_SIGOPS = 21;
 
@@ -128,26 +125,6 @@ static const ::int64_t MIN_TXOUT_AMOUNT = CENT/100;
 
 // Maximum number of script-checking threads allowed
 static const int MAX_SCRIPTCHECK_THREADS = 16;
-/** Timeout in seconds during which a peer must stall block download progress before being disconnected. */
-static const unsigned int BLOCK_STALLING_TIMEOUT = 2;
-/** Number of headers sent in one getheaders result. We rely on the assumption that if a peer sends
- *  less than this number, we reached their tip. Changing this value is a protocol upgrade. */
-static unsigned int MAX_HEADERS_RESULTS = 2000;
-/** Number of blocks that can be requested at any given time from a single peer. */
-extern int MAX_BLOCKS_IN_TRANSIT_PER_PEER;
-/** Size of the "block download window": how far ahead of our current height do we fetch?
- *  Larger windows tolerate larger download speed differences between peer, but increase the potential
- *  degree of disordering of blocks on disk (which make reindexing and in the future perhaps pruning
- *  harder). We'll probably want to make this a per-peer adaptive value at some point. */
-extern unsigned int BLOCK_DOWNLOAD_WINDOW; //32000
-extern unsigned int FETCH_BLOCK_DOWNLOAD; //4000
-// Trigger sending getblocks from other peers when header > block + HEADER_BLOCK_DIFFERENCES_TRIGGER_GETDATA
-extern unsigned int HEADER_BLOCK_DIFFERENCES_TRIGGER_GETBLOCKS; //default = 10000
-/** Headers download timeout expressed in microseconds
- *  Timeout = base + per_header * (expected number of headers) */
-extern int64_t HEADERS_DOWNLOAD_TIMEOUT_BASE; // 10 minutes
-extern int64_t BLOCK_DOWNLOAD_TIMEOUT_BASE; // 10 minutes
-static const int64_t HEADERS_DOWNLOAD_TIMEOUT_PER_HEADER = 1000; // 1ms/header
 #ifndef LOW_DIFFICULTY_FOR_DEVELOPMENT
     static const uint256 hashGenesisBlock("0x0000060fc90618113cde415ead019a1052a9abc43afcccff38608ff8751353e5");
 #else
@@ -173,9 +150,7 @@ inline ::int64_t FutureDrift(::int64_t nTime)
 
 extern CScript COINBASE_FLAGS;
 extern CCriticalSection cs_main;
-extern std::map<uint256, CBlockIndex*> mapBlockIndex;
-extern boost::mutex mapHashmutex;
-extern std::map<uint256, uint256> mapHash; // map of (SHA256-hash, chacha-hash)
+extern BlockMap mapBlockIndex;
 extern std::set<CBlockIndex*, CBlockIndexWorkComparator> setBlockIndexCandidates;
 extern unsigned int nNodeLifespan;
 //extern unsigned int nStakeMinAge;
@@ -203,15 +178,11 @@ extern bool fReindexOnlyHeaderSync;
 extern bool fReindexBlockIndex;
 extern bool fReindexToken;
 extern int nScriptCheckThreads;
-extern int nHashCalcThreads;
 extern const uint256 entropyStore[38];
 extern bool fStoreBlockHashToDb;
 
 // Minimum disk space required - used in CheckDiskSpace()
 static const ::uint64_t nMinDiskSpace = 52428800;
-
-// Median starting height of all connected peers.
-extern int nMedianStartingHeight;
 
 // Mempool
 extern CTxMemPool mempool;
@@ -222,16 +193,16 @@ class CTxIndex;
 class CScriptCheck;
 class CBlockLocator;
 class CValidationState;
-struct CNodeStateStats;
 
+arith_uint256 GetBlockProof(const CBlockIndex& block);
+int64_t GetBlockProofEquivalentTime(const CBlockIndex& to, const CBlockIndex& from, const CBlockIndex& tip);
+
+/* Wallet functions */
+void Inventory(const uint256& hash);
 void RegisterWallet(CWallet* pwalletIn);
 void CloseWallets();
 void SyncWithWallets(const CTransaction& tx, const CBlock* pblock = NULL, bool fUpdate = false, bool fConnect = true);
-/** Register with a network node to receive its signals */
-void RegisterNodeSignals(CNodeSignals& nodeSignals);
-/** Unregister a network node */
-void UnregisterNodeSignals(CNodeSignals& nodeSignals);
-bool ProcessBlock(CValidationState &state, CNode* pfrom, CBlock* pblock, CDiskBlockPos *dbp = NULL);
+bool ProcessBlock(CValidationState &state, CBlock* pblock, bool fForceProcessing, bool *fNewBlock, CDiskBlockPos *dbp = NULL);
 bool CheckDiskSpace(::uint64_t nAdditionalBytes=0);
 
 void UnloadBlockIndex();
@@ -247,10 +218,6 @@ bool LoadExternalBlockFile(FILE* fileIn, CDiskBlockPos *dbp = NULL);
 void ThreadScriptCheck(void* parg);
 // Stop the script checking threads
 void ThreadScriptCheckQuit();
-// Run an instance of the hash calculation thread
-void ThreadHashCalculation(void* parg);
-// Stop the hash calculation threads
-void ThreadHashCalculationQuit();
 
 bool CheckProofOfWork(uint256 hash, unsigned int nBits);
 unsigned int GetNextTargetRequired(const CBlockIndex* pindexLast, bool fProofOfStake);
@@ -269,8 +236,6 @@ void ResendWalletTransactions();
 
 bool VerifySignature(const CTransaction& txFrom, const CTransaction& txTo, unsigned int nIn, unsigned int flags, int nHashType);
 bool AbortNode(const std::string &msg);
-/** Get statistics from node state */
-bool GetNodeStateStats(NodeId nodeid, CNodeStateStats &stats);
 /** Increase a node's misbehavior score. */
 void Misbehaving(NodeId nodeid, int howmuch);
 
@@ -316,13 +281,6 @@ int GetCoinbaseMaturityOffset();
 bool SetBestChain(CValidationState &state, CTxDB& txdb, CBlockIndex* pindexNew);
 /** Find the best known block, and make it the tip of the block chain */
 bool ActivateBestChain(CValidationState &state, CTxDB& txdb);
-
-struct CNodeStateStats {
-    int nMisbehavior;
-    int nSyncHeight;
-    int nCommonHeight;
-    std::vector<int> vHeightInFlight;
-};
 
 /** Position on disk for a particular transaction. */
 class CDiskTxPos
@@ -418,27 +376,6 @@ public:
         std::swap(nHashType, check.nHashType);
     }
 };
-
-/** Closure representing one block hash calculation
- *  Note that this stores pointer to the block*/
-class CHashCalculation
-{
-private:
-    CBlock *pBlock;
-    CNode* pNode;
-
-public:
-    CHashCalculation() {}
-    CHashCalculation(CBlock* pBlock, CNode* pNode) :
-        pBlock(pBlock), pNode(pNode) { }
-
-    bool operator()();
-    void swap(CHashCalculation &check) {
-        std::swap(pBlock, check.pBlock);
-        std::swap(pNode, check.pNode);
-    }
-};
-
 
 /** A transaction with a merkle branch linking it to the block chain. */
 class CMerkleTx : public CTransaction
@@ -546,6 +483,71 @@ public:
     }
     int GetDepthInMainChain() const;
 
+};
+
+struct PerBlockConnectTrace {
+    CBlockIndex* pindex = nullptr;
+    std::shared_ptr<const CBlock> pblock;
+    std::shared_ptr<std::vector<CTransactionRef>> conflictedTxs;
+    PerBlockConnectTrace() : conflictedTxs(std::make_shared<std::vector<CTransactionRef>>()) {}
+};
+/**
+ * Used to track blocks whose transactions were applied to the UTXO state as a
+ * part of a single ActivateBestChainStep call.
+ *
+ * This class also tracks transactions that are removed from the mempool as
+ * conflicts (per block) and can be used to pass all those transactions
+ * through SyncTransaction.
+ *
+ * This class assumes (and asserts) that the conflicted transactions for a given
+ * block are added via mempool callbacks prior to the BlockConnected() associated
+ * with those transactions. If any transactions are marked conflicted, it is
+ * assumed that an associated block will always be added.
+ *
+ * This class is single-use, once you call GetBlocksConnected() you have to throw
+ * it away and make a new one.
+ */
+class ConnectTrace {
+private:
+    std::vector<PerBlockConnectTrace> blocksConnected;
+    CTxMemPool &pool;
+
+public:
+    ConnectTrace(CTxMemPool &_pool) : blocksConnected(1), pool(_pool) {
+        pool.NotifyEntryRemoved.connect(boost::bind(&ConnectTrace::NotifyEntryRemoved, this, _1, _2));
+    }
+
+    ~ConnectTrace() {
+        pool.NotifyEntryRemoved.disconnect(boost::bind(&ConnectTrace::NotifyEntryRemoved, this, _1, _2));
+    }
+
+    void BlockConnected(CBlockIndex* pindex, std::shared_ptr<const CBlock> pblock) {
+        assert(!blocksConnected.back().pindex);
+        assert(pindex);
+        assert(pblock);
+        blocksConnected.back().pindex = pindex;
+        blocksConnected.back().pblock = std::move(pblock);
+        blocksConnected.emplace_back();
+    }
+
+    std::vector<PerBlockConnectTrace>& GetBlocksConnected() {
+        // We always keep one extra block at the end of our list because
+        // blocks are added after all the conflicted transactions have
+        // been filled in. Thus, the last entry should always be an empty
+        // one waiting for the transactions from the next block. We pop
+        // the last entry here to make sure the list we return is sane.
+        assert(!blocksConnected.back().pindex);
+        assert(blocksConnected.back().conflictedTxs->empty());
+        blocksConnected.pop_back();
+        return blocksConnected;
+    }
+
+    void NotifyEntryRemoved(CTransactionRef txRemoved, MemPoolRemovalReason reason) {
+        assert(!blocksConnected.back().pindex);
+        if (reason == MemPoolRemovalReason::CONFLICT) {
+            blocksConnected.back().conflictedTxs->emplace_back(std::move(txRemoved));
+        }
+    }
 };
 
 #endif

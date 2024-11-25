@@ -22,6 +22,7 @@
  #include "init.h"
 #endif
 #include "streams.h"
+#include "net_processing.h"
 
 using namespace boost;
 using namespace boost::assign;
@@ -604,7 +605,7 @@ Value sendrawtransaction(const Array& params, bool fHelp)
 
         SyncWithWallets(tx, NULL, true);
     }
-    RelayTransaction(tx, hashTx);
+    RelayTransaction(tx, g_connman.get());
 
     return hashTx.GetHex();
 }

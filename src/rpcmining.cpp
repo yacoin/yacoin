@@ -678,7 +678,7 @@ Value submitblock(const Array& params, bool fHelp)
         throw JSONRPCError(-100, "Unable to sign block, wallet locked?");
 
     CValidationState state;
-    bool fAccepted = ProcessBlock(state, NULL, &block);
+    bool fAccepted = ProcessBlock(state, &block, true, nullptr);
     if (!fAccepted)
         return "rejected";
 

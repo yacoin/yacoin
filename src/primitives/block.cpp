@@ -11,6 +11,7 @@
 #include "checkpoints.h"
 #include "kernel.h"
 #include "wallet.h"
+#include "validationinterface.h"
 
 using std::vector;
 using std::map;
@@ -360,23 +361,32 @@ bool CBlock::CheckBlock(CValidationState &state, bool fCheckPOW, bool fCheckMerk
     return true;
 }
 
-bool CBlock::AcceptBlock(CValidationState &state, CBlockIndex **ppindex, CDiskBlockPos* dbp)
+bool CBlock::AcceptBlock(CValidationState &state, CBlockIndex **ppindex, bool fRequested, bool* fNewBlock, CDiskBlockPos* dbp)
 {
     // // Check for duplicate
     // uint256 hash = GetHash();
     // if (mapBlockIndex.count(hash))
     //     return error("AcceptBlock () : block already in mapBlockIndex");
 
+    if (fNewBlock) *fNewBlock = false;
     CBlockIndex *&pindex = *ppindex;
 
     if (!AcceptBlockHeader(state, &pindex))
         return false;
 
-    if (pindex->nStatus & BLOCK_HAVE_DATA) {
-        // TODO: deal better with duplicate blocks.
-        // return state.DoS(20, error("AcceptBlock() : already have block %d %s", pindex->nHeight, pindex->GetBlockHash().ToString()), REJECT_DUPLICATE, "duplicate");
-        return true;
+    // Try to process all requested blocks that we don't have, but only
+    // process an unrequested block if it's new and has enough work to
+    // advance our tip, and isn't too many blocks ahead.
+    bool fAlreadyHave = pindex->nStatus & BLOCK_HAVE_DATA;
+    bool fHasMoreOrSameWork = (chainActive.Tip() ? pindex->bnChainTrust >= chainActive.Tip()->bnChainTrust : true);
+
+    // TODO: deal better with return value and error conditions for duplicate
+    // and unrequested blocks.
+    if (fAlreadyHave) return true;
+    if (!fRequested) {  // If we didn't ask for it:
+        if (!fHasMoreOrSameWork) return true; // Don't process less-work chains
     }
+    if (fNewBlock) *fNewBlock = true;
 
     if (!CheckBlock(state))
     {
@@ -441,6 +451,12 @@ bool CBlock::AcceptBlock(CValidationState &state, CBlockIndex **ppindex, CDiskBl
         return state.DoS(
             100, error("AcceptBlock () : block height mismatch in coinbase"));
     }
+
+    // Header is valid/has work, merkle tree and segwit merkle tree are good...RELAY NOW
+    // (but if it does not build on our best tip, let the SendMessages loop relay it)
+    const std::shared_ptr<const CBlock> block = std::shared_ptr<const CBlock>(this);
+    if (!IsInitialBlockDownload() && chainActive.Tip() == pindex->pprev)
+        GetMainSignals().NewPoWValidBlock(pindex, block);
 
     // Write block to history file
     if (!CheckDiskSpace(::GetSerializeSize(*this, SER_DISK, CLIENT_VERSION)))
@@ -1658,4 +1674,23 @@ void CBlockIndex::BuildSkip()
 bool CBlockIndex::IsInMainChain() const
 {
     return (pnext || this == chainActive.Tip());
+}
+
+/** Find the last common ancestor two blocks have.
+ *  Both pa and pb must be non-NULL. */
+CBlockIndex* LastCommonAncestor(CBlockIndex* pa, CBlockIndex* pb) {
+    if (pa->nHeight > pb->nHeight) {
+        pa = pa->GetAncestor(pb->nHeight);
+    } else if (pb->nHeight > pa->nHeight) {
+        pb = pb->GetAncestor(pa->nHeight);
+    }
+
+    while (pa != pb && pa && pb) {
+        pa = pa->pprev;
+        pb = pb->pprev;
+    }
+
+    // Eventually all chain branches meet at the genesis block.
+    assert(pa == pb);
+    return pa;
 }
