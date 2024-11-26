@@ -254,7 +254,6 @@ BITCOIN_QT_CPP = \
   dbwrapper.cpp \
   txdb-leveldb.cpp \
   alert.cpp \
-  addrdb.cpp \
   hash.cpp \
   base58.cpp \
   version.cpp \

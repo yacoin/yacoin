@@ -150,7 +150,6 @@ HEADERS += \
     src/qt/mintingview.h \
     src/kernelrecord.h \
     src/alert.h \
-    src/addrdb.h \
     src/addrman.h \
     src/addressindex.h \
     src/base58.h \
@@ -264,7 +263,6 @@ SOURCES += src/qt/bitcoin.cpp src/qt/bitcoingui.cpp \
     src/qt/mintingview.cpp \
     src/kernelrecord.cpp \
     src/alert.cpp \
-    src/addrdb.cpp \
     src/hash.cpp \
     src/base58.cpp \
     src/version.cpp \

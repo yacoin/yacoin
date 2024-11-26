@@ -209,7 +209,6 @@ HEADERS = $(wildcard *.h)
 
 OBJS= \
 obj/alert.o \
-obj/addrdb.o \
 obj/addrman.o \
 obj/tokentypes.o \
 obj/tokendb.o \
