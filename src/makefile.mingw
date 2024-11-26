@@ -244,6 +244,7 @@ obj/main.o \
 obj/miner.o \
 obj/net.o \
 obj/netbase.o \
+obj/arith_uint256.o \
 obj/noui.o \
 obj/pbkdf2.o \
 obj/price.o \

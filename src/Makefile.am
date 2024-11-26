@@ -101,6 +101,7 @@ libyacoin_common_a_SOURCES= \
     miner.cpp \
     main.cpp \
     net.cpp \
+    arith_uint256.cpp \
     protocol.cpp \
     bitcoinrpc.cpp \
     price.cpp \

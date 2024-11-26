@@ -182,6 +182,7 @@ HEADERS += \
     src/miner.h \
     src/random_nonce.h \
     src/net.h \
+    src/arith_uint256.h \
     src/ministun.h \
     src/key.h \
     src/db.h \
@@ -282,6 +283,7 @@ SOURCES += src/qt/bitcoin.cpp src/qt/bitcoingui.cpp \
     src/miner.cpp \
     src/init.cpp \
     src/net.cpp \
+    src/arith_uint256.cpp \
     src/price.cpp \
     src/random_nonce.cpp \
     src/stun.cpp \
