@@ -19,10 +19,8 @@ class CTxIndex;
 class CValidationState;
 class CDiskTxPos;
 class CScriptCheck;
-class CChain;
 class CBlockIndex;
 typedef std::map<uint256, std::pair<CTxIndex, CTransaction> > MapPrevTx;
-extern CChain chainActive;
 FILE* OpenBlockFile(unsigned int nFile, unsigned int nBlockPos, const char* pszMode="rb");
 
 /** An inpoint - a combination of a transaction and an index n into its vin */

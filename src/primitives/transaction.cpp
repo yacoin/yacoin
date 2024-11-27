@@ -9,6 +9,7 @@
 #include "txdb-leveldb.h"
 #include "wallet.h"
 #include "policy/fees.h"
+#include "consensus/consensus.h"
 
 #include <map>
 

@@ -73,6 +73,7 @@ libyacoin_common_a_SOURCES= \
     compat/strnlen.cpp \
     primitives/transaction.cpp \
     primitives/block.cpp \
+    consensus/consensus.cpp \
     policy/feerate.cpp \
     policy/fees.cpp \
     support/cleanse.cpp \

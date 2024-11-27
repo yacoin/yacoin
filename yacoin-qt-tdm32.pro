@@ -301,6 +301,7 @@ SOURCES += src/qt/bitcoin.cpp src/qt/bitcoingui.cpp \
     src/tokens/tokens.cpp \
     src/primitives/transaction.cpp \
     src/primitives/block.cpp \
+    src/consensus/consensus.cpp \
     src/policy/feerate.cpp \
     src/policy/fees.cpp \
     src/crypto/siphash.cpp \

@@ -555,32 +555,15 @@ boost::filesystem::path GetBlockPosFilename(const CDiskBlockPos &pos, const char
 
 const ::int64_t 
     nSimulatedMOneySupplyAtFork = 124460820773591;  //124,460,820.773591 YAC
+#ifndef LOW_DIFFICULTY_FOR_DEVELOPMENT
+    const int64_t INITIAL_MONEY_SUPPLY = 0;
+#else
+    const int64_t INITIAL_MONEY_SUPPLY = 1E14;
+#endif
 
 const uint256 
-  //hashGenesisBlockTestNet("0xfe20c2c2fc02b36d2473e1f51dba1fb123d41ff42966e2a4edabb98fdd7107e6"),
-    // change here           ^^^^^^^^^^^^^
-  //hashGenesisBlockTestNet( "0x0000fb514c55539c42aed840fb46fedf49ce9c8a81f2ab29bd8e5b0e7134467f" ),
-  //hashGenesisBlockTestNet( "0x000026ab43bff071f9c5432b754ab00c90f520a9569007e9205d1ee13cde973d" ),
-
-//hashGenesisBlockTestNet( "0bd0495ffce47a76504f338692b70dfcd8fabc5176a49cc646f3f28478b132dc" ),
-
-                            // version 0.5.0.03
-//hashGenesisBlockTestNet( "056ce89e39622e2577f35117eef4118f5b4a35b98a16ebc218d31d55fd018c1b" ),
-                            // version 0.5.0.04
-//hashGenesisBlockTestNet( "0x049a99dd896cbaa9004c790d8b3855e714ede6328b0555c55d08b94fda187f1e" ),
-//hashGenesisBlockTestNet( "0x0619394c5fc682ef90f64a256a48b428636246010cf898b59491465e47d3b49e" ),
   hashGenesisBlockTestNet( "0x1dc29b112550069ecb870e1be78c8d0c166e5f4e41433283e74dcf30b510c1f3" ),
-    
-                            // version 0.5.0.03
-//hashGenesisMerkleRootTestNet( "0xf87fdba660d8d4cf099c09bc684968249311611ff18c92ddce3d44ccf8df0c28" ),
-                            // version 0.5.0.04
-//hashGenesisMerkleRootTestNet( "0x389003d67b17d9a38a9c83b9289225f5e5469b9f6a2d70fc7c97ee6e8f995f23" ),
-                            // old 0.4.9
   hashGenesisMerkleRootTestNet( "0xd6ab993974b85898d45cfd850c8865fefa342450b4b38dca9eaafb515920baf7" ),
-                            // new 0.5.5
-  //hashGenesisMerkleRootMainNet( "0x678b76419ff06676a591d3fa9d57d7f7b26d8021b7cc69dde925f39d4cf2244f" );
-//   hashGenesisMerkleRootMainNet( "0x97a5a4d34dc12eff03febfd7c906b31740ac3412c820950a431b25ee1b874cb6" );
-//   hashGenesisMerkleRootMainNet( "0x5b1c7339ef15a2c8ad96b672e345a8cd316cc8ee019ea7edeef4f0cd1e8116eb");
   hashGenesisMerkleRootMainNet( "0x678b76419ff06676a591d3fa9d57d7f7b26d8021b7cc69dde925f39d4cf2244f");
 
 const ::uint32_t 
@@ -694,6 +677,7 @@ map<uint256, uint256> mapProofOfStake;
 
 map<uint256, CTransaction> mapOrphanTransactions;
 map<uint256, set<uint256> > mapOrphanTransactionsByPrev;
+CCheckQueue<CScriptCheck> scriptcheckqueue(128);
 
 // Constant stuff for coinbase transactions we create:
 CScript COINBASE_FLAGS;
@@ -1826,35 +1810,6 @@ CBigNum inline GetProofOfStakeLimit(int nHeight, unsigned int nTime)
     return min(nSubsidy, MAX_MINT_PROOF_OF_WORK) + nFees;
 }
 
-::uint64_t GetMaxSize(enum GetMaxSize_mode mode)
-{
-    ::uint64_t nMaxSize = 0;
-    if (chainActive.Genesis() == NULL || (chainActive.Tip()->nHeight + 1) < nMainnetNewLogicBlockNumber)
-    {
-        nMaxSize = MAX_GENESIS_BLOCK_SIZE;
-    }
-    else
-    {
-        nMaxSize = (GetProofOfWorkReward() * 1000 / MIN_TX_FEE);
-    }
-
-    switch (mode)
-    {
-        case MAX_BLOCK_SIZE_GEN:
-            nMaxSize /= 2;
-            break;
-
-        case MAX_BLOCK_SIGOPS:
-            nMaxSize = max(nMaxSize, (::uint64_t)MAX_GENESIS_BLOCK_SIZE) / 50;
-            break;
-
-        case MAX_BLOCK_SIZE:
-        default:
-            break;
-    }
-    return nMaxSize;
-}
-
 // ppcoin: miner's coin stake is rewarded based on coin age spent (coin-days)
 ::int64_t GetProofOfStakeReward(::int64_t nCoinAge)
 {
@@ -2971,192 +2926,6 @@ bool ActivateBestChain(CValidationState &state, CTxDB& txdb) {
     } while(pindexMostWork != chainActive.Tip());
 
     return true;
-}
-//////////////////////////////////////////////////////////////////////////////
-//
-// CChain implementation
-//
-/** Efficiently check whether a block is present in this chain. */
-bool CChain::Contains(const CBlockIndex *pindex) const {
-    return (*this)[pindex->nHeight] == pindex;
-}
-
-/** Find the successor of a block in this chain, or NULL if the given index is not found or is the tip. */
-CBlockIndex *CChain::Next(const CBlockIndex *pindex) const {
-    if (Contains(pindex))
-        return (*this)[pindex->nHeight + 1];
-    else
-        return NULL;
-}
-
-CBlockIndex *CChain::SetTip(CBlockIndex *pindex) {
-    if (pindex == NULL) {
-        vChain.clear();
-        return NULL;
-    }
-    vChain.resize(pindex->nHeight + 1);
-    while (pindex && vChain[pindex->nHeight] != pindex) {
-        vChain[pindex->nHeight] = pindex;
-        pindex = pindex->pprev;
-    }
-    return pindex;
-}
-
-CBlockLocator CChain::GetLocator(const CBlockIndex *pindex) const {
-    int nStep = 1;
-    std::vector<uint256> vHave;
-    vHave.reserve(32);
-    if (!pindex)
-        pindex = Tip();
-    while (pindex) {
-        vHave.push_back(pindex->GetBlockHash());
-        // Stop when we have added the genesis block.
-        if (pindex->nHeight == 0)
-            break;
-        // Exponentially larger steps back, plus the genesis block.
-        int nHeight = std::max(pindex->nHeight - nStep, 0);
-        if (Contains(pindex)) {
-            // Use O(1) CChain index if possible.
-            pindex = (*this)[nHeight];
-        } else {
-            // Otherwise, use O(log n) skiplist.
-            pindex = pindex->GetAncestor(nHeight);
-        }
-        if (vHave.size() > 10)
-            nStep *= 2;
-    }
-    return CBlockLocator(vHave);
-}
-
-CBlockIndex *CChain::FindFork(const CBlockLocator &locator) const {
-    // Find the first block the caller has in the main chain
-    BOOST_FOREACH(const uint256& hash, locator.vHave) {
-        std::map<uint256, CBlockIndex*>::iterator mi = mapBlockIndex.find(hash);
-        if (mi != mapBlockIndex.end())
-        {
-            CBlockIndex* pindex = (*mi).second;
-            if (Contains(pindex))
-                return pindex;
-        }
-    }
-    return Genesis();
-}
-
-CBlockIndex *CChain::FindFork(CBlockIndex *pindex) const {
-    if (pindex->nHeight > Height())
-        pindex = pindex->GetAncestor(Height());
-    while (pindex && !Contains(pindex))
-        pindex = pindex->pprev;
-    return pindex;
-}
-
-// yacoin2015 GetBlockTrust upgrade
-CBigNum CBlockIndex::GetBlockTrust() const
-{
-    CBigNum bnTarget;
-    bnTarget.SetCompact(nBits);
-    if (bnTarget <= 0)
-        return CBigNum(0);
-
-    // saironiq: new trust rules (since CONSECUTIVE_STAKE_SWITCH_TIME on mainnet and always on testnet)
-    if (
-        fTestNet
-        ||
-        (GetBlockTime() >= CONSECUTIVE_STAKE_SWITCH_TIME)
-       ) 
-    {
-        // first block trust - for future compatibility (i.e., forks :P)
-        if (pprev == NULL)
-            return CBigNum(1);
-
-        // PoS after PoS? no trust for ya!
-        // (no need to explicitly disallow consecutive PoS
-        // blocks now as they won't get any trust anyway)
-        if (IsProofOfStake() && pprev->IsProofOfStake())
-            return CBigNum(0);
-
-        // PoS after PoW? trust = prev_trust + 1!
-        if (IsProofOfStake() && pprev->IsProofOfWork())
-            return pprev->GetBlockTrust() + 1;  //<<<<<<<<<<<<< does this mean this is recursive??????
-                                                // sure looks thatway!  Is this the intent?
-        // PoW trust calculation
-        if (IsProofOfWork()) 
-        {
-            // set trust to the amount of work done in this block
-            CBigNum bnTrust = bnProofOfWorkLimit / bnTarget;
-
-            // double the trust if previous block was PoS
-            // (to prevent orphaning of PoS)
-            if (pprev->IsProofOfStake())
-                bnTrust *= 2;
-
-            return bnTrust;
-        }
-        // what the hell?!
-        return CBigNum(0);
-    }
-    return (IsProofOfStake()? (CBigNum(1)<<256) / (bnTarget+1) : CBigNum(1));
-}
-
-bool CBlockIndex::IsSuperMajority(int minVersion, const CBlockIndex* pstart, unsigned int nRequired, unsigned int nToCheck)
-{
-    unsigned int nFound = 0;
-    for (unsigned int i = 0; i < nToCheck && nFound < nRequired && pstart != NULL; i++)
-    {
-        if (pstart->nVersion >= minVersion)
-            ++nFound;
-        pstart = pstart->pprev;
-    }
-    return (nFound >= nRequired);
-}
-
-/** Turn the lowest '1' bit in the binary representation of a number into a '0'. */
-int static inline InvertLowestOne(int n) { return n & (n - 1); }
-
-/** Compute what height to jump back to with the CBlockIndex::pskip pointer. */
-int static inline GetSkipHeight(int height) {
-    if (height < 2)
-        return 0;
-
-    // Determine which height to jump back to. Any number strictly lower than height is acceptable,
-    // but the following expression seems to perform well in simulations (max 110 steps to go back
-    // up to 2**18 blocks).
-    return (height & 1) ? InvertLowestOne(InvertLowestOne(height - 1)) + 1 : InvertLowestOne(height);
-}
-
-CBlockIndex* CBlockIndex::GetAncestor(int height)
-{
-    if (height > nHeight || height < 0)
-        return NULL;
-
-    CBlockIndex* pindexWalk = this;
-    int heightWalk = nHeight;
-    while (heightWalk > height) {
-        int heightSkip = GetSkipHeight(heightWalk);
-        int heightSkipPrev = GetSkipHeight(heightWalk - 1);
-        if (heightSkip == height ||
-            (heightSkip > height && !(heightSkipPrev < heightSkip - 2 &&
-                                      heightSkipPrev >= height))) {
-            // Only follow pskip if pprev->pskip isn't better than pskip->pprev.
-            pindexWalk = pindexWalk->pskip;
-            heightWalk = heightSkip;
-        } else {
-            pindexWalk = pindexWalk->pprev;
-            heightWalk--;
-        }
-    }
-    return pindexWalk;
-}
-
-const CBlockIndex* CBlockIndex::GetAncestor(int height) const
-{
-    return const_cast<CBlockIndex*>(this)->GetAncestor(height);
-}
-
-void CBlockIndex::BuildSkip()
-{
-    if (pprev)
-        pskip = pprev->GetAncestor(GetSkipHeight(nHeight));
 }
 
 bool ProcessBlock(CValidationState &state, CNode* pfrom, CBlock* pblock, CDiskBlockPos *dbp)

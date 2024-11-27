@@ -1545,3 +1545,117 @@ bool CBlock::CheckBlockSignature() const
     }
     return false;
 }
+
+// yacoin2015 GetBlockTrust upgrade
+CBigNum CBlockIndex::GetBlockTrust() const
+{
+    CBigNum bnTarget;
+    bnTarget.SetCompact(nBits);
+    if (bnTarget <= 0)
+        return CBigNum(0);
+
+    // saironiq: new trust rules (since CONSECUTIVE_STAKE_SWITCH_TIME on mainnet and always on testnet)
+    if (
+        fTestNet
+        ||
+        (GetBlockTime() >= CONSECUTIVE_STAKE_SWITCH_TIME)
+       )
+    {
+        // first block trust - for future compatibility (i.e., forks :P)
+        if (pprev == NULL)
+            return CBigNum(1);
+
+        // PoS after PoS? no trust for ya!
+        // (no need to explicitly disallow consecutive PoS
+        // blocks now as they won't get any trust anyway)
+        if (IsProofOfStake() && pprev->IsProofOfStake())
+            return CBigNum(0);
+
+        // PoS after PoW? trust = prev_trust + 1!
+        if (IsProofOfStake() && pprev->IsProofOfWork())
+            return pprev->GetBlockTrust() + 1;  //<<<<<<<<<<<<< does this mean this is recursive??????
+                                                // sure looks thatway!  Is this the intent?
+        // PoW trust calculation
+        if (IsProofOfWork())
+        {
+            // set trust to the amount of work done in this block
+            CBigNum bnTrust = bnProofOfWorkLimit / bnTarget;
+
+            // double the trust if previous block was PoS
+            // (to prevent orphaning of PoS)
+            if (pprev->IsProofOfStake())
+                bnTrust *= 2;
+
+            return bnTrust;
+        }
+        // what the hell?!
+        return CBigNum(0);
+    }
+    return (IsProofOfStake()? (CBigNum(1)<<256) / (bnTarget+1) : CBigNum(1));
+}
+
+bool CBlockIndex::IsSuperMajority(int minVersion, const CBlockIndex* pstart, unsigned int nRequired, unsigned int nToCheck)
+{
+    unsigned int nFound = 0;
+    for (unsigned int i = 0; i < nToCheck && nFound < nRequired && pstart != NULL; i++)
+    {
+        if (pstart->nVersion >= minVersion)
+            ++nFound;
+        pstart = pstart->pprev;
+    }
+    return (nFound >= nRequired);
+}
+
+/** Turn the lowest '1' bit in the binary representation of a number into a '0'. */
+int static inline InvertLowestOne(int n) { return n & (n - 1); }
+
+/** Compute what height to jump back to with the CBlockIndex::pskip pointer. */
+int static inline GetSkipHeight(int height) {
+    if (height < 2)
+        return 0;
+
+    // Determine which height to jump back to. Any number strictly lower than height is acceptable,
+    // but the following expression seems to perform well in simulations (max 110 steps to go back
+    // up to 2**18 blocks).
+    return (height & 1) ? InvertLowestOne(InvertLowestOne(height - 1)) + 1 : InvertLowestOne(height);
+}
+
+CBlockIndex* CBlockIndex::GetAncestor(int height)
+{
+    if (height > nHeight || height < 0)
+        return NULL;
+
+    CBlockIndex* pindexWalk = this;
+    int heightWalk = nHeight;
+    while (heightWalk > height) {
+        int heightSkip = GetSkipHeight(heightWalk);
+        int heightSkipPrev = GetSkipHeight(heightWalk - 1);
+        if (heightSkip == height ||
+            (heightSkip > height && !(heightSkipPrev < heightSkip - 2 &&
+                                      heightSkipPrev >= height))) {
+            // Only follow pskip if pprev->pskip isn't better than pskip->pprev.
+            pindexWalk = pindexWalk->pskip;
+            heightWalk = heightSkip;
+        } else {
+            pindexWalk = pindexWalk->pprev;
+            heightWalk--;
+        }
+    }
+    return pindexWalk;
+}
+
+const CBlockIndex* CBlockIndex::GetAncestor(int height) const
+{
+    return const_cast<CBlockIndex*>(this)->GetAncestor(height);
+}
+
+void CBlockIndex::BuildSkip()
+{
+    if (pprev)
+        pskip = pprev->GetAncestor(GetSkipHeight(nHeight));
+}
+
+bool CBlockIndex::IsInMainChain() const
+{
+    return (pnext || this == chainActive.Tip());
+}

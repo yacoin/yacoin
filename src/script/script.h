@@ -234,12 +234,6 @@ enum
     SCRIPT_VERIFY_CHECKSEQUENCEVERIFY = (1U << 10),
 };
 
-/** Flags for nSequence and nLockTime locks */
-enum {
-    /* Interpret sequence numbers as relative lock-time constraints. */
-    LOCKTIME_VERIFY_SEQUENCE = (1 << 0),
-};
-
 // Strict verification:
 //
 // * force DER encoding;
@@ -263,9 +257,6 @@ static const unsigned int STRICT_FLAGS = MANDATORY_SCRIPT_VERIFY_FLAGS | STRICT_
 
 // Soft verifications, no extended signature format checkings
 static const unsigned int SOFT_FLAGS = STRICT_FLAGS & ~STRICT_FORMAT_FLAGS;
-
-/** Used as the flags parameter to sequence and nLocktime checks in non-consensus code. */
-static const unsigned int STANDARD_LOCKTIME_VERIFY_FLAGS = LOCKTIME_VERIFY_SEQUENCE;
 
 const char* GetTxnOutputType(txnouttype t);
 

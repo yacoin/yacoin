@@ -224,6 +224,7 @@ obj/cleanse.o \
 obj/base58.o \
 obj/bitcoinrpc.o \
 obj/block.o \
+obj/consensus.o \
 obj/checkpoints.o \
 obj/crypter.o \
 obj/db.o \
@@ -307,6 +308,9 @@ obj/script.o: script/script.cpp
 	$(CXX) -c -frandom-seed=$@ $(CFLAGS) $(INCLUDEPATHS) -o $@ $<
 
 obj/block.o: primitives/block.cpp
+	$(CXX) -c -frandom-seed=$@ $(CFLAGS) $(INCLUDEPATHS) -o $@ $<
+
+obj/consensus.o: consensus/consensus.cpp
 	$(CXX) -c -frandom-seed=$@ $(CFLAGS) $(INCLUDEPATHS) -o $@ $<
 
 obj/transaction.o: primitives/transaction.cpp
