@@ -12,6 +12,9 @@
 #include "ui_interface.h"
 #include "qtipcserver.h"
 
+#include <boost/thread.hpp>
+#include "scheduler.h"
+
 #include <QApplication>
 #include <QMessageBox>
 #if QT_VERSION < 0x050000
@@ -244,7 +247,9 @@ int main(int argc, char *argv[])
 
         BitcoinGUI window;
         guiref = &window;
-        if(AppInit2())
+        boost::thread_group threadGroup;
+        CScheduler scheduler;
+        if(AppInit2(threadGroup, scheduler))
         {
             {
                 // Put this in a block, so that the Model objects are cleaned up before

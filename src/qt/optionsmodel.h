@@ -2,6 +2,7 @@
 #define OPTIONSMODEL_H
 
 #include <QAbstractListModel>
+#include <string>
 
 /** Interface from Qt to configuration data structure for Bitcoin client.
    To Qt, the options are presented as a list with the different options
@@ -21,15 +22,12 @@ public:
         MinimizeToTray,    // bool
         MapPortUPnP,       // bool
         MinimizeOnClose,   // bool
-        ProxyUse,          // bool
-        ProxyIP,           // QString
-        ProxyPort,         // int
-        ProxySocksVersion, // int
-        TorUse,            // bool
-        TorIP,             // QString
-        TorPort,           // int
-        TorOnly,           // bool
-        TorName,           // QString
+        ProxyUse,               // bool
+        ProxyIP,                // QString
+        ProxyPort,              // int
+        ProxyUseTor,            // bool
+        ProxyIPTor,             // QString
+        ProxyPortTor,           // int
         Fee,               // qint64
         DisplayUnit,       // BitcoinUnits::Unit
         DisplayAddresses,  // bool
@@ -37,6 +35,7 @@ public:
         DetachDatabases,   // bool
         Language,          // QString
         CoinControlFeatures, // bool
+        Listen,                 // bool
         OptionIDRowCount,
     };
 
@@ -55,6 +54,11 @@ public:
     bool getCoinControlFeatures();
     QString getThirdPartyTxUrls() { return strThirdPartyTxUrls; }
     QString getLanguage() { return language; }
+    const QString& getOverriddenByCommandLine() { return strOverriddenByCommandLine; }
+
+    /* Restart flag helper */
+    void setRestartRequired(bool fRequired);
+    bool isRestartRequired();
 
 private:
     int nDisplayUnit;
@@ -64,6 +68,10 @@ private:
     bool fCoinControlFeatures;
     QString language;
     QString strThirdPartyTxUrls;
+    /* settings that were overridden by command-line */
+    QString strOverriddenByCommandLine;
+    // Add option to list of GUI options overridden through command line/config file
+    void addOverriddenOption(const std::string &option);
 
 signals:
     void displayUnitChanged(int unit);

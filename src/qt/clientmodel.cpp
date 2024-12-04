@@ -76,12 +76,16 @@ int ClientModel::getNumBlocksAtStartup()
 
 quint64 ClientModel::getTotalBytesRecv() const
 {
-    return CNode::GetTotalBytesRecv();
+    if(!g_connman)
+        return 0;
+    return g_connman->GetTotalBytesRecv();
 }
 
 quint64 ClientModel::getTotalBytesSent() const
 {
-    return CNode::GetTotalBytesSent();
+    if(!g_connman)
+        return 0;
+    return g_connman->GetTotalBytesSent();
 }
 
 QDateTime ClientModel::getLastBlockDate() const
@@ -192,13 +196,13 @@ static void NotifyNetworkActiveChanged(ClientModel *clientmodel, bool networkAct
 
 static void NotifyAlertChanged(ClientModel *clientmodel)
 {
-    qDebug() << "NotifyAlertChanged";
+    LogPrintf("NotifyAlertChanged\n");
     QMetaObject::invokeMethod(clientmodel, "updateAlert", Qt::QueuedConnection);
 }
 
 static void BannedListChanged(ClientModel *clientmodel)
 {
-    qDebug() << QString("%1: Requesting update for peer banlist").arg(__func__);
+    LogPrintf("Requesting update for peer banlist\n");
     QMetaObject::invokeMethod(clientmodel, "updateBanlist", Qt::QueuedConnection);
 }
 

@@ -872,6 +872,4 @@ extern std::vector<CDNSSeedData> vSeeds;
 extern std::vector<SeedSpec6> vFixedSeeds;
 /* TACA: NEW CODE END */
 
-void SetReachable(enum Network net, bool fFlag = true);
-
 #endif

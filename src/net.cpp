@@ -2907,32 +2907,6 @@ uint64_t CConnman::CalculateKeyedNetGroup(const CAddress& ad) const
 }
 /* TACA: NEW CODE END */
 
-using namespace boost;
-
-using std::deque;
-using std::list;
-using std::map;
-using std::max;
-using std::min;
-using std::pair;
-using std::runtime_error;
-using std::set;
-using std::string;
-using std::vector;
-
-//
-// Global state variables
-//
-static bool vfReachable[NET_MAX] = {};
-
-void SetReachable(enum Network net, bool fFlag)
-{
-    LOCK(cs_mapLocalHost);
-    vfReachable[net] = fFlag;
-    if (net == NET_IPV6 && fFlag)
-        vfReachable[NET_IPV4] = true;
-}
-
 #ifdef _MSC_VER
 #include "msvc_warnings.pop.h"
 #endif
