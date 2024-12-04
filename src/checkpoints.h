@@ -13,6 +13,7 @@
 #ifndef BITCOIN_NET_H
  #include "net.h"
 #endif
+#include "validation.h"
 
 #define CHECKPOINT_MAX_SPAN (60 * 60) // max 1 hour before latest block
 
@@ -49,7 +50,7 @@ namespace Checkpoints
     int GetTotalBlocksEstimate();
 
     // Returns last CBlockIndex* in mapBlockIndex that is a checkpoint
-    CBlockIndex* GetLastCheckpoint(const std::map<uint256, CBlockIndex*>& mapBlockIndex);
+    CBlockIndex* GetLastCheckpoint(const BlockMap& mapBlockIndex);
 
     // Returns last checkpoint timestamp
     unsigned int GetLastCheckpointTime();
@@ -142,18 +143,6 @@ public:
     uint256 GetHash() const
     {
         return SerializeHash(*this);
-    }
-
-    bool RelayTo(CNode* pnode) const
-    {
-        // returns true if wasn't already sent
-        if (pnode->hashCheckpointKnown != hashCheckpoint)
-        {
-            pnode->hashCheckpointKnown = hashCheckpoint;
-            pnode->PushMessage("checkpoint", *this);
-            return true;
-        }
-        return false;
     }
 
     bool CheckSignature();

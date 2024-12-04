@@ -12,6 +12,7 @@
 #include "kernel.h"
 #include "wallet.h"
 #include "validationinterface.h"
+#include "net_processing.h"
 
 using std::vector;
 using std::map;
@@ -66,7 +67,7 @@ bool CBlockHeader::AcceptBlockHeader(CValidationState &state,
 {
     // Check for duplicate
     uint256 hash = GetHash();
-    std::map<uint256, CBlockIndex *>::iterator miSelf = mapBlockIndex.find(hash);
+    BlockMap::iterator miSelf = mapBlockIndex.find(hash);
     CBlockIndex *pindex = NULL;
     if (miSelf != mapBlockIndex.end())
     {
@@ -84,7 +85,7 @@ bool CBlockHeader::AcceptBlockHeader(CValidationState &state,
         return false;
 
     // Get prev block index
-    map<uint256, CBlockIndex *>::iterator mi = mapBlockIndex.find(hashPrevBlock);
+    BlockMap::iterator mi = mapBlockIndex.find(hashPrevBlock);
     if (mi == mapBlockIndex.end())
         return state.DoS(10, error("AcceptBlockHeader () : prev block not found"));
     CBlockIndex* pindexPrev = (*mi).second;
@@ -128,7 +129,7 @@ CBlockIndex* CBlockHeader::AddToBlockIndex()
 {
     // Check for duplicate
     uint256 hash = GetHash();
-    std::map<uint256, CBlockIndex*>::iterator it = mapBlockIndex.find(hash);
+    BlockMap::iterator it = mapBlockIndex.find(hash);
     if (it != mapBlockIndex.end())
         return it->second;
 
@@ -140,9 +141,9 @@ CBlockIndex* CBlockHeader::AddToBlockIndex()
     pindexNew->nSequenceId = 0;
 
     // Add to mapBlockIndex
-    map<uint256, CBlockIndex*>::iterator mi = mapBlockIndex.insert(make_pair(hash, pindexNew)).first;
+    BlockMap::iterator mi = mapBlockIndex.insert(make_pair(hash, pindexNew)).first;
     pindexNew->phashBlock = &((*mi).first);
-    map<uint256, CBlockIndex*>::iterator miPrev = mapBlockIndex.find(hashPrevBlock); // this bothers me when mapBlockIndex == NULL!?
+    BlockMap::iterator miPrev = mapBlockIndex.find(hashPrevBlock); // this bothers me when mapBlockIndex == NULL!?
 
     if (miPrev != mapBlockIndex.end())
     {
@@ -983,7 +984,7 @@ bool CBlock::ConnectBlock(CValidationState &state, CTxDB& txdb, CBlockIndex* pin
                 uint256 hashBlock = 0;
                 if (GetTransaction(prevout.COutPointGetHash(), tx, hashBlock))
                 {
-                    map<uint256, CBlockIndex*>::iterator mi = mapBlockIndex.find(hashBlock);
+                    BlockMap::iterator mi = mapBlockIndex.find(hashBlock);
                     if (mi != mapBlockIndex.end() && (*mi).second)
                     {
                         CBlockIndex* pTmpIndex = (*mi).second;

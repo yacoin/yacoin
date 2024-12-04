@@ -53,6 +53,7 @@ extern "C" {
 #ifndef BITCOIN_MAIN_H
  #include "main.h"
 #endif
+#include "primitives/block.h"
 
 #define SCRYPT_BUFFER_SIZE (131072 + 63)
 //                          (1<<17) + ((1<<6) -1) representing what, exactly??????

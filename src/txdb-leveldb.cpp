@@ -13,6 +13,7 @@
 #include "txdb-leveldb.h"
 #include "kernel.h"
 #include "streams.h"
+#include "net_processing.h"
 
 #include <map>
 #include <string>
@@ -314,7 +315,7 @@ static CBlockIndex *InsertBlockIndex(uint256 hash)
         return NULL;
 
     // Return existing, presume this is slow?
-    map<uint256, CBlockIndex *>::iterator mi = mapBlockIndex.find(hash);
+    BlockMap::iterator mi = mapBlockIndex.find(hash);
     if (mi != mapBlockIndex.end())
         return (*mi).second;
 
@@ -747,7 +748,7 @@ bool CTxDB::LoadBlockIndex()
             chainTip = chainTip->pprev;
         }
 
-        map<uint256, CBlockIndex *>::iterator it;
+        BlockMap::iterator it;
         int numberOfReindexOnlyHeaderSyncBlock = 0;
         for (it = mapBlockIndex.begin(); it != mapBlockIndex.end(); it++)
         {
@@ -763,7 +764,7 @@ bool CTxDB::LoadBlockIndex()
     }
     else
     {
-        map<uint256, CBlockIndex *>::iterator it;
+        BlockMap::iterator it;
         for (it = mapBlockIndex.begin(); it != mapBlockIndex.end(); it++)
         {
             CBlockIndex* pindexCurrent = (*it).second;
@@ -772,7 +773,7 @@ bool CTxDB::LoadBlockIndex()
     }
 
     // Calculate current block reward
-    map<uint256, CBlockIndex *>::iterator mi = mapBlockIndex.find(bestEpochIntervalHash);
+    BlockMap::iterator mi = mapBlockIndex.find(bestEpochIntervalHash);
     if (mi != mapBlockIndex.end())
     {
         CBlockIndex *pBestEpochIntervalIndex = (*mi).second;
@@ -853,7 +854,7 @@ bool CTxDB::LoadBlockIndex()
 
         int
             nUpdatePeriod = 10000;
-        BOOST_FOREACH (const PAIRTYPE(uint256, CBlockIndex *) & item, mapBlockIndex)
+        for (const std::pair<uint256, CBlockIndex*>& item : mapBlockIndex)
         {
             CBlockIndex
                 *pindex = item.second;

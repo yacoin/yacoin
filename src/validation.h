@@ -8,6 +8,8 @@
 #define YACOIN_CONSENSUS_VALIDATION_H
 
 #include <string>
+#include <unordered_map>
+
 #include "uint256.h"
 
 /** Headers download timeout expressed in microseconds
@@ -84,6 +86,8 @@ static const unsigned char REJECT_NONSTANDARD = 0x40;
 // static const unsigned char REJECT_DUST = 0x41; // part of BIP 61
 static const unsigned char REJECT_INSUFFICIENTFEE = 0x42;
 static const unsigned char REJECT_CHECKPOINT = 0x43;
+
+class CValidationState;
 
 /** Convert CValidationState to a human-readable message for logging */
 std::string FormatStateMessage(const CValidationState &state);
@@ -173,4 +177,5 @@ struct BlockHasher
 };
 
 typedef std::unordered_map<uint256, CBlockIndex*, BlockHasher> BlockMap;
+
 #endif // YACOIN_CONSENSUS_VALIDATION_H

@@ -23,9 +23,9 @@ CBlockHeaderAndShortTxIDs::CBlockHeaderAndShortTxIDs(const CBlock& block) :
         shorttxids(block.vtx.size() - 1), prefilledtxn(1), header(block) {
     FillShortTxIDSelector();
     //TODO: Use our mempool prior to block acceptance to predictively fill more than just the coinbase
-    prefilledtxn[0] = {0, block.vtx[0]};
+    prefilledtxn[0] = {0, std::make_shared<CTransaction>(block.vtx[0])};
     for (size_t i = 1; i < block.vtx.size(); i++) {
-        const CTransaction& tx = *block.vtx[i];
+        const CTransaction& tx = block.vtx[i];
         shorttxids[i - 1] = GetShortID(tx.GetHash());
     }
 }
@@ -187,9 +187,9 @@ ReadStatus PartiallyDownloadedBlock::FillBlock(CBlock& block, const std::vector<
         if (!txn_available[i]) {
             if (vtx_missing.size() <= tx_missing_offset)
                 return READ_STATUS_INVALID;
-            block.vtx[i] = vtx_missing[tx_missing_offset++];
+            block.vtx[i] = *vtx_missing[tx_missing_offset++];
         } else
-            block.vtx[i] = std::move(txn_available[i]);
+            block.vtx[i] = *txn_available[i];
     }
 
     // Make sure we can't call FillBlock again.

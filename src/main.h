@@ -201,7 +201,6 @@ int64_t GetBlockProofEquivalentTime(const CBlockIndex& to, const CBlockIndex& fr
 void Inventory(const uint256& hash);
 void RegisterWallet(CWallet* pwalletIn);
 void CloseWallets();
-void SyncWithWallets(const CTransaction& tx, const CBlock* pblock = NULL, bool fUpdate = false, bool fConnect = true);
 bool ProcessBlock(CValidationState &state, CBlock* pblock, bool fForceProcessing, bool *fNewBlock, CDiskBlockPos *dbp = NULL);
 bool CheckDiskSpace(::uint64_t nAdditionalBytes=0);
 
