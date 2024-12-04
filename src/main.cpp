@@ -671,7 +671,6 @@ CBlockIndex *pindexBestHeader = NULL;
 int nSyncStarted = 0;
 // All pairs A->B, where A (or one if its ancestors) misses transactions, but B has transactions.
 multimap<CBlockIndex*, CBlockIndex*> mapBlocksUnlinked;
-::int64_t nTimeBestReceived = 0;
 int nScriptCheckThreads = 0;
 
 CMedianFilter<int> cPeerBlockCounts(5, 0); // Amount of blocks that other nodes claim to have
@@ -1264,9 +1263,11 @@ int64_t GetBlockProofEquivalentTime(const CBlockIndex& to, const CBlockIndex& fr
     arith_uint256 r;
     int sign = 1;
     if (to.bnChainTrust > from.bnChainTrust) {
-        r = to.bnChainTrust - from.bnChainTrust;
+        CBigNum result = to.bnChainTrust - from.bnChainTrust;
+        r = UintToArith256(result.getuint256());
     } else {
-        r = from.bnChainTrust - to.bnChainTrust;
+        CBigNum result = from.bnChainTrust - to.bnChainTrust;
+        r = UintToArith256(result.getuint256());
         sign = -1;
     }
     r = r * arith_uint256(nPoWTargetSpacing) / GetBlockProof(tip);
@@ -2071,7 +2072,6 @@ void static UpdateTip(CBlockIndex *pindexNew) {
     chainActive.SetTip(pindexNew);
 
     bnBestChainTrust = pindexNew->bnChainTrust;
-    nTimeBestReceived = GetTime();
     mempool.AddTransactionsUpdated(1);
 
     CBigNum bnBestBlockTrust =
@@ -2306,7 +2306,6 @@ static void PruneBlockIndexCandidates() {
     // Either the current tip or a successor of it we're working towards is left in setBlockIndexCandidates.
     assert(!setBlockIndexCandidates.empty());
 }
-
 
 // Try to make some progress towards making pindexMostWork the active block.
 static bool ActivateBestChainStep(CValidationState &state, CTxDB& txdb, CBlockIndex *pindexMostWork, ConnectTrace& connectTrace) {
@@ -2598,21 +2597,21 @@ void UnloadBlockIndex()
 
 bool LoadBlockIndex(bool fAllowNew)
 {
-    if (fTestNet)
-    {
-        pchMessageStart[0] = 0xcd;
-        pchMessageStart[1] = 0xf2;
-        pchMessageStart[2] = 0xc0;
-        pchMessageStart[3] = 0xef;
-
-        bnProofOfWorkLimit = bnProofOfWorkLimitTestNet; // 16 bits PoW target limit for testnet
-        bnInitialHashTarget = bnInitialHashTargetTestNet;
-        nStakeMinAge = 2 * nSecondsPerHour;             // 2 hours (to what?)
-        nModifierInterval =  10 * nSecondsperMinute;    // 10 minutes, for what?
-        nCoinbaseMaturity = 6; // test maturity is 6 blocks + nCoinbaseMaturity(20) = 26
-        nStakeTargetSpacing = 1 * nSecondsperMinute;    // 1 minute average block period target
-        nConsecutiveStakeSwitchHeight = 4200;           // 4200 blocks until what?
-    }
+//    if (fTestNet)
+//    {
+//        pchMessageStart[0] = 0xcd;
+//        pchMessageStart[1] = 0xf2;
+//        pchMessageStart[2] = 0xc0;
+//        pchMessageStart[3] = 0xef;
+//
+//        bnProofOfWorkLimit = bnProofOfWorkLimitTestNet; // 16 bits PoW target limit for testnet
+//        bnInitialHashTarget = bnInitialHashTargetTestNet;
+//        nStakeMinAge = 2 * nSecondsPerHour;             // 2 hours (to what?)
+//        nModifierInterval =  10 * nSecondsperMinute;    // 10 minutes, for what?
+//        nCoinbaseMaturity = 6; // test maturity is 6 blocks + nCoinbaseMaturity(20) = 26
+//        nStakeTargetSpacing = 1 * nSecondsperMinute;    // 1 minute average block period target
+//        nConsecutiveStakeSwitchHeight = 4200;           // 4200 blocks until what?
+//    }
 
     //
     // Load block index
@@ -3045,67 +3044,12 @@ class CMainCleanup
 {
 public:
     CMainCleanup() {}
-    ~CMainCleanup() 
-    {
-        if (fDebug)
-        {
-#ifdef _MSC_VER
-            LogPrintf( "~CMainCleanup() destructor...\n" );
-#endif
-        }
-#ifdef _MSC_VER
-            unsigned int
-                nCount = 0,
-    #ifdef _DEBUG
-                nUpdatePeriod = 100,
-    #else
-                nUpdatePeriod = 3000, //10000,   // pure guess for a decent update period ~1 second
-    #endif
-                nEstimate;
-
-            unsigned __int64
-                nSize = (unsigned __int64)mapBlockIndex.size();
-#endif
-            // block headers
-            BlockMap::iterator
-                it1 = mapBlockIndex.begin();
-
-            for (; it1 != mapBlockIndex.end(); ++it1)
-            {
-                delete (*it1).second;
-                if (fDebug)
-                {
-    #ifdef _MSC_VER
-                    ++nCount;
-                    nEstimate = (unsigned int)( ( 100 * nCount ) / nSize );
-                    if( 0 == (nCount % nUpdatePeriod) )
-                    {
-                        LogPrintf( "~CMainCleanup() progess ~%-u%%"
-                                      "\r",
-                                      nEstimate
-                                    );
-                    }
-    #endif
-                }
-            }
-            mapBlockIndex.clear();
-            if (fDebug)
-            {
-    #ifdef _MSC_VER
-                LogPrintf( "~CMainCleanup() progess ~100%%"
-                              "\r"
-                            );
-    #endif
-            }
-
-            // orphan transactions
-            mapOrphanTransactions.clear();
-        if (fDebug)
-        {
-#ifdef _MSC_VER
-            LogPrintf( "\ndone\n" );
-#endif
-        }
+    ~CMainCleanup() {
+        // block headers
+        BlockMap::iterator it1 = mapBlockIndex.begin();
+        for (; it1 != mapBlockIndex.end(); it1++)
+            delete (*it1).second;
+        mapBlockIndex.clear();
     }
 } instance_of_cmaincleanup;
 //_____________________________________________________________________________

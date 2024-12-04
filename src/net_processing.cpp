@@ -164,9 +164,9 @@ bool CHashCalculation::operator()()
             "[HashCalcThread:%ld] Received header %s (sha256: %s) from node "
             "%s\n",
             threadId, blockHash.ToString(),
-            blockSHA256Hash.ToString(), pNode->addrName);
+            blockSHA256Hash.ToString(), pNode->GetAddrName());
         boost::mutex::scoped_lock lock(mapHashmutex);
-        mapHash.insert(make_pair(blockSHA256Hash, blockHash));
+        mapHash.insert(std::make_pair(blockSHA256Hash, blockHash));
     }
 
     return true;
@@ -917,9 +917,7 @@ void PeerLogicValidation::BlockConnected(const std::shared_ptr<const CBlock>& pb
 
     std::vector<uint256> vOrphanErase;
 
-    for (const CTransactionRef& ptx : pblock->vtx) {
-        const CTransaction& tx = *ptx;
-
+    for (const CTransaction& tx : pblock->vtx) {
         // Which orphan pool entries must we evict?
         for (const auto& txin : tx.vin) {
             auto itByPrev = mapOrphanTransactionsByPrev.find(txin.prevout);
@@ -1006,7 +1004,7 @@ void PeerLogicValidation::UpdatedBlockTip(const CBlockIndex *pindexNew, const CB
         }
         // Relay inventory, but don't relay old inventory during initial block download.
         int nBlockEstimate = Checkpoints::GetTotalBlocksEstimate();
-        connman->ForEachNode([nNewHeight, &vHashes](CNode* pnode) {
+        connman->ForEachNode([nNewHeight, &vHashes, nBlockEstimate](CNode* pnode) {
             if (nNewHeight > (pnode->nStartingHeight != -1 ? pnode->nStartingHeight - 2000 : nBlockEstimate)) {
                 for (const uint256& hash : reverse_iterate(vHashes)) {
                     pnode->PushBlockHash(hash);
@@ -1345,14 +1343,15 @@ inline void static SendBlockTransactions(const CBlock& block, const BlockTransac
             LogPrintf("Peer %d sent us a getblocktxn with out-of-bounds tx indices", pfrom->GetId());
             return;
         }
-        resp.txn[i] = block.vtx[req.indexes[i]];
+
+        resp.txn[i] = std::make_shared<CTransaction>(block.vtx[req.indexes[i]]);
     }
     LOCK(cs_main);
     const CNetMsgMaker msgMaker(pfrom->GetSendVersion());
     connman->PushMessage(pfrom, msgMaker.Make(NetMsgType::BLOCKTXN, resp));
 }
 
-bool static ProcessHeadersMessage(CNode *pfrom, CConnman *connman, const std::vector<CBlock>& headers, bool punish_duplicate_invalid)
+bool static ProcessHeadersMessage(CNode *pfrom, CConnman *connman, std::vector<CBlock>& headers, bool punish_duplicate_invalid)
 {
     const CNetMsgMaker msgMaker(pfrom->GetSendVersion());
     size_t nCount = headers.size();
@@ -1363,7 +1362,7 @@ bool static ProcessHeadersMessage(CNode *pfrom, CConnman *connman, const std::ve
     }
 
     bool received_new_header = false;
-    const CBlockIndex *pindexLast = nullptr;
+    CBlockIndex *pindexLast = nullptr;
     {
         LOCK(cs_main);
         CNodeState *nodestate = State(pfrom->GetId());
@@ -1445,7 +1444,7 @@ bool static ProcessHeadersMessage(CNode *pfrom, CConnman *connman, const std::ve
                     LogPrintf("Received header %s (sha256: %s) from node %s\n",
                               blockHash.ToString(),
                               blockSHA256Hash.ToString(),
-                              pfrom->addrName);
+                              pfrom->GetAddrName());
                     mapHash.insert(std::make_pair(blockSHA256Hash, blockHash));
                 }
 
@@ -1460,7 +1459,7 @@ bool static ProcessHeadersMessage(CNode *pfrom, CConnman *connman, const std::ve
         nodestate->nHeadersSyncTimeout = GetTimeMicros() + HEADERS_DOWNLOAD_TIMEOUT_BASE;
 
         uint256 hashLastBlock;
-        for (const CBlock& header : headers) {
+        for (CBlock& header : headers) {
             if (!hashLastBlock.IsNull() && header.hashPrevBlock != hashLastBlock) {
                 Misbehaving(pfrom->GetId(), 20);
                 return error("non-continuous headers sequence");
@@ -1546,7 +1545,7 @@ bool static ProcessHeadersMessage(CNode *pfrom, CConnman *connman, const std::ve
             nodestate->nHeadersSyncTimeout = 0;
             LogPrintf(
                     "Stop syncing headers from peer=%s, it may not have latest blockchain (startheight=%d < nMedianStartingHeight=%d), current best header has height = %d\n",
-                    pfrom->addrName.c_str(), pfrom->nStartingHeight,
+                    pfrom->GetAddrName(), pfrom->nStartingHeight,
                     nMedianStartingHeight, pindexBestHeader->nHeight);
         }
         else if (nCount == MAX_HEADERS_RESULTS) {
@@ -1623,7 +1622,7 @@ bool static ProcessHeadersMessage(CNode *pfrom, CConnman *connman, const std::ve
                 LogPrintf(
                         "Stop syncing headers from peer=%s, this node doesn't have latest blockchain or there is an error with this node which make it only send %d headers"
                         "(startheight=%d, nMedianStartingHeight=%d), current best header has height = %d\n",
-                        pfrom->addrName.c_str(), nCount, pfrom->nStartingHeight,
+                        pfrom->GetAddrName(), nCount, pfrom->nStartingHeight,
                         nMedianStartingHeight, pindexBestHeader->nHeight);
 
                 if (IsOutboundDisconnectionCandidate(pfrom)) {
@@ -2247,16 +2246,15 @@ bool static ProcessMessage(CNode* pfrom, const std::string& strCommand, CDataStr
 
         std::deque<COutPoint> vWorkQueue;
         std::vector<uint256> vEraseQueue;
-        CTransactionRef ptx;
-        vRecv >> ptx;
-        const CTransaction& tx = *ptx;
+        CTransaction tx;
+        vRecv >> tx;
+        CTransactionRef ptx = std::make_shared<CTransaction>(tx);
 
         CInv inv(MSG_TX, tx.GetHash());
         pfrom->AddInventoryKnown(inv);
 
         LOCK(cs_main);
 
-        bool fMissingInputs = false;
         CValidationState state;
 
         pfrom->setAskFor.erase(inv.hash);
@@ -2296,7 +2294,6 @@ bool static ProcessMessage(CNode* pfrom, const std::string& strCommand, CDataStr
                     const CTransaction& orphanTx = *porphanTx;
                     const uint256& orphanHash = orphanTx.GetHash();
                     NodeId fromPeer = (*mi)->second.fromPeer;
-                    bool fMissingInputs2 = false;
                     // Use a dummy CValidationState so someone can't setup nodes to counter-DoS based on orphan
                     // resolution (that is, feeding people an invalid transaction based on LegitTxX in order to get
                     // anyone relaying LegitTxX banned)

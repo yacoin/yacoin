@@ -14,6 +14,7 @@
  #include "bitcoinrpc.h"
 #endif
 #include "streams.h"
+#include "price.h"
 
 using namespace json_spirit;
 

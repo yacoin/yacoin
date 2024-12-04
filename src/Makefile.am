@@ -69,6 +69,7 @@ libyacoin_common_a_SOURCES= \
     crypto/sha256.cpp \
     crypto/sha512.cpp \
     crypto/ripemd160.cpp \
+    crypto/hmac_sha256.cpp \
     crypto/hmac_sha512.cpp \
     compat/strnlen.cpp \
     primitives/transaction.cpp \
@@ -145,7 +146,7 @@ libyacoin_common_a_LDFLAGS = $(RELDFLAGS) $(AM_LDFLAGS) $(LIBTOOL_APP_LDFLAGS) -
 yacoind_SOURCES = init.cpp
 
 yacoind_LDADD = $(LIBYACOIN_COMMON)
-yacoind_LDADD += $(BOOST_LIBS) $(BDB_LIBS) $(SSL_LIBS) $(CRYPTO_LIBS) $(MINIUPNPC_LIBS) $(LIBLEVELDB) $(LIBMEMENV)
+yacoind_LDADD += $(BOOST_LIBS) $(BDB_LIBS) $(SSL_LIBS) $(CRYPTO_LIBS) $(MINIUPNPC_LIBS) $(LIBLEVELDB) $(LIBMEMENV) $(EVENT_PTHREADS_LIBS) $(EVENT_LIBS)
 yacoind_CPPFLAGS = $(BITCOIN_INCLUDES)
 yacoind_LDFLAGS = $(RELDFLAGS) $(AM_LDFLAGS) $(LIBTOOL_APP_LDFLAGS) -ldl -lpthread -lrt
 

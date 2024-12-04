@@ -11,10 +11,6 @@
  #include "bitcoinrpc.h"
 #endif
 
-#ifndef _BITCOINALERT_H_
- #include "alert.h"
-#endif
-
 #ifndef BITCOIN_WALLET_H
  #include "wallet.h"
 #endif

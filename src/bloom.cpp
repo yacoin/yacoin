@@ -8,7 +8,7 @@
 #include "primitives/transaction.h"
 #include "hash.h"
 #include "script/script.h"
-#include "script/standard.h"
+#include "keystore.h"
 #include "random.h"
 #include "streams.h"
 

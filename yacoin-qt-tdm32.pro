@@ -319,6 +319,7 @@ SOURCES += src/qt/bitcoin.cpp src/qt/bitcoingui.cpp \
     src/crypto/sha256.cpp \
     src/crypto/sha512.cpp \
     src/crypto/ripemd160.cpp \
+    src/crypto/hmac_sha256.cpp \
     src/crypto/hmac_sha512.cpp \
     src/compat/strnlen.cpp \
     src/support/cleanse.cpp \

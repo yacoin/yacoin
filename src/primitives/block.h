@@ -1083,6 +1083,6 @@ struct CBlockIndexWorkComparator
     }
 };
 
-CBlockIndex* LastCommonAncestor(CBlockIndex* pa, CBlockIndex* pb);
+const CBlockIndex* LastCommonAncestor(const CBlockIndex* pa, const CBlockIndex* pb);
 
 #endif // YACOIN_PRIMITIVES_BLOCK_H

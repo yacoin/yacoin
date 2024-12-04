@@ -28,6 +28,7 @@
 #include "base58.h"
 #include "bitcoinrpc.h"
 #include "db.h"
+#include "net_processing.h"
 
 #undef printf
 #include <boost/asio.hpp>
@@ -43,6 +44,7 @@
 #include <boost/filesystem/fstream.hpp>
 #include <boost/shared_ptr.hpp>
 #include <list>
+#include <openssl/rand.h>
 
 #endif
 

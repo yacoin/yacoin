@@ -35,7 +35,7 @@ static constexpr int64_t EXTRA_PEER_CHECK_INTERVAL = 45;
 /** Minimum time an outbound-peer-eviction candidate must be connected for, in order to evict, in seconds */
 static constexpr int64_t MINIMUM_CONNECT_TIME = 30;
 
-extern unsigned int nPoWTargetSpacing;
+extern const unsigned int nPoWTargetSpacing;
 extern CCriticalSection cs_main;
 extern boost::mutex mapHashmutex;
 extern std::map<uint256, uint256> mapHash; // map of (SHA256-hash, chacha-hash)

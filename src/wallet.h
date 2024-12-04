@@ -1292,5 +1292,6 @@ private:
 };
 
 //bool GetWalletFile(CWallet* pwallet, std::string &strWalletFileOut);
+extern std::atomic<int64_t> nTimeBestReceived;
 
 #endif

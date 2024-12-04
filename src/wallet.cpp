@@ -27,6 +27,7 @@
 #include "random.h"
 #include "net_processing.h"
 #include <boost/algorithm/string/replace.hpp>
+#include <openssl/rand.h>
 
 using std::list;
 using std::pair;

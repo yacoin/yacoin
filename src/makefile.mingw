@@ -89,7 +89,9 @@ LIBS= \
 -Wl,-Bstatic \
 -lpthread \
 -lminiupnpc \
--lshlwapi
+-lshlwapi \
+-levent \
+-levent_pthreads
 
 # -l boost_system$(BOOST_SUFFIX) \
 # -l boost_filesystem$(BOOST_SUFFIX) \
@@ -221,6 +223,7 @@ obj/chacha20.o \
 obj/sha256.o \
 obj/sha512.o \
 obj/ripemd160.o \
+obj/hmac_sha256.o \
 obj/hmac_sha512.o \
 obj/cleanse.o \
 obj/base58.o \
@@ -349,6 +352,9 @@ obj/sha512.o: crypto/sha512.cpp
 	$(CXX) -c -frandom-seed=$@ $(CFLAGS) $(INCLUDEPATHS) -o $@ $<
 
 obj/ripemd160.o: crypto/ripemd160.cpp
+	$(CXX) -c -frandom-seed=$@ $(CFLAGS) $(INCLUDEPATHS) -o $@ $<
+
+obj/hmac_sha256.o: crypto/hmac_sha256.cpp
 	$(CXX) -c -frandom-seed=$@ $(CFLAGS) $(INCLUDEPATHS) -o $@ $<
 
 obj/hmac_sha512.o: crypto/hmac_sha512.cpp

@@ -112,7 +112,7 @@ extern ::int64_t nUpTimeStart;
 
 // PoS constants
 extern const unsigned int nStakeMaxAge, nOnedayOfAverageBlocks;
-extern unsigned int nStakeMinAge, nStakeTargetSpacing, nModifierInterval, nPoWTargetSpacing;
+extern const unsigned int nStakeMinAge, nStakeTargetSpacing, nModifierInterval;
 
 const double nInflation = 0.02; // 2%
 static const unsigned int MAX_ORPHAN_TRANSACTIONS = 10000;
@@ -162,7 +162,6 @@ extern ::uint64_t nLastBlockTx;
 extern ::uint64_t nLastBlockSize;
 extern ::uint32_t nLastCoinStakeSearchInterval;
 extern const std::string strMessageMagic;
-extern ::int64_t nTimeBestReceived;
 extern CCriticalSection cs_vpwalletRegistered;
 extern std::vector<CWallet*> vpwalletRegistered;
 extern unsigned char pchMessageStart[4];
