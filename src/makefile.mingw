@@ -208,7 +208,6 @@ LIBS += \
 HEADERS = $(wildcard *.h)
 
 OBJS= \
-obj/alert.o \
 obj/addrman.o \
 obj/addrdb.o \
 obj/bloom.o \

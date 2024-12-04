@@ -368,9 +368,6 @@ Value getaddednodeinfo(const Array& params, bool fHelp)
     return ret;
 }
 
-extern CCriticalSection cs_mapAlerts;
-extern map<uint256, CAlert> mapAlerts;
-
 Value getnettotals(const Array& params, bool fHelp)
 {
     if (fHelp || params.size() > 0)

@@ -81,7 +81,6 @@ libyacoin_common_a_SOURCES= \
     support/cleanse.cpp \
     dbwrapper.cpp \
     txdb-leveldb.cpp \
-    alert.cpp \
     hash.cpp \
     base58.cpp \
     version.cpp \
