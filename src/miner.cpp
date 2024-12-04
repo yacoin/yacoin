@@ -30,6 +30,7 @@
 #endif
 
 #include "policy/fees.h"
+#include "net_processing.h"
 #include <openssl/sha.h>
 
 using std::auto_ptr;
@@ -690,7 +691,7 @@ static void YacoinMiner(CWallet* pwallet)  // here fProofOfStake is always false
 
   while (fGenerateBitcoins && nBlocksToGenerate != 0) {
     while (IsInitialBlockDownload() ||
-           (vNodes.empty() && !fTestNet  // TestNet can mine stand alone!
+           (g_connman->GetNodeCount(CConnman::CONNECTIONS_ALL) == 0 && !fTestNet  // TestNet can mine stand alone!
             // could be that if there is more than one stand alone mining
             // forks on the blockchain can't be resolved?
             )) {
@@ -877,7 +878,7 @@ static void YacoinMiner(CWallet* pwallet)  // here fProofOfStake is always false
         }
       }
       // Check for stop or if block needs to be rebuilt
-      if (check_for_stop_mining(pindexPrev) || (vNodes.empty() && !fTestNet))
+      if (check_for_stop_mining(pindexPrev) || (g_connman->GetNodeCount(CConnman::CONNECTIONS_ALL) == 0 && !fTestNet))
         break;
       if (fLimitProcessors &&
           (vnThreadsRunning[THREAD_MINER] > nLimitProcessors)) {

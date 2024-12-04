@@ -50,16 +50,18 @@ double ClientModel::getDifficulty(bool fProofofStake)
 
 int ClientModel::getNumConnections(uint8_t flags) const
 {
-    LOCK(cs_vNodes);
-    if (flags == CONNECTIONS_ALL) // Shortcut if we want total
-        return (int)(vNodes.size());
+    CConnman::NumConnections connections = CConnman::CONNECTIONS_NONE;
 
-    int nNum = 0;
-    BOOST_FOREACH(CNode* pnode, vNodes)
-    if (flags & (pnode->fInbound ? CONNECTIONS_IN : CONNECTIONS_OUT))
-        nNum++;
+    if(flags == CONNECTIONS_IN)
+        connections = CConnman::CONNECTIONS_IN;
+    else if (flags == CONNECTIONS_OUT)
+        connections = CConnman::CONNECTIONS_OUT;
+    else if (flags == CONNECTIONS_ALL)
+        connections = CConnman::CONNECTIONS_ALL;
 
-    return nNum;
+    if(g_connman)
+         return g_connman->GetNodeCount(connections);
+    return 0;
 }
 
 int ClientModel::getNumBlocks() const

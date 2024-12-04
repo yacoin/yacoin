@@ -19,6 +19,7 @@
  #include "wallet.h"
 #endif
 #include "streams.h"
+#include "net_processing.h"
 
 using namespace json_spirit;
 
@@ -32,28 +33,18 @@ using std::map;
 Value getconnectioncount(const Array& params, bool fHelp)
 {
     if (fHelp || params.size() != 0)
-        throw runtime_error(
+        throw std::runtime_error(
             "getconnectioncount\n"
-            "Returns the number of connections to other nodes.");
+            "\nReturns the number of connections to other nodes.\n"
+            "\nResult:\n"
+            "n          (numeric) The connection count\n"
+            "\nExamples:\n"
+            + HelpExampleCli("getconnectioncount", "")
+            + HelpExampleRpc("getconnectioncount", "")
+        );
 
     {
-        LOCK(cs_vNodes);
-        return (int)vNodes.size();
-    }
-}
-
-static void CopyNodeStats(std::vector<CNodeStats>& vstats)
-{
-    vstats.clear();
-    {
-        LOCK(cs_vNodes);
-        vstats.reserve(vNodes.size());
-        BOOST_FOREACH(CNode* pnode, vNodes) 
-        {
-            CNodeStats stats;
-            pnode->copyStats(stats);
-            vstats.push_back(stats);
-        }
+        return (int)g_connman->GetNodeCount(CConnman::CONNECTIONS_ALL);
     }
 }
 
@@ -76,7 +67,7 @@ Value getaddrmaninfo(const Array& params, bool fHelp)
             "Returns a dump of addrman data.");
 
     // Get a full list of "online" address items
-    vector<CAddrInfo> vAddr = addrman.GetOnlineAddr();
+    vector<CAddrInfo> vAddr = g_connman->GetAddressesInfo();
 
     // Sort by the GetChance result backwardly
     sort(vAddr.begin(), vAddr.end(), addrManItemSort());
@@ -90,7 +81,7 @@ Value getaddrmaninfo(const Array& params, bool fHelp)
     Array 
         ret;
 
-    BOOST_FOREACH(const CAddrInfo &addr, vAddr) 
+    for(const CAddrInfo &addr : vAddr)
     {
         if (!addr.IsRoutable() || addr.IsLocal())
             continue;
@@ -142,45 +133,119 @@ Value getaddrmaninfo(const Array& params, bool fHelp)
 Value getpeerinfo(const Array& params, bool fHelp)
 {
     if (fHelp || params.size() != 0)
-        throw runtime_error(
+        throw std::runtime_error(
             "getpeerinfo\n"
-            "Returns data about each connected network node.");
+            "\nReturns data about each connected network node as a json array of objects.\n"
+            "\nResult:\n"
+            "[\n"
+            "  {\n"
+            "    \"id\": n,                   (numeric) Peer index\n"
+            "    \"addr\":\"host:port\",      (string) The IP address and port of the peer\n"
+            "    \"addrbind\":\"ip:port\",    (string) Bind address of the connection to the peer\n"
+            "    \"addrlocal\":\"ip:port\",   (string) Local address as reported by the peer\n"
+            "    \"services\":\"xxxxxxxxxxxxxxxx\",   (string) The services offered\n"
+            "    \"relaytxes\":true|false,    (boolean) Whether peer has asked us to relay transactions to it\n"
+            "    \"lastsend\": ttt,           (numeric) The time in seconds since epoch (Jan 1 1970 GMT) of the last send\n"
+            "    \"lastrecv\": ttt,           (numeric) The time in seconds since epoch (Jan 1 1970 GMT) of the last receive\n"
+            "    \"bytessent\": n,            (numeric) The total bytes sent\n"
+            "    \"bytesrecv\": n,            (numeric) The total bytes received\n"
+            "    \"conntime\": ttt,           (numeric) The connection time in seconds since epoch (Jan 1 1970 GMT)\n"
+            "    \"timeoffset\": ttt,         (numeric) The time offset in seconds\n"
+            "    \"pingtime\": n,             (numeric) ping time (if available)\n"
+            "    \"minping\": n,              (numeric) minimum observed ping time (if any at all)\n"
+            "    \"pingwait\": n,             (numeric) ping wait (if non-zero)\n"
+            "    \"version\": v,              (numeric) The peer version, such as 7001\n"
+            "    \"subver\": \"/Satoshi:0.8.5/\",  (string) The string version\n"
+            "    \"inbound\": true|false,     (boolean) Inbound (true) or Outbound (false)\n"
+            "    \"addnode\": true|false,     (boolean) Whether connection was due to addnode and is using an addnode slot\n"
+            "    \"startingheight\": n,       (numeric) The starting height (block) of the peer\n"
+            "    \"banscore\": n,             (numeric) The ban score\n"
+            "    \"synced_headers\": n,       (numeric) The last header we have in common with this peer\n"
+            "    \"synced_blocks\": n,        (numeric) The last block we have in common with this peer\n"
+            "    \"inflight\": [\n"
+            "       n,                        (numeric) The heights of blocks we're currently asking from this peer\n"
+            "       ...\n"
+            "    ],\n"
+            "    \"whitelisted\": true|false, (boolean) Whether the peer is whitelisted\n"
+            "    \"bytessent_per_msg\": {\n"
+            "       \"addr\": n,              (numeric) The total bytes sent aggregated by message type\n"
+            "       ...\n"
+            "    },\n"
+            "    \"bytesrecv_per_msg\": {\n"
+            "       \"addr\": n,              (numeric) The total bytes received aggregated by message type\n"
+            "       ...\n"
+            "    }\n"
+            "  }\n"
+            "  ,...\n"
+            "]\n"
+            "\nExamples:\n"
+            + HelpExampleCli("getpeerinfo", "")
+            + HelpExampleRpc("getpeerinfo", "")
+        );
 
-    vector<CNodeStats> vstats;
-    CopyNodeStats(vstats);
+    std::vector<CNodeStats> vstats;
+    g_connman->GetNodeStats(vstats);
 
     Array ret;
 
-    BOOST_FOREACH(const CNodeStats& stats, vstats) {
+    for(const CNodeStats& stats : vstats) {
         Object obj;
 
         CNodeStateStats statestats;
         bool fStateStats = GetNodeStateStats(stats.nodeid, statestats);
+        obj.push_back(Pair("id", (boost::int64_t)stats.nodeid));
         obj.push_back(Pair("addr", stats.addrName));
-        obj.push_back(Pair("services", strprintf("%08" PRIx64, stats.nServices)));
-      //obj.push_back(Pair("lastsend", (boost::int64_t)stats.nLastSend));
-        obj.push_back( Pair( "lastsend", DateTimeStrFormat( "%Y-%m-%d %H:%M:%S", stats.nLastSend ) ) );
-      //obj.push_back(Pair("lastrecv", (boost::int64_t)stats.nLastRecv));
+        if (!(stats.addrLocal.empty()))
+            obj.push_back(Pair("addrlocal", stats.addrLocal));
+        if (stats.addrBind.IsValid())
+            obj.push_back(Pair("addrbind", stats.addrBind.ToString()));
+        obj.push_back(Pair("services", strprintf("%016x", stats.nServices)));
+        obj.push_back(Pair("relaytxes", stats.fRelayTxes));
+        obj.push_back(Pair("lastsend", DateTimeStrFormat( "%Y-%m-%d %H:%M:%S", stats.nLastSend ) ) );
         obj.push_back(Pair("lastrecv", DateTimeStrFormat("%Y-%m-%d %H:%M:%S", stats.nLastRecv) ) );
         obj.push_back(Pair("bytessent", (boost::int64_t)stats.nSendBytes));
         obj.push_back(Pair("bytesrecv", (boost::int64_t)stats.nRecvBytes));
-      //obj.push_back(Pair("conntime", (boost::int64_t)stats.nTimeConnected));
         obj.push_back(Pair("conntime", DateTimeStrFormat("%Y-%m-%d %H:%M:%S", stats.nTimeConnected) ) );
+        obj.push_back(Pair("timeoffset", stats.nTimeOffset));
+        if (stats.dPingTime > 0.0)
+            obj.push_back(Pair("pingtime", stats.dPingTime));
+        if (stats.dMinPing < std::numeric_limits<int64_t>::max()/1e6)
+            obj.push_back(Pair("minping", stats.dMinPing));
+        if (stats.dPingWait > 0.0)
+            obj.push_back(Pair("pingwait", stats.dPingWait));
         obj.push_back(Pair("version", stats.nVersion));
-        obj.push_back(Pair("subver", stats.strSubVer));
+        // Use the sanitized form of subver here, to avoid tricksy remote peers from
+        // corrupting or modifying the JSON output by putting special characters in
+        // their ver message.
+        obj.push_back(Pair("subver", stats.cleanSubVer));
         obj.push_back(Pair("inbound", stats.fInbound));
-        obj.push_back(Pair("releasetime", (boost::int64_t)stats.nReleaseTime));
+        obj.push_back(Pair("addnode", stats.m_manual_connection));
         obj.push_back(Pair("startingheight", stats.nStartingHeight));
         if (fStateStats) {
             obj.push_back(Pair("banscore", statestats.nMisbehavior));
             obj.push_back(Pair("synced_headers", statestats.nSyncHeight));
             obj.push_back(Pair("synced_blocks", statestats.nCommonHeight));
             Array heights;
-            BOOST_FOREACH(int height, statestats.vHeightInFlight) {
+            for(int height : statestats.vHeightInFlight) {
                 heights.push_back(height);
             }
             obj.push_back(Pair("inflight", heights));
         }
+        obj.push_back(Pair("whitelisted", stats.fWhitelisted));
+
+//        Object sendPerMsgCmd;
+//        for (const mapMsgCmdSize::value_type &i : stats.mapSendBytesPerMsgCmd) {
+//            if (i.second > 0)
+//                sendPerMsgCmd.push_back(Pair(i.first, i.second));
+//        }
+//        obj.push_back(Pair("bytessent_per_msg", sendPerMsgCmd));
+//
+//        Object recvPerMsgCmd;
+//        for (const mapMsgCmdSize::value_type &i : stats.mapRecvBytesPerMsgCmd) {
+//            if (i.second > 0)
+//                recvPerMsgCmd.push_back(Pair(i.first, i.second));
+//        }
+//        obj.push_back(Pair("bytesrecv_per_msg", recvPerMsgCmd));
         ret.push_back(obj);
     }
     Object 
@@ -199,38 +264,39 @@ Value addnode(const Array& params, bool fHelp)
         strCommand = params[1].get_str();
     if (fHelp || params.size() != 2 ||
         (strCommand != "onetry" && strCommand != "add" && strCommand != "remove"))
-        throw runtime_error(
-            "addnode <node> <add|remove|onetry>\n"
-            "Attempts add or remove <node> from the addnode list or try a connection to <node> once.");
+        throw std::runtime_error(
+            "addnode \"node\" \"add|remove|onetry\"\n"
+            "\nAttempts to add or remove a node from the addnode list.\n"
+            "Or try a connection to a node once.\n"
+            "\nArguments:\n"
+            "1. \"node\"     (string, required) The node (see getpeerinfo for nodes)\n"
+            "2. \"command\"  (string, required) 'add' to add a node to the list, 'remove' to remove a node from the list, 'onetry' to try a connection to the node once\n"
+            "\nExamples:\n"
+            + HelpExampleCli("addnode", "\"192.168.0.6:8333\" \"onetry\"")
+            + HelpExampleRpc("addnode", "\"192.168.0.6:8333\", \"onetry\"")
+        );
+
+    if(!g_connman)
+        throw JSONRPCError(RPC_CLIENT_P2P_DISABLED, "Error: Peer-to-peer functionality missing or disabled");
 
     string strNode = params[0].get_str();
 
     if (strCommand == "onetry")
     {
         CAddress addr;
-        bool
-            fConnected;
-        fConnected = OpenNetworkConnection(addr, NULL, strNode.c_str());
+        g_connman->OpenNetworkConnection(addr, false, nullptr, strNode.c_str());
         return Value::null;
     }
 
-    LOCK(cs_vAddedNodes);
-    vector<string>::iterator it = vAddedNodes.begin();
-    for(; it != vAddedNodes.end(); it++)
-        if (strNode == *it)
-            break;
-
     if (strCommand == "add")
     {
-        if (it != vAddedNodes.end())
-            throw JSONRPCError(-23, "Error: Node already added");
-        vAddedNodes.push_back(strNode);
+        if(!g_connman->AddNode(strNode))
+            throw JSONRPCError(RPC_CLIENT_NODE_ALREADY_ADDED, "Error: Node already added");
     }
     else if(strCommand == "remove")
     {
-        if (it == vAddedNodes.end())
-            throw JSONRPCError(-24, "Error: Node has not been added.");
-        vAddedNodes.erase(it);
+        if(!g_connman->RemoveAddedNode(strNode))
+            throw JSONRPCError(RPC_CLIENT_NODE_NOT_ADDED, "Error: Node has not been added.");
     }
 
     return Value::null;
@@ -238,93 +304,63 @@ Value addnode(const Array& params, bool fHelp)
 
 Value getaddednodeinfo(const Array& params, bool fHelp)
 {
-    if (fHelp || params.size() < 1 || params.size() > 2)
-        throw runtime_error(
-            "getaddednodeinfo <dns> [node]\n"
-            "Returns information about the given added node, or all added nodes\n"
+    if (fHelp || params.size() > 1)
+        throw std::runtime_error(
+            "getaddednodeinfo ( \"node\" )\n"
+            "\nReturns information about the given added node, or all added nodes\n"
             "(note that onetry addnodes are not listed here)\n"
-            "If dns is false, only a list of added nodes will be provided,\n"
-            "otherwise connected information will also be available.");
+            "\nArguments:\n"
+            "1. \"node\"   (string, optional) If provided, return information about this specific node, otherwise all nodes are returned.\n"
+            "\nResult:\n"
+            "[\n"
+            "  {\n"
+            "    \"addednode\" : \"192.168.0.201\",   (string) The node IP address or name (as provided to addnode)\n"
+            "    \"connected\" : true|false,          (boolean) If connected\n"
+            "    \"addresses\" : [                    (list of objects) Only when connected = true\n"
+            "       {\n"
+            "         \"address\" : \"192.168.0.201:8333\",  (string) The bitcoin server IP and port we're connected to\n"
+            "         \"connected\" : \"outbound\"           (string) connection, inbound or outbound\n"
+            "       }\n"
+            "     ]\n"
+            "  }\n"
+            "  ,...\n"
+            "]\n"
+            "\nExamples:\n"
+            + HelpExampleCli("getaddednodeinfo", "\"192.168.0.201\"")
+            + HelpExampleRpc("getaddednodeinfo", "\"192.168.0.201\"")
+        );
 
-    bool fDns = params[0].get_bool();
+    if(!g_connman)
+        throw JSONRPCError(RPC_CLIENT_P2P_DISABLED, "Error: Peer-to-peer functionality missing or disabled");
 
-    list<string> laddedNodes(0);
-    if (params.size() == 1)
-    {
-        LOCK(cs_vAddedNodes);
-        BOOST_FOREACH(string& strAddNode, vAddedNodes)
-            laddedNodes.push_back(strAddNode);
-    }
-    else
-    {
-        string strNode = params[1].get_str();
-        LOCK(cs_vAddedNodes);
-        BOOST_FOREACH(string& strAddNode, vAddedNodes)
-            if (strAddNode == strNode)
-            {
-                laddedNodes.push_back(strAddNode);
+    std::vector<AddedNodeInfo> vInfo = g_connman->GetAddedNodeInfo();
+
+    if (params.size() == 1 && !params[0].is_null()) {
+        bool found = false;
+        for (const AddedNodeInfo& info : vInfo) {
+            if (info.strAddedNode == params[0].get_str()) {
+                vInfo.assign(1, info);
+                found = true;
                 break;
             }
-        if (laddedNodes.size() == 0)
-            throw JSONRPCError(-24, "Error: Node has not been added.");
         }
-
-        if (!fDns)
-        {
-            Object ret;
-            BOOST_FOREACH(string& strAddNode, laddedNodes)
-                ret.push_back(Pair("addednode", strAddNode));
-            return ret;
+        if (!found) {
+            throw JSONRPCError(RPC_CLIENT_NODE_NOT_ADDED, "Error: Node has not been added.");
         }
+    }
 
-        Array ret;
-
-        list<pair<string, vector<CService> > > laddedAddreses(0);
-        BOOST_FOREACH(string& strAddNode, laddedNodes)
-        {
-            vector<CService> vservNode(0);
-            if(Lookup(strAddNode.c_str(), vservNode, GetDefaultPort(), fNameLookup, 0))
-                laddedAddreses.push_back(make_pair(strAddNode, vservNode));
-            else
-            {
-                Object obj;
-                obj.push_back(Pair("addednode", strAddNode));
-                obj.push_back(Pair("connected", false));
-                Array addresses;
-                obj.push_back(Pair("addresses", addresses));
-            }
-        }
-
-    LOCK(cs_vNodes);
-    for (
-         list<pair<string, vector<CService> > >::iterator it = laddedAddreses.begin();
-         it != laddedAddreses.end();
-         ++it
-        )
-    {
+    Array ret;
+    for (const AddedNodeInfo& info : vInfo) {
         Object obj;
-        obj.push_back(Pair("addednode", it->first));
-
+        obj.push_back(Pair("addednode", info.strAddedNode));
+        obj.push_back(Pair("connected", info.fConnected));
         Array addresses;
-        bool fConnected = false;
-        BOOST_FOREACH(CService& addrNode, it->second)
-        {
-            bool fFound = false;
-            Object node;
-            node.push_back(Pair("address", addrNode.ToString()));
-            BOOST_FOREACH(CNode* pnode, vNodes)
-                if (pnode->addr == addrNode)
-                {
-                    fFound = true;
-                    fConnected = true;
-                    node.push_back(Pair("connected", pnode->fInbound ? "inbound" : "outbound"));
-                    break;
-                }
-            if (!fFound)
-                node.push_back(Pair("connected", "false"));
-            addresses.push_back(node);
+        if (info.fConnected) {
+            Object address;
+            address.push_back(Pair("address", info.resolvedAddress.ToString()));
+            address.push_back(Pair("connected", info.fInbound ? "inbound" : "outbound"));
+            addresses.push_back(address);
         }
-        obj.push_back(Pair("connected", fConnected));
         obj.push_back(Pair("addresses", addresses));
         ret.push_back(obj);
     }
@@ -334,82 +370,50 @@ Value getaddednodeinfo(const Array& params, bool fHelp)
 
 extern CCriticalSection cs_mapAlerts;
 extern map<uint256, CAlert> mapAlerts;
- 
-// ppcoin: send alert.  
-// There is a known deadlock situation with ThreadMessageHandler
-// ThreadMessageHandler: holds cs_vSend and acquiring cs_main in SendMessages()
-// ThreadRPCServer: holds cs_main and acquiring cs_vSend in alert.RelayTo()/PushMessage()/BeginMessage()
-Value sendalert(const Array& params, bool fHelp)
-{
-    if (fHelp || params.size() < 6)
-        throw runtime_error(
-            "sendalert <message> <privatekey> <minver> <maxver> <priority> <id> [cancelupto]\n"
-            "<message> is the alert text message\n"
-            "<privatekey> is hex string of alert master private key\n"
-            "<minver> is the minimum applicable internal client version\n"
-            "<maxver> is the maximum applicable internal client version\n"
-            "<priority> is integer priority number\n"
-            "<id> is the alert id\n"
-            "[cancelupto] cancels all alert id's up to this number\n"
-            "Returns true or false.");
-
-    CAlert alert;
-    CKey key;
-
-    alert.strStatusBar = params[0].get_str();
-    alert.nMinVer = params[2].get_int();
-    alert.nMaxVer = params[3].get_int();
-    alert.nPriority = params[4].get_int();
-    alert.nID = params[5].get_int();
-    if (params.size() > 6)
-        alert.nCancel = params[6].get_int();
-    alert.nVersion = PROTOCOL_VERSION;
-    alert.nRelayUntil = GetAdjustedTime() + 365*24*60*60;
-    alert.nExpiration = GetAdjustedTime() + 365*24*60*60;
-
-    CDataStream sMsg(SER_NETWORK, PROTOCOL_VERSION);
-    sMsg << (CUnsignedAlert)alert;
-    alert.vchMsg = vector<unsigned char>(sMsg.begin(), sMsg.end());
-
-    vector<unsigned char> vchPrivKey = ParseHex(params[1].get_str());
-    key.SetPrivKey(CPrivKey(vchPrivKey.begin(), vchPrivKey.end())); // if key is not correct openssl may crash
-    if (!key.Sign(Hash(alert.vchMsg.begin(), alert.vchMsg.end()), alert.vchSig))
-        throw runtime_error(
-            "Unable to sign alert, check private key?\n");  
-    if(!alert.ProcessAlert()) 
-        throw runtime_error(
-            "Failed to process alert.\n");
-    // Relay alert
-    {
-        LOCK(cs_vNodes);
-        BOOST_FOREACH(CNode* pnode, vNodes)
-            alert.RelayTo(pnode);
-    }
-
-    Object result;
-    result.push_back(Pair("strStatusBar", alert.strStatusBar));
-    result.push_back(Pair("nVersion", alert.nVersion));
-    result.push_back(Pair("nMinVer", alert.nMinVer));
-    result.push_back(Pair("nMaxVer", alert.nMaxVer));
-    result.push_back(Pair("nPriority", alert.nPriority));
-    result.push_back(Pair("nID", alert.nID));
-    if (alert.nCancel > 0)
-        result.push_back(Pair("nCancel", alert.nCancel));
-    return result;
-}
 
 Value getnettotals(const Array& params, bool fHelp)
 {
     if (fHelp || params.size() > 0)
-        throw runtime_error(
+        throw std::runtime_error(
             "getnettotals\n"
-            "Returns information about network traffic, including bytes in, bytes out,\n"
-            "and current time.");
+            "\nReturns information about network traffic, including bytes in, bytes out,\n"
+            "and current time.\n"
+            "\nResult:\n"
+            "{\n"
+            "  \"totalbytesrecv\": n,   (numeric) Total bytes received\n"
+            "  \"totalbytessent\": n,   (numeric) Total bytes sent\n"
+            "  \"timemillis\": t,       (numeric) Current UNIX time in milliseconds\n"
+            "  \"uploadtarget\":\n"
+            "  {\n"
+            "    \"timeframe\": n,                         (numeric) Length of the measuring timeframe in seconds\n"
+            "    \"target\": n,                            (numeric) Target in bytes\n"
+            "    \"target_reached\": true|false,           (boolean) True if target is reached\n"
+            "    \"serve_historical_blocks\": true|false,  (boolean) True if serving historical blocks\n"
+            "    \"bytes_left_in_cycle\": t,               (numeric) Bytes left in current time cycle\n"
+            "    \"time_left_in_cycle\": t                 (numeric) Seconds left in current time cycle\n"
+            "  }\n"
+            "}\n"
+            "\nExamples:\n"
+            + HelpExampleCli("getnettotals", "")
+            + HelpExampleRpc("getnettotals", "")
+       );
+
+    if(!g_connman)
+        throw JSONRPCError(RPC_CLIENT_P2P_DISABLED, "Error: Peer-to-peer functionality missing or disabled");
 
     Object obj;
-    obj.push_back(Pair("totalbytesrecv", static_cast< boost::uint64_t>(CNode::GetTotalBytesRecv())));
-    obj.push_back(Pair("totalbytessent", static_cast<boost::uint64_t>(CNode::GetTotalBytesSent())));
-    obj.push_back(Pair("timemillis", static_cast<boost::int64_t>(GetTimeMillis())));
+    obj.push_back(Pair("totalbytesrecv", g_connman->GetTotalBytesRecv()));
+    obj.push_back(Pair("totalbytessent", g_connman->GetTotalBytesSent()));
+    obj.push_back(Pair("timemillis", GetTimeMillis()));
+
+    Object outboundLimit;
+    outboundLimit.push_back(Pair("timeframe", g_connman->GetMaxOutboundTimeframe()));
+    outboundLimit.push_back(Pair("target", g_connman->GetMaxOutboundTarget()));
+    outboundLimit.push_back(Pair("target_reached", g_connman->OutboundTargetReached(false)));
+    outboundLimit.push_back(Pair("serve_historical_blocks", !g_connman->OutboundTargetReached(true)));
+    outboundLimit.push_back(Pair("bytes_left_in_cycle", g_connman->GetOutboundTargetBytesLeft()));
+    outboundLimit.push_back(Pair("time_left_in_cycle", g_connman->GetMaxOutboundTimeLeftInCycle()));
+    obj.push_back(Pair("uploadtarget", outboundLimit));
     return obj;
 }
 #ifdef _MSC_VER

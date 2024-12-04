@@ -1337,7 +1337,6 @@ static const CRPCCommand vRPCCommands[] =
     { "repairwallet",           &repairwallet,           false,  true  },
     { "resendtx",               &resendtx,               false,  true  },
     { "makekeypair",            &makekeypair,            false,  true  },
-    { "sendalert",              &sendalert,              false,  false },
     /** YAC_TOKEN START */
     { "issue",                  &issue,                  false,  false },
     { "transfer",               &transfer,               false,  false },
@@ -1426,13 +1425,6 @@ Array RPCConvertValues(std::string &strMethod, const std::vector<std::string> &s
     if (strMethod == "getblocktemplate"       && n > 0) ConvertTo<Object>(params[0]);
     if (strMethod == "listsinceblock"         && n > 1) ConvertTo<boost::int64_t>(params[1]);
     if (strMethod == "listsinceblock"         && n > 2) ConvertTo<bool>(params[2]);
-
-    if (strMethod == "sendalert"              && n > 2) ConvertTo<boost::int64_t>(params[2]);
-    if (strMethod == "sendalert"              && n > 3) ConvertTo<boost::int64_t>(params[3]);
-    if (strMethod == "sendalert"              && n > 4) ConvertTo<boost::int64_t>(params[4]);
-    if (strMethod == "sendalert"              && n > 5) ConvertTo<boost::int64_t>(params[5]);
-    if (strMethod == "sendalert"              && n > 6) ConvertTo<boost::int64_t>(params[6]);
-
     if (strMethod == "sendmany"               && n > 1) ConvertTo<Object>(params[1]);
     if (strMethod == "sendmany"               && n > 2) ConvertTo<bool>(params[2]);
     if (strMethod == "sendmany"               && n > 3) ConvertTo<boost::int64_t>(params[3]);

@@ -2518,6 +2518,11 @@ std::vector<CAddress> CConnman::GetAddresses()
     return addrman.GetAddr();
 }
 
+std::vector<CAddrInfo> CConnman::GetAddressesInfo()
+{
+    return addrman.GetAddrInfo();
+}
+
 bool CConnman::AddNode(const std::string& strNode)
 {
     LOCK(cs_vAddedNodes);

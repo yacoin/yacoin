@@ -261,6 +261,7 @@ protected:
 
     //! Select several addresses at once.
     void GetAddr_(std::vector<CAddress> &vAddr);
+    void GetAddrInfo_(std::vector<CAddrInfo> &vAddr);
 
     //! Mark an entry as currently-connected-to.
     void Connected_(const CService &addr, int64_t nTime);
@@ -577,6 +578,19 @@ public:
         {
             LOCK(cs);
             GetAddr_(vAddr);
+        }
+        Check();
+        return vAddr;
+    }
+
+    //! Return a bunch of addresses info, selected at random.
+    std::vector<CAddrInfo> GetAddrInfo()
+    {
+        Check();
+        std::vector<CAddrInfo> vAddr;
+        {
+            LOCK(cs);
+            GetAddrInfo_(vAddr);
         }
         Check();
         return vAddr;

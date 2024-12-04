@@ -228,8 +228,9 @@ Value getinfo(const Array& params, bool fHelp)
     obj.push_back(Pair("up-time",       sUpTime));
 
     obj.push_back(Pair("moneysupply",   ValueFromAmount(chainActive.Tip()->nMoneySupply)));
-    obj.push_back(Pair("connections",   (int)vNodes.size()));
-    obj.push_back(Pair("proxy",         (proxy.first.IsValid() ? proxy.first.ToStringIPPort() : string())));
+    if(g_connman)
+        obj.push_back(Pair("connections",   (int)g_connman->GetNodeCount(CConnman::CONNECTIONS_ALL)));
+    obj.push_back(Pair("proxy",         (proxy.IsValid() ? proxy.proxy.ToStringIPPort() : std::string())));
     for (const std::pair<CNetAddr, LocalServiceInfo> &item : mapLocalHost)
     {
         obj.push_back(Pair("ip", item.first.ToString()));

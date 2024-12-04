@@ -481,6 +481,27 @@ void CAddrMan::GetAddr_(std::vector<CAddress>& vAddr)
     }
 }
 
+void CAddrMan::GetAddrInfo_(std::vector<CAddrInfo>& vAddr)
+{
+    unsigned int nNodes = ADDRMAN_GETADDR_MAX_PCT * vRandom.size() / 100;
+    if (nNodes > ADDRMAN_GETADDR_MAX)
+        nNodes = ADDRMAN_GETADDR_MAX;
+
+    // gather a list of random nodes, skipping those of low quality
+    for (unsigned int n = 0; n < vRandom.size(); n++) {
+        if (vAddr.size() >= nNodes)
+            break;
+
+        int nRndPos = RandomInt(vRandom.size() - n) + n;
+        SwapRandom(n, nRndPos);
+        assert(mapInfo.count(vRandom[n]) == 1);
+
+        const CAddrInfo& ai = mapInfo[vRandom[n]];
+        if (!ai.IsTerrible())
+            vAddr.push_back(ai);
+    }
+}
+
 void CAddrMan::Connected_(const CService& addr, int64_t nTime)
 {
     CAddrInfo* pinfo = Find(addr);
