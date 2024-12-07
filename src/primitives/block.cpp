@@ -455,7 +455,7 @@ bool CBlock::AcceptBlock(CValidationState &state, CBlockIndex **ppindex, bool fR
 
     // Header is valid/has work, merkle tree and segwit merkle tree are good...RELAY NOW
     // (but if it does not build on our best tip, let the SendMessages loop relay it)
-    const std::shared_ptr<const CBlock> block = std::shared_ptr<const CBlock>(this);
+    const std::shared_ptr<const CBlock> block = std::make_shared<CBlock>(*this);
     if (!IsInitialBlockDownload() && chainActive.Tip() == pindex->pprev)
         GetMainSignals().NewPoWValidBlock(pindex, block);
 
