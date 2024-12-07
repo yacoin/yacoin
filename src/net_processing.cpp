@@ -1363,11 +1363,15 @@ bool static ProcessHeadersMessage(CNode *pfrom, CConnman *connman, std::vector<C
 
     bool received_new_header = false;
     CBlockIndex *pindexLast = nullptr;
+    bool needReactivateTimeout = false;
     {
         LOCK(cs_main);
         CNodeState *nodestate = State(pfrom->GetId());
         // For YACoin, at the time the node receives headers from peer, reset the timeout so the node doesn't trigger disconnect due to the hash calculation takes much time
-        nodestate->nHeadersSyncTimeout = std::numeric_limits<int64_t>::max();
+        if (nodestate->nHeadersSyncTimeout < std::numeric_limits<int64_t>::max()) {
+            needReactivateTimeout = true;
+            nodestate->nHeadersSyncTimeout = std::numeric_limits<int64_t>::max();
+        }
 
         // If this looks like it could be a block announcement (nCount <
         // MAX_BLOCKS_TO_ANNOUNCE), use special logic for handling headers that
@@ -1396,9 +1400,14 @@ bool static ProcessHeadersMessage(CNode *pfrom, CConnman *connman, std::vector<C
             if (nodestate->nUnconnectingHeaders % MAX_UNCONNECTING_HEADERS == 0) {
                 Misbehaving(pfrom->GetId(), 20);
             }
+            if (needReactivateTimeout) {
+                nodestate->nHeadersSyncTimeout = GetTimeMicros() + HEADERS_DOWNLOAD_TIMEOUT_BASE;
+            }
             return true;
         }
+    }
 
+    {
         // Calculate header hash
         LogPrintf("Start calculating hash for %d block headers\n", nCount);
         if (nHashCalcThreads > 1)
@@ -1455,8 +1464,14 @@ bool static ProcessHeadersMessage(CNode *pfrom, CConnman *connman, std::vector<C
             }
         }
         LogPrintf("Finish calculating hash for %d block headers\n", nCount);
+    }
+    {
+        LOCK(cs_main);
+        CNodeState *nodestate = State(pfrom->GetId());
         // Reactivate the timeout to guarantee the node check for headers sync timeouts
-        nodestate->nHeadersSyncTimeout = GetTimeMicros() + HEADERS_DOWNLOAD_TIMEOUT_BASE;
+        if (needReactivateTimeout) {
+            nodestate->nHeadersSyncTimeout = GetTimeMicros() + HEADERS_DOWNLOAD_TIMEOUT_BASE;
+        }
 
         uint256 hashLastBlock;
         for (CBlock& header : headers) {
