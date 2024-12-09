@@ -483,7 +483,7 @@ void CAddrMan::GetAddr_(std::vector<CAddress>& vAddr)
 
 void CAddrMan::GetAddrInfo_(std::vector<CAddrInfo>& vAddr)
 {
-    unsigned int nNodes = ADDRMAN_GETADDR_MAX_PCT * vRandom.size() / 100;
+    unsigned int nNodes = vRandom.size();
     if (nNodes > ADDRMAN_GETADDR_MAX)
         nNodes = ADDRMAN_GETADDR_MAX;
 

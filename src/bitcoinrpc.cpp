@@ -1257,11 +1257,21 @@ static const CRPCCommand vRPCCommands[] =
     { "getblockcountt",         &getcurrentblockandtime, true,   false },
 #endif
     { "getyacprice",            &getYACprice,            true,   false },
+    // network start
     { "getconnectioncount",     &getconnectioncount,     true,   false },
+    { "ping",                   &ping,                   true,   true },
     { "getaddrmaninfo",         &getaddrmaninfo,         true,   false },
     { "getpeerinfo",            &getpeerinfo,            true,   false },
     { "addnode",                &addnode,                true,   true  },
+    { "disconnectnode",         &disconnectnode,         true,   true  },
     { "getaddednodeinfo",       &getaddednodeinfo,       true,   true  },
+    { "getnettotals",           &getnettotals,           true,   true  },
+    { "getnetworkinfo",         &getnetworkinfo,         true,   true  },
+    { "setban",                 &setban,                 true,   true  },
+    { "listbanned",             &listbanned,             true,   true  },
+    { "clearbanned",            &clearbanned,            true,   true  },
+    { "setnetworkactive",       &setnetworkactive,       true,   true  },
+    // network end
     { "getdifficulty",          &getdifficulty,          true,   false },
     { "getinfo",                &getinfo,                true,   false },
     { "getgenerate",            &getgenerate,            true,   false },
@@ -1271,7 +1281,6 @@ static const CRPCCommand vRPCCommands[] =
     { "gethashespersec",        &gethashespersec,        true,   false },
     { "getmininginfo",          &getmininginfo,          true,   false },
     { "getnewaddress",          &getnewaddress,          true,   false },
-    { "getnettotals",           &getnettotals,           true,   true  },
     { "getaccountaddress",      &getaccountaddress,      true,   false },
     { "setaccount",             &setaccount,             true,   false },
     { "getaccount",             &getaccount,             false,  false },
@@ -1458,6 +1467,12 @@ Array RPCConvertValues(std::string &strMethod, const std::vector<std::string> &s
     if (strMethod == "importaddress"          && n > 2) ConvertTo<bool>(params[2]);
     if (strMethod == "generatetoaddress"      && n > 2) ConvertTo<int>(params[0]);
     if (strMethod == "generatetoaddress"      && n > 2) ConvertTo<int>(params[2]);
+    /* Network-related RPC start */
+    if (strMethod == "disconnectnode"         && n > 1) ConvertTo<boost::int64_t>(params[1]); // node id
+    if (strMethod == "setban"                 && n > 2) ConvertTo<boost::int64_t>(params[2]); // banTime
+    if (strMethod == "setban"                 && n > 3) ConvertTo<bool>(params[3]); // absolute
+    if (strMethod == "setnetworkactive"       && n > 0) ConvertTo<bool>(params[0]); // state
+    /* Network-related RPC end */
     /** YAC_TOKEN START */
     if (strMethod == "issue"               && n > 1) ConvertTo<double>(params[1]); // qty
     if (strMethod == "issue"               && n > 2) ConvertTo<boost::int64_t>(params[2]); // units

@@ -44,6 +44,29 @@ Value getconnectioncount(const Array& params, bool fHelp)
     }
 }
 
+Value ping(const Array& params, bool fHelp)
+{
+    if (fHelp || params.size() != 0)
+        throw std::runtime_error(
+            "ping\n"
+            "\nRequests that a ping be sent to all other nodes, to measure ping time.\n"
+            "Results provided in getpeerinfo, pingtime and pingwait fields are decimal seconds.\n"
+            "Ping command is handled in queue with all other commands, so it measures processing backlog, not just network ping.\n"
+            "\nExamples:\n"
+            + HelpExampleCli("ping", "")
+            + HelpExampleRpc("ping", "")
+        );
+
+    if(!g_connman)
+        throw JSONRPCError(RPC_CLIENT_P2P_DISABLED, "Error: Peer-to-peer functionality missing or disabled");
+
+    // Request that each node send a ping during next message processing pass
+    g_connman->ForEachNode([](CNode* pnode) {
+        pnode->fPingQueued = true;
+    });
+    return Value::null;
+}
+
 struct addrManItemSort 
 {
     bool operator()(const CAddrInfo &leftItem, const CAddrInfo &rightItem) 
@@ -298,6 +321,48 @@ Value addnode(const Array& params, bool fHelp)
     return Value::null;
 }
 
+Value disconnectnode(const Array& params, bool fHelp)
+{
+    if (fHelp || params.size() == 0 || params.size() >= 3)
+        throw std::runtime_error(
+            "disconnectnode \"[address]\" [nodeid]\n"
+            "\nImmediately disconnects from the specified peer node.\n"
+            "\nStrictly one out of 'address' and 'nodeid' can be provided to identify the node.\n"
+            "\nTo disconnect by nodeid, either set 'address' to the empty string, or call using the named 'nodeid' argument only.\n"
+            "\nArguments:\n"
+            "1. \"address\"     (string, optional) The IP address/port of the node\n"
+            "2. \"nodeid\"      (number, optional) The node ID (see getpeerinfo for node IDs)\n"
+            "\nExamples:\n"
+            + HelpExampleCli("disconnectnode", "\"192.168.0.6:8333\"")
+            + HelpExampleCli("disconnectnode", "\"\" 1")
+            + HelpExampleRpc("disconnectnode", "\"192.168.0.6:8333\"")
+            + HelpExampleRpc("disconnectnode", "\"\", 1")
+        );
+
+    if(!g_connman)
+        throw JSONRPCError(RPC_CLIENT_P2P_DISABLED, "Error: Peer-to-peer functionality missing or disabled");
+
+    bool success;
+    string address_arg = params[0].get_str();
+    NodeId nodeid = params.size() < 2 ? -1 : params[1].get_int();
+
+    if (!address_arg.empty() && nodeid == -1) {
+        /* handle disconnect-by-address */
+        success = g_connman->DisconnectNode(address_arg);
+    } else if (nodeid != -1 && address_arg.empty()) {
+        /* handle disconnect-by-id */
+        success = g_connman->DisconnectNode(nodeid);
+    } else {
+        throw JSONRPCError(RPC_INVALID_PARAMS, "Only one of address and nodeid should be provided.");
+    }
+
+    if (!success) {
+        throw JSONRPCError(RPC_CLIENT_NODE_NOT_CONNECTED, "Node not found in connected nodes");
+    }
+
+    return Value::null;
+}
+
 Value getaddednodeinfo(const Array& params, bool fHelp)
 {
     if (fHelp || params.size() > 1)
@@ -409,6 +474,237 @@ Value getnettotals(const Array& params, bool fHelp)
     obj.push_back(Pair("uploadtarget", outboundLimit));
     return obj;
 }
+
+static Value GetNetworksInfo()
+{
+    Array networks;
+    for(int n=0; n<NET_MAX; ++n)
+    {
+        enum Network network = static_cast<enum Network>(n);
+        if(network == NET_UNROUTABLE || network == NET_INTERNAL)
+            continue;
+        proxyType proxy;
+        Object obj;
+        GetProxy(network, proxy);
+        obj.push_back(Pair("name", GetNetworkName(network)));
+        obj.push_back(Pair("limited", IsLimited(network)));
+        obj.push_back(Pair("reachable", IsReachable(network)));
+        obj.push_back(Pair("proxy", proxy.IsValid() ? proxy.proxy.ToStringIPPort() : std::string()));
+        obj.push_back(Pair("proxy_randomize_credentials", proxy.randomize_credentials));
+        networks.push_back(obj);
+    }
+    return networks;
+}
+
+Value getnetworkinfo(const Array& params, bool fHelp)
+{
+    if (fHelp || params.size() != 0)
+        throw std::runtime_error(
+            "getnetworkinfo\n"
+            "Returns an object containing various state info regarding P2P networking.\n"
+            "\nResult:\n"
+            "{\n"
+            "  \"version\": xxxxx,                      (numeric) the server version\n"
+            "  \"subversion\": \"/Satoshi:x.x.x/\",     (string) the server subversion string\n"
+            "  \"protocolversion\": xxxxx,              (numeric) the protocol version\n"
+            "  \"localservices\": \"xxxxxxxxxxxxxxxx\", (string) the services we offer to the network\n"
+            "  \"localrelay\": true|false,              (bool) true if transaction relay is requested from peers\n"
+            "  \"timeoffset\": xxxxx,                   (numeric) the time offset\n"
+            "  \"connections\": xxxxx,                  (numeric) the number of connections\n"
+            "  \"networkactive\": true|false,           (bool) whether p2p networking is enabled\n"
+            "  \"networks\": [                          (array) information per network\n"
+            "  {\n"
+            "    \"name\": \"xxx\",                     (string) network (ipv4, ipv6 or onion)\n"
+            "    \"limited\": true|false,               (boolean) is the network limited using -onlynet?\n"
+            "    \"reachable\": true|false,             (boolean) is the network reachable?\n"
+            "    \"proxy\": \"host:port\"               (string) the proxy that is used for this network, or empty if none\n"
+            "    \"proxy_randomize_credentials\": true|false,  (string) Whether randomized credentials are used\n"
+            "  }\n"
+            "  ,...\n"
+            "  ],\n"
+            "  \"relayfee\": x.xxxxxxxx,                (numeric) minimum relay fee for transactions in " + CURRENCY_UNIT + "/kB\n"
+            "  \"incrementalfee\": x.xxxxxxxx,          (numeric) minimum fee increment for mempool limiting or BIP 125 replacement in " + CURRENCY_UNIT + "/kB\n"
+            "  \"localaddresses\": [                    (array) list of local addresses\n"
+            "  {\n"
+            "    \"address\": \"xxxx\",                 (string) network address\n"
+            "    \"port\": xxx,                         (numeric) network port\n"
+            "    \"score\": xxx                         (numeric) relative score\n"
+            "  }\n"
+            "  ,...\n"
+            "  ]\n"
+            "  \"warnings\": \"...\"                    (string) any network warnings\n"
+            "}\n"
+            "\nExamples:\n"
+            + HelpExampleCli("getnetworkinfo", "")
+            + HelpExampleRpc("getnetworkinfo", "")
+        );
+
+    LOCK(cs_main);
+    Object obj;
+    obj.push_back(Pair("version",       CLIENT_VERSION));
+    obj.push_back(Pair("subversion",    strSubVersion));
+    obj.push_back(Pair("protocolversion",PROTOCOL_VERSION));
+    if(g_connman)
+        obj.push_back(Pair("localservices", strprintf("%016x", g_connman->GetLocalServices())));
+    obj.push_back(Pair("localrelay",     fRelayTxes));
+    obj.push_back(Pair("timeoffset",    GetTimeOffset()));
+    if (g_connman) {
+        obj.push_back(Pair("networkactive", g_connman->GetNetworkActive()));
+        obj.push_back(Pair("connections",   (int)g_connman->GetNodeCount(CConnman::CONNECTIONS_ALL)));
+    }
+    obj.push_back(Pair("networks",      GetNetworksInfo()));
+    Array localAddresses;
+    {
+        LOCK(cs_mapLocalHost);
+        for (const std::pair<CNetAddr, LocalServiceInfo> &item : mapLocalHost)
+        {
+            Object rec;
+            rec.push_back(Pair("address", item.first.ToString()));
+            rec.push_back(Pair("port", item.second.nPort));
+            rec.push_back(Pair("score", item.second.nScore));
+            localAddresses.push_back(rec);
+        }
+    }
+    obj.push_back(Pair("localaddresses", localAddresses));
+    obj.push_back(Pair("warnings",       GetWarnings("statusbar")));
+    return obj;
+}
+
+Value setban(const Array& params, bool fHelp)
+{
+    std::string strCommand;
+    if (params.size() >= 2)
+        strCommand = params[1].get_str();
+    if (fHelp || params.size() < 2 ||
+        (strCommand != "add" && strCommand != "remove"))
+        throw std::runtime_error(
+                            "setban \"subnet\" \"add|remove\" (bantime) (absolute)\n"
+                            "\nAttempts to add or remove an IP/Subnet from the banned list.\n"
+                            "\nArguments:\n"
+                            "1. \"subnet\"       (string, required) The IP/Subnet (see getpeerinfo for nodes IP) with an optional netmask (default is /32 = single IP)\n"
+                            "2. \"command\"      (string, required) 'add' to add an IP/Subnet to the list, 'remove' to remove an IP/Subnet from the list\n"
+                            "3. \"bantime\"      (numeric, optional) time in seconds how long (or until when if [absolute] is set) the IP is banned (0 or empty means using the default time of 24h which can also be overwritten by the -bantime startup argument)\n"
+                            "4. \"absolute\"     (boolean, optional) If set, the bantime must be an absolute timestamp in seconds since epoch (Jan 1 1970 GMT)\n"
+                            "\nExamples:\n"
+                            + HelpExampleCli("setban", "\"192.168.0.6\" \"add\" 86400")
+                            + HelpExampleCli("setban", "\"192.168.0.0/24\" \"add\"")
+                            + HelpExampleRpc("setban", "\"192.168.0.6\", \"add\", 86400")
+                            );
+    if(!g_connman)
+        throw JSONRPCError(RPC_CLIENT_P2P_DISABLED, "Error: Peer-to-peer functionality missing or disabled");
+
+    CSubNet subNet;
+    CNetAddr netAddr;
+    bool isSubnet = false;
+
+    if (params[0].get_str().find("/") != std::string::npos)
+        isSubnet = true;
+
+    if (!isSubnet) {
+        CNetAddr resolved;
+        LookupHost(params[0].get_str().c_str(), resolved, false);
+        netAddr = resolved;
+    }
+    else
+        LookupSubNet(params[0].get_str().c_str(), subNet);
+
+    if (! (isSubnet ? subNet.IsValid() : netAddr.IsValid()) )
+        throw JSONRPCError(RPC_CLIENT_INVALID_IP_OR_SUBNET, "Error: Invalid IP/Subnet");
+
+    if (strCommand == "add")
+    {
+        if (isSubnet ? g_connman->IsBanned(subNet) : g_connman->IsBanned(netAddr))
+            throw JSONRPCError(RPC_CLIENT_NODE_ALREADY_ADDED, "Error: IP/Subnet already banned");
+
+        int64_t banTime = 0; //use standard bantime if not specified
+        if (params.size() >= 3 && !params[2].is_null())
+            banTime = params[2].get_int64();
+
+        bool absolute = false;
+        if (params.size() == 4 && params[3].get_bool())
+            absolute = true;
+
+        isSubnet ? g_connman->Ban(subNet, BanReasonManuallyAdded, banTime, absolute) : g_connman->Ban(netAddr, BanReasonManuallyAdded, banTime, absolute);
+    }
+    else if(strCommand == "remove")
+    {
+        if (!( isSubnet ? g_connman->Unban(subNet) : g_connman->Unban(netAddr) ))
+            throw JSONRPCError(RPC_CLIENT_INVALID_IP_OR_SUBNET, "Error: Unban failed. Requested address/subnet was not previously banned.");
+    }
+    return Value::null;
+}
+
+Value listbanned(const Array& params, bool fHelp)
+{
+    if (fHelp || params.size() != 0)
+        throw std::runtime_error(
+                            "listbanned\n"
+                            "\nList all banned IPs/Subnets.\n"
+                            "\nExamples:\n"
+                            + HelpExampleCli("listbanned", "")
+                            + HelpExampleRpc("listbanned", "")
+                            );
+
+    if(!g_connman)
+        throw JSONRPCError(RPC_CLIENT_P2P_DISABLED, "Error: Peer-to-peer functionality missing or disabled");
+
+    banmap_t banMap;
+    g_connman->GetBanned(banMap);
+
+    Array bannedAddresses;
+    for (banmap_t::iterator it = banMap.begin(); it != banMap.end(); it++)
+    {
+        CBanEntry banEntry = (*it).second;
+        Object rec;
+        rec.push_back(Pair("address", (*it).first.ToString()));
+        rec.push_back(Pair("banned_until", banEntry.nBanUntil));
+        rec.push_back(Pair("ban_created", banEntry.nCreateTime));
+        rec.push_back(Pair("ban_reason", banEntry.banReasonToString()));
+
+        bannedAddresses.push_back(rec);
+    }
+
+    return bannedAddresses;
+}
+
+Value clearbanned(const Array& params, bool fHelp)
+{
+    if (fHelp || params.size() != 0)
+        throw std::runtime_error(
+                            "clearbanned\n"
+                            "\nClear all banned IPs.\n"
+                            "\nExamples:\n"
+                            + HelpExampleCli("clearbanned", "")
+                            + HelpExampleRpc("clearbanned", "")
+                            );
+    if(!g_connman)
+        throw JSONRPCError(RPC_CLIENT_P2P_DISABLED, "Error: Peer-to-peer functionality missing or disabled");
+
+    g_connman->ClearBanned();
+
+    return Value::null;
+}
+
+Value setnetworkactive(const Array& params, bool fHelp)
+{
+    if (fHelp || params.size() != 1) {
+        throw std::runtime_error(
+            "setnetworkactive true|false\n"
+            "\nDisable/enable all p2p network activity.\n"
+            "\nArguments:\n"
+            "1. \"state\"        (boolean, required) true to enable networking, false to disable\n"
+        );
+    }
+
+    if (!g_connman) {
+        throw JSONRPCError(RPC_CLIENT_P2P_DISABLED, "Error: Peer-to-peer functionality missing or disabled");
+    }
+
+    g_connman->SetNetworkActive(params[0].get_bool());
+
+    return g_connman->GetNetworkActive();
+}
+
 #ifdef _MSC_VER
     #include "msvc_warnings.pop.h"
 #endif
