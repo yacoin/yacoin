@@ -65,6 +65,7 @@ void ThreadHashCalculation(void*)
     ++vnThreadsRunning[THREAD_HASHCALCULATION];
     RenameThread("yacoin-hashcalc");
     hashCalculationQueue.Thread();
+    LogPrintf("ThreadHashCalculation shutdown\n");
     --vnThreadsRunning[THREAD_HASHCALCULATION];
 }
 
@@ -96,8 +97,7 @@ void StartNode(void *parg)
 
 void StopNode()
 {
-    if (fDebug)
-        LogPrintf("StopNode()\n");
+    LogPrintf("StopNode()\n");
     fShutdown = true;
 
 #ifdef WIN32
@@ -113,25 +113,28 @@ void StopNode()
         ThreadHashCalculationQuit();
     }
 
-    if (vnThreadsRunning[THREAD_RPCLISTENER] > 0)
-        LogPrintf("ThreadRPCListener still running\n");
-
-    if (vnThreadsRunning[THREAD_RPCHANDLER] > 0)
-        LogPrintf("ThreadsRPCServer still running\n");
-
-    if (vnThreadsRunning[THREAD_MINTER] > 0)
-        LogPrintf("ThreadStakeMinter still running\n");
-
-    if (vnThreadsRunning[THREAD_SCRIPTCHECK] > 0)
-        LogPrintf("ThreadScriptCheck still running\n");
-
-    if (vnThreadsRunning[THREAD_HASHCALCULATION] > 0)
-        LogPrintf("ThreadHashCalculation still running\n");
-
-    while ((vnThreadsRunning[THREAD_RPCHANDLER] > 0) ||
+    while ((vnThreadsRunning[THREAD_RPCLISTENER] > 0) ||
+           (vnThreadsRunning[THREAD_RPCHANDLER] > 0) ||
+           (vnThreadsRunning[THREAD_MINER] > 0) ||
            (vnThreadsRunning[THREAD_SCRIPTCHECK] > 0) ||
-           (vnThreadsRunning[THREAD_HASHCALCULATION] > 0))
-        Sleep(2 * nTenMilliseconds);
+           (vnThreadsRunning[THREAD_HASHCALCULATION] > 0)) {
+
+        if (vnThreadsRunning[THREAD_RPCLISTENER] > 0)
+            LogPrintf("ThreadRPCListener still running\n");
+
+        if (vnThreadsRunning[THREAD_RPCHANDLER] > 0)
+            LogPrintf("ThreadsRPCServer still running\n");
+
+        if (vnThreadsRunning[THREAD_MINER] > 0)
+            LogPrintf("ThreadStakeMinter still running\n");
+
+        if (vnThreadsRunning[THREAD_SCRIPTCHECK] > 0)
+            LogPrintf("ThreadScriptCheck still running\n");
+
+        if (vnThreadsRunning[THREAD_HASHCALCULATION] > 0)
+            LogPrintf("ThreadHashCalculation still running\n");
+        Sleep(20 * nTenMilliseconds);
+    }
 }
 
 bool CHashCalculation::operator()()

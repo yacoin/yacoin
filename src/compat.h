@@ -91,17 +91,9 @@ extern bool
 
 inline int myclosesocket(SOCKET& hSocket)
 {
-#ifdef WIN32
-    static ::uint32_t 
-        nHowManyValidCloses = 0,
-        nHowManyCloses = 0;
-
-    ++nHowManyCloses;
-#endif
     if (hSocket == INVALID_SOCKET)
         return WSAENOTSOCK;
 #ifdef WIN32
-    ++nHowManyValidCloses;
     int ret = closesocket(hSocket);
 #else
     int ret = close(hSocket);

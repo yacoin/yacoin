@@ -430,7 +430,7 @@ LIBS += \
 	$$join(BDB_LIB_PATH,,-L,) \
 	$$join(OPENSSL_LIB_PATH,,-L,) \
 	$$join(QRENCODE_LIB_PATH,,-L,)
-LIBS += -lssl -lcrypto -ldb_cxx$$BDB_LIB_SUFFIX -lqrencode
+LIBS += -lssl -lcrypto -ldb_cxx$$BDB_LIB_SUFFIX -lqrencode -levent -levent_pthreads
 # -lgdi32 has to happen after -lcrypto (see  #681)
 windows:LIBS += -lws2_32 -lshlwapi -lmswsock -lole32 -loleaut32 -luuid -lgdi32
 LIBS += -lboost_system -lboost_filesystem -lboost_program_options -lboost_thread

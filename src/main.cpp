@@ -1977,6 +1977,7 @@ void ThreadScriptCheck(void*)
     ++vnThreadsRunning[THREAD_SCRIPTCHECK];
     RenameThread("yacoin-scriptch");
     scriptcheckqueue.Thread();
+    LogPrintf("ThreadScriptCheck shutdown\n");
     --vnThreadsRunning[THREAD_SCRIPTCHECK];
 }
 

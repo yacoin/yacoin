@@ -106,88 +106,83 @@ void ExitTimeout(void* parg)
 #ifndef TESTS_ENABLED
 void StartShutdown()
 {
-#ifdef QT_GUI
-    // ensure we leave the Qt main loop for a clean GUI exit (Shutdown() is called in bitcoin.cpp afterwards)
-    uiInterface.QueueShutdown();
-#else
-    // Without UI, Shutdown() can simply be started in a new thread
-    NewThread(Shutdown, NULL);
-#endif
+    fRequestShutdown = true;
 }
-static bool
-    fExit;
+
+bool ShutdownRequested()
+{
+    return fRequestShutdown;
+}
+
+void WaitForShutdown(boost::thread_group* threadGroup)
+{
+    bool fShutdown = ShutdownRequested();
+    // Tell the main threads to shutdown.
+    while (!fShutdown)
+    {
+        MilliSleep(200);
+        fShutdown = ShutdownRequested();
+    }
+    if (threadGroup)
+    {
+        Interrupt(*threadGroup);
+        threadGroup->join_all();
+    }
+}
+
+void Interrupt(boost::thread_group& threadGroup)
+{
+    InterruptTorControl();
+    if (g_connman)
+        g_connman->Interrupt();
+    threadGroup.interrupt_all();
+}
 
 void Shutdown(void* parg)
 {
-    if (fDebug)
-        LogPrintf("Shutdown : In progress...\n");
-    
-    static CCriticalSection 
-        cs_Shutdown;
+    LogPrintf("%s: In progress...\n", __func__);
+    static CCriticalSection cs_Shutdown;
+    TRY_LOCK(cs_Shutdown, lockShutdown);
+    if (!lockShutdown)
+        return;
 
-    static bool 
-        fTaken;
-
-    // Make this thread recognisable as the shutdown thread
+    /// Note: Shutdown() must be able to handle cases in which initialization failed part of the way,
+    /// for example if the data directory was found to be locked.
+    /// Be sure that anything that writes files or flushes caches only does this if the respective
+    /// module was initialized.
     RenameThread("yacoin-shutoff");
+    mempool.AddTransactionsUpdated(1);
 
-    bool 
-        fFirstThread = false;
+    MapPort(false);
+    bitdb.Flush(false);
+
+    // Stop all background threads: miner, rpc, script validation and hash calculation
+    StopNode();
+
+    // Because these depend on each-other, we make sure that neither can be
+    // using the other before destroying them.
+    UnregisterValidationInterface(peerLogic.get());
+    if(g_connman) g_connman->Stop();
+    peerLogic.reset();
+    g_connman.reset();
+    StopTorControl();
+
     {
-        TRY_LOCK(cs_Shutdown, lockShutdown);
-        if (lockShutdown)
-        {
-            fFirstThread = !fTaken;
-            fTaken = true;
-        }
+        LOCK(cs_main);
+        if (pwalletMain)
+            pwalletMain->SetBestChain(chainActive.GetLocator());
     }
-    if (fFirstThread)
-    {
-        fShutdown = true;
-        fRequestShutdown = true;
-//        CTxDB().Close();
-        bitdb.Flush(false);
-        StopNode();
-        {
-            LOCK(cs_main);
-            if (pwalletMain)
-                pwalletMain->SetBestChain(chainActive.GetLocator());
-        }
-        bitdb.Flush(true);
+    bitdb.Flush(true);
+
 #if !defined(WIN32) && !defined(QT_GUI)
     if (fDaemon)
     {
         boost::filesystem::remove(GetPidFile());
     }
 #endif
-        CloseWallets();
-        if (fDebug)
-            if (fPrintToConsole)
-                LogPrintf("wallet unregistered\n");
-        NewThread(ExitTimeout, NULL);
-        if (fDebug)
-            if (fPrintToConsole)
-                LogPrintf("exit thread started\n");
-        Sleep(50);
-        if (fDebug)
-            LogPrintf("Yacoin exited\n\n");
-        fExit = true;
-#ifndef QT_GUI
-        // ensure non-UI client gets exited here, but let yacoin-qt reach 'return 0;' in bitcoin.cpp
-    #ifdef _MSC_VER
-        return;
-    #else
-        exit(0);
-    #endif        
-#endif
-    }
-    else
-    {
-        while (!fExit)
-            Sleep(500);
-        Sleep(100);
-        ExitThread(0);
-    }
+    CloseWallets();
+    LogPrintf("wallet unregistered\n");
+    LogPrintf("Yacoin exited\n\n");
 }
 #endif
 
@@ -247,15 +242,6 @@ static int WindowsHandleSigterm( unsigned long the_signal )
 void HandleSIGHUP(int)
 {
     fReopenDebugLog = true;
-}
-
-
-
-void Interrupt(boost::thread_group& threadGroup)
-{
-    if (g_connman)
-        g_connman->Interrupt();
-    threadGroup.interrupt_all();
 }
 
 //////////////////////////////////////////////////////////////////////////////
@@ -357,8 +343,17 @@ bool AppInit(int argc, char* argv[])
     {
         Interrupt(threadGroup);
         threadGroup.join_all();
-        Shutdown(NULL);
     }
+    else
+    {
+        WaitForShutdown(&threadGroup);
+    }
+#ifdef QT_GUI
+    // ensure we leave the Qt main loop for a clean GUI exit (Shutdown() is called in bitcoin.cpp afterwards)
+    uiInterface.QueueShutdown();
+#else
+    Shutdown(NULL);
+#endif
     return fRet;
 }
 
@@ -1559,17 +1554,7 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
      // Add wallet transactions that aren't already in a block to mapTransactions
     pwalletMain->ReacceptWalletTransactions();
 
-#if !defined(QT_GUI)
-    // Loop until process is exit()ed from shutdown() function,
-    // called from ThreadRPCServer thread when a "stop" command is received.
-    while (1)
-    {
-        Sleep(5 * 1000);
-        if(fExit)
-            break;
-    }
-#endif
-    return true;
+    return !fRequestShutdown;
 }
 #ifdef _MSC_VER
     #include "msvc_warnings.pop.h"

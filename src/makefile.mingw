@@ -61,7 +61,8 @@ INCLUDEPATHS= \
 -I'../../../sw/db-4.8.30.NC/include' \
 -I'../../../sw/openssl-1.0.1u/include' \
 -I'../../../sw/miniupnpc-1.9.20150206/include' \
--I'../../../sw/qrencode-3.4.4/include'
+-I'../../../sw/qrencode-3.4.4/include' \
+-I'../../../sw/event2/include'
 
 LIBPATHS= \
 -L'../../../sw/boost_1_58_0/lib' \
@@ -69,7 +70,8 @@ LIBPATHS= \
 -L'../../../sw/openssl-1.0.1u/lib' \
 -L'leveldb' \
 -L'../../../sw/miniupnpc-1.9.20150206/lib' \
--L'../../../sw/qrencode-3.4.4/lib'
+-L'../../../sw/qrencode-3.4.4/lib' \
+-L'../../../sw/event2/lib'
 
 LIBS= \
 -lmingw32 \
