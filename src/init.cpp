@@ -408,114 +408,135 @@ bool static Bind(const CService &addr, bool fError = true)
 // Core-specific options shared between UI and daemon
 std::string HelpMessage()
 {
-    string strUsage = _("Options:") + "\n" +
-        "  -?                     " + _("This help message") + "\n" +
-        "  -v                     " + _("Yacoin version") + "\n" +
-        "  -conf=<file>           " + _("Specify configuration file (default: yacoin.conf)") + "\n" +
-        "  -pid=<file>            " + _("Specify pid file (default: yacoind.pid)") + "\n" +
-        "  -datadir=<dir>         " + _("Specify data directory") + "\n" +
-        "  -wallet=<file>         " + _("Specify wallet file (within data directory)") + "\n" +
-        "  -dbcache=<n>           " + _("Set database cache size in megabytes (default: 25)") + "\n" +
-        "  -dblogsize=<n>         " + _("Set database disk log size in megabytes (default: 100)") + "\n" +
-        "  -timeout=<n>           " + _("Specify connection timeout in milliseconds (default: 5000)") + "\n" +
-        "  -proxy=<ip:port>       " + _("Connect through socks proxy") + "\n" +
-        "  -socks=<n>             " + _("Select the version of socks proxy to use (4-5, default: 5)") + "\n" +
-        "  -tor=<ip:port>         " + _("Use proxy to reach tor hidden services (default: same as -proxy)") + "\n"
-        "  -torname=<host.onion>  " + _("Send the specified hidden service name when connecting to Tor nodes (default: none)") + "\n"
-        "  -dns                   " + _("Allow DNS lookups for -addnode, -seednode and -connect") + "\n" +
-        "  -maxconnections=<n>    " + _("Maintain at most <n> connections to peers (default: 125)") + "\n" +
-        "  -addnode=<ip>          " + _("Add a node to connect to and attempt to keep the connection open") + "\n" +
-        "  -tokenindex            " + _("Keep an index of tokens. Requires a -reindex-token.") + "\n" +
-        "  -addressindex          " + _("Maintain a full address index, used to query for the balance, txids and unspent outputs for addresses. Require a -reindex-token or -reindex-blockindex") + "\n" +
-        "  -connect=<ip>          " + _("Connect only to the specified node(s)") + "\n" +
-        "  -seednode=<ip>         " + _("Connect to a node to retrieve peer addresses, and disconnect") + "\n" +
-        "  -externalip=<ip>       " + _("Specify your own public address") + "\n" +
-        "  -onlynet=<net>         " + _("Only connect to nodes in network <net> (IPv4, IPv6 or Tor)") + "\n" +
-        "  -discover              " + _("Discover own IP address (default: 1 when listening and no -externalip)") + "\n" +
-        "  -listen                " + _("Accept connections from outside (default: 1 if no -proxy or -connect)") + "\n" +
-        "  -bind=<addr>           " + _("Bind to given address. Use [host]:port notation for IPv6") + "\n" +
-        "  -dnsseed               " + _("Find peers using DNS lookup (default: 1)") + "\n" +
-        "  -cppolicy              " + _("Sync checkpoints policy (default: strict)") + "\n" +
-        "  -banscore=<n>          " + _("Threshold for disconnecting misbehaving peers (default: 100)") + "\n" +
-        "  -bantime=<n>           " + _("Number of seconds to keep misbehaving peers from reconnecting (default: 86400)") + "\n" +
-        "  -maxreceivebuffer=<n>  " + _("Maximum per-connection receive buffer, <n>*1000 bytes (default: 5000)") + "\n" +
-        "  -maxsendbuffer=<n>     " + _("Maximum per-connection send buffer, <n>*1000 bytes (default: 1000)") + "\n" +
-        "  -reindex-onlyheadersync          " + _("Upgrade block index to have new field `nstatus`, it just takes a few minutes") + "\n" +
-        "  -reindex-blockindex              " + _("Rebuild block index and transaction index from the blk*.dat files on disk, it takes very long time (around 24->48 hours)") + "\n" +
-        "  -reindex-token                   " + _("Rebuild token index from the blk*.dat files on disk, it takes around 6->9 hours") + "\n" +
-        "  -initSyncDownloadTimeout=<n>     " + _("Headers/block download timeout in seconds (default: 600)") + "\n" +
-        "  -initSyncMaximumBlocksInDownloadPerPeer=<n>     " + _("Maximum number of blocks being downloaded at a time from one peer (default: 500)") + "\n" +
-        "  -initSyncBlockDownloadWindow=<n>     " + _("Block download windows (default: initSyncMaximumBlocksInDownloadPerPeer * 64)") + "\n" +
-        "  -initSyncTriggerGetBlocks=<n>     " + _("When number of synced headers - number of synced blocks, send getblocks message to all peers to download block (default: 10000)") + "\n" +
+    // When adding new options to the categories, please keep and ensure alphabetical ordering.
+    // Do not translate _(...) -help-debug options, Many technical terms, and only a very small audience, so is unnecessary stress to translators.
+    std::string strUsage = HelpMessageGroup(_("Options:"));
+    strUsage += HelpMessageOpt("-?", _("Print this help message and exit"));
+    strUsage += HelpMessageOpt("-version", _("Print version and exit"));
+    strUsage += HelpMessageOpt("-conf=<file>", strprintf(_("Specify configuration file (default: %s)"), YACOIN_CONF_FILENAME));
+    strUsage += HelpMessageOpt("-pid=<file>", strprintf(_("Specify pid file (default: %s)"), YACOIN_PID_FILENAME));
+    strUsage += HelpMessageOpt("-datadir=<dir>", _("Specify data directory"));
+    strUsage += HelpMessageOpt("-blocknotify=<cmd>", _("Execute command when the best block changes (%s in cmd is replaced by block hash)"));
+    strUsage += HelpMessageOpt("-blocksonly", strprintf(_("Whether to operate in a blocks only mode (default: %u)"), DEFAULT_BLOCKSONLY));
+#if !defined(WIN32) && !defined(QT_GUI)
+    strUsage += HelpMessageOpt("-daemon", _("Run in the background as a daemon and accept commands"));
+#endif
+    strUsage += HelpMessageOpt("-dbcache=<n>", _("Set database cache size in megabytes (default: 25)"));
+    strUsage += HelpMessageOpt("-loadblock=<file>", _("Imports blocks from external blk000??.dat file on startup"));
+    strUsage += HelpMessageOpt("-maxorphantx=<n>", strprintf(_("Keep at most <n> unconnectable transactions in memory (default: %u)"), DEFAULT_MAX_ORPHAN_TRANSACTIONS));
+    strUsage += HelpMessageOpt("-par=<n>", _("Set the number of script verification threads (1-16, 0=auto, default: 0)"));
+    strUsage += HelpMessageOpt("-reindex-onlyheadersync", _("Upgrade block index to have new field `nstatus`, it just takes a few minutes"));
+    strUsage += HelpMessageOpt("-reindex-blockindex", _("Rebuild block index and transaction index from the blk*.dat files on disk, it takes very long time (around 24->48 hours)"));
+    strUsage += HelpMessageOpt("-reindex-token", _("Rebuild token index from the blk*.dat files on disk, it takes around 6->9 hours"));
+
+    strUsage += HelpMessageGroup(_("Connection options:"));
+    strUsage += HelpMessageOpt("-addnode=<ip>", _("Add a node to connect to and attempt to keep the connection open"));
+    strUsage += HelpMessageOpt("-banscore=<n>", strprintf(_("Threshold for disconnecting misbehaving peers (default: %u)"), DEFAULT_BANSCORE_THRESHOLD));
+    strUsage += HelpMessageOpt("-bantime=<n>", strprintf(_("Number of seconds to keep misbehaving peers from reconnecting (default: %u)"), DEFAULT_MISBEHAVING_BANTIME));
+    strUsage += HelpMessageOpt("-bind=<addr>", _("Bind to given address and always listen on it. Use [host]:port notation for IPv6"));
+    strUsage += HelpMessageOpt("-connect=<ip>", _("Connect only to the specified node(s); -connect=0 disables automatic connections"));
+    strUsage += HelpMessageOpt("-discover", _("Discover own IP addresses (default: 1 when listening and no -externalip or -proxy)"));
+    strUsage += HelpMessageOpt("-dns", _("Allow DNS lookups for -addnode, -seednode and -connect") + " " + strprintf(_("(default: %u)"), DEFAULT_NAME_LOOKUP));
+    strUsage += HelpMessageOpt("-dnsseed", _("Query for peer addresses via DNS lookup, if low on addresses (default: 1 unless -connect used)"));
+    strUsage += HelpMessageOpt("-externalip=<ip>", _("Specify your own public address"));
+    strUsage += HelpMessageOpt("-forcednsseed", strprintf(_("Always query for peer addresses via DNS lookup (default: %u)"), DEFAULT_FORCEDNSSEED));
+    strUsage += HelpMessageOpt("-listen", _("Accept connections from outside (default: 1 if no -proxy or -connect)"));
+    strUsage += HelpMessageOpt("-listenonion", strprintf(_("Automatically create Tor hidden service (default: %d)"), DEFAULT_LISTEN_ONION));
+    strUsage += HelpMessageOpt("-maxconnections=<n>", strprintf(_("Maintain at most <n> connections to peers (default: %u)"), DEFAULT_MAX_PEER_CONNECTIONS));
+    strUsage += HelpMessageOpt("-maxreceivebuffer=<n>", strprintf(_("Maximum per-connection receive buffer, <n>*1000 bytes (default: %u)"), DEFAULT_MAXRECEIVEBUFFER));
+    strUsage += HelpMessageOpt("-maxsendbuffer=<n>", strprintf(_("Maximum per-connection send buffer, <n>*1000 bytes (default: %u)"), DEFAULT_MAXSENDBUFFER));
+    strUsage += HelpMessageOpt("-maxtimeadjustment", strprintf(_("Maximum allowed median peer time offset adjustment. Local perspective of time may be influenced by peers forward or backward by this amount. (default: %u seconds)"), DEFAULT_MAX_TIME_ADJUSTMENT));
+    strUsage += HelpMessageOpt("-onion=<ip:port>", strprintf(_("Use separate SOCKS5 proxy to reach peers via Tor hidden services (default: %s)"), "-proxy"));
+    strUsage += HelpMessageOpt("-onlynet=<net>", _("Only connect to nodes in network <net> (ipv4, ipv6 or onion)"));
+    strUsage += HelpMessageOpt("-port=<port>", _("Listen for connections on <port> (default: 7688 or testnet: 17688)"));
+    strUsage += HelpMessageOpt("-proxy=<ip:port>", _("Connect through SOCKS5 proxy"));
+    strUsage += HelpMessageOpt("-proxyrandomize", strprintf(_("Randomize credentials for every proxy connection. This enables Tor stream isolation (default: %u)"), DEFAULT_PROXYRANDOMIZE));
+    strUsage += HelpMessageOpt("-seednode=<ip>", _("Connect to a node to retrieve peer addresses, and disconnect"));
+    strUsage += HelpMessageOpt("-timeout=<n>", strprintf(_("Specify connection timeout in milliseconds (minimum: 1, default: %d)"), DEFAULT_CONNECT_TIMEOUT));
+    strUsage += HelpMessageOpt("-torcontrol=<ip>:<port>", strprintf(_("Tor control port to use if onion listening enabled (default: %s)"), DEFAULT_TOR_CONTROL));
+    strUsage += HelpMessageOpt("-torpassword=<pass>", _("Tor control port password (default: empty)"));
 #ifdef USE_UPNP
 #if USE_UPNP
-        "  -upnp                  " + _("Use UPnP to map the listening port (default: 1 when listening)") + "\n" +
+    strUsage += HelpMessageOpt("-upnp", _("Use UPnP to map the listening port (default: 1 when listening and no -proxy)"));
 #else
-        "  -upnp                  " + _("Use UPnP to map the listening port (default: 0)") + "\n" +
+    strUsage += HelpMessageOpt("-upnp", strprintf(_("Use UPnP to map the listening port (default: %u)"), 0));
 #endif
 #endif
-        "  -detachdb              " + _("Detach block and address databases. Increases shutdown time (default: 0)") + "\n" +
+    strUsage += HelpMessageOpt("-whitebind=<addr>", _("Bind to given address and whitelist peers connecting to it. Use [host]:port notation for IPv6"));
+    strUsage += HelpMessageOpt("-whitelist=<IP address or network>", _("Whitelist peers connecting from the given IP address (e.g. 1.2.3.4) or CIDR notated network (e.g. 1.2.3.0/24). Can be specified multiple times.") +
+        " " + _("Whitelisted peers cannot be DoS banned and their transactions are always relayed, even if they are already in the mempool, useful e.g. for a gateway"));
+    strUsage += HelpMessageOpt("-maxuploadtarget=<n>", strprintf(_("Tries to keep outbound traffic under the given target (in MiB per 24h), 0 = no limit (default: %d)"), DEFAULT_MAX_UPLOAD_TARGET));
 
-#ifdef DB_LOG_IN_MEMORY
-        "  -memorylog             " + _("Use in-memory logging for block index database (default: 1)") + "\n" +
-#endif
+    strUsage += HelpMessageGroup(_("Wallet options:"));
+    strUsage += HelpMessageOpt("-keypool=<n>", strprintf(_("Set key pool size to <n> (default: %u)"), DEFAULT_KEYPOOL_SIZE));
+    strUsage += HelpMessageOpt("-paytxfee=<amt>", _("Fee per KB to add to transactions you send"));
+    strUsage += HelpMessageOpt("-mininput=<amt>", strprintf(_("When creating transactions, ignore inputs with value less than this (default: %s)"), FormatMoney(MIN_TXOUT_AMOUNT)));
+    strUsage += HelpMessageOpt("-rescan", _("Rescan the block chain for missing wallet transactions on startup"));
+    strUsage += HelpMessageOpt("-salvagewallet", _("Attempt to recover private keys from a corrupt wallet on startup"));
+    strUsage += HelpMessageOpt("-upgradewallet", _("Upgrade wallet to latest format on startup"));
+    strUsage += HelpMessageOpt("-wallet=<file>", _("Specify wallet file (within data directory)"));
+    strUsage += HelpMessageOpt("-walletnotify=<cmd>", _("Execute command when a wallet transaction changes (%s in cmd is replaced by TxID)"));
+    strUsage += HelpMessageOpt("-dblogsize=<n>", _("Flush wallet database activity from memory to disk log every <n> megabytes (default: 100)"));
 
-        "  -paytxfee=<amt>        " + _("Fee per KB to add to transactions you send") + "\n" +
-        "  -mininput=<amt>        " + str(boost::format(_("When creating transactions, ignore inputs with value less than this (default: %s)")) % FormatMoney(MIN_TXOUT_AMOUNT)) + "\n" +
-#ifdef QT_GUI
-        "  -server                " + _("Accept command line and JSON-RPC commands") + "\n" +
-#endif
-#if !defined(WIN32) && !defined(QT_GUI)
-        "  -daemon                " + _("Run in the background as a daemon and accept commands") + "\n" +
-#endif
-        "  -testnet               " + _("Use the test network") + "\n" +
-        "  -testnetNewLogic       " + _("Use the test network New Logic") + "\n" +
-        "  -testnetnewlogicblocknumber=<number> " + _("New Logic starting at block = <number>") + "\n" +
-        "  -debug                 " + _("Output extra debugging information. Implies all other -debug* options") + "\n" +
-        "  -debugnet              " + _("Output extra network debugging information") + "\n" +
-        "  -logtimestamps         " + _("Prepend debug output with timestamp") + "\n" +
-        "  -shrinkdebugfile       " + _("Shrink debug.log file on client startup (default: 1 when no -debug)") + "\n" +
-        "  -printtoconsole        " + _("Send trace/debug info to console instead of debug.log file") + "\n" +
-#ifdef WIN32
-        "  -printtodebugger       " + _("Send trace/debug info to debugger") + "\n" +
-#endif
-        "  -btcyacprovider        " + _("Add a BTC to YAC price provider, entered as") + "\n" +
-        "                         domain,key,argument,offset,port" + "\n" 
-        "                         For example: where the url is" + "\n"
-        "                         http://pubapi2.cryptsy.com/api.php?method=singlemarketdata&marketid=11" + "\n"
-        "                         one would enter" + "\n"
-        "                         pubapi2.cryptsy.com,lasttradeprice,/api.php?method=singlemarketdata&marketid=11,3,80" + "\n"
-        "                         see https://www.cryptsy.com/pages/publicapi" + "\n" +
-        "  -usdbtcprovider        " + _("Add a USD to BTC price provider, entered as") + "\n" +
-        "                         domain,key,argument,offset" + "\n" +
-        "                         For example: where the url is" + "\n" +
-        "                         http://pubapi2.cryptsy.com/api.php?method=singlemarketdata&marketid=2" + "\n" +
-        "                         one would enter" + "\n" +
-        "                         pubapi2.cryptsy.com,lastdata,/api.php?method=singlemarketdata&marketid=2,3,80" + "\n" +
-        "                         see https://www.cryptsy.com/pages/publicapi" + "\n" +
-        "  -rpcuser=<user>        " + _("Username for JSON-RPC connections") + "\n" +
-        "  -rpcpassword=<pw>      " + _("Password for JSON-RPC connections") + "\n" +
-        "  -port=<port>           " + _("Listen for connections on <port> (default: 7688 or testnet: 17688)") + "\n" +
-        "  -rpcport=<port>        " + _("Listen for JSON-RPC connections on <port> (default: 7687 or testnet: 17687)") + "\n" +
-        "  -rpcallowip=<ip>       " + _("Allow JSON-RPC connections from specified IP address") + "\n" +
-        "  -rpcconnect=<ip>       " + _("Send commands to node running on <ip> (default: 127.0.0.1)") + "\n" +
-        "  -blocknotify=<cmd>     " + _("Execute command when the best block changes (%s in cmd is replaced by block hash)") + "\n" +
-        "  -walletnotify=<cmd>    " + _("Execute command when a wallet transaction changes (%s in cmd is replaced by TxID)") + "\n" +
-        "  -confchange            " + _("Require a confirmations for change (default: 0)") + "\n" +
-        "  -upgradewallet         " + _("Upgrade wallet to latest format") + "\n" +
-        "  -keypool=<n>           " + _("Set key pool size to <n> (default: 100)") + "\n" +
-        "  -rescan                " + _("Rescan the block chain for missing wallet transactions") + "\n" +
-        "  -salvagewallet         " + _("Attempt to recover private keys from a corrupt wallet.dat") + "\n" +
-        "  -checkblocks=<n>       " + _("How many blocks to check at startup (default: 750, 0 = all)") + "\n" +
-        "  -checklevel=<n>        " + _("How thorough the block verification is (0-6, default: 1)") + "\n" +
-        "  -par=N                 " + _("Set the number of script verification threads (1-16, 0=auto, default: 0)") + "\n" +
-        "  -hashcalcthreads=N     " + _("Set the number of threads which calculate hash (maximum threads = number of cpu cores, default: 1)") + "\n" +
-        "  -loadblock=<file>      " + _("Imports blocks from external blk000?.dat file") + "\n" +
-                                        "\n" + _("SSL options: (see the Bitcoin Wiki for SSL setup instructions)") + "\n" +
-        "  -rpcssl                                  " + _("Use OpenSSL (https) for JSON-RPC connections") + "\n" +
-        "  -rpcsslcertificatechainfile=<file.cert>  " + _("Server certificate file (default: server.cert)") + "\n" +
-        "  -rpcsslprivatekeyfile=<file.pem>         " + _("Server private key (default: server.pem)") + "\n" +
-        "  -rpcsslciphers=<ciphers>                 " + _("Acceptable ciphers (default: TLSv1+HIGH:!SSLv2:!aNULL:!eNULL:!AH:!3DES:@STRENGTH)") + "\n";
+    strUsage += HelpMessageGroup(_("Debugging/Testing options:"));
+    strUsage += HelpMessageOpt("-uacomment=<cmt>", _("Append comment to the user agent string"));
+    strUsage += HelpMessageOpt("-checkblocks=<n>", _("How many blocks to check at startup (default: 750)"));
+    strUsage += HelpMessageOpt("-checklevel=<n>", _("How thorough the block verification of -checkblocks is (0-6, default: 1)"));
+    strUsage += HelpMessageOpt("-debug=<category>", strprintf(_("Output debugging information (default: %u, supplying <category> is optional)"), 0) + ". " +
+        _("If <category> is not supplied or if <category> = 1, output all debugging information.") + " " + _("<category> can be:") + " " + ListLogCategories() + ".");
+    strUsage += HelpMessageOpt("-logips", strprintf(_("Include IP addresses in debug output (default: %u)"), DEFAULT_LOGIPS));
+    strUsage += HelpMessageOpt("-logtimestamps", strprintf(_("Prepend debug output with timestamp (default: %u)"), DEFAULT_LOGTIMESTAMPS));
+    strUsage += HelpMessageOpt("-logtimemicros", strprintf("Add microsecond precision to debug timestamps (default: %u)", DEFAULT_LOGTIMEMICROS));
+    strUsage += HelpMessageOpt("-maxtipage=<n>", strprintf("Maximum tip age in seconds to consider node in initial block download (default: %u)", DEFAULT_MAX_TIP_AGE));
+    strUsage += HelpMessageOpt("-printtoconsole", _("Send trace/debug info to console instead of debug.log file"));
+    strUsage += HelpMessageOpt("-printtodebugger", _("Send trace/debug info to debug.log file"));
+    strUsage += HelpMessageOpt("-printpriority", _("Log transaction fee per kB when mining blocks (default: false)"));
+    strUsage += HelpMessageOpt("-shrinkdebugfile", _("Shrink debug.log file on client startup (default: 1 when no -debug)"));
+
+    strUsage += HelpMessageGroup(_("RPC server options:"));
+    strUsage += HelpMessageOpt("-server", _("Accept command line and JSON-RPC commands"));
+    strUsage += HelpMessageOpt("-rpcuser=<user>", _("Username for JSON-RPC connections"));
+    strUsage += HelpMessageOpt("-rpcpassword=<pw>", _("Password for JSON-RPC connections"));
+    strUsage += HelpMessageOpt("-rpcport=<port>", _("Listen for JSON-RPC connections on <port> (default: 7687 or testnet: 17687)"));
+    strUsage += HelpMessageOpt("-rpcallowip=<ip>", _("Allow JSON-RPC connections from specified source. Valid for <ip> are a single IP (e.g. 1.2.3.4), a network/netmask (e.g. 1.2.3.4/255.255.255.0) or a network/CIDR (e.g. 1.2.3.4/24). This option can be specified multiple times"));
+    strUsage += HelpMessageOpt("-rpcconnect=<ip>", _("Send commands to node running on <ip> (default: 127.0.0.1)"));
+    strUsage += HelpMessageOpt("-rpcssl", _("Use OpenSSL (https) for JSON-RPC connections"));
+    strUsage += HelpMessageOpt("-rpcsslcertificatechainfile=<file.cert>", _("Server certificate file (default: server.cert)"));
+    strUsage += HelpMessageOpt("-rpcsslprivatekeyfile=<file.pem>", _("Server private key (default: server.pem)"));
+    strUsage += HelpMessageOpt("-rpcsslciphers=<ciphers>", _("Acceptable ciphers (default: TLSv1+HIGH:!SSLv2:!aNULL:!eNULL:!AH:!3DES:@STRENGTH)"));
+
+    strUsage += HelpMessageGroup(_("Other options:"));
+    strUsage += HelpMessageOpt("-tokenindex", _("Keep an index of tokens. Requires a -reindex-token."));
+    strUsage += HelpMessageOpt("-addressindex", _("Maintain a full address index, used to query for the balance, txids and unspent outputs for addresses. Require a -reindex-token or -reindex-blockindex"));
+    strUsage += HelpMessageOpt("-cppolicy", _("Sync checkpoints policy (default: strict)"));
+    strUsage += HelpMessageOpt("-initSyncDownloadTimeout=<n>", _("Headers/block download timeout in seconds (default: 600)"));
+    strUsage += HelpMessageOpt("-initSyncMaximumBlocksInDownloadPerPeer=<n>", _("Maximum number of blocks being downloaded at a time from one peer (default: 500)"));
+    strUsage += HelpMessageOpt("-initSyncBlockDownloadWindow=<n>", _("Block download windows (default: initSyncMaximumBlocksInDownloadPerPeer * 64)"));
+    strUsage += HelpMessageOpt("-initSyncTriggerGetBlocks=<n>", _("When number of synced headers - number of synced blocks, send getblocks message to all peers to download block (default: 10000)"));
+    strUsage += HelpMessageOpt("-detachdb", _("Detach block and address databases. Increases shutdown time (default: 0)"));
+    strUsage += HelpMessageOpt("-memorylog", _("Use in-memory logging for block index database (default: 1)"));
+    strUsage += HelpMessageOpt("-testnet", _("Use the test network"));
+    strUsage += HelpMessageOpt("-testnetnewlogicblocknumber=<number>", _("New Logic starting at block = <number>"));
+    strUsage += HelpMessageOpt(
+        "-btcyacprovider",
+        _("Add a BTC to YAC price provider, entered as "
+          "domain,key,argument,offset,port. For example: where the url is "
+          "http://pubapi2.cryptsy.com/"
+          "api.php?method=singlemarketdata&marketid=11 one would enter "
+          "pubapi2.cryptsy.com,lasttradeprice,/"
+          "api.php?method=singlemarketdata&marketid=11,3,80 . See "
+          "https://www.cryptsy.com/pages/publicapi"));
+    strUsage += HelpMessageOpt(
+        "-usdbtcprovider",
+        _("Add a USD to BTC price provider, entered as "
+          "domain,key,argument,offset. For example: where the url is "
+          "http://pubapi2.cryptsy.com/"
+          "api.php?method=singlemarketdata&marketid=2 one would enter "
+          "pubapi2.cryptsy.com,lastdata,/"
+          "api.php?method=singlemarketdata&marketid=2,3,80 . See "
+          "https://www.cryptsy.com/pages/publicapi"));
+    strUsage += HelpMessageOpt("-confchange", _("Require a confirmations for change (default: 0)"));
+    strUsage += HelpMessageOpt("-hashcalcthreads=N", strprintf("Set the number of threads which calculate hash (maximum threads = number of cpu cores, default: %d)", (int)boost::thread::hardware_concurrency() - 1));
 
     return strUsage;
 }
@@ -575,7 +596,7 @@ bool AppInitParameterInteraction()
     HEADER_BLOCK_DIFFERENCES_TRIGGER_GETBLOCKS = gArgs.GetArg("-initSyncTriggerGetBlocks", 10000);
 
     int maximumHashCalcThread = boost::thread::hardware_concurrency();
-    nHashCalcThreads = (int)(gArgs.GetArg("-hashcalcthreads", 1));
+    nHashCalcThreads = (int)(gArgs.GetArg("-hashcalcthreads", maximumHashCalcThread - 1));
     if (nHashCalcThreads <= 0)
         nHashCalcThreads = 1;
     else if (nHashCalcThreads > maximumHashCalcThread)
@@ -662,11 +683,8 @@ bool AppInitParameterInteraction()
 
     fConfChange = gArgs.GetBoolArg("-confchange", false);
 
-    if (gArgs.IsArgSet("-mininput"))
-    {
-        if (!ParseMoney(gArgs.GetArg("-mininput", ""), nMinimumInputValue))
-            return InitError(strprintf(_("Invalid amount for -mininput=<amount>: '%s'"), gArgs.GetArg("-mininput", "").c_str()));
-    }
+    if (!ParseMoney(gArgs.GetArg("-mininput", FormatMoney(MIN_TXOUT_AMOUNT)), nMinimumInputValue))
+        return InitError(strprintf(_("Invalid amount for -mininput=<amount>: '%s'"), gArgs.GetArg("-mininput", FormatMoney(MIN_TXOUT_AMOUNT))));
 
     nMaxTipAge = gArgs.GetArg("-maxtipage", DEFAULT_MAX_TIP_AGE);
 

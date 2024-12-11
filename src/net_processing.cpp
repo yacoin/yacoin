@@ -126,7 +126,7 @@ void StopNode()
             LogPrintf("ThreadsRPCServer still running\n");
 
         if (vnThreadsRunning[THREAD_MINER] > 0)
-            LogPrintf("ThreadStakeMinter still running\n");
+            LogPrintf("ThreadMiner still running\n");
 
         if (vnThreadsRunning[THREAD_SCRIPTCHECK] > 0)
             LogPrintf("ThreadScriptCheck still running\n");

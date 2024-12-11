@@ -23,6 +23,8 @@
 #endif
 #include "streams.h"
 
+static const unsigned int DEFAULT_KEYPOOL_SIZE = 100;
+
 //extern unsigned int nStakeMaxAge;
 extern bool fWalletUnlockMintOnly;
 extern bool fConfChange;

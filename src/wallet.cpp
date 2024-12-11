@@ -3449,7 +3449,7 @@ bool CWallet::NewKeyPool(unsigned int nSize)
         if (nSize > 0)
             nKeys = nSize;
         else
-            nKeys = max< uint64_t>(gArgs.GetArg("-keypool", 100), 0);
+            nKeys = max< uint64_t>(gArgs.GetArg("-keypool", DEFAULT_KEYPOOL_SIZE), 0);
 
         for (uint64_t i = 0; i < nKeys; i++)
         {
@@ -3477,7 +3477,7 @@ bool CWallet::TopUpKeyPool(unsigned int nSize)
         if (nSize > 0)
             nTargetSize = nSize;
         else
-            nTargetSize = max< uint64_t>(gArgs.GetArg("-keypool", 100), 0);
+            nTargetSize = max< uint64_t>(gArgs.GetArg("-keypool", DEFAULT_KEYPOOL_SIZE), 0);
 
         while (setKeyPool.size() < (nTargetSize + 1))
         {

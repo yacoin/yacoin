@@ -458,10 +458,6 @@ extern ::int64_t
 extern std::string strMiscWarning;
 extern unsigned char MAXIMUM_YAC1DOT0_N_FACTOR;
 
-#ifdef WIN32
-extern void DoProgress( int nCount, int nTotalToScan, ::int64_t n64MsStartTime );
-#endif
-
 extern unsigned long long getTotalSystemMemory( void );
 void PrintException(std::exception* pex, const char* pszThread);
 void ParseString(const std::string& str, char c, std::vector<std::string>& v);

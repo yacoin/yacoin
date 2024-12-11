@@ -312,12 +312,10 @@ const ::uint32_t
                         );
     #endif
 #endif
-            if (
-                (pindexPrev != chainActive.Tip()) ||
-                fShutdown
-               )
-                break;
         }
+
+        if ((pindexPrev != chainActive.Tip()) || fShutdown)
+            break;
     }
     memcpy(result, hash, 32);
     return *nOnce;
