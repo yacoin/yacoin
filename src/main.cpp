@@ -1943,8 +1943,10 @@ bool IsInitialBlockDownload()
         return true;
     if (chainActive.Height() < Checkpoints::GetTotalBlocksEstimate())
         return true;
+#ifndef LOW_DIFFICULTY_FOR_DEVELOPMENT
     if (chainActive.Tip()->GetBlockTime() < (GetTime() - nMaxTipAge))
         return true;
+#endif
     LogPrintf("Leaving InitialBlockDownload (latching to false)\n");
     latchToFalse.store(true, std::memory_order_relaxed);
     return false;
