@@ -244,137 +244,6 @@ void HandleSIGHUP(int)
     fReopenDebugLog = true;
 }
 
-//////////////////////////////////////////////////////////////////////////////
-//
-// Start
-//
-#if !defined(QT_GUI) && !defined(TESTS_ENABLED)
-bool AppInit(int argc, char* argv[])
-{
-    boost::thread_group threadGroup;
-    CScheduler scheduler;
-
-    bool fRet = false;
-    try
-    {
-        //
-        // Parameters
-        //
-        // If Qt is used, parameters/bitcoin.conf are parsed in qt/bitcoin.cpp's main()
-        gArgs.ParseParameters(argc, argv);
-        bool 
-            fTest_or_Main_Net_is_decided = false;
-
-        if (!boost::filesystem::is_directory(GetDataDir(fTest_or_Main_Net_is_decided)))
-        {
-            fprintf(stderr, "Error: Specified directory does not exist\n");
-            Shutdown(NULL);
-        }
-        try
-        {
-            gArgs.ReadConfigFile(gArgs.GetArg("-conf", YACOIN_CONF_FILENAME));
-        } catch (const std::exception& e) {
-            fprintf(stderr,"Error reading configuration file: %s\n", e.what());
-            return false;
-        }
-
-        if(gArgs.IsArgSet("-version") || gArgs.IsArgSet("-v"))
-        {
-            std::string msg = "Yacoin version: " + FormatFullVersion() + "\n\n";
-            fprintf(stdout, "%s", msg.c_str());
-            exit(0);
-        } else if (gArgs.IsArgSet("-?") || gArgs.IsArgSet("-h") || gArgs.IsArgSet("-help"))
-        {
-            // First part of help message is specific to yacoind / RPC client
-            std::string strUsage = _("Yacoin version") + " " + FormatFullVersion() + "\n\n" +
-                _("Usage:") + "\n" +
-                  "  yacoind [options]                     " + "\n" +
-                  "  yacoind [options] <command> [params]  " + _("Send command to -server or yacoind") + "\n" +
-                  "  yacoind [options] help                " + _("List commands") + "\n" +
-                  "  yacoind [options] help <command>      " + _("Get help for a command") + "\n";
-
-            strUsage += "\n" + HelpMessage();
-
-            fprintf(stdout, "%s", strUsage.c_str());
-#ifdef _MSC_VER
-            fRet = false;
-            //Shutdown(NULL);
-#else            
-            exit(0);
-#endif
-        }
-        else
-        {
-            bool 
-                fCommandLine = false;
-            // Command-line RPC
-            for (int i = 1; i < argc; ++i)
-            {
-                if (!IsSwitchChar(argv[i][0]) && !boost::algorithm::istarts_with(argv[i], "yacoin:"))
-                {
-                    fCommandLine = true;
-                }
-            }
-            if (fCommandLine)
-            {
-                int ret = CommandLineRPC(argc, argv);
-#ifdef _MSC_VER
-                if( 0 == ret )  // signifies a successful RPC call
-                {
-                    fRet = false;
-                }
-#else
-                exit(ret);
-#endif
-            }
-            else
-                fRet = AppInit2(threadGroup, scheduler);
-        }
-    }
-    catch(std::exception& e) 
-    {
-        PrintException(&e, "AppInit()");
-    } 
-    catch(...)
-    {
-        PrintException(NULL, "AppInit()");
-    }
-    if (!fRet)
-    {
-        Interrupt(threadGroup);
-        threadGroup.join_all();
-    }
-    else
-    {
-        WaitForShutdown(&threadGroup);
-    }
-#ifdef QT_GUI
-    // ensure we leave the Qt main loop for a clean GUI exit (Shutdown() is called in bitcoin.cpp afterwards)
-    uiInterface.QueueShutdown();
-#else
-    Shutdown(NULL);
-#endif
-    return fRet;
-}
-
-extern void noui_connect();
-int main(int argc, char* argv[])
-{
-    bool fRet = false;
-
-    nUpTimeStart = GetTime();
-    // Connect yacoind signal handlers
-    noui_connect();
-
-    fRet = AppInit(argc, argv);
-
-    if (fRet)
-        return 0;
-
-    return 1;
-}
-#endif
-
 bool static InitError(const std::string &str)
 {
     uiInterface.ThreadSafeMessageBox(str, _("Yacoin"), CClientUIInterface::OK | CClientUIInterface::MODAL);
@@ -763,89 +632,8 @@ void InitLogging()
     LogPrintf("fPrintToConsole = %d, fPrintToDebugLog = %d\n", fPrintToConsole, fPrintToDebugLog);
 }
 
-//_____________________________________________________________________________
-
-/** Initialize bitcoin.
- *  @pre Parameters should be parsed and config file should be read.
- */
-bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
+bool AppInitLockDataDirectory()
 {
-    // ********************************************************* Step 1: setup
-    // Set this early so that parameter interactions go to console
-    InitLogging();
-
-#ifdef _MSC_VER
-    // Turn off Microsoft heap dump noise
-    _CrtSetReportMode(_CRT_WARN, _CRTDBG_MODE_FILE);
-    _CrtSetReportFile(_CRT_WARN, CreateFileA("NUL", GENERIC_WRITE, 0, NULL, OPEN_EXISTING, 0, 0));
-#endif
-#if _MSC_VER >= 1400
-    // Disable confusing "helpful" text message on abort, Ctrl-C
-    _set_abort_behavior(0, _WRITE_ABORT_MSG | _CALL_REPORTFAULT);
-#endif
-#ifdef WIN32
-    // Enable Data Execution Prevention (DEP)
-    // Minimum supported OS versions: WinXP SP3, WinVista >= SP1, Win Server 2008
-    // A failure is non-critical and needs no further attention!
-#ifndef PROCESS_DEP_ENABLE
-// We define this here, because GCCs winbase.h limits this to _WIN32_WINNT >= 0x0601 (Windows 7),
-// which is not correct. Can be removed, when GCCs winbase.h is fixed!
-#define PROCESS_DEP_ENABLE 0x00000001
-#endif
-    typedef BOOL (WINAPI *PSETPROCDEPPOL)(DWORD);
-    PSETPROCDEPPOL setProcDEPPol = (PSETPROCDEPPOL)GetProcAddress(GetModuleHandleA("Kernel32.dll"), "SetProcessDEPPolicy");
-    if (setProcDEPPol != NULL) setProcDEPPol(PROCESS_DEP_ENABLE);
-#endif
-#ifndef WIN32
-    umask(077);
-
-    // Clean shutdown on SIGTERM
-    struct sigaction sa;
-    sa.sa_handler = HandleSIGTERM;
-    sigemptyset(&sa.sa_mask);
-    sa.sa_flags = 0;
-    sigaction(SIGTERM, &sa, NULL);
-    sigaction(SIGINT, &sa, NULL);
-
-    // Reopen debug.log on SIGHUP
-    struct sigaction sa_hup;
-    sa_hup.sa_handler = HandleSIGHUP;
-    sigemptyset(&sa_hup.sa_mask);
-    sa_hup.sa_flags = 0;
-    sigaction(SIGHUP, &sa_hup, NULL);
-#else
-    // what do we do for windows aborts or Ctl-Cs, etc.?
-    bool
-        fWeShouldBeConcerned = true;
-        
-    if( SetConsoleCtrlHandler( ( PHANDLER_ROUTINE )&WindowsHandleSigterm, true ) )
-        fWeShouldBeConcerned = false;    // success
-    else                        //exigency of wincon.h
-    {    //    // we failed!
-        LogPrintf(
-                    "\n"
-                    "Windows CCH failed?"
-                    "\n"
-                    ""
-                    );
-    }
-#endif
-
-    // ********************************************************* Step 2: parameter interactions
-    InitParameterInteraction();
-
-    // ********************************************************* Step 3: parameter-to-internal-flags
-    if (!AppInitParameterInteraction())
-    {
-        // InitError will have been called with detailed error, which ends up on console
-        exit(EXIT_FAILURE);
-    }
-
-    if (fPrintToDebugLog)
-        OpenDebugLog();
-
-    // ********************************************************* Step 4: application initialization: dir lock, daemonize, pidfile, debug log
-
     std::string // note fTestNet has been set and finally we 'discover' the 'data directory'!
         strDataDir = GetDataDir().string();
 
@@ -853,63 +641,61 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
 
     // strWalletFileName must be a plain filename without a directory
     if (
-        strWalletFileName != 
-        boost::filesystem::basename(strWalletFileName) + 
+        strWalletFileName !=
+        boost::filesystem::basename(strWalletFileName) +
         boost::filesystem::extension(strWalletFileName)
        )
         return InitError(
                          strprintf(
-                            _("Wallet %s resides outside data directory %s."), 
-                            strWalletFileName.c_str(), 
+                            _("Wallet %s resides outside data directory %s."),
+                            strWalletFileName.c_str(),
                             strDataDir.c_str()
                                   )
                         );
 
     // Make sure only a single Bitcoin process is using the data directory.
-    boost::filesystem::path 
+    boost::filesystem::path
         pathLockFile = GetDataDir() / ".lock";
 
     FILE
         * file = fopen(pathLockFile.string().c_str(), "a"); // empty lock file; created if it doesn't exist.
 
-    if (file)         
+    if (file)
         fclose(file);
 
-    static boost::interprocess::file_lock 
+    static boost::interprocess::file_lock
         lock(pathLockFile.string().c_str());
 
     if (!lock.try_lock())
         return InitError(
                          strprintf(
-                            _("Cannot obtain a lock on data directory %s.  Yacoin is probably already running."), 
+                            _("Cannot obtain a lock on data directory %s.  Yacoin is probably already running."),
                             strDataDir.c_str()
                                   )
                         );
+    return true;
+}
 
-#if !defined(WIN32) && !defined(QT_GUI)
-    if (fDaemon)
-    {
-        // Daemonize
-        pid_t pid = fork();
-        if (pid < 0)
-        {
-            fprintf(stderr, "Error: fork() returned %d errno %d\n", pid, errno);
-            return false;
-        }
-        if (pid > 0)
-        {
-            CreatePidFile(GetPidFile(), pid);
-            return true;
-        }
+//_____________________________________________________________________________
 
-        pid_t sid = setsid();
-        if (sid < 0)
-            fprintf(stderr, "Error: setsid() returned %d errno %d\n", sid, errno);
-    }
-#endif
+/** Initialize bitcoin.
+ *  @pre Parameters should be parsed and config file should be read.
+ */
+bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
+{
+    // ********************************************************* Step 4: application initialization: dir lock, daemonize, pidfile, debug log
+
+    std::string // note fTestNet has been set and finally we 'discover' the 'data directory'!
+        strDataDir = GetDataDir().string();
+
+    strWalletFileName = gArgs.GetArg("-wallet", "wallet.dat");
 
     if (gArgs.GetBoolArg("-shrinkdebugfile", !fDebug))
         ShrinkDebugFile();
+
+    if (fPrintToDebugLog)
+        OpenDebugLog();
+
     LogPrintf("\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n");
     LogPrintf("Yacoin version %s (%s)\n", FormatFullVersion(), CLIENT_DATE);
     LogPrintf("\n" );
@@ -1574,6 +1360,246 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
 
     return !fRequestShutdown;
 }
+
+bool AppInitBasicSetup()
+{
+#ifdef _MSC_VER
+    // Turn off Microsoft heap dump noise
+    _CrtSetReportMode(_CRT_WARN, _CRTDBG_MODE_FILE);
+    _CrtSetReportFile(_CRT_WARN, CreateFileA("NUL", GENERIC_WRITE, 0, NULL, OPEN_EXISTING, 0, 0));
+#endif
+#if _MSC_VER >= 1400
+    // Disable confusing "helpful" text message on abort, Ctrl-C
+    _set_abort_behavior(0, _WRITE_ABORT_MSG | _CALL_REPORTFAULT);
+#endif
+#ifdef WIN32
+    // Enable Data Execution Prevention (DEP)
+    // Minimum supported OS versions: WinXP SP3, WinVista >= SP1, Win Server 2008
+    // A failure is non-critical and needs no further attention!
+#ifndef PROCESS_DEP_ENABLE
+// We define this here, because GCCs winbase.h limits this to _WIN32_WINNT >= 0x0601 (Windows 7),
+// which is not correct. Can be removed, when GCCs winbase.h is fixed!
+#define PROCESS_DEP_ENABLE 0x00000001
+#endif
+    typedef BOOL (WINAPI *PSETPROCDEPPOL)(DWORD);
+    PSETPROCDEPPOL setProcDEPPol = (PSETPROCDEPPOL)GetProcAddress(GetModuleHandleA("Kernel32.dll"), "SetProcessDEPPolicy");
+    if (setProcDEPPol != NULL) setProcDEPPol(PROCESS_DEP_ENABLE);
+#endif
+#ifndef WIN32
+    umask(077);
+
+    // Clean shutdown on SIGTERM
+    struct sigaction sa;
+    sa.sa_handler = HandleSIGTERM;
+    sigemptyset(&sa.sa_mask);
+    sa.sa_flags = 0;
+    sigaction(SIGTERM, &sa, NULL);
+    sigaction(SIGINT, &sa, NULL);
+
+    // Reopen debug.log on SIGHUP
+    struct sigaction sa_hup;
+    sa_hup.sa_handler = HandleSIGHUP;
+    sigemptyset(&sa_hup.sa_mask);
+    sa_hup.sa_flags = 0;
+    sigaction(SIGHUP, &sa_hup, NULL);
+#else
+    // what do we do for windows aborts or Ctl-Cs, etc.?
+    bool
+        fWeShouldBeConcerned = true;
+
+    if( SetConsoleCtrlHandler( ( PHANDLER_ROUTINE )&WindowsHandleSigterm, true ) )
+        fWeShouldBeConcerned = false;    // success
+    else                        //exigency of wincon.h
+    {    //    // we failed!
+        LogPrintf(
+                    "\n"
+                    "Windows CCH failed?"
+                    "\n"
+                    ""
+                    );
+    }
+#endif
+    return true;
+}
+
+//////////////////////////////////////////////////////////////////////////////
+//
+// Start
+//
+#if !defined(QT_GUI) && !defined(TESTS_ENABLED)
+bool AppInit(int argc, char* argv[])
+{
+    boost::thread_group threadGroup;
+    CScheduler scheduler;
+
+    bool fRet = false;
+    try
+    {
+        //
+        // Parameters
+        //
+        // If Qt is used, parameters/bitcoin.conf are parsed in qt/bitcoin.cpp's main()
+        gArgs.ParseParameters(argc, argv);
+        bool
+            fTest_or_Main_Net_is_decided = false;
+
+        if (!boost::filesystem::is_directory(GetDataDir(fTest_or_Main_Net_is_decided)))
+        {
+            fprintf(stderr, "Error: Specified directory does not exist\n");
+            Shutdown(NULL);
+        }
+        try
+        {
+            gArgs.ReadConfigFile(gArgs.GetArg("-conf", YACOIN_CONF_FILENAME));
+        } catch (const std::exception& e) {
+            fprintf(stderr,"Error reading configuration file: %s\n", e.what());
+            return false;
+        }
+
+        if(gArgs.IsArgSet("-version") || gArgs.IsArgSet("-v"))
+        {
+            std::string msg = "Yacoin version: " + FormatFullVersion() + "\n\n";
+            fprintf(stdout, "%s", msg.c_str());
+            exit(0);
+        } else if (gArgs.IsArgSet("-?") || gArgs.IsArgSet("-h") || gArgs.IsArgSet("-help"))
+        {
+            // First part of help message is specific to yacoind / RPC client
+            std::string strUsage = _("Yacoin version") + " " + FormatFullVersion() + "\n\n" +
+                _("Usage:") + "\n" +
+                  "  yacoind [options]                     " + "\n" +
+                  "  yacoind [options] <command> [params]  " + _("Send command to -server or yacoind") + "\n" +
+                  "  yacoind [options] help                " + _("List commands") + "\n" +
+                  "  yacoind [options] help <command>      " + _("Get help for a command") + "\n";
+
+            strUsage += "\n" + HelpMessage();
+
+            fprintf(stdout, "%s", strUsage.c_str());
+#ifdef _MSC_VER
+            fRet = false;
+            //Shutdown(NULL);
+#else
+            exit(0);
+#endif
+        }
+        else
+        {
+            bool
+                fCommandLine = false;
+            // Command-line RPC
+            for (int i = 1; i < argc; ++i)
+            {
+                if (!IsSwitchChar(argv[i][0]) && !boost::algorithm::istarts_with(argv[i], "yacoin:"))
+                {
+                    fCommandLine = true;
+                }
+            }
+            if (fCommandLine)
+            {
+                int ret = CommandLineRPC(argc, argv);
+#ifdef _MSC_VER
+                if( 0 == ret )  // signifies a successful RPC call
+                {
+                    fRet = false;
+                }
+#else
+                exit(ret);
+#endif
+            }
+            else {
+                // ********************************************************* Step 1: setup
+                // Set this early so that parameter interactions go to console
+                InitLogging();
+                // ********************************************************* Step 2: parameter interactions
+                InitParameterInteraction();
+                if (!AppInitBasicSetup())
+                {
+                    // InitError will have been called with detailed error, which ends up on console
+                    exit(EXIT_FAILURE);
+                }
+                // ********************************************************* Step 3: parameter-to-internal-flags
+                if (!AppInitParameterInteraction())
+                {
+                    // InitError will have been called with detailed error, which ends up on console
+                    exit(EXIT_FAILURE);
+                }
+
+#if !defined(WIN32) && !defined(QT_GUI)
+                if (fDaemon)
+                {
+                    // Daemonize
+                    pid_t pid = fork();
+                    if (pid < 0)
+                    {
+                        fprintf(stderr, "Error: fork() returned %d errno %d\n", pid, errno);
+                        return false;
+                    }
+                    if (pid > 0)
+                    {
+                        CreatePidFile(GetPidFile(), pid);
+                        return true;
+                    }
+
+                    pid_t sid = setsid();
+                    if (sid < 0)
+                        fprintf(stderr, "Error: setsid() returned %d errno %d\n", sid, errno);
+                }
+#endif
+
+                // Lock data directory after daemonization
+                if (!AppInitLockDataDirectory())
+                {
+                    // If locking the data directory failed, exit immediately
+                    exit(EXIT_FAILURE);
+                }
+
+                fRet = AppInit2(threadGroup, scheduler);
+            }
+        }
+    }
+    catch(std::exception& e)
+    {
+        PrintException(&e, "AppInit()");
+    }
+    catch(...)
+    {
+        PrintException(NULL, "AppInit()");
+    }
+    if (!fRet)
+    {
+        Interrupt(threadGroup);
+        threadGroup.join_all();
+    }
+    else
+    {
+        WaitForShutdown(&threadGroup);
+    }
+#ifdef QT_GUI
+    // ensure we leave the Qt main loop for a clean GUI exit (Shutdown() is called in bitcoin.cpp afterwards)
+    uiInterface.QueueShutdown();
+#else
+    Shutdown(NULL);
+#endif
+    return fRet;
+}
+
+extern void noui_connect();
+int main(int argc, char* argv[])
+{
+    bool fRet = false;
+
+    nUpTimeStart = GetTime();
+    // Connect yacoind signal handlers
+    noui_connect();
+
+    fRet = AppInit(argc, argv);
+
+    if (fRet)
+        return 0;
+
+    return 1;
+}
+#endif
+
 #ifdef _MSC_VER
     #include "msvc_warnings.pop.h"
 #endif
