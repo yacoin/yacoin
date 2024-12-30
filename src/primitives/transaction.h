@@ -8,6 +8,7 @@
 #define YACOIN_PRIMITIVES_TRANSACTION_H
 
 #include <stdint.h>
+#include <memory>
 #include "amount.h"
 #include "script/script.h"
 #include "serialize.h"
@@ -23,6 +24,21 @@ class CBlockIndex;
 typedef std::map<uint256, std::pair<CTxIndex, CTransaction> > MapPrevTx;
 extern CChain chainActive;
 FILE* OpenBlockFile(unsigned int nFile, unsigned int nBlockPos, const char* pszMode="rb");
+
+/** An inpoint - a combination of a transaction and an index n into its vin */
+class CInPoint
+{
+//public:
+private:
+    CTransaction* ptx;
+    ::uint32_t n;
+public:
+    CTransaction* GetPtx() const { return ptx; }
+    CInPoint() { SetNull(); }
+    CInPoint(CTransaction* ptxIn, unsigned int nIn) { ptx = ptxIn; n = nIn; }
+    void SetNull() { ptx = NULL; n = (unsigned int) -1; }
+    bool IsNull() const { return (ptx == NULL && n == (unsigned int) -1); }
+};
 
 /** An outpoint - a combination of a transaction hash and an index n into its vout */
 class COutPoint
@@ -379,6 +395,8 @@ public:
         return fNewer;
     }
 
+    unsigned int GetTotalSize() const;
+
     bool IsCoinBase() const
     {
         return (vin.size() == 1 && vin[0].prevout.IsNull() && vout.size() >= 1);
@@ -547,7 +565,7 @@ public:
                      unsigned int flags=STRICT_FLAGS, std::vector<CScriptCheck> *pvChecks = NULL) const;
     bool ClientConnectInputs();
     bool CheckTransaction(CValidationState &state) const;
-    bool AcceptToMemoryPool(CValidationState &state, CTxDB& txdb, bool fCheckInputs=true, bool* pfMissingInputs=NULL);
+    bool AcceptToMemoryPool(CValidationState &state, CTxDB& txdb, bool *pfMissingInputs=NULL) const;
     bool GetCoinAge(CTxDB& txdb, ::uint64_t& nCoinAge) const;  // ppcoin: get transaction coin age
 
     /** YAC_TOKEN START */
@@ -563,4 +581,5 @@ protected:
     const CTxOut& GetOutputFor(const CTxIn& input, const MapPrevTx& inputs) const;
 };
 
+typedef std::shared_ptr<const CTransaction> CTransactionRef;
 #endif // YACOIN_PRIMITIVES_TRANSACTION_H

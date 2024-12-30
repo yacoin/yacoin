@@ -1055,7 +1055,7 @@ public:
 
     void AddSupportingTransactions(CTxDB& txdb);
 
-    bool AcceptWalletTransaction(CTxDB& txdb, bool fCheckInputs=true);
+    bool AcceptWalletTransaction(CTxDB& txdb);
     bool AcceptWalletTransaction();
 
     void RelayWalletTransaction(CTxDB& txdb);

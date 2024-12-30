@@ -107,9 +107,7 @@ bool fDaemon = false;
 bool fServer = false;
 string strMiscWarning;
 bool fTestNet = false;
-bool
-  //fUseOld044Rules = false;
-    fUseOld044Rules = true;
+bool fUseOld044Rules = true;
 bool fNoListen = false;
 bool fLogTimestamps = false;
 CMedianFilter< int64_t> vTimeOffsets(200,0);

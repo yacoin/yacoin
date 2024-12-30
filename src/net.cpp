@@ -1964,31 +1964,6 @@ void static ProcessOneShot()
     }
 }
 
-// ppcoin: stake minter thread
-void static ThreadStakeMinter(void *parg)
-{
-    printf("ThreadStakeMinter started\n");
-    CWallet *pwallet = (CWallet *)parg;
-    try
-    {
-        ++vnThreadsRunning[THREAD_MINTER];
-        StakeMinter(pwallet);
-        --vnThreadsRunning[THREAD_MINTER];
-    }
-    catch (std::exception &e)
-    {
-        --vnThreadsRunning[THREAD_MINTER];
-        PrintException(&e, "ThreadStakeMinter()");
-    }
-    catch (...)
-    {
-        --vnThreadsRunning[THREAD_MINTER];
-        PrintException(NULL, "ThreadStakeMinter()");
-    }
-    printf("ThreadStakeMinter exiting, %d threads remaining\n",
-           vnThreadsRunning[THREAD_MINTER]);
-}
-
 void ThreadOpenConnections2(void *parg)
 {
     printf("ThreadOpenConnections started\n");
@@ -2787,14 +2762,6 @@ void StartNode(void *parg)
     if (!NewThread(ThreadDumpAddress, NULL))
         printf("Error; NewThread(ThreadDumpAddress) failed\n");
 
-    if (!chainActive.Tip() ||
-        (chainActive.Tip()->nHeight + 1) < nMainnetNewLogicBlockNumber)
-    {
-        // ppcoin: mint proof-of-stake blocks in the background
-        if (!NewThread(ThreadStakeMinter, pwalletMain))
-            printf("Error: NewThread(ThreadStakeMinter) failed\n");
-    }
-
     // Generate coins in the background
     GenerateYacoins(GetBoolArg("-gen", false), pwalletMain);
 }
@@ -2811,7 +2778,6 @@ bool StopNode()
     SetThreadExecutionState(ES_CONTINUOUS);
 #endif
 
-    ++nTransactionsUpdated;
     ::int64_t nStart = GetTime();
     {
         LOCK(cs_main);

@@ -8,6 +8,7 @@
 #include "primitives/transaction.h"
 #include "txdb.h"
 #include "wallet.h"
+#include "policy/fees.h"
 
 #include <map>
 
@@ -263,15 +264,20 @@ unsigned int
 CTransaction::GetLegacySigOpCount() const
 {
     unsigned int nSigOps = 0;
-    BOOST_FOREACH(const CTxIn& txin, vin)
+    for (const auto& txin : vin)
     {
         nSigOps += txin.scriptSig.GetSigOpCount(false);
     }
-    BOOST_FOREACH(const CTxOut& txout, vout)
+    for (const auto& txout : vout)
     {
         nSigOps += txout.scriptPubKey.GetSigOpCount(false);
     }
     return nSigOps;
+}
+
+unsigned int CTransaction::GetTotalSize() const
+{
+    return ::GetSerializeSize(*this, SER_NETWORK, PROTOCOL_VERSION);
 }
 
 bool CTransaction::CheckTransaction(CValidationState &state) const
@@ -487,12 +493,12 @@ bool CTransaction::CheckTransaction(CValidationState &state) const
 
 ::int64_t CTransaction::GetMinFee(unsigned int nBytes) const
 {
-    return (nBytes * MIN_TX_FEE) / 1000;
+    return ::GetMinFee(nBytes);
 }
 
-bool CTransaction::AcceptToMemoryPool(CValidationState &state, CTxDB& txdb, bool fCheckInputs, bool* pfMissingInputs)
+bool CTransaction::AcceptToMemoryPool(CValidationState &state, CTxDB& txdb, bool* pfMissingInputs) const
 {
-    return mempool.accept(state, txdb, *this, fCheckInputs, pfMissingInputs);
+    return mempool.accept(state, txdb, *this, pfMissingInputs);
 }
 
 bool CTransaction::DisconnectInputs(CValidationState &state, CTxDB& txdb)
@@ -574,7 +580,7 @@ bool CTransaction::FetchInputs(CValidationState &state, CTxDB& txdb, const map<u
                 LOCK(mempool.cs);
                 if (!mempool.exists(prevout.COutPointGetHash()))
                     return state.Invalid(error("FetchInputs() : %s mempool Tx prev not found %s", GetHash().ToString().substr(0,10).c_str(),  prevout.COutPointGetHash().ToString().substr(0,10).c_str()));
-                txPrev = mempool.lookup(prevout.COutPointGetHash());
+                txPrev = mempool.get(prevout.COutPointGetHash());
             }
             if (!fFound)
                 txindex.vSpent.resize(txPrev.vout.size());
@@ -858,7 +864,7 @@ bool CTransaction::ClientConnectInputs()
             COutPoint prevout = vin[i].prevout;
             if (!mempool.exists(prevout.COutPointGetHash()))
                 return false;
-            CTransaction& txPrev = mempool.lookup(prevout.COutPointGetHash());
+            const CTransaction& txPrev = mempool.get(prevout.COutPointGetHash());
 
             if (prevout.COutPointGet_n() >= txPrev.vout.size())
                 return false;

@@ -408,62 +408,12 @@ uint256 GetProofOfStakeHash(
                            )
 {
     uint256 thash;
+    CDataStream
+        ss(SER_GETHASH, 0);
 
-    if (
-        !fUseOld044Rules
-    //(nTimeTx >= YACOIN_NEW_LOGIC_SWITCH_TIME) 
-    //    || fTestNet   // to do testnet always the new way
-    //    && !fTestNet  // to do testnet the old way
-       )
-    {
-        // scrypt-jane used for hashProofOfStake from now on
-        // valid stakeNfactor depends on transaction time and kernel Coin Day Weight
-        // and ranges from 4 to ProofOfWork Nfactor-1
-        uint8_t 
-            stakeNfactor = GetStakeNfactor( (uint64_t)nTimeTx, nCoinDayWeight );
-
-        if ( stakeNfactor < 4 )
-            return error("GetProofOfStakeHash() : min coin day weight violation");
-
-        struct stakeHashStruct
-        {
-            uint64_t nStakeModifier;
-            uint32_t nTimeBlockFrom;
-            uint32_t nTxPrevOffset;
-            uint32_t nTxPrevTime;
-            uint32_t nPrevoutn;
-            uint32_t nTimeTx;
-        }
-          stakehashdata;
-
-        stakehashdata.nStakeModifier = nStakeModifier;
-        stakehashdata.nTimeBlockFrom = nTimeBlockFrom;
-        stakehashdata.nTxPrevOffset = nTxPrevOffset;
-        stakehashdata.nTxPrevTime = nTxPrevTime;
-        stakehashdata.nPrevoutn = nPrevoutn;
-        stakehashdata.nTimeTx = nTimeTx;
-
-        if(
-           !scrypt_hash(
-                       CVOIDBEGIN( stakehashdata.nStakeModifier ), 
-                       sizeof( stakehashdata ), 
-                       UINTBEGIN( thash ), 
-                       stakeNfactor
-                      )
-          )
-        {
-            thash = 0;  // perhaps? should error("lack of memory for scrypt hash?");
-        }
-    }
-    else    // the old 0.4.4 way
-    {
-        CDataStream 
-            ss(SER_GETHASH, 0);
-
-        ss << nStakeModifier;
-        ss << nTimeBlockFrom << nTxPrevOffset << nTxPrevTime << nPrevoutn << nTimeTx;
-        thash = Hash(ss.begin(), ss.end());
-    }
+    ss << nStakeModifier;
+    ss << nTimeBlockFrom << nTxPrevOffset << nTxPrevTime << nPrevoutn << nTimeTx;
+    thash = Hash(ss.begin(), ss.end());
     return thash;
 }
 

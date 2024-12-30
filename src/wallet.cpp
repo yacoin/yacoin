@@ -1454,7 +1454,7 @@ void CWallet::ReacceptWalletTransactions()
             {
                 // Re-accept any txes of ours that aren't already in a block
                 if (!(wtx.IsCoinBase() || wtx.IsCoinStake()))
-                    wtx.AcceptWalletTransaction(txdb, false);
+                    wtx.AcceptWalletTransaction(txdb);
             }
         }
         if (!vMissingTx.empty())
@@ -2033,17 +2033,7 @@ int64_t CWallet::GetStake() const
             pcoin->GetDepthInMainChain() > 0
            )
         {
-            if(
-               fUseOld044Rules
-              )
-            {
-                nTotal += CWallet::GetDebit(*pcoin, MINE_ALL );
-            }
-            else   // fTestnet || (pcoin->nTimeReceived >= YACOIN_NEW_LOGIC_SWITCH_TIME)
-            {
-              //nTotal += CWallet::GetDebit(*pcoin, MINE_ALL);  //<<<<<<<<<<<<<<<< test
-                nTotal += CWallet::GetCredit(*pcoin, MINE_ALL);
-            }
+            nTotal += CWallet::GetDebit(*pcoin, MINE_ALL );
         }
     }
     return nTotal;

@@ -126,7 +126,6 @@ void Shutdown(void* parg)
     {
         fShutdown = true;
         fRequestShutdown = true;
-        ++nTransactionsUpdated;
 //        CTxDB().Close();
         bitdb.Flush(false);
         StopNode();
@@ -590,7 +589,7 @@ bool AppInit2()
         nHashCalcThreads = maximumHashCalcThread;
 
     // Ping and address broadcast intervals
-    nPingInterval = max< ::int64_t>(10 * 60, GetArg("-keepalive", 30 * 60));
+    nPingInterval = max< ::int64_t>(10, GetArg("-keepalive", 10 * 60));
 
     nBroadcastInterval = max< ::int64_t>(6 * 60 * 60, GetArg("-addrsetlifetime", 24 * 60 * 60));
 
@@ -1368,8 +1367,6 @@ bool AppInit2()
                     );
 #endif
     }
-
-    (void)HaveWeSwitchedToNewLogicRules( fUseOld044Rules );
 
     if (GetBoolArg("-printblockindex") || GetBoolArg("-printblocktree"))
     {
