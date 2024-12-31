@@ -6,9 +6,10 @@
 
 #include "tokens/tokens.h"
 #include "primitives/transaction.h"
-#include "txdb.h"
+#include "txdb-leveldb.h"
 #include "wallet.h"
 #include "policy/fees.h"
+#include "consensus/consensus.h"
 
 #include <map>
 
@@ -81,8 +82,8 @@ bool CTransaction::ReadFromDisk(COutPoint prevout)
 bool CTransaction::ReadFromDisk(CDiskTxPos pos, FILE** pfileRet)
 {
   //CAutoFile filein = CAutoFile(OpenBlockFile(pos.nFile, 0, pfileRet ? "rb+" : "rb"), SER_DISK, CLIENT_VERSION);
-    CAutoFile filein = CAutoFile(OpenBlockFile(pos.Get_CDiskTxPos_nFile(), 0, pfileRet ? "rb+" : "rb"), SER_DISK, CLIENT_VERSION);
-    if (!filein)
+    CAutoFile filein(OpenBlockFile(pos.Get_CDiskTxPos_nFile(), 0, pfileRet ? "rb+" : "rb"), SER_DISK, CLIENT_VERSION);
+    if (filein.IsNull())
         return error("CTransaction::ReadFromDisk() : OpenBlockFile failed");
 
     // Read transaction
@@ -813,7 +814,7 @@ bool CTransaction::ConnectInputs(CValidationState &state,
 
             unsigned int
                 nTxSize = (nTime > VALIDATION_SWITCH_TIME || fTestNet) ?
-                          GetSerializeSize(SER_NETWORK, PROTOCOL_VERSION) : 0;
+                          ::GetSerializeSize(*this, SER_NETWORK, PROTOCOL_VERSION) : 0;
 
             ::int64_t
                 nReward = GetValueOut() - nValueIn;
@@ -930,13 +931,13 @@ bool CTransaction::GetCoinAge(CTxDB& txdb, ::uint64_t& nCoinAge) const
         ::int64_t nValueIn = txPrev.vout[txin.prevout.COutPointGet_n()].nValue;
         bnCentSecond += CBigNum(nValueIn) * (nTime-txPrev.nTime) / CENT;
 
-        if (fDebug && GetBoolArg("-printcoinage"))
-            printf("coin age nValueIn=%" PRId64 " nTimeDiff=%ld bnCentSecond=%s\n", nValueIn, nTime - txPrev.nTime, bnCentSecond.ToString().c_str());
+        if (fDebug && gArgs.GetBoolArg("-printcoinage"))
+            LogPrintf("coin age nValueIn=%" PRId64 " nTimeDiff=%ld bnCentSecond=%s\n", nValueIn, nTime - txPrev.nTime, bnCentSecond.ToString());
     }
 
     CBigNum bnCoinDay = bnCentSecond * CENT / COIN / (24 * 60 * 60);
-    if (fDebug && GetBoolArg("-printcoinage"))
-        printf("coin age bnCoinDay=%s\n", bnCoinDay.ToString().c_str());
+    if (fDebug && gArgs.GetBoolArg("-printcoinage"))
+        LogPrintf("coin age bnCoinDay=%s\n", bnCoinDay.ToString());
     nCoinAge = bnCoinDay.getuint64();
     return true;
 }

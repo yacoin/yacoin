@@ -28,8 +28,7 @@ struct CBlockTokenUndo
     ADD_SERIALIZE_METHODS;
 
     template <typename Stream, typename Operation>
-    inline void SerializationOp(Stream& s, Operation ser_action, int nType, int nVersion) {
-        unsigned int nSerSize = 0;
+    inline void SerializationOp(Stream& s, Operation ser_action) {
         READWRITE(fChangedUnits);
         READWRITE(fChangedIPFS);
         READWRITE(strIPFS);

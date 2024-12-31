@@ -12,48 +12,9 @@ OptionsModel::OptionsModel(QObject *parent) :
     Init();
 }
 
-bool static ApplyProxySettings()
+void OptionsModel::addOverriddenOption(const std::string &option)
 {
-    QSettings settings;
-    CService addrProxy(settings.value("addrProxy", "127.0.0.1:9050").toString().toStdString());
-    int nSocksVersion(settings.value("nSocksVersion", 5).toInt());
-    if (!settings.value("fUseProxy", false).toBool()) {
-        addrProxy = CService();
-        nSocksVersion = 0;
-        return false;
-    }
-    if (nSocksVersion && !addrProxy.IsValid())
-        return false;
-
-    if (!IsLimited(NET_IPV4))
-        SetProxy(NET_IPV4, addrProxy, nSocksVersion);
-    if (nSocksVersion > 4) {
-#ifdef USE_IPV6
-        if (!IsLimited(NET_IPV6))
-            SetProxy(NET_IPV6, addrProxy, nSocksVersion);
-#endif
-    }
-
-    SetNameProxy(addrProxy, nSocksVersion);
-
-    return true;
-}
-
-bool static ApplyTorSettings()
-{
-    QSettings settings;
-    CService addrTor(settings.value("addrTor", "127.0.0.1:9050").toString().toStdString());
-    if (!settings.value("fUseTor", false).toBool()) {
-        addrTor = CService();
-        return false;
-    }
-    if (!addrTor.IsValid())
-        return false;
-
-    SetProxy(NET_TOR, addrTor, 5);
-    SetReachable(NET_TOR);
-
-    return true;
+    strOverriddenByCommandLine += QString::fromStdString(option) + "=" + QString::fromStdString(gArgs.GetArg(option, "")) + " ";
 }
 
 void OptionsModel::Init()
@@ -76,35 +37,41 @@ void OptionsModel::Init()
     nTransactionFee = settings.value("nTransactionFee").toLongLong();
     language = settings.value("language", "").toString();
 
-    // These are shared with core Bitcoin; we want
-    // command-line options to override the GUI settings:
-    if (settings.contains("fUseUPnP"))
-        SoftSetBoolArg("-upnp", settings.value("fUseUPnP").toBool());
-    if ( !(settings.value("fTorOnly").toBool() && settings.contains("addrTor")) ) {
-        if (settings.contains("addrProxy") && settings.value("fUseProxy").toBool())
-            SoftSetArg("-proxy", settings.value("addrProxy").toString().toStdString());
-        if (settings.contains("nSocksVersion") && settings.value("fUseProxy").toBool())
-            SoftSetArg("-socks", settings.value("nSocksVersion").toString().toStdString());
-    }
+    // Network
+    if (!settings.contains("fUseUPnP"))
+        settings.setValue("fUseUPnP", DEFAULT_UPNP);
+    if (!gArgs.SoftSetBoolArg("-upnp", settings.value("fUseUPnP").toBool()))
+        addOverriddenOption("-upnp");
 
-    if (settings.contains("addrTor") && settings.value("fUseTor").toBool()) {
-        SoftSetArg("-tor", settings.value("addrTor").toString().toStdString());
-        if (settings.value("fTorOnly").toBool())
-            SoftSetArg("-onlynet", "tor");
+    if (!settings.contains("fListen"))
+        settings.setValue("fListen", DEFAULT_LISTEN);
+    if (!gArgs.SoftSetBoolArg("-listen", settings.value("fListen").toBool()))
+        addOverriddenOption("-listen");
 
-        if (settings.value("TorName").toString().length() == 22) {
-            std::string strTorName = settings.value("TorName").toString().toStdString();
+    if (!settings.contains("fUseProxy"))
+        settings.setValue("fUseProxy", false);
+    if (!settings.contains("addrProxy"))
+        settings.setValue("addrProxy", "127.0.0.1:9050");
+    // Only try to set -proxy, if user has enabled fUseProxy
+    if (settings.value("fUseProxy").toBool() && !gArgs.SoftSetArg("-proxy", settings.value("addrProxy").toString().toStdString()))
+        addOverriddenOption("-proxy");
+    else if(!settings.value("fUseProxy").toBool() && !gArgs.GetArg("-proxy", "").empty())
+        addOverriddenOption("-proxy");
 
-            CService addrTorName(strTorName, GetListenPort());
-            if (addrTorName.IsValid())
-                SoftSetArg("-torname", strTorName);
-        }
-    }
+    if (!settings.contains("fUseSeparateProxyTor"))
+        settings.setValue("fUseSeparateProxyTor", false);
+    if (!settings.contains("addrSeparateProxyTor"))
+        settings.setValue("addrSeparateProxyTor", "127.0.0.1:9050");
+    // Only try to set -onion, if user has enabled fUseSeparateProxyTor
+    if (settings.value("fUseSeparateProxyTor").toBool() && !gArgs.SoftSetArg("-onion", settings.value("addrSeparateProxyTor").toString().toStdString()))
+        addOverriddenOption("-onion");
+    else if(!settings.value("fUseSeparateProxyTor").toBool() && !gArgs.GetArg("-onion", "").empty())
+        addOverriddenOption("-onion");
 
     if (settings.contains("detachDB"))
-        SoftSetBoolArg("-detachdb", settings.value("detachDB").toBool());
+        gArgs.SoftSetBoolArg("-detachdb", settings.value("detachDB").toBool());
     if (!language.isEmpty())
-        SoftSetArg("-lang", language.toStdString());
+        gArgs.SoftSetArg("-lang", language.toStdString());
 }
 
 int OptionsModel::rowCount(const QModelIndex & parent) const
@@ -124,47 +91,41 @@ QVariant OptionsModel::data(const QModelIndex & index, int role) const
         case MinimizeToTray:
             return QVariant(fMinimizeToTray);
         case MapPortUPnP:
-            return settings.value("fUseUPnP", GetBoolArg("-upnp", true));
+#ifdef USE_UPNP
+            return settings.value("fUseUPnP");
+#else
+            return false;
+#endif
         case MinimizeOnClose:
             return QVariant(fMinimizeOnClose);
+
+        // default proxy
         case ProxyUse:
             return settings.value("fUseProxy", false);
         case ProxyIP: {
-            proxyType proxy;
-            if (GetProxy(NET_IPV4, proxy))
-                return QVariant(QString::fromStdString(proxy.first.ToStringIP()));
-            else
-                return QVariant(QString::fromStdString("127.0.0.1"));
+            // contains IP at index 0 and port at index 1
+            QStringList strlIpPort = settings.value("addrProxy").toString().split(":", QString::SkipEmptyParts);
+            return strlIpPort.at(0);
         }
         case ProxyPort: {
-            proxyType proxy;
-            if (GetProxy(NET_IPV4, proxy))
-                return QVariant(proxy.first.GetPort());
-            else
-                return QVariant(9050);
+            // contains IP at index 0 and port at index 1
+            QStringList strlIpPort = settings.value("addrProxy").toString().split(":", QString::SkipEmptyParts);
+            return strlIpPort.at(1);
         }
-        case ProxySocksVersion:
-            return settings.value("nSocksVersion", 5);
-        case TorUse:
-            return settings.value("fUseTor", false);
-        case TorIP: {
-            proxyType proxy;
-            if (GetProxy(NET_TOR, proxy))
-                return QVariant(QString::fromStdString(proxy.first.ToStringIP()));
-            else
-                return QVariant(QString::fromStdString("127.0.0.1"));
+
+        // separate Tor proxy
+        case ProxyUseTor:
+            return settings.value("fUseSeparateProxyTor", false);
+        case ProxyIPTor: {
+            // contains IP at index 0 and port at index 1
+            QStringList strlIpPort = settings.value("addrSeparateProxyTor").toString().split(":", QString::SkipEmptyParts);
+            return strlIpPort.at(0);
         }
-        case TorPort: {
-            proxyType proxy;
-            if (GetProxy(NET_TOR, proxy))
-                return QVariant(proxy.first.GetPort());
-            else
-                return QVariant(9050);
+        case ProxyPortTor: {
+            // contains IP at index 0 and port at index 1
+            QStringList strlIpPort = settings.value("addrSeparateProxyTor").toString().split(":", QString::SkipEmptyParts);
+            return strlIpPort.at(1);
         }
-        case TorOnly:
-            return settings.value("fTorOnly", false);
-        case TorName:
-            return settings.value("TorName", "");
         case Fee:
             return QVariant(static_cast<qlonglong>(nTransactionFee));
         case DisplayUnit:
@@ -201,82 +162,75 @@ bool OptionsModel::setData(const QModelIndex & index, const QVariant & value, in
             fMinimizeToTray = value.toBool();
             settings.setValue("fMinimizeToTray", fMinimizeToTray);
             break;
-        case MapPortUPnP:
-            fUseUPnP = value.toBool();
-            settings.setValue("fUseUPnP", fUseUPnP);
-            MapPort();
+        case MapPortUPnP: // core option - can be changed on-the-fly
+            settings.setValue("fUseUPnP", value.toBool());
+            MapPort(value.toBool());
             break;
         case MinimizeOnClose:
             fMinimizeOnClose = value.toBool();
             settings.setValue("fMinimizeOnClose", fMinimizeOnClose);
             break;
+        // default proxy
         case ProxyUse:
-            settings.setValue("fUseProxy", value.toBool());
-            ApplyProxySettings();
+            if (settings.value("fUseProxy") != value) {
+                settings.setValue("fUseProxy", value.toBool());
+                setRestartRequired(true);
+            }
             break;
         case ProxyIP: {
-            proxyType proxy;
-            proxy.first = CService("127.0.0.1", 9050);
-            GetProxy(NET_IPV4, proxy);
-
-            CNetAddr addr(value.toString().toStdString());
-            proxy.first.SetIP(addr);
-            settings.setValue("addrProxy", proxy.first.ToStringIPPort().c_str());
-            successful = ApplyProxySettings();
+            // contains current IP at index 0 and current port at index 1
+            QStringList strlIpPort = settings.value("addrProxy").toString().split(":", QString::SkipEmptyParts);
+            // if that key doesn't exist or has a changed IP
+            if (!settings.contains("addrProxy") || strlIpPort.at(0) != value.toString()) {
+                // construct new value from new IP and current port
+                QString strNewValue = value.toString() + ":" + strlIpPort.at(1);
+                settings.setValue("addrProxy", strNewValue);
+                setRestartRequired(true);
+            }
         }
         break;
         case ProxyPort: {
-            proxyType proxy;
-            proxy.first = CService("127.0.0.1", 9050);
-            GetProxy(NET_IPV4, proxy);
+            // contains current IP at index 0 and current port at index 1
+            QStringList strlIpPort = settings.value("addrProxy").toString().split(":", QString::SkipEmptyParts);
+            // if that key doesn't exist or has a changed port
+            if (!settings.contains("addrProxy") || strlIpPort.at(1) != value.toString()) {
+                // construct new value from current IP and new port
+                QString strNewValue = strlIpPort.at(0) + ":" + value.toString();
+                settings.setValue("addrProxy", strNewValue);
+                setRestartRequired(true);
+            }
+        }
+        break;
 
-            proxy.first.SetPort(value.toInt());
-            settings.setValue("addrProxy", proxy.first.ToStringIPPort().c_str());
-            successful = ApplyProxySettings();
+        // separate Tor proxy
+        case ProxyUseTor:
+            if (settings.value("fUseSeparateProxyTor") != value) {
+                settings.setValue("fUseSeparateProxyTor", value.toBool());
+                setRestartRequired(true);
+            }
+            break;
+        case ProxyIPTor: {
+            // contains current IP at index 0 and current port at index 1
+            QStringList strlIpPort = settings.value("addrSeparateProxyTor").toString().split(":", QString::SkipEmptyParts);
+            // if that key doesn't exist or has a changed IP
+            if (!settings.contains("addrSeparateProxyTor") || strlIpPort.at(0) != value.toString()) {
+                // construct new value from new IP and current port
+                QString strNewValue = value.toString() + ":" + strlIpPort.at(1);
+                settings.setValue("addrSeparateProxyTor", strNewValue);
+                setRestartRequired(true);
+            }
         }
         break;
-        case ProxySocksVersion: {
-            proxyType proxy;
-            proxy.second = 5;
-            GetProxy(NET_IPV4, proxy);
-
-            proxy.second = value.toInt();
-            settings.setValue("nSocksVersion", proxy.second);
-            successful = ApplyProxySettings();
-        }
-        break;
-        case TorUse: {
-            settings.setValue("fUseTor", value.toBool());
-            ApplyTorSettings();
-        }
-        break;
-        case TorIP: {
-            proxyType proxy;
-            proxy.first = CService("127.0.0.1", 9050);
-            GetProxy(NET_IPV4, proxy);
-
-            CNetAddr addr(value.toString().toStdString());
-            proxy.first.SetIP(addr);
-            settings.setValue("addrTor", proxy.first.ToStringIPPort().c_str());
-            successful = ApplyTorSettings();
-        }
-        break;
-        case TorPort: {
-            proxyType proxy;
-            proxy.first = CService("127.0.0.1", 9050);
-            GetProxy(NET_IPV4, proxy);
-
-            proxy.first.SetPort(value.toInt());
-            settings.setValue("addrTor", proxy.first.ToStringIPPort().c_str());
-            successful = ApplyTorSettings();
-        }
-        break;
-        case TorOnly: {
-            settings.setValue("fTorOnly", value.toBool());
-            ApplyTorSettings();
-        }
-        case TorName: {
-            settings.setValue("TorName", value.toString());
+        case ProxyPortTor: {
+            // contains current IP at index 0 and current port at index 1
+            QStringList strlIpPort = settings.value("addrSeparateProxyTor").toString().split(":", QString::SkipEmptyParts);
+            // if that key doesn't exist or has a changed port
+            if (!settings.contains("addrSeparateProxyTor") || strlIpPort.at(1) != value.toString()) {
+                // construct new value from current IP and new port
+                QString strNewValue = strlIpPort.at(0) + ":" + value.toString();
+                settings.setValue("addrSeparateProxyTor", strNewValue);
+                setRestartRequired(true);
+            }
         }
         break;
         case Fee:
@@ -321,6 +275,18 @@ bool OptionsModel::setData(const QModelIndex & index, const QVariant & value, in
     emit dataChanged(index, index);
 
     return successful;
+}
+
+void OptionsModel::setRestartRequired(bool fRequired)
+{
+    QSettings settings;
+    return settings.setValue("fRestartRequired", fRequired);
+}
+
+bool OptionsModel::isRestartRequired()
+{
+    QSettings settings;
+    return settings.value("fRestartRequired", false).toBool();
 }
 
 qint64 OptionsModel::getTransactionFee()

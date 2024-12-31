@@ -88,10 +88,12 @@ public:
     friend bool operator!=(const CPubKey &a, const CPubKey &b) { return a.vchPubKey != b.vchPubKey; }
     friend bool operator<(const CPubKey &a, const CPubKey &b) { return a.vchPubKey < b.vchPubKey; }
 
-    IMPLEMENT_SERIALIZE
-    (
+    ADD_SERIALIZE_METHODS;
+
+    template <typename Stream, typename Operation>
+    inline void SerializationOp(Stream& s, Operation ser_action) {
         READWRITE(vchPubKey);
-    )
+    }
 
     CKeyID GetID() const {
         return CKeyID(Hash160(vchPubKey));

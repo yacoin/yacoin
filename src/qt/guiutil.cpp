@@ -267,7 +267,7 @@ void openDebugLogfile()
 
 void openConfigfile()
 {
-    boost::filesystem::path pathConfig = GetConfigFile();
+    boost::filesystem::path pathConfig = GetConfigFile(gArgs.GetArg("-conf", YACOIN_CONF_FILENAME));
 
     /* Open yacoin.conf with the associated application */
     if (boost::filesystem::exists(pathConfig))

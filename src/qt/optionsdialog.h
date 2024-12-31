@@ -37,6 +37,8 @@ private slots:
     void disableSaveButtons();
     /* set apply button and OK button state (enabled / disabled) */
     void setSaveButtonState(bool fState);
+    /* set OK button state (enabled / disabled) */
+    void setOkButtonState(bool fState);
     void on_okButton_clicked();
     void on_cancelButton_clicked();
     void on_applyButton_clicked();
@@ -45,13 +47,17 @@ private slots:
     void showRestartWarning_Tor();
     void showRestartWarning_Lang();
     void showRestartWarning_URL();
+    void showRestartWarning(bool fPersistent = false);
     void updateDisplayUnit();
-    void handleProxyIpValid(QValidatedLineEdit *object, bool fState);
-    void handleTorIpValid(QValidatedLineEdit *object, bool fState);
+    void clearStatusLabel();
+    void updateProxyValidationState();
+    /* query the networks, for which the default proxy is used */
+    void updateDefaultProxyNets();
 
 signals:
     void proxyIpValid(QValidatedLineEdit *object, bool fValid);
     void torIpValid(QValidatedLineEdit *object, bool fValid);
+    void validationDidChange(QValidatedLineEdit *validatedLineEdit);
 
 private:
     Ui::OptionsDialog *ui;

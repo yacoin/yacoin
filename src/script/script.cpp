@@ -8,18 +8,16 @@
     #include "msvc_warnings.push.h"
 #endif
 
+#include "script/script.h"
+#include "main.h"
+#include "tokens/tokens.h"
+#include "streams.h"
+
 #include <boost/foreach.hpp>
 #include <boost/tuple/tuple.hpp>
 
-#ifndef H_BITCOIN_SCRIPT
- #include "script/script.h"
-#endif
-
-#ifndef BITCOIN_MAIN_H
- #include "main.h"
-#endif
-
-#include "tokens/tokens.h"
+#include <openssl/ripemd.h>
+#include <openssl/sha.h>
 
 using namespace boost;
 
@@ -1170,7 +1168,7 @@ uint256 SignatureHash(CScript scriptCode, const CTransaction& txTo, unsigned int
 {
     if (nIn >= txTo.vin.size())
     {
-        printf("ERROR: SignatureHash() : nIn=%d out of range\n", nIn);
+        LogPrintf("ERROR: SignatureHash() : nIn=%d out of range\n", nIn);
         return 1;
     }
     CTransaction txTmp(txTo);
@@ -1201,7 +1199,7 @@ uint256 SignatureHash(CScript scriptCode, const CTransaction& txTo, unsigned int
         unsigned int nOut = nIn;
         if (nOut >= txTmp.vout.size())
         {
-            printf("ERROR: SignatureHash() : nOut=%d out of range\n", nOut);
+            LogPrintf("ERROR: SignatureHash() : nOut=%d out of range\n", nOut);
             return 1;
         }
         txTmp.vout.resize(nOut+1);
@@ -1285,7 +1283,7 @@ public:
         // (~200 bytes per cache entry times 50,000 entries)
         // Since there are a maximum of 20,000 signature operations per block
         // 50,000 is a reasonable default.
-        ::int64_t nMaxCacheSize = GetArg("-maxsigcachesize", 50000);
+        ::int64_t nMaxCacheSize = gArgs.GetArg("-maxsigcachesize", 50000);
         if (nMaxCacheSize <= 0) return;
 
         // We must use unique_lock, instead of shared_lock for writer
@@ -1322,7 +1320,7 @@ public:
         // (~200 bytes per cache entry times 50,000 entries)
         // Since there are a maximum of 20,000 signature operations per block
         // 50,000 is a reasonable default.
-        ::int64_t nMaxCacheSize = GetArg("-maxsigcachesize", 50000);
+        ::int64_t nMaxCacheSize = gArgs.GetArg("-maxsigcachesize", 50000);
         if (nMaxCacheSize <= 0) return;
 
         // We must use unique_lock, instead of shared_lock for writer
@@ -1358,7 +1356,7 @@ bool CheckLockTime(const CTransaction& txTo, unsigned int nIn, const CScriptNum&
     // We want to compare apples to apples, so fail the script
     // unless the type of nLockTime being tested is the same as
     // the nLockTime in the transaction.
-    printf("CheckLockTime(), locktime of cltv address = %d, transaction time = %d\n", nLockTime, txTo.nLockTime);
+    LogPrintf("CheckLockTime(), locktime of cltv address = %d, transaction time = %d\n", nLockTime.getint(), txTo.nLockTime);
     if (!(
         (txTo.nLockTime <  LOCKTIME_THRESHOLD && nLockTime <  LOCKTIME_THRESHOLD) ||
         (txTo.nLockTime >= LOCKTIME_THRESHOLD && nLockTime >= LOCKTIME_THRESHOLD)
@@ -1369,7 +1367,7 @@ bool CheckLockTime(const CTransaction& txTo, unsigned int nIn, const CScriptNum&
     // comparison is a simple numeric one.
     if (nLockTime > (int64_t)txTo.nLockTime)
     {
-        printf("CheckLockTime(), coins are still being locked, can't use them until reaching lock time\n");
+        LogPrintf("CheckLockTime(), coins are still being locked, can't use them until reaching lock time\n");
         return false;
     }
 
@@ -1413,7 +1411,7 @@ bool CheckSequence(const CTransaction& txTo, unsigned int nIn, const CScriptNum&
     const int64_t txToSequenceMasked = txToSequence & nLockTimeMask;
     const CScriptNum nSequenceMasked = nSequence & nLockTimeMask;
 
-    printf("CheckLockTime(), sequence of csv address = %d, sequence number of the input = %ld\n", nSequence, txToSequence);
+    LogPrintf("CheckLockTime(), sequence of csv address = %d, sequence number of the input = %ld\n", nSequence.getint(), txToSequence);
 
     // There are two kinds of nSequence: lock-by-blockheight
     // and lock-by-blocktime, distinguished by whether
@@ -1434,7 +1432,7 @@ bool CheckSequence(const CTransaction& txTo, unsigned int nIn, const CScriptNum&
     // comparison is a simple numeric one.
     if (nSequenceMasked > txToSequenceMasked)
     {
-        printf("CheckSequence(), coins are still being locked, can't use them until reaching lock time\n");
+        LogPrintf("CheckSequence(), coins are still being locked, can't use them until reaching lock time\n");
         return false;
     }
 
@@ -1869,7 +1867,7 @@ bool IsSpendableTimelockUTXO(const CKeyStore &keystore,
 		retType = whichType;
 	    if (!ExtractLockDuration(scriptPubKey, retLockDur))
 	    {
-	        printf("IsSpendableTimelockUTXO(), Can't get lock duration from scriptPubKey\n");
+	        LogPrintf("IsSpendableTimelockUTXO(), Can't get lock duration from scriptPubKey\n");
 	    }
 		if (keystore.HaveKey(keyID))
 		{
@@ -1884,7 +1882,7 @@ bool IsSpendableTimelockUTXO(const CKeyStore &keystore,
         retType = whichType;
         if (!ExtractLockDuration(scriptPubKey, retLockDur))
         {
-            printf("IsSpendableTimelockUTXO(), Can't get lock duration from scriptPubKey\n");
+            LogPrintf("IsSpendableTimelockUTXO(), Can't get lock duration from scriptPubKey\n");
         }
         if (keystore.HaveKey(keyID))
         {

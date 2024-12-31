@@ -864,7 +864,7 @@ std::string BuildTxDetailsFrom(
         ++nRowCount;
         //_____________________________________________________________________
 
-        std::map<uint256, CBlockIndex*>::iterator 
+        BlockMap::iterator
             mi = mapBlockIndex.find(hashBlock);
 
         if (mi != mapBlockIndex.end() && (*mi).second)

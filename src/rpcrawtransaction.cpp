@@ -15,12 +15,14 @@
 #endif
 
 #ifndef BITCOIN_TXDB_H
- #include "txdb.h"
+ #include "txdb-leveldb.h"
 #endif
  
 #ifndef BITCOIN_INIT_H
  #include "init.h"
 #endif
+#include "streams.h"
+#include "net_processing.h"
 
 using namespace boost;
 using namespace boost::assign;
@@ -103,7 +105,7 @@ void TxToJSON(const CTransaction& tx, const uint256 hashBlock, Object& entry)
     if (hashBlock != 0)
     {
         entry.push_back(Pair("blockhash", hashBlock.GetHex()));
-        map<uint256, CBlockIndex*>::iterator mi = mapBlockIndex.find(hashBlock);
+        BlockMap::iterator mi = mapBlockIndex.find(hashBlock);
         if (mi != mapBlockIndex.end() && (*mi).second)
         {
             CBlockIndex* pindex = (*mi).second;
@@ -603,7 +605,7 @@ Value sendrawtransaction(const Array& params, bool fHelp)
 
         SyncWithWallets(tx, NULL, true);
     }
-    RelayTransaction(tx, hashTx);
+    RelayTransaction(tx, g_connman.get());
 
     return hashTx.GetHex();
 }

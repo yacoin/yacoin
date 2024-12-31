@@ -8,7 +8,7 @@
 #include <stdint.h>
 #include <stdlib.h> // for rand()
 #include <stdio.h>  // for fclose()
-#include "util.h"   // for GetArg()(
+#include "util.h"   // for gArgs.GetArg()(
 
 //#include <boost/filesystem.hpp>
 

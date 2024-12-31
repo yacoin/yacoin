@@ -7,10 +7,12 @@
 #include "addressindex.h"
 #include "tokens/tokendb.h"
 #include "primitives/block.h"
-#include "txdb.h"
+#include "txdb-leveldb.h"
 #include "checkpoints.h"
 #include "kernel.h"
 #include "wallet.h"
+#include "validationinterface.h"
+#include "net_processing.h"
 
 using std::vector;
 using std::map;
@@ -65,7 +67,7 @@ bool CBlockHeader::AcceptBlockHeader(CValidationState &state,
 {
     // Check for duplicate
     uint256 hash = GetHash();
-    std::map<uint256, CBlockIndex *>::iterator miSelf = mapBlockIndex.find(hash);
+    BlockMap::iterator miSelf = mapBlockIndex.find(hash);
     CBlockIndex *pindex = NULL;
     if (miSelf != mapBlockIndex.end())
     {
@@ -83,7 +85,7 @@ bool CBlockHeader::AcceptBlockHeader(CValidationState &state,
         return false;
 
     // Get prev block index
-    map<uint256, CBlockIndex *>::iterator mi = mapBlockIndex.find(hashPrevBlock);
+    BlockMap::iterator mi = mapBlockIndex.find(hashPrevBlock);
     if (mi == mapBlockIndex.end())
         return state.DoS(10, error("AcceptBlockHeader () : prev block not found"));
     CBlockIndex* pindexPrev = (*mi).second;
@@ -127,7 +129,7 @@ CBlockIndex* CBlockHeader::AddToBlockIndex()
 {
     // Check for duplicate
     uint256 hash = GetHash();
-    std::map<uint256, CBlockIndex*>::iterator it = mapBlockIndex.find(hash);
+    BlockMap::iterator it = mapBlockIndex.find(hash);
     if (it != mapBlockIndex.end())
         return it->second;
 
@@ -139,9 +141,9 @@ CBlockIndex* CBlockHeader::AddToBlockIndex()
     pindexNew->nSequenceId = 0;
 
     // Add to mapBlockIndex
-    map<uint256, CBlockIndex*>::iterator mi = mapBlockIndex.insert(make_pair(hash, pindexNew)).first;
+    BlockMap::iterator mi = mapBlockIndex.insert(make_pair(hash, pindexNew)).first;
     pindexNew->phashBlock = &((*mi).first);
-    map<uint256, CBlockIndex*>::iterator miPrev = mapBlockIndex.find(hashPrevBlock); // this bothers me when mapBlockIndex == NULL!?
+    BlockMap::iterator miPrev = mapBlockIndex.find(hashPrevBlock); // this bothers me when mapBlockIndex == NULL!?
 
     if (miPrev != mapBlockIndex.end())
     {
@@ -169,16 +171,16 @@ CBlockIndex* CBlockHeader::AddToBlockIndex()
     CTxDB txdb;
     if (!txdb.TxnBegin())
     {
-        printf("AddToBlockIndex(): TxnBegin failed\n");
+        LogPrintf("AddToBlockIndex(): TxnBegin failed\n");
     }
     txdb.WriteBlockIndex(CDiskBlockIndex(pindexNew));
     if (fStoreBlockHashToDb && !txdb.WriteBlockHash(CDiskBlockIndex(pindexNew)))
     {
-        printf("AddToBlockIndex(): Can't WriteBlockHash\n");
+        LogPrintf("AddToBlockIndex(): Can't WriteBlockHash\n");
     }
     if (!txdb.TxnCommit())
     {
-        printf("AddToBlockIndex(): TxnCommit failed\n");
+        LogPrintf("AddToBlockIndex(): TxnCommit failed\n");
     }
 
     return pindexNew;
@@ -209,7 +211,7 @@ bool CBlockHeader::CheckBlockHeader(CValidationState& state, bool fCheckPOW) con
 
         // Check timestamp
         if (GetBlockTime() > FutureDrift(GetAdjustedTime())){
-            printf("Block timestamp in future: blocktime %d futuredrift %d",GetBlockTime(),FutureDrift(GetAdjustedTime()));
+            LogPrintf("Block timestamp in future: blocktime %d futuredrift %d\n",GetBlockTime(),FutureDrift(GetAdjustedTime()));
             return error("CheckBlockHeader () : block timestamp too far in the future");
         }
     }
@@ -220,12 +222,12 @@ bool CBlockHeader::CheckBlockHeader(CValidationState& state, bool fCheckPOW) con
 bool CBlock::WriteToDisk(unsigned int& nFileRet, unsigned int& nBlockPosRet)
 {
     // Open history file to append
-    CAutoFile fileout = CAutoFile(AppendBlockFile(nFileRet), SER_DISK, CLIENT_VERSION);
-    if (!fileout)
+    CAutoFile fileout(AppendBlockFile(nFileRet), SER_DISK, CLIENT_VERSION);
+    if (fileout.IsNull())
         return error("CBlock::WriteToDisk() : AppendBlockFile failed");
 
     // Write index header
-    unsigned int nSize = fileout.GetSerializeSize(*this);
+    unsigned int nSize = ::GetSerializeSize(fileout, *this);
     fileout << FLATDATA(pchMessageStart) << nSize;
 
     // Write block
@@ -295,13 +297,13 @@ bool CBlock::CheckBlock(CValidationState &state, bool fCheckPOW, bool fCheckMerk
         // NovaCoin: check proof-of-stake block signature
         if (fCheckSig && !CheckBlockSignature())
         {
-            printf( "\n" );
-            printf(
+            LogPrintf( "\n" );
+            LogPrintf(
                 "bad PoS block signature, in block:"
                 "\n"
                   );
             print();
-            printf( "\n" );
+            LogPrintf( "\n" );
 
             return state.DoS(100, error("CheckBlock () : bad proof-of-stake block signature"));
         }
@@ -360,23 +362,32 @@ bool CBlock::CheckBlock(CValidationState &state, bool fCheckPOW, bool fCheckMerk
     return true;
 }
 
-bool CBlock::AcceptBlock(CValidationState &state, CBlockIndex **ppindex, CDiskBlockPos* dbp)
+bool CBlock::AcceptBlock(CValidationState &state, CBlockIndex **ppindex, bool fRequested, bool* fNewBlock, CDiskBlockPos* dbp)
 {
     // // Check for duplicate
     // uint256 hash = GetHash();
     // if (mapBlockIndex.count(hash))
     //     return error("AcceptBlock () : block already in mapBlockIndex");
 
+    if (fNewBlock) *fNewBlock = false;
     CBlockIndex *&pindex = *ppindex;
 
     if (!AcceptBlockHeader(state, &pindex))
         return false;
 
-    if (pindex->nStatus & BLOCK_HAVE_DATA) {
-        // TODO: deal better with duplicate blocks.
-        // return state.DoS(20, error("AcceptBlock() : already have block %d %s", pindex->nHeight, pindex->GetBlockHash().ToString()), REJECT_DUPLICATE, "duplicate");
-        return true;
+    // Try to process all requested blocks that we don't have, but only
+    // process an unrequested block if it's new and has enough work to
+    // advance our tip, and isn't too many blocks ahead.
+    bool fAlreadyHave = pindex->nStatus & BLOCK_HAVE_DATA;
+    bool fHasMoreOrSameWork = (chainActive.Tip() ? pindex->bnChainTrust >= chainActive.Tip()->bnChainTrust : true);
+
+    // TODO: deal better with return value and error conditions for duplicate
+    // and unrequested blocks.
+    if (fAlreadyHave) return true;
+    if (!fRequested) {  // If we didn't ask for it:
+        if (!fHasMoreOrSameWork) return true; // Don't process less-work chains
     }
+    if (fNewBlock) *fNewBlock = true;
 
     if (!CheckBlock(state))
     {
@@ -442,6 +453,12 @@ bool CBlock::AcceptBlock(CValidationState &state, CBlockIndex **ppindex, CDiskBl
             100, error("AcceptBlock () : block height mismatch in coinbase"));
     }
 
+    // Header is valid/has work, merkle tree and segwit merkle tree are good...RELAY NOW
+    // (but if it does not build on our best tip, let the SendMessages loop relay it)
+    const std::shared_ptr<const CBlock> block = std::make_shared<CBlock>(*this);
+    if (!IsInitialBlockDownload() && chainActive.Tip() == pindex->pprev)
+        GetMainSignals().NewPoWValidBlock(pindex, block);
+
     // Write block to history file
     if (!CheckDiskSpace(::GetSerializeSize(*this, SER_DISK, CLIENT_VERSION)))
     {
@@ -491,13 +508,12 @@ bool CBlock::ReadFromDisk(unsigned int nFile, unsigned int nBlockPos,
 {
     SetNull();
 
+    int nType = fReadTransactions ? SER_DISK : SER_DISK | SER_BLOCKHEADERONLY;
     // Open history file to read
-    CAutoFile filein = CAutoFile(OpenBlockFile(nFile, nBlockPos, "rb"),
-            SER_DISK, CLIENT_VERSION);
-    if (!filein)
+    CAutoFile filein(OpenBlockFile(nFile, nBlockPos, "rb"),
+            nType, CLIENT_VERSION);
+    if (filein.IsNull())
         return error("CBlock::ReadFromDisk() : OpenBlockFile failed");
-    if (!fReadTransactions)
-        filein.nType |= SER_BLOCKHEADERONLY;
 
     // Read block
     try {
@@ -513,7 +529,7 @@ bool CBlock::ReadFromDisk(unsigned int nFile, unsigned int nBlockPos,
     CTxDB txdb("r");
     if (fStoreBlockHashToDb && !txdb.ReadBlockHash(nFile, nBlockPos, blockHash))
     {
-        printf("CBlock::ReadFromDisk(): can't read block hash at file = %d, block pos = %d\n", nFile, nBlockPos);
+        LogPrintf("CBlock::ReadFromDisk(): can't read block hash at file = %d, block pos = %d\n", nFile, nBlockPos);
     }
     // Check the header
     if (fReadTransactions && IsProofOfWork()
@@ -532,7 +548,7 @@ bool CBlock::DisconnectBlock(CValidationState& state, CTxDB& txdb,
                              CBlockIndex* pindex, CTokensCache* tokensCache,
                              bool ignoreAddressIndex)
 {
-    printf("CBlock::DisconnectBlock, disconnect block (height: %d, hash: %s)\n", pindex->nHeight, GetHash().GetHex().c_str());
+    LogPrintf("CBlock::DisconnectBlock, disconnect block (height: %d, hash: %s)\n", pindex->nHeight, GetHash().GetHex());
     /** YAC_TOKEN START */
     std::vector<std::pair<std::string, CBlockTokenUndo> > vUndoData;
     if (!ptokensdb->ReadBlockUndoTokenData(this->GetHash(), vUndoData)) {
@@ -841,7 +857,7 @@ bool CBlock::DisconnectBlock(CValidationState& state, CTxDB& txdb,
             return error("DisconnectBlock() : WriteBlockIndex failed");
         if (fStoreBlockHashToDb && !txdb.WriteBlockHash(blockindexPrev))
         {
-            printf("CBlock::DisconnectBlock(): Can't WriteBlockHash\n");
+            LogPrintf("CBlock::DisconnectBlock(): Can't WriteBlockHash\n");
             return error("DisconnectBlock() : WriteBlockHash failed");
         }
     }
@@ -855,7 +871,7 @@ bool CBlock::DisconnectBlock(CValidationState& state, CTxDB& txdb,
 
 bool CBlock::ConnectBlock(CValidationState &state, CTxDB& txdb, CBlockIndex* pindex, CTokensCache* tokensCache, bool fJustCheck, bool ignoreAddressIndex)
 {
-    printf("CBlock::ConnectBlock, connect block (height: %d, hash: %s)\n", pindex->nHeight, GetHash().GetHex().c_str());
+    LogPrintf("CBlock::ConnectBlock, connect block (height: %d, hash: %s)\n", pindex->nHeight, GetHash().GetHex());
     // Check it again in case a previous version let a bad block in, but skip BlockSig checking
     if (!CheckBlock(state, !fJustCheck, !fJustCheck, false))
         return false;
@@ -938,7 +954,7 @@ bool CBlock::ConnectBlock(CValidationState &state, CTxDB& txdb, CBlockIndex* pin
                 for (auto out : tx.vout)
                     if (out.scriptPubKey.IsTokenScript())
                     {
-                        printf("WARNING: Received Block with tx that contained an token when tokens wasn't active\n");
+                        LogPrintf("WARNING: Received Block with tx that contained an token when tokens wasn't active\n");
                     }
             }
 
@@ -968,7 +984,7 @@ bool CBlock::ConnectBlock(CValidationState &state, CTxDB& txdb, CBlockIndex* pin
                 uint256 hashBlock = 0;
                 if (GetTransaction(prevout.COutPointGetHash(), tx, hashBlock))
                 {
-                    map<uint256, CBlockIndex*>::iterator mi = mapBlockIndex.find(hashBlock);
+                    BlockMap::iterator mi = mapBlockIndex.find(hashBlock);
                     if (mi != mapBlockIndex.end() && (*mi).second)
                     {
                         CBlockIndex* pTmpIndex = (*mi).second;
@@ -1176,7 +1192,7 @@ bool CBlock::ConnectBlock(CValidationState &state, CTxDB& txdb, CBlockIndex* pin
 //_____________________ this is new code here
     if (!control.Wait())
     {
-        (void)printf( "\nDoS ban of whom?\n\n" );   //maybe all nodes?
+        LogPrintf( "\nDoS ban of whom?\n\n" );   //maybe all nodes?
         return state.DoS(100, false);     // a direct ban
     }
 
@@ -1200,14 +1216,14 @@ bool CBlock::ConnectBlock(CValidationState &state, CTxDB& txdb, CBlockIndex* pin
         return error("Connect() : WriteBlockIndex for pindex failed");
     if (fStoreBlockHashToDb && !txdb.WriteBlockHash(CDiskBlockIndex(pindex)))
     {
-        printf("Connect(): Can't WriteBlockHash\n");
+        LogPrintf("Connect(): Can't WriteBlockHash\n");
         return error("Connect() : WriteBlockHash failed");
     }
 
     // fees are not collected by proof-of-stake miners
     // fees are destroyed to compensate the entire network
-    if (fDebug && IsProofOfStake() && GetBoolArg("-printcreation"))
-        printf("ConnectBlock() : destroy=%s nFees=%" PRId64 "\n", FormatMoney(nFees).c_str(), nFees);
+    if (fDebug && IsProofOfStake() && gArgs.GetBoolArg("-printcreation"))
+        LogPrintf("ConnectBlock() : destroy=%s nFees=%" PRId64 "\n", FormatMoney(nFees), nFees);
 
     if (fJustCheck)
         return true;
@@ -1247,7 +1263,7 @@ bool CBlock::ConnectBlock(CValidationState &state, CTxDB& txdb, CBlockIndex* pin
             return error("ConnectBlock() : WriteBlockIndex failed");
         if (fStoreBlockHashToDb && !txdb.WriteBlockHash(blockindexPrev))
         {
-            printf("ConnectBlock(): Can't WriteBlockHash\n");
+            LogPrintf("ConnectBlock(): Can't WriteBlockHash\n");
             return error("ConnectBlock() : WriteBlockHash failed");
         }
     }
@@ -1281,8 +1297,8 @@ bool CBlock::GetCoinAge(::uint64_t& nCoinAge) const
 
     if (nCoinAge == 0) // block coin age minimum 1 coin-day
         nCoinAge = 1;
-    if (fDebug && GetBoolArg("-printcoinage"))
-        printf("block coin age total nCoinDays=%" PRId64 "\n", nCoinAge);
+    if (fDebug && gArgs.GetBoolArg("-printcoinage"))
+        LogPrintf("block coin age total nCoinDays=%" PRId64 "\n", nCoinAge);
     return true;
 }
 
@@ -1312,7 +1328,7 @@ bool CBlock::ReceivedBlockTransactions(CValidationState &state, unsigned int nFi
     CTxDB txdb;
     if (!txdb.TxnBegin())
     {
-        printf("AddToBlockIndex(): TxnBegin failed\n");
+        LogPrintf("AddToBlockIndex(): TxnBegin failed\n");
         return false;
     }
 
@@ -1347,12 +1363,12 @@ bool CBlock::ReceivedBlockTransactions(CValidationState &state, unsigned int nFi
 
                 pindex->nStakeModifierChecksum = GetStakeModifierChecksum(pindex);
                 if (!CheckStakeModifierCheckpoints(pindex->nHeight, pindex->nStakeModifierChecksum))
-                    printf("AcceptBlock() : Rejected by stake modifier checkpoint height=%d, modifier=0x%016\n" PRIx64, pindex->nHeight, nStakeModifier);
+                    LogPrintf("AcceptBlock() : Rejected by stake modifier checkpoint height=%d, modifier=0x%016\n" PRIx64, pindex->nHeight, nStakeModifier);
             }
 
             if (fStoreBlockHashToDb && !txdb.WriteBlockHash(CDiskBlockIndex(pindex)))
             {
-                printf("AddToBlockIndex(): Can't WriteBlockHash\n");
+                LogPrintf("AddToBlockIndex(): Can't WriteBlockHash\n");
             }
         }
     } else {
@@ -1362,14 +1378,14 @@ bool CBlock::ReceivedBlockTransactions(CValidationState &state, unsigned int nFi
         txdb.WriteBlockIndex(CDiskBlockIndex(pindexNew));
         if (fStoreBlockHashToDb && !txdb.WriteBlockHash(CDiskBlockIndex(pindexNew)))
         {
-            printf("AddToBlockIndex(): Can't WriteBlockHash\n");
+            LogPrintf("AddToBlockIndex(): Can't WriteBlockHash\n");
         }
     }
 
     // Write to disk block index
     if (!txdb.TxnCommit())
     {
-        printf("AddToBlockIndex(): TxnCommit failed\n");
+        LogPrintf("AddToBlockIndex(): TxnCommit failed\n");
         return false;
     }
 
@@ -1437,7 +1453,7 @@ bool CBlock::SignBlock044(const CKeyStore& keystore)
         }
     }
 
-    printf("Sign failed\n");
+    LogPrintf("Sign failed\n");
     return false;
 }
 
@@ -1545,4 +1561,137 @@ bool CBlock::CheckBlockSignature() const
         }
     }
     return false;
+}
+
+// yacoin2015 GetBlockTrust upgrade
+CBigNum CBlockIndex::GetBlockTrust() const
+{
+    CBigNum bnTarget;
+    bnTarget.SetCompact(nBits);
+    if (bnTarget <= 0)
+        return CBigNum(0);
+
+    // saironiq: new trust rules (since CONSECUTIVE_STAKE_SWITCH_TIME on mainnet and always on testnet)
+    if (
+        fTestNet
+        ||
+        (GetBlockTime() >= CONSECUTIVE_STAKE_SWITCH_TIME)
+       )
+    {
+        // first block trust - for future compatibility (i.e., forks :P)
+        if (pprev == NULL)
+            return CBigNum(1);
+
+        // PoS after PoS? no trust for ya!
+        // (no need to explicitly disallow consecutive PoS
+        // blocks now as they won't get any trust anyway)
+        if (IsProofOfStake() && pprev->IsProofOfStake())
+            return CBigNum(0);
+
+        // PoS after PoW? trust = prev_trust + 1!
+        if (IsProofOfStake() && pprev->IsProofOfWork())
+            return pprev->GetBlockTrust() + 1;  //<<<<<<<<<<<<< does this mean this is recursive??????
+                                                // sure looks thatway!  Is this the intent?
+        // PoW trust calculation
+        if (IsProofOfWork())
+        {
+            // set trust to the amount of work done in this block
+            CBigNum bnTrust = bnProofOfWorkLimit / bnTarget;
+
+            // double the trust if previous block was PoS
+            // (to prevent orphaning of PoS)
+            if (pprev->IsProofOfStake())
+                bnTrust *= 2;
+
+            return bnTrust;
+        }
+        // what the hell?!
+        return CBigNum(0);
+    }
+    return (IsProofOfStake()? (CBigNum(1)<<256) / (bnTarget+1) : CBigNum(1));
+}
+
+bool CBlockIndex::IsSuperMajority(int minVersion, const CBlockIndex* pstart, unsigned int nRequired, unsigned int nToCheck)
+{
+    unsigned int nFound = 0;
+    for (unsigned int i = 0; i < nToCheck && nFound < nRequired && pstart != NULL; i++)
+    {
+        if (pstart->nVersion >= minVersion)
+            ++nFound;
+        pstart = pstart->pprev;
+    }
+    return (nFound >= nRequired);
+}
+
+/** Turn the lowest '1' bit in the binary representation of a number into a '0'. */
+int static inline InvertLowestOne(int n) { return n & (n - 1); }
+
+/** Compute what height to jump back to with the CBlockIndex::pskip pointer. */
+int static inline GetSkipHeight(int height) {
+    if (height < 2)
+        return 0;
+
+    // Determine which height to jump back to. Any number strictly lower than height is acceptable,
+    // but the following expression seems to perform well in simulations (max 110 steps to go back
+    // up to 2**18 blocks).
+    return (height & 1) ? InvertLowestOne(InvertLowestOne(height - 1)) + 1 : InvertLowestOne(height);
+}
+
+CBlockIndex* CBlockIndex::GetAncestor(int height)
+{
+    if (height > nHeight || height < 0)
+        return NULL;
+
+    CBlockIndex* pindexWalk = this;
+    int heightWalk = nHeight;
+    while (heightWalk > height) {
+        int heightSkip = GetSkipHeight(heightWalk);
+        int heightSkipPrev = GetSkipHeight(heightWalk - 1);
+        if (heightSkip == height ||
+            (heightSkip > height && !(heightSkipPrev < heightSkip - 2 &&
+                                      heightSkipPrev >= height))) {
+            // Only follow pskip if pprev->pskip isn't better than pskip->pprev.
+            pindexWalk = pindexWalk->pskip;
+            heightWalk = heightSkip;
+        } else {
+            pindexWalk = pindexWalk->pprev;
+            heightWalk--;
+        }
+    }
+    return pindexWalk;
+}
+
+const CBlockIndex* CBlockIndex::GetAncestor(int height) const
+{
+    return const_cast<CBlockIndex*>(this)->GetAncestor(height);
+}
+
+void CBlockIndex::BuildSkip()
+{
+    if (pprev)
+        pskip = pprev->GetAncestor(GetSkipHeight(nHeight));
+}
+
+bool CBlockIndex::IsInMainChain() const
+{
+    return (pnext || this == chainActive.Tip());
+}
+
+/** Find the last common ancestor two blocks have.
+ *  Both pa and pb must be non-NULL. */
+const CBlockIndex* LastCommonAncestor(const CBlockIndex* pa, const CBlockIndex* pb) {
+    if (pa->nHeight > pb->nHeight) {
+        pa = pa->GetAncestor(pb->nHeight);
+    } else if (pb->nHeight > pa->nHeight) {
+        pb = pb->GetAncestor(pa->nHeight);
+    }
+
+    while (pa != pb && pa && pb) {
+        pa = pa->pprev;
+        pb = pb->pprev;
+    }
+
+    // Eventually all chain branches meet at the genesis block.
+    assert(pa == pb);
+    return pa;
 }

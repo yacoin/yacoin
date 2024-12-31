@@ -9,9 +9,9 @@
 #include <vector>
 #include <openssl/bn.h>
 
-#ifndef BITCOIN_UTIL_H
- #include "util.h"
-#endif
+#include "util.h"
+#include "version.h"
+#include "serialize.h"
 
 /** Errors thrown by the bignum class */
 class bignum_error : public std::runtime_error
@@ -546,16 +546,16 @@ public:
     }
 
     template<typename Stream>
-    void Serialize(Stream& s, int nType=0, int nVersion=PROTOCOL_VERSION) const
+    void Serialize(Stream& s) const
     {
-        ::Serialize(s, getvch(), nType, nVersion);
+        ::Serialize(s, getvch());
     }
 
     template<typename Stream>
-    void Unserialize(Stream& s, int nType=0, int nVersion=PROTOCOL_VERSION)
+    void Unserialize(Stream& s)
     {
         std::vector< ::uint8_t> vch;
-        ::Unserialize(s, vch, nType, nVersion);
+        ::Unserialize(s, vch);
         setvch(vch);
     }
 

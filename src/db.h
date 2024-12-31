@@ -8,6 +8,7 @@
 #ifndef BITCOIN_MAIN_H
  #include "main.h"
 #endif
+#include "streams.h"
 
 #include <map>
 #include <string>
@@ -315,18 +316,6 @@ public:
     }
 
     bool static Rewrite(const std::string& strFile, const char* pszSkip = NULL);
-};
-
-
-/** Access to the (IP) address database (peers.dat) */
-class CAddrDB
-{
-private:
-    boost::filesystem::path pathAddr;
-public:
-    CAddrDB();
-    bool Write(const CAddrMan& addr);
-    bool Read(CAddrMan& addr);
 };
 
 #endif // BITCOIN_DB_H

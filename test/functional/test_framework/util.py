@@ -340,7 +340,6 @@ def initialize_datadir(dirname, n, chain):
         f.write("rpcport=" + str(rpc_port(n)) + "\n")
         f.write("rpcpallowip=127.0.0.1\n")
         f.write("checkblocks=8\n")
-        f.write("irc=0\n")
         f.write("server=1\n")
         f.write("daemon=0\n")
         f.write("debug=1\n")

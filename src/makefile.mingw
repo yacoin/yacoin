@@ -48,10 +48,12 @@ INCLUDEPATHS= \
 -I"$(CURDIR)" \
 -I"$(CURDIR)/tokens" \
 -I"$(CURDIR)/crypto" \
+-I"$(CURDIR)/compat" \
 -I"$(CURDIR)/primitives" \
 -I"$(CURDIR)/policy" \
 -I"$(CURDIR)/scrypt-jane" \
 -I"$(CURDIR)/script" \
+-I"$(CURDIR)/support" \
 -I"$(CURDIR)/obj" \
 -I'./leveldb/include' \
 -I'./leveldb/helpers' \
@@ -59,7 +61,8 @@ INCLUDEPATHS= \
 -I'../../../sw/db-4.8.30.NC/include' \
 -I'../../../sw/openssl-1.0.1u/include' \
 -I'../../../sw/miniupnpc-1.9.20150206/include' \
--I'../../../sw/qrencode-3.4.4/include'
+-I'../../../sw/qrencode-3.4.4/include' \
+-I'../../../sw/event2/include'
 
 LIBPATHS= \
 -L'../../../sw/boost_1_58_0/lib' \
@@ -67,7 +70,8 @@ LIBPATHS= \
 -L'../../../sw/openssl-1.0.1u/lib' \
 -L'leveldb' \
 -L'../../../sw/miniupnpc-1.9.20150206/lib' \
--L'../../../sw/qrencode-3.4.4/lib'
+-L'../../../sw/qrencode-3.4.4/lib' \
+-L'../../../sw/event2/lib'
 
 LIBS= \
 -lmingw32 \
@@ -87,7 +91,9 @@ LIBS= \
 -Wl,-Bstatic \
 -lpthread \
 -lminiupnpc \
--lshlwapi
+-lshlwapi \
+-levent \
+-levent_pthreads
 
 # -l boost_system$(BOOST_SUFFIX) \
 # -l boost_filesystem$(BOOST_SUFFIX) \
@@ -180,17 +186,7 @@ endif
 #
 # LevelDB support, with mingw shlwapi lib must come at the end! (Why?)
 #
-ifdef USE_LEVELDB
 DEFS += -DUSE_LEVELDB
-#leveldb/libleveldb.a:
-#	cd leveldb; TARGET_OS=NATIVE_WINDOWS make libleveldb.a libmemenv.a; cd ..
-#obj/txdb-leveldb.o	: txdb-leveldb.cpp
-#	g++ -c $(CFLAGS) -MMD -o $@ $<
-#	@echo TEST LEVELDB $(DEFS)
-else
-obj/txdb-bdb.o	: txdb-bdb.cpp
-	$(CC) -c $(CFLAGS) -MMD -o $@ $<
-endif
 ######################
 
 LIBS += \
@@ -216,20 +212,37 @@ LIBS += \
 HEADERS = $(wildcard *.h)
 
 OBJS= \
-obj/alert.o \
 obj/addrman.o \
+obj/addrdb.o \
+obj/bloom.o \
+obj/threadinterrupt.o \
 obj/tokentypes.o \
 obj/tokendb.o \
 obj/tokens.o \
+obj/hash.o \
 obj/siphash.o \
+obj/chacha20.o \
+obj/sha256.o \
+obj/sha512.o \
+obj/ripemd160.o \
+obj/hmac_sha256.o \
+obj/hmac_sha512.o \
+obj/cleanse.o \
 obj/base58.o \
 obj/bitcoinrpc.o \
 obj/block.o \
+obj/consensus.o \
+obj/merkleblock.o \
+obj/blockencodings.o \
 obj/checkpoints.o \
 obj/crypter.o \
 obj/db.o \
+obj/fs.o \
+obj/validationinterface.o \
+obj/scheduler.o \
+obj/torcontrol.o \
+obj/random.o \
 obj/init.o \
-obj/irc.o \
 obj/json_spirit_reader.o \
 obj/json_spirit_value.o \
 obj/kernel.o \
@@ -239,7 +252,9 @@ obj/LibBoolEE.o \
 obj/main.o \
 obj/miner.o \
 obj/net.o \
+obj/net_processing.o \
 obj/netbase.o \
+obj/arith_uint256.o \
 obj/noui.o \
 obj/pbkdf2.o \
 obj/price.o \
@@ -264,11 +279,15 @@ obj/scrypt-generic.o \
 obj/scrypt-jane.o \
 obj/stun.o \
 obj/sync.o \
+obj/strnlen.o \
 obj/transaction.o \
-obj/txdb-bdb.o \
 obj/dbwrapper.o \
 obj/txdb-leveldb.o \
 obj/util.o \
+obj/utilstrencodings.o \
+obj/utiltime.o \
+obj/timedata.o \
+obj/warnings.o \
 obj/version.o \
 obj/txmempool.o \
 obj/wallet.o \
@@ -284,21 +303,13 @@ test check: test_yacoin.exe FORCE
 # None of this code below works! At all!!
 # I built leveldb libraries from the Qt build, which does work!
 
-ifdef USE_LEVELDB
- #SOURCES += src/txdb-leveldb.cpp  
- #OBJS += obj/txdb-leveldb.o
+#SOURCES += src/txdb-leveldb.cpp  
+#OBJS += obj/txdb-leveldb.o
 leveldb/libleveldb.a:
 	cd leveldb; TARGET_OS=NATIVE_WINDOWS make libleveldb.a libmemenv.a; cd ..
 #obj/txdb-leveldb.o	: txdb-leveldb.cpp
 #	$(CXX) -c -frandom-seed=$@ $(CFLAGS) $(INCLUDEPATHS) -o $@ $<
 # @echo TEST LEVELDB $(DEFS)
-else
- #SOURCES += src/txdb-bdb.cpp
- #OBJS += obj/txdb-bdb.o
- #obj/txdb-bdb.o	: txdb-bdb.cpp
-#	$(CXX) -c -frandom-seed=$@ $(CFLAGS) $(INCLUDEPATHS) -o $@ $<
-# @echo TEST BDB $(DEFS)	
-endif
 ######################
 #.genjane:
 #	touch .genjane; gcc -c -O3 -DSCRYPT_CHACHA -DSCRYPT_KECCAK512 -DSCRYPT_CHOOSE_COMPILETIME -o obj/scrypt-jane.o scrypt-jane/scrypt-jane.c
@@ -307,6 +318,9 @@ obj/script.o: script/script.cpp
 	$(CXX) -c -frandom-seed=$@ $(CFLAGS) $(INCLUDEPATHS) -o $@ $<
 
 obj/block.o: primitives/block.cpp
+	$(CXX) -c -frandom-seed=$@ $(CFLAGS) $(INCLUDEPATHS) -o $@ $<
+
+obj/consensus.o: consensus/consensus.cpp
 	$(CXX) -c -frandom-seed=$@ $(CFLAGS) $(INCLUDEPATHS) -o $@ $<
 
 obj/transaction.o: primitives/transaction.cpp
@@ -328,6 +342,30 @@ obj/fees.o: policy/fees.cpp
 	$(CXX) -c -frandom-seed=$@ $(CFLAGS) $(INCLUDEPATHS) -o $@ $<
 
 obj/siphash.o: crypto/siphash.cpp
+	$(CXX) -c -frandom-seed=$@ $(CFLAGS) $(INCLUDEPATHS) -o $@ $<
+
+obj/chacha20.o: crypto/chacha20.cpp
+	$(CXX) -c -frandom-seed=$@ $(CFLAGS) $(INCLUDEPATHS) -o $@ $<
+
+obj/sha256.o: crypto/sha256.cpp
+	$(CXX) -c -frandom-seed=$@ $(CFLAGS) $(INCLUDEPATHS) -o $@ $<
+
+obj/sha512.o: crypto/sha512.cpp
+	$(CXX) -c -frandom-seed=$@ $(CFLAGS) $(INCLUDEPATHS) -o $@ $<
+
+obj/ripemd160.o: crypto/ripemd160.cpp
+	$(CXX) -c -frandom-seed=$@ $(CFLAGS) $(INCLUDEPATHS) -o $@ $<
+
+obj/hmac_sha256.o: crypto/hmac_sha256.cpp
+	$(CXX) -c -frandom-seed=$@ $(CFLAGS) $(INCLUDEPATHS) -o $@ $<
+
+obj/hmac_sha512.o: crypto/hmac_sha512.cpp
+	$(CXX) -c -frandom-seed=$@ $(CFLAGS) $(INCLUDEPATHS) -o $@ $<
+
+obj/strnlen.o: compat/strnlen.cpp
+	$(CXX) -c -frandom-seed=$@ $(CFLAGS) $(INCLUDEPATHS) -o $@ $<
+
+obj/cleanse.o: support/cleanse.cpp
 	$(CXX) -c -frandom-seed=$@ $(CFLAGS) $(INCLUDEPATHS) -o $@ $<
 
 obj/scrypt-jane.o: scrypt-jane/scrypt-jane.c

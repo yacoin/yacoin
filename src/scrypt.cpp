@@ -53,6 +53,7 @@ extern "C" {
 #ifndef BITCOIN_MAIN_H
  #include "main.h"
 #endif
+#include "primitives/block.h"
 
 #define SCRYPT_BUFFER_SIZE (131072 + 63)
 //                          (1<<17) + ((1<<6) -1) representing what, exactly??????
@@ -137,12 +138,12 @@ bool scrypt_hash(
       )
     {
         scryptHash.mEnd.stamp();
-        printf("scrypt_hash(): Total time = %lu (us), Nfactor = %d\n",
+        LogPrintf("scrypt_hash(): Total time = %lu (us), Nfactor = %d\n",
                 scryptHash.getExecutionTime(), Nfactor);
         return true;
     }
     scryptHash.mEnd.stamp();
-    printf("scrypt_hash(): Total time = %lu (us), Nfactor = %d\n",
+    LogPrintf("scrypt_hash(): Total time = %lu (us), Nfactor = %d\n",
             scryptHash.getExecutionTime(), Nfactor);
     return false;
 }
@@ -266,13 +267,6 @@ const ::uint32_t
     }
 
     highestZeroBitsSet <<= 1;
-// #ifdef Yac1dot0
-//     (void)printf(
-//                  "test mask %02x\n"
-//                  ""
-//                  , nMask
-//                 );
-// #endif
     size_t
         nHeaderSize;
 
@@ -311,19 +305,17 @@ const ::uint32_t
         {               // really we should hash for a while, then check
 #ifdef Yac1dot0
     #ifdef _DEBUG
-            (void)printf(
+            LogPrintf(
                          "hash count is %d\n"
                          ""
                          , hash_count
                         );
     #endif
 #endif
-            if (
-                (pindexPrev != chainActive.Tip()) ||
-                fShutdown
-               )
-                break;
         }
+
+        if ((pindexPrev != chainActive.Tip()) || fShutdown)
+            break;
     }
     memcpy(result, hash, 32);
     return *nOnce;

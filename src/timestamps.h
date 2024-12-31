@@ -5,6 +5,23 @@
 #ifndef _MSC_VER
     #include <limits.h>
 #endif
+#include <stdint.h>;
+
+const ::int64_t nSecondsPerMinute = 60, nMinutesPerHour = 60,
+                nOneHourInSeconds = nSecondsPerMinute * nMinutesPerHour,
+                nTwoHoursInSeconds = 2 * nOneHourInSeconds,
+                nTwelveHoursInSeconds = 12 * nOneHourInSeconds,
+                nOneDayInSeconds = 24 * nOneHourInSeconds;
+
+const int nOneMinuteInSeconds = 60,
+          nTenMilliseconds = 10, nOneHundredMilliseconds = 100;
+
+const ::uint32_t nOneMillisecond = 1, nMillisecondsPerSecond = 1000,
+                 nSecondsperMinute = 60, nMinutesperHour = 60,
+                 nSecondsPerHour = nSecondsperMinute * nMinutesperHour,
+                 nHoursPerDay = 24,
+                 nSecondsPerDay = nHoursPerDay * nSecondsPerHour;
+
 // saironiq : block height where "no consecutive PoS blocks" rule activates
 // Yacoin, updated to time.
 //static const int nConsecutiveStakeSwitchHeight = 420000;

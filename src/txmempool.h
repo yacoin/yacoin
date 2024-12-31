@@ -16,11 +16,14 @@
 #include <boost/multi_index/ordered_index.hpp>
 #include <boost/multi_index/sequenced_index.hpp>
 
+#include <boost/signals2/signal.hpp>
+
 #include "primitives/transaction.h"
 #include "primitives/block.h"
 #include "policy/feerate.h"
 #include "core_memusage.h"
 #include "memusage.h"
+#include "random.h"
 
 class CTxDB;
 
@@ -635,6 +638,9 @@ public:
     std::vector<TxMempoolInfo> infoAll() const;
 
     size_t DynamicMemoryUsage() const;
+
+    boost::signals2::signal<void (CTransactionRef)> NotifyEntryAdded;
+    boost::signals2::signal<void (CTransactionRef, MemPoolRemovalReason)> NotifyEntryRemoved;
 
 private:
     /** UpdateForDescendants is used by UpdateTransactionsFromBlock to update
