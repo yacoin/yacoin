@@ -1354,7 +1354,7 @@ inline void static SendBlockTransactions(const CBlock& block, const BlockTransac
     connman->PushMessage(pfrom, msgMaker.Make(NetMsgType::BLOCKTXN, resp));
 }
 
-bool static ProcessHeadersMessage(CNode *pfrom, CConnman *connman, std::vector<CBlock>& headers, bool punish_duplicate_invalid)
+bool static ProcessHeadersMessage(CNode *pfrom, CConnman *connman, std::vector<CBlockHeader>& headers, bool punish_duplicate_invalid)
 {
     const CNetMsgMaker msgMaker(pfrom->GetSendVersion());
     size_t nCount = headers.size();
@@ -1420,7 +1420,7 @@ bool static ProcessHeadersMessage(CNode *pfrom, CConnman *connman, std::vector<C
             vHashCalc.reserve(nCount);
 
             int index = 0;
-            for (CBlock& header : headers) {
+            for (CBlockHeader& header : headers) {
                 CHashCalculation hashCalc(&header, pfrom);
                 vHashCalc.push_back(CHashCalculation());
                 hashCalc.swap(vHashCalc.back());
@@ -1437,7 +1437,7 @@ bool static ProcessHeadersMessage(CNode *pfrom, CConnman *connman, std::vector<C
         }
         else
         {
-            for (CBlock& header : headers) {
+            for (CBlockHeader& header : headers) {
                 // SHA256 doesn't cost much cpu usage to calculate
                 uint256 blockSHA256Hash = header.GetSHA256Hash();
 
@@ -1477,7 +1477,7 @@ bool static ProcessHeadersMessage(CNode *pfrom, CConnman *connman, std::vector<C
         }
 
         uint256 hashLastBlock;
-        for (CBlock& header : headers) {
+        for (CBlockHeader& header : headers) {
             if (!hashLastBlock.IsNull() && header.hashPrevBlock != hashLastBlock) {
                 Misbehaving(pfrom->GetId(), 20);
                 return error("non-continuous headers sequence");
@@ -2264,9 +2264,9 @@ bool static ProcessMessage(CNode* pfrom, const std::string& strCommand, CDataStr
 
         std::deque<COutPoint> vWorkQueue;
         std::vector<uint256> vEraseQueue;
-        CTransaction tx;
-        vRecv >> tx;
-        CTransactionRef ptx = std::make_shared<CTransaction>(tx);
+        CTransactionRef ptx;
+        vRecv >> ptx;
+        const CTransaction& tx = *ptx;
 
         CInv inv(MSG_TX, tx.GetHash());
         pfrom->AddInventoryKnown(inv);
@@ -2735,7 +2735,7 @@ bool static ProcessMessage(CNode* pfrom, const std::string& strCommand, CDataStr
 
     else if (strCommand == NetMsgType::HEADERS)
     {
-        std::vector<CBlock> headers;
+        std::vector<CBlockHeader> headers;
 
         // Bypass the normal CBlock deserialization, as we don't want to risk deserializing 2000 full blocks.
         unsigned int nCount = ReadCompactSize(vRecv);

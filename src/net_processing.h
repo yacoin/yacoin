@@ -82,17 +82,18 @@ struct CNodeStateStats {
     std::vector<int> vHeightInFlight;
 };
 
+class CBlockHeader;
 /** Closure representing one block hash calculation
  *  Note that this stores pointer to the block*/
 class CHashCalculation
 {
 private:
-    CBlock *pBlock;
+    CBlockHeader *pBlock;
     CNode* pNode;
 
 public:
     CHashCalculation() {}
-    CHashCalculation(CBlock* pBlock, CNode* pNode) :
+    CHashCalculation(CBlockHeader* pBlock, CNode* pNode) :
         pBlock(pBlock), pNode(pNode) { }
 
     bool operator()();

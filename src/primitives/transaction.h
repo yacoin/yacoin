@@ -328,6 +328,13 @@ public:
         READWRITE(nLockTime);
     }
 
+    /** This deserializing constructor is provided instead of an Unserialize method.
+     *  Unserialize is not possible, since it would require overwriting const fields. */
+    template <typename Stream>
+    CTransaction(deserialize_type, Stream& s) {
+        Unserialize(s);
+    }
+
     void SetNull();
 
     bool IsNull() const
