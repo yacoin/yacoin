@@ -65,22 +65,40 @@ libyacoin_common_a_SOURCES= \
     tokens/tokendb.cpp \
     tokens/tokens.cpp \
     crypto/siphash.cpp \
+    crypto/chacha20.cpp \
+    crypto/sha256.cpp \
+    crypto/sha512.cpp \
+    crypto/ripemd160.cpp \
+    crypto/hmac_sha256.cpp \
+    crypto/hmac_sha512.cpp \
+    compat/strnlen.cpp \
     primitives/transaction.cpp \
     primitives/block.cpp \
+    consensus/consensus.cpp \
+    merkleblock.cpp \
+    blockencodings.cpp \
     policy/feerate.cpp \
     policy/fees.cpp \
+    support/cleanse.cpp \
     dbwrapper.cpp \
     txdb-leveldb.cpp \
-    alert.cpp \
+    hash.cpp \
     base58.cpp \
     version.cpp \
     checkpoints.cpp \
     netbase.cpp \
     addrman.cpp \
+    addrdb.cpp \
+    bloom.cpp \
+    threadinterrupt.cpp \
     crypter.cpp \
     key.cpp \
     db.cpp \
-    irc.cpp \
+    fs.cpp \
+    validationinterface.cpp \
+    scheduler.cpp \
+    torcontrol.cpp \
+    random.cpp \
     keystore.cpp \
     kernelrecord.cpp \
     LibBoolEE.cpp \
@@ -88,6 +106,8 @@ libyacoin_common_a_SOURCES= \
     miner.cpp \
     main.cpp \
     net.cpp \
+    arith_uint256.cpp \
+    net_processing.cpp \
     protocol.cpp \
     bitcoinrpc.cpp \
     price.cpp \
@@ -103,6 +123,11 @@ libyacoin_common_a_SOURCES= \
     script/script.cpp \
     sync.cpp \
     util.cpp \
+    utilstrencodings.cpp \
+    utiltime.cpp \
+    netaddress.cpp \
+    timedata.cpp \
+    warnings.cpp \
     txmempool.cpp \
     wallet.cpp \
     walletdb.cpp \
@@ -121,7 +146,7 @@ libyacoin_common_a_LDFLAGS = $(RELDFLAGS) $(AM_LDFLAGS) $(LIBTOOL_APP_LDFLAGS) -
 yacoind_SOURCES = init.cpp
 
 yacoind_LDADD = $(LIBYACOIN_COMMON)
-yacoind_LDADD += $(BOOST_LIBS) $(BDB_LIBS) $(SSL_LIBS) $(CRYPTO_LIBS) $(MINIUPNPC_LIBS) $(LIBLEVELDB) $(LIBMEMENV)
+yacoind_LDADD += $(BOOST_LIBS) $(BDB_LIBS) $(SSL_LIBS) $(CRYPTO_LIBS) $(MINIUPNPC_LIBS) $(LIBLEVELDB) $(LIBMEMENV) $(EVENT_PTHREADS_LIBS) $(EVENT_LIBS)
 yacoind_CPPFLAGS = $(BITCOIN_INCLUDES)
 yacoind_LDFLAGS = $(RELDFLAGS) $(AM_LDFLAGS) $(LIBTOOL_APP_LDFLAGS) -ldl -lpthread -lrt
 

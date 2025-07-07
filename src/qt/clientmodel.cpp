@@ -4,7 +4,6 @@
 #include "addresstablemodel.h"
 #include "transactiontablemodel.h"
 
-#include "alert.h"
 #include "main.h"
 #include "ui_interface.h"
 
@@ -50,16 +49,18 @@ double ClientModel::getDifficulty(bool fProofofStake)
 
 int ClientModel::getNumConnections(uint8_t flags) const
 {
-    LOCK(cs_vNodes);
-    if (flags == CONNECTIONS_ALL) // Shortcut if we want total
-        return (int)(vNodes.size());
+    CConnman::NumConnections connections = CConnman::CONNECTIONS_NONE;
 
-    int nNum = 0;
-    BOOST_FOREACH(CNode* pnode, vNodes)
-    if (flags & (pnode->fInbound ? CONNECTIONS_IN : CONNECTIONS_OUT))
-        nNum++;
+    if(flags == CONNECTIONS_IN)
+        connections = CConnman::CONNECTIONS_IN;
+    else if (flags == CONNECTIONS_OUT)
+        connections = CConnman::CONNECTIONS_OUT;
+    else if (flags == CONNECTIONS_ALL)
+        connections = CConnman::CONNECTIONS_ALL;
 
-    return nNum;
+    if(g_connman)
+         return g_connman->GetNodeCount(connections);
+    return 0;
 }
 
 int ClientModel::getNumBlocks() const
@@ -75,12 +76,16 @@ int ClientModel::getNumBlocksAtStartup()
 
 quint64 ClientModel::getTotalBytesRecv() const
 {
-    return CNode::GetTotalBytesRecv();
+    if(!g_connman)
+        return 0;
+    return g_connman->GetTotalBytesRecv();
 }
 
 quint64 ClientModel::getTotalBytesSent() const
 {
-    return CNode::GetTotalBytesSent();
+    if(!g_connman)
+        return 0;
+    return g_connman->GetTotalBytesSent();
 }
 
 QDateTime ClientModel::getLastBlockDate() const
@@ -114,23 +119,9 @@ void ClientModel::updateNumConnections(int numConnections)
     emit numConnectionsChanged(numConnections);
 }
 
-void ClientModel::updateAlert(const QString &hash, int status)
+void ClientModel::updateAlert()
 {
-    // Show error message notification for new alert
-    if(status == CT_NEW)
-    {
-        uint256 hash_256;
-        hash_256.SetHex(hash.toStdString());
-        CAlert alert = CAlert::getAlertByHash(hash_256);
-        if(!alert.IsNull())
-        {
-            emit error(tr("Network Alert"), QString::fromStdString(alert.strStatusBar), false);
-        }
-    }
-
-    // Emit a numBlocksChanged when the status message changes,
-    // so that the view recomputes and updates the status bar.
-    emit numBlocksChanged(getNumBlocks(), getNumBlocksOfPeers());
+    emit alertsChanged(getStatusBarWarnings());
 }
 
 bool ClientModel::isTestNet() const
@@ -192,17 +183,27 @@ static void NotifyBlocksChanged(ClientModel *clientmodel)
 
 static void NotifyNumConnectionsChanged(ClientModel *clientmodel, int newNumConnections)
 {
-    // Too noisy: OutputDebugStringF("NotifyNumConnectionsChanged %i\n", newNumConnections);
+    // Too noisy: LogPrintf("NotifyNumConnectionsChanged %i\n", newNumConnections);
     QMetaObject::invokeMethod(clientmodel, "updateNumConnections", Qt::QueuedConnection,
                               Q_ARG(int, newNumConnections));
 }
 
-static void NotifyAlertChanged(ClientModel *clientmodel, const uint256 &hash, ChangeType status)
+static void NotifyNetworkActiveChanged(ClientModel *clientmodel, bool networkActive)
 {
-    OutputDebugStringF("NotifyAlertChanged %s status=%i\n", hash.GetHex().c_str(), status);
-    QMetaObject::invokeMethod(clientmodel, "updateAlert", Qt::QueuedConnection,
-                              Q_ARG(QString, QString::fromStdString(hash.GetHex())),
-                              Q_ARG(int, status));
+    QMetaObject::invokeMethod(clientmodel, "updateNetworkActive", Qt::QueuedConnection,
+                              Q_ARG(bool, networkActive));
+}
+
+static void NotifyAlertChanged(ClientModel *clientmodel)
+{
+    LogPrintf("NotifyAlertChanged\n");
+    QMetaObject::invokeMethod(clientmodel, "updateAlert", Qt::QueuedConnection);
+}
+
+static void BannedListChanged(ClientModel *clientmodel)
+{
+    LogPrintf("Requesting update for peer banlist\n");
+    QMetaObject::invokeMethod(clientmodel, "updateBanlist", Qt::QueuedConnection);
 }
 
 void ClientModel::subscribeToCoreSignals()
@@ -210,7 +211,7 @@ void ClientModel::subscribeToCoreSignals()
     // Connect signals to client
 //    uiInterface.NotifyBlocksChanged.connect(boost::bind(NotifyBlocksChanged, this));
     uiInterface.NotifyNumConnectionsChanged.connect(boost::bind(NotifyNumConnectionsChanged, this, _1));
-    uiInterface.NotifyAlertChanged.connect(boost::bind(NotifyAlertChanged, this, _1, _2));
+    uiInterface.NotifyAlertChanged.connect(boost::bind(NotifyAlertChanged, this));
 }
 
 void ClientModel::unsubscribeFromCoreSignals()
@@ -218,5 +219,5 @@ void ClientModel::unsubscribeFromCoreSignals()
     // Disconnect signals from client
 //    uiInterface.NotifyBlocksChanged.disconnect(boost::bind(NotifyBlocksChanged, this));
     uiInterface.NotifyNumConnectionsChanged.disconnect(boost::bind(NotifyNumConnectionsChanged, this, _1));
-    uiInterface.NotifyAlertChanged.disconnect(boost::bind(NotifyAlertChanged, this, _1, _2));
+    uiInterface.NotifyAlertChanged.disconnect(boost::bind(NotifyAlertChanged, this));
 }

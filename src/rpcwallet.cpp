@@ -21,6 +21,7 @@
 #endif
 
 #include "coincontrol.h"
+#include "streams.h"
 #include <sstream>
 
 using namespace json_spirit;
@@ -70,7 +71,7 @@ void WalletTxToJSON(const CWalletTx& wtx, Object& entry)
     entry.push_back(Pair("txid", wtx.GetHash().GetHex()));
     entry.push_back(Pair("time", (boost::int64_t)wtx.GetTxTime()));
     entry.push_back(Pair("timereceived", (boost::int64_t)wtx.nTimeReceived));
-    BOOST_FOREACH(const PAIRTYPE(string,string)& item, wtx.mapValue)
+    for(const PAIRTYPE(string,string)& item : wtx.mapValue)
         entry.push_back(Pair(item.first, item.second));
 }
 
@@ -227,9 +228,15 @@ Value getinfo(const Array& params, bool fHelp)
     obj.push_back(Pair("up-time",       sUpTime));
 
     obj.push_back(Pair("moneysupply",   ValueFromAmount(chainActive.Tip()->nMoneySupply)));
-    obj.push_back(Pair("connections",   (int)vNodes.size()));
-    obj.push_back(Pair("proxy",         (proxy.first.IsValid() ? proxy.first.ToStringIPPort() : string())));
-    obj.push_back(Pair("ip",            addrSeenByPeer.ToStringIP()));
+    if(g_connman)
+        obj.push_back(Pair("connections",   (int)g_connman->GetNodeCount(CConnman::CONNECTIONS_ALL)));
+    obj.push_back(Pair("proxy",         (proxy.IsValid() ? proxy.proxy.ToStringIPPort() : std::string())));
+    for (const std::pair<CNetAddr, LocalServiceInfo> &item : mapLocalHost)
+    {
+        obj.push_back(Pair("ip", item.first.ToString()));
+        obj.push_back(Pair("port", item.second.nPort));
+        obj.push_back(Pair("score", item.second.nScore));
+    }
 
     diff.push_back(Pair("proof-of-work",  GetDifficulty()));
     diff.push_back(Pair("proof-of-stake", GetDifficulty(GetLastBlockIndex(chainActive.Tip(), true))));
@@ -2080,7 +2087,7 @@ Value listsinceblock(const Array& params, bool fHelp)
             blockId = 0;
 
         blockId.SetHex(params[0].get_str());
-        std::map<uint256, CBlockIndex*>::iterator it = mapBlockIndex.find(blockId);
+        BlockMap::iterator it = mapBlockIndex.find(blockId);
         if (it != mapBlockIndex.end())
             pindex = it->second;
     }
@@ -2208,7 +2215,7 @@ Value gettransaction(const Array& params, bool fHelp)
             else
             {
                 entry.push_back(Pair("blockhash", hashBlock.GetHex()));
-                map<uint256, CBlockIndex*>::iterator mi = mapBlockIndex.find(hashBlock);
+                BlockMap::iterator mi = mapBlockIndex.find(hashBlock);
                 if (mi != mapBlockIndex.end() && (*mi).second)
                 {
                     CBlockIndex* pindex = (*mi).second;
@@ -2252,7 +2259,7 @@ Value keypoolrefill(const Array& params, bool fHelp)
             "should be replaced with the newly generated one."
             + HelpRequiringPassphrase());
 
-    unsigned int nSize = max<unsigned int>(GetArg("-keypool", 100), 0);
+    unsigned int nSize = max<unsigned int>(gArgs.GetArg("-keypool", DEFAULT_KEYPOOL_SIZE), 0);
     if (params.size() > 0) {
         if (params[0].get_int() < 0)
             throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid parameter, expected valid size");
@@ -2279,7 +2286,7 @@ Value keypoolreset(const Array& params, bool fHelp)
             "should be replaced with the newly generated one."
             + HelpRequiringPassphrase());
 
-    unsigned int nSize = max<unsigned int>(GetArg("-keypool", 100), 0);
+    unsigned int nSize = max<unsigned int>(gArgs.GetArg("-keypool", DEFAULT_KEYPOOL_SIZE), 0);
     if (params.size() > 0) {
         if (params[0].get_int() < 0)
             throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid parameter, expected valid size");
@@ -2602,19 +2609,19 @@ Value reservebalance(const Array& params, bool fHelp)
             nAmount = (nAmount / CENT) * CENT;  // round to cent
             if (nAmount < 0)
                 throw runtime_error("amount cannot be negative.\n");
-            mapArgs["-reservebalance"] = FormatMoney(nAmount).c_str();
+            gArgs.ForceSetArg("-reservebalance", FormatMoney(nAmount));
         }
         else
         {
             if (params.size() > 1)
                 throw runtime_error("cannot specify amount to turn off reserve.\n");
-            mapArgs["-reservebalance"] = "0";
+            gArgs.ForceSetArg("-reservebalance", "0");
         }
     }
 
     Object result;
     int64_t nReserveBalance = 0;
-    if (mapArgs.count("-reservebalance") && !ParseMoney(mapArgs["-reservebalance"], nReserveBalance))
+    if (gArgs.IsArgSet("-reservebalance") && !ParseMoney(gArgs.GetArg("-reservebalance", ""), nReserveBalance))
         throw runtime_error("invalid reserve balance amount\n");
     result.push_back(Pair("reserve", (nReserveBalance > 0)));
     result.push_back(Pair("amount", ValueFromAmount(nReserveBalance)));

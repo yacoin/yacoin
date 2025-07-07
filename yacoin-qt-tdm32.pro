@@ -149,8 +149,10 @@ HEADERS += \
     src/qt/mintingtablemodel.h \
     src/qt/mintingview.h \
     src/kernelrecord.h \
-    src/alert.h \
     src/addrman.h \
+    src/addrdb.h \
+    src/bloom.h \
+    src/threadinterrupt.h \
     src/addressindex.h \
     src/base58.h \
     src/bignum.h \
@@ -160,8 +162,14 @@ HEADERS += \
     src/coins.h \
     src/indirectmap.h \
     src/LibBoolEE.h \
+    src/limitedmap.h \
     src/sync.h \
     src/util.h \
+    src/utilstrencodings.h \
+    src/utiltime.h \
+    src/netaddress.h \
+    src/timedata.h \
+    src/warnings.h \
     src/timestamps.h \
     src/hash.h \
     src/uint256.h \
@@ -171,21 +179,24 @@ HEADERS += \
     src/prevector.h \
     src/serialize.h \
     src/strlcpy.h \
+    src/scheduler.h \
+    src/torcontrol.h \
     src/main.h \
     src/memusage.h \
     src/miner.h \
     src/random_nonce.h \
     src/net.h \
+    src/arith_uint256.h \
+    src/net_processing.h \
     src/ministun.h \
     src/key.h \
     src/db.h \
     src/dbwrapper.h \
-    src/txdb.h \
+    src/txdb-leveldb.h \
     src/tinyformat.h \
     src/walletdb.h \
     src/script/script.h \
     src/init.h \
-    src/irc.h \
     src/mruset.h \
     src/compat/endian.h \
     src/compat/byteswap.h \
@@ -238,7 +249,6 @@ HEADERS += \
     src/qt/multisigdialog.h
 
 #    src/txdb-leveldb.cpp \
-#    src/txdb-bdb.cpp \
 
 SOURCES += src/qt/bitcoin.cpp src/qt/bitcoingui.cpp \
     src/qt/transactiontablemodel.cpp \
@@ -257,11 +267,16 @@ SOURCES += src/qt/bitcoin.cpp src/qt/bitcoingui.cpp \
     src/qt/mintingtablemodel.cpp \
     src/qt/mintingview.cpp \
     src/kernelrecord.cpp \
-    src/alert.cpp \
+    src/hash.cpp \
     src/base58.cpp \
     src/version.cpp \
     src/sync.cpp \
     src/util.cpp \
+    src/utilstrencodings.cpp \
+    src/utiltime.cpp \
+    src/netaddress.cpp \
+    src/timedata.cpp \
+    src/warnings.cpp \
     src/netbase.cpp \
     src/key.cpp \
     src/LibBoolEE.cpp \
@@ -270,13 +285,22 @@ SOURCES += src/qt/bitcoin.cpp src/qt/bitcoingui.cpp \
     src/miner.cpp \
     src/init.cpp \
     src/net.cpp \
+    src/arith_uint256.cpp \
+    src/net_processing.cpp \
     src/price.cpp \
     src/random_nonce.cpp \
     src/stun.cpp \
-    src/irc.cpp \
     src/checkpoints.cpp \
     src/addrman.cpp \
+    src/addrdb.cpp \
+    src/bloom.cpp \
+    src/threadinterrupt.cpp \
     src/db.cpp \
+    src/fs.cpp \
+    src/validationinterface.cpp \
+    src/scheduler.cpp \
+    src/torcontrol.cpp \
+    src/random.cpp \
     src/dbwrapper.cpp \
     src/walletdb.cpp \
     src/txmempool.cpp \
@@ -285,8 +309,20 @@ SOURCES += src/qt/bitcoin.cpp src/qt/bitcoingui.cpp \
     src/tokens/tokens.cpp \
     src/primitives/transaction.cpp \
     src/primitives/block.cpp \
+    src/consensus/consensus.cpp \
+    src/merkleblock.cpp \
+    src/blockencodings.cpp \
     src/policy/feerate.cpp \
     src/policy/fees.cpp \
+    src/crypto/siphash.cpp \
+    src/crypto/chacha20.cpp \
+    src/crypto/sha256.cpp \
+    src/crypto/sha512.cpp \
+    src/crypto/ripemd160.cpp \
+    src/crypto/hmac_sha256.cpp \
+    src/crypto/hmac_sha512.cpp \
+    src/compat/strnlen.cpp \
+    src/support/cleanse.cpp \
     src/qt/clientmodel.cpp \
     src/qt/guiutil.cpp \
     src/qt/transactionrecord.cpp \
@@ -394,7 +430,7 @@ LIBS += \
 	$$join(BDB_LIB_PATH,,-L,) \
 	$$join(OPENSSL_LIB_PATH,,-L,) \
 	$$join(QRENCODE_LIB_PATH,,-L,)
-LIBS += -lssl -lcrypto -ldb_cxx$$BDB_LIB_SUFFIX -lqrencode
+LIBS += -lssl -lcrypto -ldb_cxx$$BDB_LIB_SUFFIX -lqrencode -levent -levent_pthreads
 # -lgdi32 has to happen after -lcrypto (see  #681)
 windows:LIBS += -lws2_32 -lshlwapi -lmswsock -lole32 -loleaut32 -luuid -lgdi32
 LIBS += -lboost_system -lboost_filesystem -lboost_program_options -lboost_thread

@@ -9,7 +9,7 @@
 #endif
 
 #ifndef BITCOIN_TXDB_H
-#include "txdb.h"
+#include "txdb-leveldb.h"
 #endif
 
 #include <map>
@@ -35,7 +35,7 @@ leveldb::DB *txdb[DB_TYPE_MAX]; // global pointer for LevelDB object instance
 static leveldb::Options GetOptions()
 {
     leveldb::Options options;
-    int nCacheSizeMB = GetArg("-dbcache", 25);
+    int nCacheSizeMB = gArgs.GetArg("-dbcache", 25);
     options.block_cache = leveldb::NewLRUCache(nCacheSizeMB * 1048576);
     options.filter_policy = leveldb::NewBloomFilterPolicy(10);
     return options;
@@ -53,22 +53,22 @@ void init_blockindex(DatabaseType dbType, leveldb::Options &options, bool fRemov
 	    directory = GetDataDir() / "tokens";
 	    break;
 	default:
-		printf("Unknown database type = %d\n", dbType);
+	    LogPrintf("Unknown database type = %d\n", dbType);
 		break;
 	}
 
     if (fRemoveOld)
     {
-        printf("REMOVE LevelDB in %s\n", directory.string().c_str());
+        LogPrintf("REMOVE LevelDB in %s\n", directory.string());
         system::error_code ec;
         filesystem::remove_all(directory, ec); // remove directory
         if (ec) {
-            printf("FAILED to remove LevelDB in %s (%s)\n", directory.string().c_str(), ec.message().c_str());
+            LogPrintf("FAILED to remove LevelDB in %s (%s)\n", directory.string(), ec.message());
         }
     }
 
     filesystem::create_directory(directory);
-    printf("OPENING LevelDB in %s\n", directory.string().c_str());
+    LogPrintf("OPENING LevelDB in %s\n", directory.string());
     leveldb::Status status = leveldb::DB::Open(options, directory.string(), &txdb[dbType]);
     if (!status.ok())
     {
@@ -103,11 +103,11 @@ CDBWrapper::CDBWrapper(DatabaseType dbType, const char *pszMode, bool fWipe)
     if (Exists(string("version")))
     {
         ReadVersion(nVersion);
-        printf("Transaction index version is %d\n", nVersion);
+        LogPrintf("Transaction index version is %d\n", nVersion);
 
         if (nVersion < DATABASE_VERSION)
         {
-            printf("Required index version is %d, removing old database\n", DATABASE_VERSION);
+            LogPrintf("Required index version is %d, removing old database\n", DATABASE_VERSION);
 
             // Leveldb instance destruction
             delete txdb[mDbType];
@@ -132,7 +132,7 @@ CDBWrapper::CDBWrapper(DatabaseType dbType, const char *pszMode, bool fWipe)
         fReadOnly = fTmp;
     }
 
-    printf("Opened LevelDB successfully\n");
+    LogPrintf("Opened LevelDB successfully\n");
 }
 
 CDBIterator* CDBWrapper::NewIterator()
@@ -167,7 +167,7 @@ bool CDBWrapper::TxnCommit()
     activeBatch = NULL;
     if (!status.ok())
     {
-        printf("LevelDB batch commit failure: %s\n", status.ToString().c_str());
+        LogPrintf("LevelDB batch commit failure: %s\n", status.ToString());
         return false;
     }
     return true;

@@ -25,19 +25,19 @@ struct CAddressUnspentKey {
         return 57 + token.size();
     }
     template<typename Stream>
-    void Serialize(Stream& s, int nType, int nVersion) const {
+    void Serialize(Stream& s) const {
         ser_writedata8(s, type);
-        hashBytes.Serialize(s, nType, nVersion);
-        ::Serialize(s, token, nType, nVersion);
-        txhash.Serialize(s, nType, nVersion);
+        hashBytes.Serialize(s);
+        ::Serialize(s, token);
+        txhash.Serialize(s);
         ser_writedata32(s, index);
     }
     template<typename Stream>
-    void Unserialize(Stream& s, int nType, int nVersion) {
+    void Unserialize(Stream& s) {
         type = ser_readdata8(s);
-        hashBytes.Unserialize(s, nType, nVersion);
-        ::Unserialize(s, token, nType, nVersion);
-        txhash.Unserialize(s, nType, nVersion);
+        hashBytes.Unserialize(s);
+        ::Unserialize(s, token);
+        txhash.Unserialize(s);
         index = ser_readdata32(s);
     }
 
@@ -78,8 +78,7 @@ struct CAddressUnspentValue {
     ADD_SERIALIZE_METHODS;
 
     template <typename Stream, typename Operation>
-    inline void SerializationOp(Stream& s, Operation ser_action, int nType, int nVersion) {
-        unsigned int nSerSize = 0;
+    inline void SerializationOp(Stream& s, Operation ser_action) {
         READWRITE(satoshis);
         READWRITE(*(std::vector< ::uint8_t>*)(&script));
         READWRITE(blockHeight);
@@ -120,26 +119,26 @@ struct CAddressIndexKey {
         return 34 + token.size();
     }
     template<typename Stream>
-    void Serialize(Stream& s, int nType, int nVersion) const {
+    void Serialize(Stream& s) const {
         ser_writedata8(s, type);
-        hashBytes.Serialize(s, nType, nVersion);
-        ::Serialize(s, token, nType, nVersion);
+        hashBytes.Serialize(s);
+        ::Serialize(s, token);
         // Heights are stored big-endian for key sorting in LevelDB
         ser_writedata32be(s, blockHeight);
         ser_writedata32be(s, txindex);
-        txhash.Serialize(s, nType, nVersion);
+        txhash.Serialize(s);
         ser_writedata32(s, index);
         char f = spending;
         ser_writedata8(s, f);
     }
     template<typename Stream>
-    void Unserialize(Stream& s, int nType, int nVersion) {
+    void Unserialize(Stream& s) {
         type = ser_readdata8(s);
-        hashBytes.Unserialize(s, nType, nVersion);
-        ::Unserialize(s, token, nType, nVersion);
+        hashBytes.Unserialize(s);
+        ::Unserialize(s, token);
         blockHeight = ser_readdata32be(s);
         txindex = ser_readdata32be(s);
-        txhash.Unserialize(s, nType, nVersion);
+        txhash.Unserialize(s);
         index = ser_readdata32(s);
         char f = ser_readdata8(s);
         spending = f;
@@ -194,14 +193,14 @@ struct CAddressIndexIteratorKey {
         return 21;
     }
     template<typename Stream>
-    void Serialize(Stream& s, int nType, int nVersion) const {
+    void Serialize(Stream& s) const {
         ser_writedata8(s, type);
-        hashBytes.Serialize(s, nType, nVersion);
+        hashBytes.Serialize(s);
     }
     template<typename Stream>
-    void Unserialize(Stream& s, int nType, int nVersion) {
+    void Unserialize(Stream& s) {
         type = ser_readdata8(s);
-        hashBytes.Unserialize(s, nType, nVersion);
+        hashBytes.Unserialize(s);
     }
 
     CAddressIndexIteratorKey(unsigned int addressType, uint160 addressHash) {
@@ -228,16 +227,16 @@ struct CAddressIndexIteratorTokenKey {
         return 21 + token.size();
     }
     template<typename Stream>
-    void Serialize(Stream& s, int nType, int nVersion) const {
+    void Serialize(Stream& s) const {
         ser_writedata8(s, type);
-        hashBytes.Serialize(s, nType, nVersion);
-        ::Serialize(s, token, nType, nVersion);
+        hashBytes.Serialize(s);
+        ::Serialize(s, token);
     }
     template<typename Stream>
-    void Unserialize(Stream& s, int nType, int nVersion) {
+    void Unserialize(Stream& s) {
         type = ser_readdata8(s);
-        hashBytes.Unserialize(s, nType, nVersion);
-        ::Unserialize(s, token, nType, nVersion);
+        hashBytes.Unserialize(s);
+        ::Unserialize(s, token);
     }
 
     CAddressIndexIteratorTokenKey(unsigned int addressType, uint160 addressHash) {
@@ -273,17 +272,17 @@ struct CAddressIndexIteratorHeightKey {
         return 25 + token.size();
     }
     template<typename Stream>
-    void Serialize(Stream& s, int nType, int nVersion) const {
+    void Serialize(Stream& s) const {
         ser_writedata8(s, type);
-        hashBytes.Serialize(s, nType, nVersion);
-        ::Serialize(s, token, nType, nVersion);
+        hashBytes.Serialize(s);
+        ::Serialize(s, token);
         ser_writedata32be(s, blockHeight);
     }
     template<typename Stream>
-    void Unserialize(Stream& s, int nType, int nVersion) {
+    void Unserialize(Stream& s) {
         type = ser_readdata8(s);
-        hashBytes.Unserialize(s, nType, nVersion);
-        ::Unserialize(s, token, nType, nVersion);
+        hashBytes.Unserialize(s);
+        ::Unserialize(s, token);
         blockHeight = ser_readdata32be(s);
     }
 

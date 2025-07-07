@@ -78,6 +78,7 @@ signals:
     void numBlocksChanged(int count, int countOfPeers);
     void bytesChanged(quint64 totalBytesIn, quint64 totalBytesOut);
     void nFactorChanged(int value);
+    void alertsChanged(const QString &warnings);
 
 
     //! Asynchronous error notification
@@ -86,7 +87,7 @@ signals:
 public slots:
     void updateTimer();
     void updateNumConnections(int numConnections);
-    void updateAlert(const QString &hash, int status);
+    void updateAlert();
 };
 
 #endif // CLIENTMODEL_H

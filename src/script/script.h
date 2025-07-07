@@ -16,7 +16,6 @@
 #include "prevector.h"
 
 typedef std::vector< ::uint8_t> valtype;
-typedef prevector<28, unsigned char> CScriptBase;
 
 class CTransaction;
 class CTxOut;
@@ -235,12 +234,6 @@ enum
     SCRIPT_VERIFY_CHECKSEQUENCEVERIFY = (1U << 10),
 };
 
-/** Flags for nSequence and nLockTime locks */
-enum {
-    /* Interpret sequence numbers as relative lock-time constraints. */
-    LOCKTIME_VERIFY_SEQUENCE = (1 << 0),
-};
-
 // Strict verification:
 //
 // * force DER encoding;
@@ -264,9 +257,6 @@ static const unsigned int STRICT_FLAGS = MANDATORY_SCRIPT_VERIFY_FLAGS | STRICT_
 
 // Soft verifications, no extended signature format checkings
 static const unsigned int SOFT_FLAGS = STRICT_FLAGS & ~STRICT_FORMAT_FLAGS;
-
-/** Used as the flags parameter to sequence and nLocktime checks in non-consensus code. */
-static const unsigned int STANDARD_LOCKTIME_VERIFY_FLAGS = LOCKTIME_VERIFY_SEQUENCE;
 
 const char* GetTxnOutputType(txnouttype t);
 
@@ -448,8 +438,10 @@ std::vector<unsigned char> ToByteVector(const T& in)
     return std::vector<unsigned char>(in.begin(), in.end());
 }
 
+typedef std::vector< ::uint8_t> CScriptBase;
+
 /** Serialized script, used inside transaction inputs and outputs */
-class CScript : public std::vector< ::uint8_t>
+class CScript : public CScriptBase
 {
 protected:
     CScript& push_int64(::int64_t n)
@@ -485,6 +477,13 @@ public:
 #ifndef _MSC_VER
     CScript(const uint8_t* pbegin, const uint8_t* pend) : std::vector<uint8_t>(pbegin, pend) { }
 #endif
+
+    ADD_SERIALIZE_METHODS;
+
+    template <typename Stream, typename Operation>
+    inline void SerializationOp(Stream& s, Operation ser_action) {
+        READWRITE(static_cast<CScriptBase&>(*this));
+    }
 
     CScript& operator+=(const CScript& b)
     {
@@ -772,7 +771,7 @@ public:
 
     void PrintHex() const
     {
-        printf("CScript(%s)\n", HexStr(begin(), end(), true).c_str());
+        LogPrintf("CScript(%s)\n", HexStr(begin(), end(), true));
     }
 
     std::string ToString(bool fShort=false) const
@@ -800,7 +799,7 @@ public:
 
     void print() const
     {
-        printf("%s\n", ToString().c_str());
+        LogPrintf("%s\n", ToString());
     }
 
     CScriptID GetID() const

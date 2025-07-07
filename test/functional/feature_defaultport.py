@@ -67,12 +67,12 @@ class BasicTransfer_Test(BitcoinTestFramework):
 
     def run_test(self):
         # connect() 192.168.1.26:6688 failed after select(): Connection refused
-        msgs = ["trying connection 192.168.5.5:1688", "connection timeout 192.168.5.5:1688"]
+        msgs = ["trying connection 192.168.5.5:1688", "connection to 192.168.5.5:1688 timeout"]
         with self.nodes[0].assert_debug_log(expected_msgs=msgs):
             self.nodes[0].addnode("192.168.5.5:1688","onetry")        
         
         # testing default port
-        msgs = ["trying connection 192.168.5.5", "connection timeout 192.168.5.5:7688"]
+        msgs = ["trying connection 192.168.5.5", "connection to 192.168.5.5:7688 timeout"]
         with self.nodes[0].assert_debug_log(expected_msgs=msgs):
             self.nodes[0].addnode("192.168.5.5","onetry")        
         

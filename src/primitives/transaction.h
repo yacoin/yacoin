@@ -19,11 +19,11 @@ class CTxIndex;
 class CValidationState;
 class CDiskTxPos;
 class CScriptCheck;
-class CChain;
 class CBlockIndex;
 typedef std::map<uint256, std::pair<CTxIndex, CTransaction> > MapPrevTx;
-extern CChain chainActive;
 FILE* OpenBlockFile(unsigned int nFile, unsigned int nBlockPos, const char* pszMode="rb");
+
+static const int SERIALIZE_TRANSACTION_NO_WITNESS = 0x40000000;
 
 /** An inpoint - a combination of a transaction and an index n into its vin */
 class CInPoint
@@ -52,10 +52,13 @@ public:
     ::uint32_t COutPointGet_n() const { return n; }
     COutPoint() { SetNull(); }
     COutPoint(uint256 hashIn, unsigned int nIn) { hash = hashIn; n = nIn; }
-    IMPLEMENT_SERIALIZE
-    (
-        READWRITE(FLATDATA(*this));
-    )
+    ADD_SERIALIZE_METHODS;
+
+    template <typename Stream, typename Operation>
+    inline void SerializationOp(Stream& s, Operation ser_action) {
+        READWRITE(hash);
+        READWRITE(n);
+    }
     void SetNull() { hash = 0; n = (unsigned int) -1; }
     bool IsNull() const { return (hash == 0 && n == (unsigned int) -1); }
 
@@ -81,7 +84,7 @@ public:
 
     void print() const
     {
-        printf("%s\n", ToString().c_str());
+        LogPrintf("%s\n", ToString());
     }
 };
 
@@ -142,12 +145,14 @@ public:
         nSequence = nSequenceIn;
     }
 
-    IMPLEMENT_SERIALIZE
-    (
+    ADD_SERIALIZE_METHODS;
+
+    template <typename Stream, typename Operation>
+    inline void SerializationOp(Stream& s, Operation ser_action) {
         READWRITE(prevout);
         READWRITE(scriptSig);
         READWRITE(nSequence);
-    )
+    }
 
     bool IsFinal() const
     {
@@ -188,7 +193,7 @@ public:
 
     void print() const
     {
-        printf("%s\n", ToString().c_str());
+        LogPrintf("%s\n", ToString());
     }
 };
 
@@ -212,11 +217,13 @@ public:
         scriptPubKey = scriptPubKeyIn;
     }
 
-    IMPLEMENT_SERIALIZE
-    (
+    ADD_SERIALIZE_METHODS;
+
+    template <typename Stream, typename Operation>
+    inline void SerializationOp(Stream& s, Operation ser_action) {
         READWRITE(nValue);
         READWRITE(scriptPubKey);
-    )
+    }
 
     void SetNull()
     {
@@ -271,7 +278,7 @@ public:
 
     void print() const
     {
-        printf("%s\n", ToString().c_str());
+        LogPrintf("%s\n", ToString());
     }
 };
 
@@ -300,10 +307,11 @@ public:
         SetNull();
     }
 
-    IMPLEMENT_SERIALIZE
-    (
+    ADD_SERIALIZE_METHODS;
+
+    template <typename Stream, typename Operation>
+    inline void SerializationOp(Stream& s, Operation ser_action) {
         READWRITE(this->nVersion);
-        nVersion = this->nVersion;
         // nTime is extended to 64-bit since yacoin 1.0.0
         if (this->nVersion >= CURRENT_VERSION_of_Tx_for_yac_new) // 64-bit nTime
         {
@@ -318,7 +326,14 @@ public:
         READWRITE(vin);
         READWRITE(vout);
         READWRITE(nLockTime);
-    )
+    }
+
+    /** This deserializing constructor is provided instead of an Unserialize method.
+     *  Unserialize is not possible, since it would require overwriting const fields. */
+    template <typename Stream>
+    CTransaction(deserialize_type, Stream& s) {
+        Unserialize(s);
+    }
 
     void SetNull();
 
@@ -524,7 +539,7 @@ public:
 
     void print() const
     {
-        printf("%s", ToString().c_str());
+        LogPrintf("%s", ToString());
     }
 
 

@@ -64,3 +64,7 @@ Makefile.release
 object_script.yacoin-qt.Debug
 object_script.yacoin-qt.Release
 *.pyc
+.autotools
+.cproject
+.project
+.settings/

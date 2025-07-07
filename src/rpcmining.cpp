@@ -9,7 +9,7 @@
 #endif
 
 #ifndef BITCOIN_TXDB_H
- #include "txdb.h"
+ #include "txdb-leveldb.h"
 #endif
 
 #ifndef BITCOIN_INIT_H
@@ -23,6 +23,7 @@
 #ifndef _BITCOINRPC_H_
  #include "bitcoinrpc.h"
 #endif
+#include "streams.h"
 
 using namespace json_spirit;
 
@@ -51,7 +52,7 @@ Value getgenerate(const Array& params, bool fHelp)
             "getgenerate\n"
             "Returns true or false.");
 
-    return GetBoolArg("-gen");
+    return gArgs.GetBoolArg("-gen");
 }
 
 Value setgenerate(const Array& params, bool fHelp)
@@ -69,11 +70,11 @@ Value setgenerate(const Array& params, bool fHelp)
     if (params.size() > 1)
     {
         int nGenProcLimit = params[1].get_int();
-        mapArgs["-genproclimit"] = itostr(nGenProcLimit);
+        gArgs.ForceSetArg("-genproclimit", itostr(nGenProcLimit));
         if (nGenProcLimit == 0)
             fGenerate = false;
     }
-    mapArgs["-gen"] = (fGenerate ? "1" : "0");
+    gArgs.ForceSetArg("-gen", (fGenerate ? "1" : "0"));
 
     GenerateYacoins(fGenerate, pwalletMain);
     return Value::null;
@@ -128,10 +129,10 @@ Value generatetoaddress(const Array& params, bool fHelp){
     //     std::string hash = mineSingleBlock(address, maxtries);
     //     res.push_back(hash);
     // }
-    mapArgs["-gen"] = "1";
-    mapArgs["-genproclimit"]="1";
+    gArgs.ForceSetArg("-gen", "1");
+    gArgs.ForceSetArg("-genproclimit", "1");
     GenerateYacoins(true, pwalletMain, nblocks);
-    mapArgs["-gen"] = "0";
+    gArgs.ForceSetArg("-gen", "0");
     return res;
 }
 
@@ -164,8 +165,8 @@ Value getmininginfo(const Array& params, bool fHelp)
     obj.push_back(Pair("netmhashps",     GetPoWMHashPS()));
     obj.push_back(Pair("netstakeweight", GetPoSKernelPS()));
     obj.push_back(Pair("errors",        GetWarnings("statusbar")));
-    obj.push_back(Pair("generate",      GetBoolArg("-gen")));
-    obj.push_back(Pair("genproclimit",  (int)GetArg("-genproclimit", -1)));
+    obj.push_back(Pair("generate",      gArgs.GetBoolArg("-gen")));
+    obj.push_back(Pair("genproclimit",  (int)gArgs.GetArg("-genproclimit", -1)));
     obj.push_back(Pair("hashespersec",  gethashespersec(params, false)));
     obj.push_back(Pair("pooledtx",      (Value_type)mempool.size()));
 
@@ -204,8 +205,8 @@ Value getworkex(const Array& params, bool fHelp)
             "If [data, coinbase] is not specified, returns extended work data.\n"
         );
 
-    if (vNodes.empty())
-        throw JSONRPCError(-9, "Yacoin is not connected!");
+    if (g_connman->GetNodeCount(CConnman::CONNECTIONS_ALL) == 0)
+        throw JSONRPCError(RPC_CLIENT_NOT_CONNECTED, "Yacoin is not connected!");
 
     if (IsInitialBlockDownload())
         throw JSONRPCError(-10, "Yacoin is downloading blocks...");
@@ -337,7 +338,7 @@ Value getwork(const Array& params, bool fHelp)
             "  \"target\" : little endian hash target\n"
             "If [data] is specified, tries to solve the block and returns true if it was successful.");
 
-    if (vNodes.empty())
+    if (g_connman->GetNodeCount(CConnman::CONNECTIONS_ALL) == 0)
         throw JSONRPCError(RPC_CLIENT_NOT_CONNECTED, "Yacoin is not connected!");
 
     if (IsInitialBlockDownload())
@@ -395,7 +396,7 @@ Value getwork(const Array& params, bool fHelp)
         // Save
         mapNewBlock[pblock->hashMerkleRoot] = make_pair(pblock, pblock->vtx[0].vin[0].scriptSig);
 
-        printf("rpc getwork,\n"
+        LogPrintf("rpc getwork,\n"
                "params.size() == 0,\n"
                "pblock->nVersion = %d,\n"
                "pblock->hashPrevBlock = %s,\n"
@@ -403,7 +404,7 @@ Value getwork(const Array& params, bool fHelp)
                "pblock->nTime = %lld,\n"
                "pblock->nBits = %u,\n"
                "pblock->nNonce = %u\n",
-               pblock->nVersion, pblock->hashPrevBlock.ToString().c_str(), pblock->hashMerkleRoot.ToString().c_str(),
+               pblock->nVersion, pblock->hashPrevBlock.ToString(), pblock->hashMerkleRoot.ToString(),
                pblock->nTime, pblock->nBits, pblock->nNonce);
 
         // Pre-build hash buffers
@@ -447,7 +448,7 @@ Value getwork(const Array& params, bool fHelp)
       //for (int i = 0; i < 128/4; i++) //really, the limit is sizeof( *pdata ) / sizeof( uint32_t
             ((uint32_t *)pdata)[i] = ByteReverse(((uint32_t *)pdata)[i]);
 
-        printf("rpc getwork,\n"
+        LogPrintf("rpc getwork,\n"
                "params.size() != 0,\n"
                "pdata->nVersion = %d,\n"
                "pdata->hashPrevBlock = %s,\n"
@@ -455,13 +456,13 @@ Value getwork(const Array& params, bool fHelp)
                "pdata->nTime = %lld,\n"
                "pdata->nBits = %u,\n"
                "pdata->nNonce = %u\n",
-               pdata->version, pdata->prev_block.ToString().c_str(), pdata->merkle_root.ToString().c_str(),
+               pdata->version, pdata->prev_block.ToString(), pdata->merkle_root.ToString(),
                pdata->timestamp, pdata->bits, pdata->nonce);
 
         // Get saved block
         if (!mapNewBlock.count(pdata->merkle_root))
         {
-            printf("rpc getwork, No saved block\n");
+            LogPrintf("rpc getwork, No saved block\n");
             return false;
         }
 
@@ -484,7 +485,7 @@ Value getwork(const Array& params, bool fHelp)
 
         if (!pblock->SignBlock(*pwalletMain))
         {
-            printf("rpc getwork, Unable to sign block\n");
+            LogPrintf("rpc getwork, Unable to sign block\n");
             throw JSONRPCError(-100, "Unable to sign block, wallet locked?");
         }
         
@@ -533,7 +534,7 @@ Value getblocktemplate(const Array& params, bool fHelp)
     if (strMode != "template")
         throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid mode");
 
-    if (vNodes.empty())
+    if (g_connman->GetNodeCount(CConnman::CONNECTIONS_ALL) == 0)
         throw JSONRPCError(RPC_CLIENT_NOT_CONNECTED, "Yacoin is not connected!");
 
     if (IsInitialBlockDownload())
@@ -677,7 +678,7 @@ Value submitblock(const Array& params, bool fHelp)
         throw JSONRPCError(-100, "Unable to sign block, wallet locked?");
 
     CValidationState state;
-    bool fAccepted = ProcessBlock(state, NULL, &block);
+    bool fAccepted = ProcessBlock(state, &block, true, nullptr);
     if (!fAccepted)
         return "rejected";
 

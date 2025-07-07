@@ -13,8 +13,9 @@
 #endif
 
 #ifndef BITCOIN_TXDB_H
- #include "txdb.h"
+ #include "txdb-leveldb.h"
 #endif
+#include "streams.h"
 
 namespace Checkpoints
 {
@@ -118,14 +119,14 @@ namespace Checkpoints
         return checkpoints.rbegin()->second.second;
     }
 
-    CBlockIndex* GetLastCheckpoint(const std::map<uint256, CBlockIndex*>& mapBlockIndex)
+    CBlockIndex* GetLastCheckpoint(const BlockMap& mapBlockIndex)
     {
         MapCheckpoints& checkpoints = (fTestNet ? mapCheckpointsTestnet : mapCheckpoints);
 
         BOOST_REVERSE_FOREACH(const MapCheckpoints::value_type& i, checkpoints)
         {
             const uint256& hash = i.second.first;
-            std::map<uint256, CBlockIndex*>::const_iterator t = mapBlockIndex.find(hash);
+            BlockMap::const_iterator t = mapBlockIndex.find(hash);
             if (t != mapBlockIndex.end())
                 return t->second;
         }
@@ -208,10 +209,6 @@ namespace Checkpoints
         }
         if (!txdb.TxnCommit())
             return error("WriteSyncCheckpoint(): failed to commit to db sync checkpoint %s", hashCheckpoint.ToString().c_str());
-
-#ifndef USE_LEVELDB
-        txdb.Close();
-#endif
 
         Checkpoints::hashSyncCheckpoint = hashCheckpoint;
         return true;

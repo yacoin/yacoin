@@ -12,29 +12,7 @@
  #include "net.h"
 #endif
 
-#pragma pack(push, 1)
-struct block_header
-{
-    unsigned int version;
-    uint256 prev_block;
-    uint256 merkle_root;
-    ::int64_t timestamp;
-    unsigned int bits;
-    unsigned int nonce;
-
-};
-#pragma pack(pop)
-
-typedef struct
-{
-    unsigned int version;
-    uint256 prev_block;
-    uint256 merkle_root;
-    unsigned int timestamp;
-    unsigned int bits;
-    unsigned int nonce;
-
-} old_block_header;
+class CBlockIndex;
 
 uint256 scrypt_salted_multiround_hash(const void* input, size_t inputlen, const void* salt, size_t saltlen, const unsigned int nRounds);
 uint256 scrypt_salted_hash(const void* input, size_t inputlen, const void* salt, size_t saltlen);

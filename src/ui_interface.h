@@ -94,22 +94,17 @@ public:
     boost::signals2::signal<void (int newNumConnections)> NotifyNumConnectionsChanged;
 
     /**
-     * New, updated or cancelled alert.
-     * @note called with lock cs_mapAlerts held.
+     * Status bar alerts changed.
      */
-    boost::signals2::signal<void (const uint256 &hash, ChangeType status)> NotifyAlertChanged;
+    boost::signals2::signal<void ()> NotifyAlertChanged;
+
+    /** Network activity state changed. */
+    boost::signals2::signal<void (bool networkActive)> NotifyNetworkActiveChanged;
+
+    /** Banlist did change. */
+    boost::signals2::signal<void (void)> BannedListChanged;
 };
 
 extern CClientUIInterface uiInterface;
-
-/**
- * Translation function: Call Translate signal on UI interface, which returns a boost::optional result.
- * If no translation slot is registered, nothing is returned, and simply return the input.
- */
-inline std::string _(const char* psz)
-{
-    boost::optional<std::string> rv = uiInterface.Translate(psz);
-    return rv ? (*rv) : psz;
-}
 
 #endif
