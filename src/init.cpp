@@ -64,11 +64,11 @@
 #include <boost/interprocess/sync/file_lock.hpp>
 #include <boost/thread.hpp>
 #include <openssl/crypto.h>
+#include <iostream>
 
 static const bool DEFAULT_PROXYRANDOMIZE = true;
 static const bool DEFAULT_DISABLE_SAFEMODE = false;
 static const bool DEFAULT_STOPAFTERBLOCKIMPORT = false;
-::int64_t nUpTimeStart = 0;
 static const ::uint32_t mainnetNewLogicBlockNumber = 1890000;
 static const ::uint32_t testnetNewLogicBlockNumber = 0;
 static const ::uint32_t tokenSupportBlockNumber = 1911210;
@@ -181,8 +181,6 @@ void Interrupt(boost::thread_group& threadGroup)
     InterruptTorControl();
     if (g_connman)
         g_connman->Interrupt();
-    ThreadScriptCheckQuit();
-    ThreadHashCalculationQuit();
     threadGroup.interrupt_all();
 }
 

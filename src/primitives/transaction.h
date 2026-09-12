@@ -492,16 +492,55 @@ struct CMutableTransaction
         Unserialize(s);
     }
 
+    bool IsCoinBase() const
+    {
+        return (vin.size() == 1 && vin[0].prevout.IsNull() && vout.size() >= 1);
+    }
+
     /** Compute the hash of this CMutableTransaction. This is computed on the
      * fly, as opposed to GetHash() in CTransaction, which uses a cached result.
      */
-    uint256 GetHash() const;
+    const uint256 GetNormalizedHash() const
+    {
+        // Coinbase transactions cannot be malleated and may not change after
+        // publication. We cannot zero out the scripts, otherwise we get collisions
+        // among coinbase transactions by the same miner.
+        if (IsCoinBase())
+        {
+            return SerializeHash(*this);
+        }
+        else
+        {
+            CMutableTransaction tmp(*this);
+            // Replace scriptSigs in inputs with empty strings
+            for (unsigned int i = 0; i < tmp.vin.size(); i++)
+            {
+                tmp.vin[i].scriptSig = CScript();
+            }
+
+            CHashWriter ss(SER_GETHASH, 0);
+            ss << tmp;
+            return ss.GetHash();
+        }
+    }
+
+    uint256 GetHash() const
+    {
+        // transaction with version >=2 fixes tx malleability
+        if (this->nVersion >= CTransaction::CURRENT_VERSION_of_Tx_for_yac_new)
+        {
+            return GetNormalizedHash();
+        }
+        else
+        {
+            return SerializeHash(*this);
+        }
+    }
 
     friend bool operator==(const CMutableTransaction& a, const CMutableTransaction& b)
     {
         return a.GetHash() == b.GetHash();
     }
-
 };
 
 typedef std::shared_ptr<const CTransaction> CTransactionRef;

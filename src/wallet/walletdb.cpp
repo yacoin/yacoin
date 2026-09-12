@@ -858,7 +858,7 @@ bool DumpWallet(CWallet* pwallet, const string& strDest)
       file << strprintf("# * Best block at time of backup was %i (%s),\n", chainActive.Height(), chainActive.Tip()->blockHash.ToString().c_str());
       file << strprintf("#   mined on %s\n", EncodeDumpTime(chainActive.Tip()->nTime).c_str());
       file << "\n";
-      file << "@ BELOW ARE LIST OF P2PKH ADDRESSES AND THEIR PRIVATE KEYS:";
+      file << "# BELOW ARE LIST OF P2PKH ADDRESSES AND THEIR PRIVATE KEYS:";
       file << "\n";
 
       // add the base58check encoded extended master if the wallet uses HD
@@ -899,7 +899,7 @@ bool DumpWallet(CWallet* pwallet, const string& strDest)
           }
       }
       file << "\n";
-      file << "@ BELOW ARE LIST OF P2SH ADDRESSES AND THEIR PRIVATE KEYS:";
+      file << "# BELOW ARE LIST OF P2SH ADDRESSES AND THEIR PRIVATE KEYS:";
       file << "\n";
       for (const auto& elem: mapScripts) {
           const auto& redeemScriptHash = elem.first;

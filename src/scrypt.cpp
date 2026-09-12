@@ -236,7 +236,7 @@ const ::uint32_t NArbitraryHashCount = nTunedTo5seconds;
         *hasht = (unsigned char *) &nT,
         *hashc = (unsigned char *) &hash,
       //highestZeroBitsSet = 0xe0;
-        // Hash target can't be smaller than bnProofOfWorkLimit which is 00000fffff000000
+        // Hash target can't be smaller than Params().GetConsensus().powLimit which is 00000fffff000000
         nMask = 0x00,
 #ifndef LOW_DIFFICULTY_FOR_DEVELOPMENT        
         highestZeroBitsSet = ~(hasht[ 29 ]),
@@ -271,7 +271,7 @@ const ::uint32_t NArbitraryHashCount = nTunedTo5seconds;
             return 0;
         }
          ++hash_count;
-        // Hash target can't be smaller than bnProofOfWorkLimit which is 00000fffff000000
+        // Hash target can't be smaller than Params().GetConsensus().powLimit which is 00000fffff000000
         if (            
             ( 0 == ( hashc[31]))
             && ( 0 == ( hashc[30]))

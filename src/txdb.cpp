@@ -652,7 +652,7 @@ bool CBlockTreeDB::BuildMapHashFromOldDB()
         ssKey >> strType;
 
         // Did we reach the end of the data to read?
-        if (fRequestShutdown || strType != "blockindex")
+        if (strType != "blockindex")
             break;
 
         CDiskBlockIndexOld diskindex;

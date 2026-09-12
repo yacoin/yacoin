@@ -460,6 +460,7 @@ CLEANFILES += script/*.gcda script/*.gcno
 CLEANFILES += support/*.gcda support/*.gcno
 CLEANFILES += univalue/*.gcda univalue/*.gcno
 CLEANFILES += wallet/*.gcda wallet/*.gcno
+CLEANFILES += wallet/test/*.gcda wallet/test/*.gcno
 
 DISTCLEANFILES = obj/build.h
 
@@ -508,9 +509,9 @@ if EMBEDDED_LEVELDB
 include Makefile.leveldb.include
 endif
 
-#if ENABLE_TESTS
-#include Makefile.test.include
-#endif
+if ENABLE_TESTS
+include Makefile.test.include
+endif
 
 #if ENABLE_BENCH
 #include Makefile.bench.include

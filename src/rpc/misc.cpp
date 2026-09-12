@@ -35,7 +35,7 @@
 
 #include <univalue.h>
 
-extern ::int64_t nUpTimeStart;
+::int64_t nUpTimeStart = 0;
 
 static void ConvertUpTimeToNiceString(::int64_t nUpTimeSeconds, std::string& sUpTime)
 {
@@ -1235,6 +1235,27 @@ UniValue logging(const JSONRPCRequest& request)
     return result;
 }
 
+UniValue calculateblockhash(const JSONRPCRequest& request)
+{
+    if (request.fHelp || request.params.size() != 1)
+        throw std::runtime_error(
+            "calculateblockchash <blockhex> \n"
+            "\nReturns the hash of the block.\n"
+            "\nResult:\n"
+            "\"hex\"      (string) the block hash hex encoded\n"
+            "\nExamples:\n"
+            + HelpExampleCli("calculateblockchash", "02000000b37a8c6800000000010000000000000000000000000000000000000000000000000000000000000000ffffffff0d031dc81d0175062f503253482fffffffff01d2c74e000000000023210369f09ef3b2711f205d17dff219d84e522d36cd45f7ca3e003e410e3ebd1d1fa6ac00000000")
+            + HelpExampleRpc("calculateblockchash", "02000000b37a8c6800000000010000000000000000000000000000000000000000000000000000000000000000ffffffff0d031dc81d0175062f503253482fffffffff01d2c74e000000000023210369f09ef3b2711f205d17dff219d84e522d36cd45f7ca3e003e410e3ebd1d1fa6ac00000000")
+        );
+
+    LOCK(cs_main);
+    std::string strHex = request.params[0].get_str();
+    CBlock block;
+    DecodeHexBlk(block, strHex);
+
+    return block.GetHash().GetHex();
+}
+
 static const CRPCCommand commands[] =
 { //  category              name                      actor (function)         okSafeMode
   //  --------------------- ------------------------  -----------------------  ----------
@@ -1250,6 +1271,8 @@ static const CRPCCommand commands[] =
     { "addressindex",       "getaddressdeltas",       &getaddressdeltas,       true,  {"addresses"} },
     { "addressindex",       "getaddresstxids",        &getaddresstxids,        true,  {"addresses","includeTokens"} },
     { "addressindex",       "getaddressbalance",      &getaddressbalance,      true,  {"addresses","includeTokens"} },
+
+    { "blockchain",         "calculateblockhash",     &calculateblockhash,     true,  {"blockhex"} },
 
     /* Not shown in help */
     { "hidden",             "setmocktime",            &setmocktime,            true,  {"timestamp"}},

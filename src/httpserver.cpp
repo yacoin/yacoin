@@ -630,6 +630,48 @@ void HTTPRequest::WriteReply(int nStatus, const std::string& strReply)
     req = nullptr; // transferred back to main thread
 }
 
+bool HTTPRequest::IsClientConnected() const
+{
+    // The reply has already been handed back to the event thread, so there is
+    // no longer a request of ours in flight to cut short.
+    if (!req) {
+        return false;
+    }
+
+    evhttp_connection* conn = evhttp_request_get_connection(req);
+    if (!conn) {
+        return true;
+    }
+
+    bufferevent* bev = evhttp_connection_get_bufferevent(conn);
+    if (!bev) {
+        return true;
+    }
+
+    const evutil_socket_t fd = bufferevent_getfd(bev);
+    if (fd == -1) {
+        return true;
+    }
+
+    // MSG_PEEK leaves anything it finds in the receive queue, so this neither
+    // consumes a pipelined request nor changes what libevent reads once the
+    // reply re-enables it.
+    char discard = 0;
+    const int nRead = recv(fd, &discard, 1, MSG_PEEK | MSG_DONTWAIT);
+
+    if (nRead == 0) {
+        return false;    // orderly shutdown: the peer sent FIN
+    }
+    if (nRead > 0) {
+        return true;     // bytes waiting, so the peer is certainly still there
+    }
+
+    // Nothing to read is the normal case for a client waiting on an answer.
+    // Anything else is a broken connection.
+    const int nErr = WSAGetLastError();
+    return nErr == WSAEWOULDBLOCK || nErr == WSAEINTR;
+}
+
 CService HTTPRequest::GetPeer()
 {
     evhttp_connection* con = evhttp_request_get_connection(req);

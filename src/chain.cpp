@@ -100,7 +100,7 @@ CBigNum CBlockIndex::GetBlockTrust() const
         if (IsProofOfWork())
         {
             // set trust to the amount of work done in this block
-            CBigNum bnTrust = bnProofOfWorkLimit / bnTarget;
+            CBigNum bnTrust = Params().GetConsensus().powLimit / bnTarget;
 
             // double the trust if previous block was PoS
             // (to prevent orphaning of PoS)

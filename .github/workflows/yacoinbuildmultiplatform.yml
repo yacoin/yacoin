@@ -26,17 +26,31 @@ jobs:
           path: /home/runner/work/yacoin/yacoin/release-root/bin/yacoin-cli
           if-no-files-found: error
   build-ubuntu-1604-functional-test:
-    runs-on: ubuntu-latest  
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
       - name: build
         run: |
           docker run -v /home/runner/work/yacoin/yacoin:/src --entrypoint /bin/bash dev34253/yacoin-build:ubuntu.16.04 -c "cd /src && ./autogen.sh && ./configure --with-gui=no --enable-low-difficulty-for-development && make -j 2"
           docker run -v /home/runner/work/yacoin/yacoin:/src --entrypoint /src/test/functional/test_runner.py dev34253/yacoin-build:ubuntu.16.04 -j 1
+  build-ubuntu-1604-low-difficulty:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: build
+        # Build a low-difficulty yacoind using the depends system, mirroring
+        # build-ubuntu-1604 (depends, glibc-back-compat, static-libstdc++) so
+        # the resulting binary is portable to Ubuntu 16.04 and later — but with
+        # --enable-low-difficulty-for-development added to the configure step
+        # so mainnet PoW limits are relaxed enough for miner end-to-end testing.
+        # See doc/cross-compilation-with-depends-system.md for the source of
+        # the depends + configure commands chained here.
+        run: |
+          docker run -v /home/runner/work/yacoin/yacoin:/src -e BUILDVERSION=$GITHUB_RUN_NUMBER --entrypoint /bin/bash dev34253/yacoin-build:ubuntu.16.04-1 -c "cd /src/depends && make -j 4 HOST=x86_64-pc-linux-gnu && cd /src && ./autogen.sh && CONFIG_SITE=/src/depends/x86_64-pc-linux-gnu/share/config.site ./configure --enable-glibc-back-compat --enable-reduce-exports --enable-low-difficulty-for-development LDFLAGS=-static-libstdc++ --prefix=/ && make -j 4 && make install DESTDIR=/src/release-root"
       - uses: actions/upload-artifact@v4
         with:
           name: yacoind-low-difficulty-16.04
-          path: /home/runner/work/yacoin/yacoin/src/yacoind
+          path: /home/runner/work/yacoin/yacoin/release-root/bin/yacoind
           if-no-files-found: error
   build-ubuntu-1804:
     runs-on: ubuntu-latest  

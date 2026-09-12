@@ -71,9 +71,3 @@ CMutableTransaction::CMutableTransaction(){
     nLockTime = 0;
 }
 CMutableTransaction::CMutableTransaction(const CTransaction& tx) : nVersion(tx.nVersion), nTime(tx.nTime), vin(tx.vin), vout(tx.vout), nLockTime(tx.nLockTime) {}
-
-uint256 CMutableTransaction::GetHash() const
-{
-    return SerializeHash(*this, SER_GETHASH);
-}
-

@@ -8,8 +8,7 @@
 #include "../validation.h"
 #include "chain.h"
 
-int nCoinbaseMaturity = 500;  // 500 blocks, 1 blk/minute => ~8.33 hrs
-int nCoinbaseMaturityAfterHardfork = 6;
+
 
 /* yac: The maximum block size increases based on the block reward, which is
  * influenced by the money supply. After each epoch interval, both the block
@@ -51,11 +50,11 @@ int GetCoinbaseMaturity()
 {
     if (chainActive.Height() != -1 && chainActive.Genesis() && chainActive.Height() >= nMainnetNewLogicBlockNumber)
     {
-        return nCoinbaseMaturityAfterHardfork;
+        return COINBASE_MATURITY_AFTER_HARDFORK;
     }
     else
     {
-        return nCoinbaseMaturity;
+        return COINBASE_MATURITY_BEFORE_HARDFORK;
     }
 }
 

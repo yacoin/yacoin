@@ -10,6 +10,7 @@
 #include "rpc/protocol.h"
 #include "uint256.h"
 
+#include <functional>
 #include <list>
 #include <map>
 #include <stdint.h>
@@ -47,8 +48,27 @@ public:
     std::string URI;
     std::string authUser;
 
+    /**
+     * Whether the caller is still connected, for handlers that block.
+     *
+     * Set by the HTTP layer. Left empty for calls that arrive by any other
+     * route, where there is no client that can go away, so ask through
+     * IsClientConnected() rather than calling this directly.
+     */
+    std::function<bool()> isClientConnected;
+
     JSONRPCRequest() : id(NullUniValue), params(NullUniValue), fHelp(false) {}
     void parse(const UniValue& valRequest);
+
+    /**
+     * False once the client that made this call has hung up.
+     *
+     * Any handler that can block for a long time should poll this and give up
+     * when it returns false: until it does, it is holding one of a small number
+     * of HTTP worker threads on behalf of nobody. Answers true whenever the
+     * question does not apply or cannot be decided.
+     */
+    bool IsClientConnected() const { return !isClientConnected || isClientConnected(); }
 };
 
 /** Query whether RPC is running */

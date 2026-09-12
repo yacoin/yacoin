@@ -541,6 +541,7 @@ public:
     void removeForReorg(const CCoinsViewCache *pcoins, unsigned int nMemPoolHeight, int flags); // Used in case of reorg to remove any now-immature tx and any no-longer-final timelock tx
     void removeConflicts(const CTransaction &tx);
     void removeForBlock(const std::vector<CTransaction>& vtx, ConnectedBlockTokenData& connectedBlockData);
+    void removeForBlock(const std::vector<CTransaction>& vtx);
 
     void clear();
     void _clear(); //lock free

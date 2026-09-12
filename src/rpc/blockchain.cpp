@@ -25,6 +25,7 @@
 #include "util.h"
 #include "utilstrencodings.h"
 #include "hash.h"
+#include "scrypt.h"
 
 #include <stdint.h>
 
@@ -188,6 +189,23 @@ UniValue getbestblockhash(const JSONRPCRequest& request)
 
     LOCK(cs_main);
     return chainActive.Tip()->blockHash.GetHex();
+}
+
+UniValue getbestblockhashsha256(const JSONRPCRequest& request)
+{
+    if (request.fHelp || request.params.size() != 0)
+        throw std::runtime_error(
+            "getbestblockhashsha256\n"
+            "\nReturns the sha256 hash of the best (tip) block in the longest blockchain.\n"
+            "\nResult:\n"
+            "\"hex\"      (string) the block hash hex encoded\n"
+            "\nExamples:\n"
+            + HelpExampleCli("getbestblockhashsha256", "")
+            + HelpExampleRpc("getbestblockhashsha256", "")
+        );
+
+    LOCK(cs_main);
+    return chainActive.Tip()->GetBlockHeader().GetSHA256Hash().GetHex();
 }
 
 void RPCNotifyBlockChange(bool ibd, const CBlockIndex * pindex)
@@ -1136,7 +1154,7 @@ UniValue getchaintxstats(const JSONRPCRequest& request)
     }
 
     const CBlockIndex* pindexPast = pindex->GetAncestor(pindex->nHeight - blockcount);
-    int nTimeDiff = pindex->GetMedianTimePast() - pindexPast->GetMedianTimePast();
+    int nTimeDiff = pindex->nTime - pindexPast->nTime;
     int nTxDiff = pindex->nChainTx - pindexPast->nChainTx;
 
     UniValue ret(UniValue::VOBJ);
@@ -1176,12 +1194,109 @@ UniValue getblockbynumber(const JSONRPCRequest& request)
     return blockToJSON(block, pblockindex, request.params.size() > 1 ? request.params[1].get_bool() : false);
 }
 
+UniValue invalidateblock(const JSONRPCRequest& request)
+{
+    if (request.fHelp || request.params.size() != 1)
+        throw std::runtime_error(
+            "invalidateblock \"blockhash\"\n"
+            "\nPermanently marks a block as invalid, as if it violated a consensus rule.\n"
+            "\nArguments:\n"
+            "1. \"blockhash\"   (string, required) the hash of the block to mark as invalid\n"
+            "\nResult:\n"
+            "\nExamples:\n"
+            + HelpExampleCli("invalidateblock", "\"blockhash\"")
+            + HelpExampleRpc("invalidateblock", "\"blockhash\"")
+        );
+
+    std::string strHash = request.params[0].get_str();
+    uint256 hash(uint256S(strHash));
+    CValidationState state;
+
+    {
+        LOCK(cs_main);
+        if (mapBlockIndex.count(hash) == 0)
+            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Block not found");
+
+        CBlockIndex* pblockindex = mapBlockIndex[hash];
+        InvalidateBlock(state, Params(), pblockindex);
+    }
+
+    if (state.IsValid()) {
+        ActivateBestChain(state, Params());
+    }
+
+    if (!state.IsValid()) {
+        throw JSONRPCError(RPC_DATABASE_ERROR, state.GetRejectReason());
+    }
+
+    return NullUniValue;
+}
+
+UniValue calculateScryptHash(const JSONRPCRequest& request)
+{
+    if (request.fHelp || request.params.size() < 1)
+        throw std::runtime_error(
+            "calculatescrypthash [data]\n"
+            "Calculate scrypt hash from block header data.\n"
+            "Data should be 80 or 84 bytes of hex-encoded block header.");
+
+    // Parse parameters
+    std::vector<unsigned char> vchData = ParseHex(request.params[0].get_str());
+
+    if (vchData.size() != 80 && vchData.size() != 84)
+    {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid parameter: data must be exactly 80 or 84 bytes");
+    }
+
+    // Create CBlockHeader from the raw data
+    CBlockHeader blockHeader;
+    try {
+        // Use all input data for block header deserialization
+        CDataStream ssBlock(vchData, SER_NETWORK, PROTOCOL_VERSION);
+        ssBlock >> blockHeader;
+    }
+    catch (std::exception &e) {
+        throw JSONRPCError(RPC_DESERIALIZATION_ERROR, "Block header decode failed");
+    }
+
+    LogPrintf("calculatescrypthash:\n"
+           "  input_size = %zu bytes\n"
+           "  version = %d\n"
+           "  prev_block = %s\n"
+           "  merkle_root = %s\n"
+           "  timestamp = %lld\n"
+           "  bits = %u\n"
+           "  nonce = %u\n",
+           vchData.size(), blockHeader.nVersion, blockHeader.hashPrevBlock.ToString(), 
+           blockHeader.hashMerkleRoot.ToString(), blockHeader.nTime, blockHeader.nBits, blockHeader.nNonce);
+
+    // Calculate hash using the CBlockHeader's CalculateHash method
+    uint256 blockHash = blockHeader.CalculateHash();
+
+    LogPrintf("calculatescrypthash: calculated hash = %s\n", blockHash.ToString());
+
+    // Return the calculated hash as hex string
+    UniValue result(UniValue::VOBJ);
+    result.pushKV("hash_BE", blockHash.GetHex());
+    result.pushKV("hash_LE", HexStr(BEGIN(blockHash), END(blockHash)));
+    result.pushKV("input_size", (int)vchData.size());
+    result.pushKV("version", (int)blockHeader.nVersion);
+    result.pushKV("prev_block", blockHeader.hashPrevBlock.GetHex());
+    result.pushKV("merkle_root", blockHeader.hashMerkleRoot.GetHex());
+    result.pushKV("timestamp", (int64_t)blockHeader.nTime);
+    result.pushKV("bits", (int)blockHeader.nBits);
+    result.pushKV("nonce", (int)blockHeader.nNonce);
+
+    return result;
+}
+
 static const CRPCCommand commands[] =
 { //  category              name                      actor (function)         okSafe argNames
   //  --------------------- ------------------------  -----------------------  ------ ----------
     { "blockchain",         "gettimechaininfo",       &gettimechaininfo,       true,  {} },
     { "blockchain",         "getchaintxstats",        &getchaintxstats,        true,  {"nblocks", "blockhash"} },
     { "blockchain",         "getbestblockhash",       &getbestblockhash,       true,  {} },
+    { "blockchain",         "getbestblockhashsha256", &getbestblockhashsha256, true,  {} },
     { "blockchain",         "getblockcount",          &getblockcount,          true,  {} },
     { "blockchain",         "getblock",               &getblock,               true,  {"blockhash","verbosity|verbose"} },
     { "blockchain",         "getblockhash",           &getblockhash,           true,  {"height"} },
@@ -1196,7 +1311,9 @@ static const CRPCCommand commands[] =
     { "blockchain",         "gettxout",               &gettxout,               true,  {"txid","n","include_mempool"} },
     { "blockchain",         "verifychain",            &verifychain,            true,  {"checklevel","nblocks"} },
     { "blockchain",         "getblockbynumber",       &getblockbynumber,       true,  {"number","verbose"} },
+    { "blockchain",         "calculatescrypthash",    &calculateScryptHash,    true,  {"data"} },
     /* Not shown in help */
+    { "hidden",             "invalidateblock",        &invalidateblock,        true,  {"blockhash"} },
     { "hidden",             "waitfornewblock",        &waitfornewblock,        true,  {"timeout"} },
     { "hidden",             "waitforblock",           &waitforblock,           true,  {"blockhash","timeout"} },
     { "hidden",             "waitforblockheight",     &waitforblockheight,     true,  {"height","timeout"} },

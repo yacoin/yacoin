@@ -61,7 +61,6 @@ static CCheckQueue<CHashCalculation> hashCalculationQueue(200);
 boost::mutex mapHashmutex;
 std::map<uint256, uint256> mapHash;
 int nHashCalcThreads = 0;
-const unsigned int nPoWTargetSpacing = nStakeTargetSpacing;
 
 void ThreadHashCalculation()
 {
@@ -69,11 +68,6 @@ void ThreadHashCalculation()
     RenameThread("yacoin-hashcalc");
     hashCalculationQueue.Thread();
     LogPrintf("ThreadHashCalculation shutdown\n");
-}
-
-void ThreadHashCalculationQuit()
-{
-    hashCalculationQueue.Quit();
 }
 
 bool CHashCalculation::operator()()
@@ -507,13 +501,13 @@ bool TipMayBeStale()
     if (g_last_tip_update == 0) {
         g_last_tip_update = GetTime();
     }
-    return g_last_tip_update < GetTime() - nPoWTargetSpacing * 3 && mapBlocksInFlight.empty();
+    return g_last_tip_update < GetTime() - Params().GetConsensus().nPowTargetSpacing * 3 && mapBlocksInFlight.empty();
 }
 
 // Requires cs_main
 bool CanDirectFetch()
 {
-    return chainActive.Tip()->GetBlockTime() > GetAdjustedTime() - nPoWTargetSpacing * 20;
+    return chainActive.Tip()->GetBlockTime() > GetAdjustedTime() - Params().GetConsensus().nPowTargetSpacing * 20;
 }
 
 // Requires cs_main
@@ -3335,6 +3329,7 @@ bool PeerLogicValidation::SendMessages(CNode* pto, std::atomic<bool>& interruptM
         if (pindexBestHeader == nullptr)
             pindexBestHeader = chainActive.Tip();
         bool fFetch = state.fPreferredDownload || (nPreferredDownload == 0 && !pto->fClient && !pto->fOneShot); // Download if this is a nice peer, or we have no nice peers and this one might do.
+
         if (!state.fSyncStarted && !pto->fClient) {
             // Only actively request headers from a single peer, unless we're close to today.
             // This single peer must have good starting height (>= nMedianStartingHeight)
@@ -3634,7 +3629,7 @@ bool PeerLogicValidation::SendMessages(CNode* pto, std::atomic<bool>& interruptM
             QueuedBlock &queuedBlock = state.vBlocksInFlight.front();
             int nOtherPeersWithValidatedDownloads = nPeersWithValidatedDownloads - (state.nBlocksInFlightValidHeaders > 0);
             // For YACoin, the header hash calculation might take much time when syncing header, it will block the process downloading block, so need to check pto->vProcessMsg.empty() here
-            if (pto->vProcessMsg.empty() && nNow > state.nDownloadingSince + nPoWTargetSpacing * (BLOCK_DOWNLOAD_TIMEOUT_BASE + BLOCK_DOWNLOAD_TIMEOUT_PER_PEER * nOtherPeersWithValidatedDownloads)) {
+            if (pto->vProcessMsg.empty() && nNow > state.nDownloadingSince + Params().GetConsensus().nPowTargetSpacing * (BLOCK_DOWNLOAD_TIMEOUT_BASE + BLOCK_DOWNLOAD_TIMEOUT_PER_PEER * nOtherPeersWithValidatedDownloads)) {
                 LogPrintf("Timeout downloading block %s from peer=%d, disconnecting\n", queuedBlock.hash.ToString(), pto->GetId());
                 pto->fDisconnect = true;
                 return true;

@@ -94,14 +94,16 @@ class BasicTransfer_Test(BitcoinTestFramework):
         )
         assert_equal(tx_details['confirmations'],Decimal('0'))
 
+        self.log_accounts("after send")
         self.mine_blocks(0, 10)
+        self.log_accounts("after mine 10")
         assert_equal(self.nodes[0].getblockcount(), 40)
         balance_0 = self.nodes[0].getbalance()
         balance_1 = self.nodes[1].getbalance()
         assert_equal(balance_1, Decimal('2'))
         node_0_accounts = self.nodes[0].listaccounts()
         node_1_accounts = self.nodes[1].listaccounts()
-        assert_equal(node_0_accounts[''],balance_0)
+        assert_equal(node_0_accounts['coinbase']+node_0_accounts[''],balance_0)
         assert_equal(node_1_accounts[''],balance_1)
 
         tx_details = self.nodes[0].gettransaction(transaction_id)

@@ -80,6 +80,28 @@ public:
      */
     CService GetPeer();
 
+    /**
+     * Whether the client that issued this request is still on the other end.
+     *
+     * A handler that blocks for a long time (getblocktemplate's longpoll is the
+     * one that matters) otherwise keeps an HTTP worker thread occupied for a
+     * client that has already gone away, because nothing else in the server
+     * notices. On a quiet chain those threads accumulate until the pool is
+     * exhausted and the daemon stops answering RPC altogether.
+     *
+     * Implemented as a non-destructive peek at the socket rather than through
+     * libevent's connection close callback. That callback is driven by
+     * libevent's read path, and http_request_cb disables reading on this
+     * connection for the whole life of the request (the libevent 2.1.x
+     * workaround), so it could never fire during exactly the wait this exists
+     * to bound. The same disabled read is what makes peeking safe here: no
+     * libevent thread is touching this socket while a handler runs.
+     *
+     * Returns true if the answer is not knowable, so a handler can only ever
+     * be cut short by a disconnect this actually observed.
+     */
+    bool IsClientConnected() const;
+
     /** Get request method.
      */
     RequestMethod GetRequestMethod();

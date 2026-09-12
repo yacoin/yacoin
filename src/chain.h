@@ -8,6 +8,7 @@
 #define YACOIN_CHAIN_H
 
 #include "arith_uint256.h"
+#include "chainparams.h"
 #include "primitives/block.h"
 #include "pow.h"
 #include "tinyformat.h"
@@ -16,12 +17,6 @@
 #include "utilmoneystr.h"
 
 #include <vector>
-
-#ifndef LOW_DIFFICULTY_FOR_DEVELOPMENT
-    const int64_t INITIAL_MONEY_SUPPLY = 0;
-#else
-    const int64_t INITIAL_MONEY_SUPPLY = 1E14;
-#endif
 
 /**
  * Maximum amount of time that a block timestamp is allowed to exceed the
@@ -268,7 +263,7 @@ public:
         nUndoPos = 0;
         bnChainTrust = CBigNum(0);
         nMint = 0;
-        nMoneySupply = INITIAL_MONEY_SUPPLY;
+        nMoneySupply = Params().GetConsensus().initialMoneySupply;
         nTx = 0;
         nChainTx = 0;
         nStatus = 0;

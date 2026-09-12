@@ -446,7 +446,6 @@ inline void Sleep(::int64_t n)
 }
 #endif
 
-extern std::atomic<bool> fRequestShutdown;
 extern bool 
     fDebug,
     fShutdown,

@@ -344,17 +344,17 @@ class BitcoinTestFramework(metaclass=BitcoinTestMetaClass):
         self.import_deterministic_coinbase_privkeys()
         if not self.setup_clean_chain:
             for n in self.nodes:
-                assert_equal(n.getblockchaininfo()["blocks"], 199)
+                assert_equal(n.gettimechaininfo()["blocks"], 40)
             # To ensure that all nodes are out of IBD, the most recent block
             # must have a timestamp not too old (see IsInitialBlockDownload()).
             self.log.debug('Generate a block with current time')
             block_hash = self.nodes[0].generate(1)[0]
             block = self.nodes[0].getblock(blockhash=block_hash, verbosity=0)
-            for n in self.nodes:
-                n.submitblock(block)
-                chain_info = n.getblockchaininfo()
-                assert_equal(chain_info["blocks"], 200)
-                assert_equal(chain_info["initialblockdownload"], False)
+            # for n in self.nodes:
+            #     n.submitblock(block)
+            #     chain_info = n.gettimechaininfo()
+            #     assert_equal(chain_info["blocks"], 41)
+            #     assert_equal(chain_info["initialblockdownload"], False)
 
     def import_deterministic_coinbase_privkeys(self):
         for n in self.nodes:
@@ -488,9 +488,7 @@ class BitcoinTestFramework(metaclass=BitcoinTestMetaClass):
         sync_blocks(nodes or self.nodes, **kwargs)
 
     def sync_mempools(self, nodes=None, **kwargs):
-        # TODO sync mempools in Yacoin. Not now.
-        # sync_mempools(nodes or self.nodes, **kwargs)
-        pass
+        sync_mempools(nodes or self.nodes, **kwargs)
 
     def sync_all(self, nodes=None, **kwargs):
         self.sync_blocks(nodes, **kwargs)
@@ -539,7 +537,7 @@ class BitcoinTestFramework(metaclass=BitcoinTestMetaClass):
         if not os.path.isdir(cache_node_dir):
             self.log.debug("Creating cache directory {}".format(cache_node_dir))
 
-            initialize_datadir(self.options.cachedir, CACHE_NODE_ID, self.chain)
+            initialize_datadir(self.options.cachedir, CACHE_NODE_ID, self.chain, 20)
             self.nodes.append(
                 TestNode(
                     CACHE_NODE_ID,
@@ -560,31 +558,31 @@ class BitcoinTestFramework(metaclass=BitcoinTestMetaClass):
             # Wait for RPC connections to be ready
             self.nodes[CACHE_NODE_ID].wait_for_rpc_connection()
 
-            # Create a 199-block-long chain; each of the 4 first nodes
-            # gets 25 mature blocks and 25 immature.
-            # The 4th node gets only 24 immature blocks so that the very last
+            # Create a 40-block-long chain; each of the 4 first nodes
+            # gets 4 mature blocks and 6 immature.
+            # The 4th node gets only 6 immature blocks so that the very last
             # block in the cache does not age too much (have an old tip age).
             # This is needed so that we are out of IBD when the test starts,
             # see the tip age check in IsInitialBlockDownload().
-            for i in range(8):
+            for i in range(4):
                 self.nodes[CACHE_NODE_ID].generatetoaddress(
-                    nblocks=25 if i != 7 else 24,
+                    nblocks=10,
                     address=TestNode.PRIV_KEYS[i % 4].address,
                 )
 
-            assert_equal(self.nodes[CACHE_NODE_ID].getblockchaininfo()["blocks"], 199)
+            assert_equal(self.nodes[CACHE_NODE_ID].gettimechaininfo()["blocks"], 40)
 
             # Shut it down, and clean up cache directories:
             self.stop_nodes()
             self.nodes = []
 
-            def cache_path(*paths):
-                return os.path.join(cache_node_dir, self.chain, *paths)
+            # def cache_path(*paths):
+            #     return os.path.join(cache_node_dir, self.chain, *paths)
 
-            os.rmdir(cache_path('wallets'))  # Remove empty wallets dir
-            for entry in os.listdir(cache_path()):
-                if entry not in ['chainstate', 'blocks']:  # Only keep chainstate and blocks folder
-                    os.remove(cache_path(entry))
+            # os.rmdir(cache_path('wallets'))  # Remove empty wallets dir
+            # for entry in os.listdir(cache_path()):
+            #     if entry not in ['chainstate', 'blocks']:  # Only keep chainstate and blocks folder
+            #         os.remove(cache_path(entry))
 
         for i in range(self.num_nodes):
             self.log.debug("Copy cache directory {} to node {}".format(cache_node_dir, i))

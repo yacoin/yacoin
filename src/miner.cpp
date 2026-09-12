@@ -473,6 +473,16 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript& sc
 
     // Add coinbase tx as first transaction
     pblock->vtx.push_back(txNew);
+    // Placeholders so that vTxFees and vTxSigOpsCost stay index-aligned with
+    // pblock->vtx. Slot 0 belongs to the coinbase and is never reported.
+    pblocktemplate->vTxFees.push_back(-1);
+    pblocktemplate->vTxSigOpsCost.push_back(-1);
+
+    // Protect the chain tip read and the mempool walk in addPackageTxs, so that
+    // several miners can call getblocktemplate at the same time. cs_main is
+    // recursive, so a caller already holding it is fine, and the acquisition
+    // order is always cs_main before mempool.cs.
+    LOCK2(cs_main, mempool.cs);
 
     // Next block height
     CBlockIndex* pindexPrev = chainActive.Tip();
@@ -636,10 +646,17 @@ bool CheckWork(CBlock* pblock, CWallet& wallet, CReserveKey& reservekey) {
                  hashBlock.GetHex().c_str());
 
   if (hashBlock > hashTarget) {
-    return error("CheckWork () : proof-of-work not meeting target");
+    return error("CheckWork () : %s proof-of-work not meeting target", hashBlock.GetHex().c_str());
   }
 
-  //// debug print
+  // Found a solution
+  {
+    LOCK(cs_main);
+    if (pblock->hashPrevBlock != chainActive.Tip()->blockHash)
+      return error("CheckWork () : %s generated block is stale", hashBlock.GetHex().c_str());
+  }
+
+    //// debug print
   LogPrintf(
       "CheckWork () : new proof-of-work block found  \n"
       "hash: %s  \n"
@@ -648,12 +665,6 @@ bool CheckWork(CBlock* pblock, CWallet& wallet, CReserveKey& reservekey) {
   pblock->print();
   LogPrintf("generated %s\n", FormatMoney(pblock->vtx[0].vout[0].nValue));
 
-  // Found a solution
-  {
-    LOCK(cs_main);
-    if (pblock->hashPrevBlock != chainActive.Tip()->blockHash)
-      return error("CheckWork () : generated block is stale");
-  }
   // Remove key from key pool
   reservekey.KeepKey();
 
@@ -750,10 +761,12 @@ static void YacoinMiner() // here fProofOfStake is always false
 
         LogPrintf("Starting mining loop\n");
         while (fGenerateYacoins && nBlocksToGenerate != 0) {
-            while (IsInitialBlockDownload() || (g_connman->GetNodeCount(CConnman::CONNECTIONS_ALL) == 0 && !fTestNet)) {
-                Sleep(nMillisecondsPerSecond);
-                if (fShutdown || !fGenerateYacoins) // someone shut off the miner
-                    break;
+            if (Params().MiningRequiresPeers()) {
+                while (IsInitialBlockDownload() || (g_connman->GetNodeCount(CConnman::CONNECTIONS_ALL) == 0)) {
+                    Sleep(nMillisecondsPerSecond);
+                    if (fShutdown || !fGenerateYacoins) // someone shut off the miner
+                        break;
+                }
             }
 
             if (fShutdown || !fGenerateYacoins) // someone shut off the miner
@@ -778,11 +791,6 @@ static void YacoinMiner() // here fProofOfStake is always false
 
             CBlock * pblock = &pblocktemplate->block;
             IncrementExtraNonce(pblock, pindexPrev, nExtraNonce);
-
-            bool fYac1dot0BlockOrTx = false;
-            if ((pindexPrev->nHeight + 1) >= nMainnetNewLogicBlockNumber) {
-                fYac1dot0BlockOrTx = true;
-            }
 
             LogPrintf("Running YACoinMiner with %u transactions in block (%u bytes)\n", pblock->vtx.size(), ::GetSerializeSize( * pblock, SER_NETWORK, PROTOCOL_VERSION));
 

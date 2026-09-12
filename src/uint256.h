@@ -40,8 +40,6 @@ public:
         memset(pn, 0, sizeof(pn));
     }
 
-    inline int Compare(const base_blob& other) const { return memcmp(pn, other.pn, sizeof(pn)); }
-
     bool operator!() const
     {
         for (int i = 0; i < WIDTH; i++)
@@ -388,7 +386,7 @@ public:
 
     uint64_t GetUint64(int pos) const
     {
-        return Get64(0);
+        return Get64(pos);
     }
 
     ::uint64_t Get64(int n=0) const
@@ -605,7 +603,7 @@ public:
      */
     uint64_t GetCheapHash() const
     {
-        return ReadLE64((unsigned char*)&pn);
+        return ReadLE64((unsigned char*)pn);
     }
 };
 

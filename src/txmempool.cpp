@@ -892,6 +892,15 @@ void CTxMemPool::removeConflicts(const CTransaction &tx)
 /**
  * Called when a block is connected. Removes from mempool.
  */
+void CTxMemPool::removeForBlock(const std::vector<CTransaction>& vtx)
+{
+    ConnectedBlockTokenData connectedBlockData;
+    removeForBlock(vtx, connectedBlockData);
+}
+
+/**
+ * Called when a block is connected. Removes from mempool.
+ */
 void CTxMemPool::removeForBlock(const std::vector<CTransaction>& vtx, ConnectedBlockTokenData& connectedBlockData)
 {
     LOCK(cs);

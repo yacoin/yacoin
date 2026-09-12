@@ -31,7 +31,9 @@ static const unsigned int MAX_BLOCK_SERIALIZED_SIZE = 1000000;
 static const unsigned int MAX_GENESIS_BLOCK_SIZE = 1000000;
 static const size_t MIN_TRANSACTION_WEIGHT = 68; // 60 is the lower bound for the size of a valid serialized CTransaction
 static const size_t MIN_SERIALIZABLE_TRANSACTION_WEIGHT = 18; // 10 is the lower bound for the size of a serialized CTransaction
-extern int nCoinbaseMaturity;
+/** Coinbase transaction outputs can only be spent after this number of new blocks (network rule) */
+static const int COINBASE_MATURITY_AFTER_HARDFORK = 6;
+static const int COINBASE_MATURITY_BEFORE_HARDFORK = 500;  // 500 blocks, 1 blk/minute => ~8.33 hrs
 
 extern ::uint64_t GetMaxSize(enum GetMaxSize_mode mode, unsigned int nHeight = 0);
 extern ::int64_t GetProofOfWorkReward(unsigned int nBits=0, ::int64_t nFees=0, unsigned int nHeight=0);

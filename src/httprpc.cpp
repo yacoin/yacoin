@@ -180,6 +180,11 @@ static bool HTTPReq_JSONRPC(HTTPRequest* req, const std::string &)
         // Set the URI
         jreq.URI = req->GetURI();
 
+        // Let a handler that blocks find out that the caller hung up. The
+        // worker thread owns this HTTPRequest for the whole call, so capturing
+        // the pointer is safe for as long as the handler can run.
+        jreq.isClientConnected = [req]{ return req->IsClientConnected(); };
+
         std::string strReply;
         // singleton request
         if (valRequest.isObject()) {

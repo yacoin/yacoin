@@ -106,10 +106,7 @@ unsigned char GetNfactor(::int64_t nTimestamp, bool fYac1dot0BlockOrTx)
 
     int nBitCount = 0;
 
-    if (fTestNet || (nTimestamp <= (fTestNet? nChainStartTimeTestNet: nChainStartTime)))
-        return minNfactor;
-
-    ::int64_t nAgeOfBlockOrTxInSeconds = nTimestamp - (fTestNet? nChainStartTimeTestNet: nChainStartTime);
+    ::int64_t nAgeOfBlockOrTxInSeconds = nTimestamp - nChainStartTime;
 
     while ((nAgeOfBlockOrTxInSeconds >> 1) > 3)     // nAgeOfBlockOrTxInSeconds / 2 is 4 or more
     {

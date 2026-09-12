@@ -51,11 +51,12 @@ class TXMalleability_Test(BitcoinTestFramework):
         for node in self.nodes:
             node.setmocktime(mocktime)
 
-    def mine_blocks(self, nodeId, numberOfBlocksAtOnce):
+    def mine_blocks(self, nodeId, numberOfBlocks):
         timeBetweenBlocks = 60
-        self.setmocktimeforallnodes(self.mocktime)
-        self.nodes[nodeId].generate(numberOfBlocksAtOnce)
-        self.mocktime=self.mocktime+timeBetweenBlocks*numberOfBlocksAtOnce
+        for i in range(numberOfBlocks):
+            self.setmocktimeforallnodes(self.mocktime)
+            self.mocktime = self.mocktime + timeBetweenBlocks
+            self.nodes[nodeId].generate(1)
         self.sync_all()
 
     def log_accounts(self, description):
@@ -156,14 +157,15 @@ class TXMalleability_Test(BitcoinTestFramework):
         txid_modified = self.nodes[1].sendrawtransaction(transaction_raw_modified)
         self.log.info('Modified transaction ID: '+str(txid_original))
         assert_equal(txid_original, txid_modified) # 1.0 tx malleability fix
+
         # mine it into the blockchain
         self.mine_blocks(1,10)
 
         # check if the modified txid is confirmed and synced across the network
         transaction_details = self.nodes[1].gettransaction(txid_modified)
         self.log.info('Modified transaction found on node 1: '+str(transaction_details))
-        transaction_details = self.nodes[0].gettransaction(txid_modified)
         assert_equal(transaction_details['confirmations'],Decimal('10'))
+        transaction_details = self.nodes[0].gettransaction(txid_modified)
         self.log.info('Modified transaction found on node 0: '+str(transaction_details))
         assert_equal(transaction_details['confirmations'],Decimal('10'))
         # check that coins have been transferred

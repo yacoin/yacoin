@@ -22,10 +22,7 @@ using std::make_pair;
 using std::max;
 using std::deque;
 
-const ::int64_t
-    nChainStartTime = 1367991200,           // unix time???? ~ Wed May 08 2013 05:33:20
-    nChainStartTimeTestNet = 1546300800;    // 1546116950 ~12/29/2018
-                                            // 1546300800 1/1/2019 00:00:00 GMT
+const ::int64_t nChainStartTime = 1367991200;           // unix time???? ~ Wed May 08 2013 05:33:20
 
 // Every received block is assigned a unique and increasing identifier, so we
 // know which one to give priority in case of a fork.

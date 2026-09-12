@@ -462,11 +462,22 @@ bool Consensus::CheckTxTokens(const CTransaction& tx, CValidationState& state, c
             if (!GetTokenData(coin.out.scriptPubKey, data))
                 return state.DoS(100, false, REJECT_INVALID, "bad-txns-failed-to-get-token-from-script", false, "bad-txns-failed-to-get-token-from-script");
 
+            // Reject out-of-range token input amounts. Without this, a crafted amount can be summed
+            // into totalInputs below and wrap the signed 64-bit accumulator (Token Transfer Quantity Overflow).
+            if (data.nAmount < 0)
+                return state.DoS(100, false, REJECT_INVALID, "bad-txns-input-token-amount-negative", false, "bad-txns-input-token-amount-negative");
+            if (data.nAmount > MAX_MONEY)
+                return state.DoS(100, false, REJECT_INVALID, "bad-txns-input-token-amount-toolarge", false, "bad-txns-input-token-amount-toolarge");
+
             // Add to the total value of tokens in the inputs
             if (totalInputs.count(data.tokenName))
                 totalInputs.at(data.tokenName) += data.nAmount;
             else
                 totalInputs.insert(make_pair(data.tokenName, data.nAmount));
+
+            // Re-check the running total after each addition, so an overflow of the accumulator itself is caught.
+            if (!MoneyRange(totalInputs.at(data.tokenName)))
+                return state.DoS(100, false, REJECT_INVALID, "bad-txns-input-token-totalInputs-toolarge", false, "bad-txns-input-token-totalInputs-toolarge");
         }
     }
 
@@ -503,11 +514,23 @@ bool Consensus::CheckTxTokens(const CTransaction& tx, CValidationState& state, c
             if (!ContextualCheckTransferToken(tokenCache, transfer, address, strError))
                 return state.DoS(100, false, REJECT_INVALID, strError, false, strError);
 
+            // Reject out-of-range token transfer amounts. ContextualCheckTransferToken only rejects
+            // amounts <= 0, so without an upper bound a crafted amount can wrap the signed 64-bit
+            // accumulator below and defeat the inputs-equal-outputs check (Token Transfer Quantity Overflow).
+            if (transfer.nAmount < 0)
+                return state.DoS(100, false, REJECT_INVALID, "bad-txns-transfer-token-amount-negative", false, "bad-txns-transfer-token-amount-negative");
+            if (transfer.nAmount > MAX_MONEY)
+                return state.DoS(100, false, REJECT_INVALID, "bad-txns-transfer-token-amount-toolarge", false, "bad-txns-transfer-token-amount-toolarge");
+
             // Add to the total value of tokens in the outputs
             if (totalOutputs.count(transfer.strName))
                 totalOutputs.at(transfer.strName) += transfer.nAmount;
             else
                 totalOutputs.insert(make_pair(transfer.strName, transfer.nAmount));
+
+            // Re-check the running total after each addition, so an overflow of the accumulator itself is caught.
+            if (!MoneyRange(totalOutputs.at(transfer.strName)))
+                return state.DoS(100, false, REJECT_INVALID, "bad-txns-transfer-token-totalOutputs-toolarge", false, "bad-txns-transfer-token-totalOutputs-toolarge");
 
             if (IsTokenNameAnOwner(transfer.strName))
             {

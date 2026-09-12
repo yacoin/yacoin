@@ -54,10 +54,7 @@ static const unsigned char MAXIMUM_N_FACTOR = 25;  //30; since uint32_t fails on
                                                    //    when stored as an uint32_t in a block
                                                    //    so there is no point going past Nf = 25
 
-extern const ::int64_t
-    nChainStartTime,
-    nChainStartTimeTestNet;
-extern CBigNum bnProofOfWorkLimit;
+extern const ::int64_t nChainStartTime;
 
 /** Nodes collect new transactions into a block, hash them into a hash tree,
  * and scan through nonce values to make the block's hash satisfy proof-of-work
