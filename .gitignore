@@ -75,7 +75,6 @@ src/univalue/gen
 
 # Local developer builds (dev.sh)
 /.devbuild/
-/build/
 
 # autoreconf backup files
 *~

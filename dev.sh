@@ -71,6 +71,7 @@ ensure_dirs() {
 }
 
 cmd_depends() {
+    ensure_dirs  # TMPDIR is used by the package builds
     local args=(-C "$ROOT/depends" -j"$JOBS" HOST="$DEV_HOST")
     [[ "${1:-}" == qt ]] || args+=(NO_QT=1)
     # The depends packages run their own configure scripts with their own
@@ -112,6 +113,9 @@ variant_flags() {
 
 cmd_configure() {
     local variant="${1:?variant required}"
+    # Validate the variant before creating anything.
+    local flags
+    variant_flags "$variant"
     [[ -f "$CONFIG_SITE" ]] || { echo "Run ./dev.sh depends first" >&2; exit 1; }
     if [[ -f "$ROOT/config.status" ]]; then
         echo "The source tree was configured in place, which blocks out-of-tree builds." >&2
@@ -122,8 +126,6 @@ cmd_configure() {
     ensure_autogen
     local dir="$BUILD_ROOT/$variant"
     mkdir -p "$dir"
-    local flags
-    variant_flags "$variant"
     (cd "$dir" && "$ROOT/configure" "${flags[@]}")
     # The functional test runner reads ../config.ini relative to its own path,
     # so give each out-of-tree build its own runner that points at its config.
