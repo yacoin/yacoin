@@ -9,24 +9,32 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # Not HOST: some shells (e.g. tcsh) export HOST as the machine's hostname.
-DEV_HOST="${DEV_HOST:-x86_64-pc-linux-gnu}"
+DEFAULT_HOST=x86_64-pc-linux-gnu
+DEV_HOST="${DEV_HOST:-$DEFAULT_HOST}"
 JOBS="${JOBS:-$(nproc)}"
 DEPENDS_PREFIX="$ROOT/depends/$DEV_HOST"
+# Builds for other hosts get their own directories, so a variant is never
+# silently reused for a different host.
+if [[ "$DEV_HOST" == "$DEFAULT_HOST" ]]; then
+    BUILD_ROOT="$ROOT/build"
+else
+    BUILD_ROOT="$ROOT/build/$DEV_HOST"
+fi
 # Exported rather than set only for the initial configure: make re-runs
 # configure by itself when configure changes (e.g. after autogen), and that
-# re-run must also see the depends settings.
+# re-run must also see the depends settings. cmd_depends removes it again.
 export CONFIG_SITE="$DEPENDS_PREFIX/share/config.site"
 DEVBUILD="$ROOT/.devbuild"
 
-# Keep ccache and temporary test data inside the repository.
-export CCACHE_DIR="${CCACHE_DIR:-$DEVBUILD/ccache}"
+# Keep ccache and temporary test data inside the repository, even if the
+# environment points CCACHE_DIR elsewhere.
+export CCACHE_DIR="$DEVBUILD/ccache"
 export CCACHE_BASEDIR="$ROOT"
 export CCACHE_MAXSIZE="${CCACHE_MAXSIZE:-10G}"
 # One cache for all variants. With -g, ccache includes the build directory in
 # the cache key, so each variant gets its own entries and its debug info points
 # at its own build directory.
 export TMPDIR="$DEVBUILD/tmp"
-mkdir -p "$CCACHE_DIR" "$TMPDIR" "$DEVBUILD/logs"
 
 usage() {
     cat <<EOF
@@ -39,8 +47,9 @@ Usage: ./dev.sh <command> [args]
                           no suites = all suites, in parallel (UNIT_JOBS)
   check                   Full "make check" on build/dev (serial, as upstream)
   ftest [test...]         Functional tests on build/func, serially (-j 1)
-  asan                    Build and run all unit tests with ASan + UBSan
-  all                     dev build + unit, func build + ftest, release build
+  asan [suite...]         Build and run unit tests with ASan + UBSan
+  all                     dev build, unit, ftest and release build; runs every
+                          step and prints a summary
   ccache-stats            Show ccache statistics
 
 Variants: dev (mainnet consensus, no GUI, -O1 -g), func (dev + low difficulty),
@@ -57,14 +66,25 @@ timed() {
     log "$1 ${2:-} finished in $((SECONDS - start))s"
 }
 
+ensure_dirs() {
+    mkdir -p "$CCACHE_DIR" "$TMPDIR" "$DEVBUILD/logs"
+}
+
 cmd_depends() {
     local args=(-C "$ROOT/depends" -j"$JOBS" HOST="$DEV_HOST")
     [[ "${1:-}" == qt ]] || args+=(NO_QT=1)
-    make "${args[@]}"
+    # The depends packages run their own configure scripts with their own
+    # settings; they must not read the config.site meant for yacoind.
+    env -u CONFIG_SITE make "${args[@]}"
 }
 
+# Runs autogen.sh when configure or the helper files it needs are missing.
+# The helpers in build-aux/ aren't tracked by git, so a clone that already
+# has a configure script can still be missing them.
 ensure_autogen() {
-    [[ -x "$ROOT/configure" ]] || (cd "$ROOT" && ./autogen.sh)
+    if [[ ! -x "$ROOT/configure" || ! -f "$ROOT/build-aux/install-sh" || ! -f "$ROOT/build-aux/ltmain.sh" ]]; then
+        (cd "$ROOT" && ./autogen.sh)
+    fi
 }
 
 # Sets the configure arguments for a build variant in the array "flags".
@@ -93,31 +113,41 @@ variant_flags() {
 cmd_configure() {
     local variant="${1:?variant required}"
     [[ -f "$CONFIG_SITE" ]] || { echo "Run ./dev.sh depends first" >&2; exit 1; }
+    if [[ -f "$ROOT/config.status" ]]; then
+        echo "The source tree was configured in place, which blocks out-of-tree builds." >&2
+        echo "Run 'make distclean' in $ROOT first." >&2
+        exit 1
+    fi
+    ensure_dirs
     ensure_autogen
-    mkdir -p "$ROOT/build/$variant"
+    local dir="$BUILD_ROOT/$variant"
+    mkdir -p "$dir"
     local flags
     variant_flags "$variant"
-    (cd "$ROOT/build/$variant" && "$ROOT/configure" "${flags[@]}")
+    (cd "$dir" && "$ROOT/configure" "${flags[@]}")
     # The functional test runner reads ../config.ini relative to its own path,
     # so give each out-of-tree build its own runner that points at its config.
-    mkdir -p "$ROOT/build/$variant/test/functional"
-    ln -sf "$ROOT/test/functional/test_runner.py" "$ROOT/build/$variant/test/functional/test_runner.py"
+    mkdir -p "$dir/test/functional"
+    ln -sf "$ROOT/test/functional/test_runner.py" "$dir/test/functional/test_runner.py"
 }
 
 cmd_build() {
     local variant="${1:?variant required}"
-    [[ -f "$ROOT/build/$variant/Makefile" ]] || cmd_configure "$variant"
+    local dir="$BUILD_ROOT/$variant"
+    ensure_dirs
+    [[ -f "$dir/Makefile" ]] || cmd_configure "$variant"
     if [[ -n "${2:-}" ]]; then
-        make -C "$ROOT/build/$variant/src" -j"$JOBS" "$2"
+        make -C "$dir/src" -j"$JOBS" "$2"
     else
-        make -C "$ROOT/build/$variant" -j"$JOBS"
+        make -C "$dir" -j"$JOBS"
     fi
 }
 
 # Runs Boost test suites as separate processes. Each process gets its own
 # TMPDIR, because the test fixtures create their datadirs in the temp dir.
+# Logs and temp dirs are per variant, so e.g. unit and asan can run at once.
 run_unit_suites() {
-    local bin="$1"; shift
+    local variant="$1" bin="$2"; shift 2
     local suites=("$@")
     if [[ ${#suites[@]} -eq 0 ]]; then
         mapfile -t suites < <("$bin" --list_content 2>&1 | sed -n 's/^\([A-Za-z0-9_]*\)\*$/\1/p')
@@ -128,53 +158,68 @@ run_unit_suites() {
         echo "No unit test suites found; '$bin --list_content' failed?" >&2
         return 1
     fi
-    local outdir="$DEVBUILD/logs/unit"
-    rm -rf "$outdir"; mkdir -p "$outdir"
-    export bin outdir
-    # Each selector is passed to bash as "$1", never pasted into the script, so
+    local outdir="$DEVBUILD/logs/unit-$variant"
+    local tmproot="$TMPDIR/unit-$variant"
+    rm -rf "$outdir" "$tmproot"; mkdir -p "$outdir" "$tmproot"
+    export bin outdir tmproot
+    # Each selector is passed to bash as "$2", never pasted into the script, so
     # Boost filters such as suite/case, suite/* or !suite reach --run_test as is.
-    # Log and temp dir names replace characters that aren't safe in file names.
-    printf '%s\0' "${suites[@]}" | xargs -0 -P "${UNIT_JOBS:-$JOBS}" -n 1 bash -c '
-        name=$(printf "%s" "$1" | tr -c "A-Za-z0-9_.-" "_")
-        dir="$TMPDIR/unit-$name"; rm -rf "$dir"; mkdir -p "$dir"
-        if TMPDIR="$dir" "$bin" --run_test="$1" --log_level=test_suite >"$outdir/$name.log" 2>&1; then
-            echo "PASS $1"
-        else
-            echo "FAIL $1"
-        fi
-        rm -rf "$dir"' _ | sort | tee "$outdir/summary.txt"
+    # Log and temp dir names are the selector's index plus its characters that
+    # are safe in file names, so different selectors never share them.
+    local i
+    for i in "${!suites[@]}"; do printf '%s\0%s\0' "$i" "${suites[$i]}"; done |
+        xargs -0 -P "${UNIT_JOBS:-$JOBS}" -n 2 bash -c '
+            name="$1-$(printf "%s" "$2" | tr -c "A-Za-z0-9_.-" "_")"
+            dir="$tmproot/$name"; mkdir -p "$dir"
+            if TMPDIR="$dir" "$bin" --run_test="$2" --log_level=test_suite >"$outdir/$name.log" 2>&1; then
+                echo "PASS $2"
+            else
+                echo "FAIL $2"
+            fi
+            rm -rf "$dir"' _ | sort -k2 | tee "$outdir/summary.txt"
     local failed
     failed=$(grep -c '^FAIL' "$outdir/summary.txt" || true)
-    log "$(grep -c '^PASS' "$outdir/summary.txt") passed, $failed failed (logs: .devbuild/logs/unit/)"
+    log "$(grep -c '^PASS' "$outdir/summary.txt") passed, $failed failed (logs: ${outdir#"$ROOT"/})"
     [[ "$failed" -eq 0 ]]
 }
 
 cmd_unit() {
     cmd_build dev test/test_bitcoin
-    run_unit_suites "$ROOT/build/dev/src/test/test_bitcoin" "$@"
+    run_unit_suites dev "$BUILD_ROOT/dev/src/test/test_bitcoin" "$@"
 }
 
 cmd_check() {
     cmd_build dev
-    make -C "$ROOT/build/dev" check
+    make -C "$BUILD_ROOT/dev" check
 }
 
 cmd_ftest() {
     cmd_build func
-    "$ROOT/build/func/test/functional/test_runner.py" -j 1 --tmpdirprefix="$TMPDIR" "$@"
+    "$BUILD_ROOT/func/test/functional/test_runner.py" -j 1 --tmpdirprefix="$TMPDIR" "$@"
 }
 
 cmd_asan() {
     cmd_build asan test/test_bitcoin
     ASAN_OPTIONS="${ASAN_OPTIONS:-detect_leaks=1}" \
-        run_unit_suites "$ROOT/build/asan/src/test/test_bitcoin" "$@"
+        run_unit_suites asan "$BUILD_ROOT/asan/src/test/test_bitcoin" "$@"
 }
 
+# Runs every step even if an earlier one fails, then prints a summary. Each
+# step runs as its own dev.sh process: inside an "if", bash ignores set -e in
+# functions, so calling the functions directly would hide failures.
 cmd_all() {
-    timed cmd_build dev
-    timed cmd_unit
-    timed cmd_ftest
-    timed cmd_build release
+    local steps=("build dev" "unit" "ftest" "build release") step status=0 summary=()
+    for step in "${steps[@]}"; do
+        # shellcheck disable=SC2086 # step is split into command and arguments
+        if "$ROOT/dev.sh" $step; then
+            summary+=("PASS  $step")
+        else
+            summary+=("FAIL  $step"); status=1
+        fi
+    done
+    log "Summary"
+    printf '  %s\n' "${summary[@]}"
+    return "$status"
 }
 
 case "${1:-}" in
