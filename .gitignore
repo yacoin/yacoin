@@ -72,3 +72,7 @@ object_script.yacoin-qt.Release
 .project
 .settings/
 src/univalue/gen
+
+# Local developer builds (dev.sh)
+/.devbuild/
+/build/
