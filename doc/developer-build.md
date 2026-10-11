@@ -11,7 +11,7 @@ Everything it creates stays inside the repository and is ignored by git:
 |---|---|
 | `depends/x86_64-pc-linux-gnu/` | Built dependencies (shared by all variants) |
 | `build/<variant>/` | Out-of-tree build directories |
-| `.devbuild/ccache/` | Compiler cache, shared by all variants |
+| `.devbuild/ccache/` | Compiler cache (one directory, separate entries per variant) |
 | `.devbuild/tmp/` | Temporary data directories of unit and functional tests |
 | `.devbuild/logs/` | Logs, including one log per unit test suite |
 
@@ -53,7 +53,10 @@ curl -fL -o depends/sources/ccache-3.3.4.tar.bz2 \
 The unit tests assume mainnet consensus parameters (for example `pow_tests`),
 so they fail on the low-difficulty build. The functional tests need it.
 
-All variants use ccache. The `asan` variant builds
+All variants use one ccache directory. Because they're built with `-g`, ccache
+keys entries on the build directory, so variants don't share cached objects
+and debug info always points at the variant's own build directory. The first
+build of each variant is therefore a cold build. The `asan` variant builds
 secp256k1 without its x86_64 assembly, which doesn't compile under ASan.
 
 ## Commands
@@ -104,7 +107,7 @@ Ubuntu 22.04, 8 cores, 15 GB RAM.
 | `depends` without Qt (first run, including downloads) | 4 min 14 s |
 | Configure one variant | 48 s |
 | Clean build of a variant, cold ccache | 6 min 52 s – 7 min 55 s |
-| Rebuild after switching configuration, warm ccache | 67 s |
+| Rebuild of a variant after reconfiguring it, warm ccache | 67 s |
 | Rebuild `test_bitcoin` after changing one source file | 7 s |
 | All unit tests, serial | 29 s |
 | All unit tests, parallel (`./dev.sh unit`) | 15 s |

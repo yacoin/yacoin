@@ -12,15 +12,19 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DEV_HOST="${DEV_HOST:-x86_64-pc-linux-gnu}"
 JOBS="${JOBS:-$(nproc)}"
 DEPENDS_PREFIX="$ROOT/depends/$DEV_HOST"
+# Exported rather than set only for the initial configure: make re-runs
+# configure by itself when configure changes (e.g. after autogen), and that
+# re-run must also see the depends settings.
+export CONFIG_SITE="$DEPENDS_PREFIX/share/config.site"
 DEVBUILD="$ROOT/.devbuild"
 
 # Keep ccache and temporary test data inside the repository.
 export CCACHE_DIR="${CCACHE_DIR:-$DEVBUILD/ccache}"
 export CCACHE_BASEDIR="$ROOT"
 export CCACHE_MAXSIZE="${CCACHE_MAXSIZE:-10G}"
-# With -g, ccache hashes the working directory by default, so identical
-# objects in build/dev, build/func, ... would never share cache entries.
-export CCACHE_NOHASHDIR=1
+# One cache for all variants. With -g, ccache includes the build directory in
+# the cache key, so each variant gets its own entries and its debug info points
+# at its own build directory.
 export TMPDIR="$DEVBUILD/tmp"
 mkdir -p "$CCACHE_DIR" "$TMPDIR" "$DEVBUILD/logs"
 
@@ -88,13 +92,12 @@ variant_flags() {
 
 cmd_configure() {
     local variant="${1:?variant required}"
-    [[ -f "$DEPENDS_PREFIX/share/config.site" ]] || { echo "Run ./dev.sh depends first" >&2; exit 1; }
+    [[ -f "$CONFIG_SITE" ]] || { echo "Run ./dev.sh depends first" >&2; exit 1; }
     ensure_autogen
     mkdir -p "$ROOT/build/$variant"
     local flags
     variant_flags "$variant"
-    (cd "$ROOT/build/$variant" &&
-        CONFIG_SITE="$DEPENDS_PREFIX/share/config.site" "$ROOT/configure" "${flags[@]}")
+    (cd "$ROOT/build/$variant" && "$ROOT/configure" "${flags[@]}")
     # The functional test runner reads ../config.ini relative to its own path,
     # so give each out-of-tree build its own runner that points at its config.
     mkdir -p "$ROOT/build/$variant/test/functional"
