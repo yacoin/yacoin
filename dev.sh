@@ -8,9 +8,10 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-HOST="${HOST:-x86_64-pc-linux-gnu}"
+# Not HOST: some shells (e.g. tcsh) export HOST as the machine's hostname.
+DEV_HOST="${DEV_HOST:-x86_64-pc-linux-gnu}"
 JOBS="${JOBS:-$(nproc)}"
-DEPENDS_PREFIX="$ROOT/depends/$HOST"
+DEPENDS_PREFIX="$ROOT/depends/$DEV_HOST"
 DEVBUILD="$ROOT/.devbuild"
 
 # Keep ccache and temporary test data inside the repository.
@@ -53,10 +54,7 @@ timed() {
 }
 
 cmd_depends() {
-    # Some upstream download hosts accept connections but never send data, so
-    # abort stalled transfers and let depends fall back to its mirror.
-    local dl="curl --location --fail --connect-timeout 10 --speed-limit 1024 --speed-time 20 --retry 3 -o"
-    local args=(-C "$ROOT/depends" -j"$JOBS" HOST="$HOST" "build_linux_DOWNLOAD=$dl")
+    local args=(-C "$ROOT/depends" -j"$JOBS" HOST="$DEV_HOST")
     [[ "${1:-}" == qt ]] || args+=(NO_QT=1)
     make "${args[@]}"
 }
@@ -67,24 +65,23 @@ ensure_autogen() {
 
 # Sets the configure arguments for a build variant in the array "flags".
 variant_flags() {
-    local ld="-fuse-ld=gold"
     local san="-fsanitize=address,undefined -fno-omit-frame-pointer -fno-sanitize-recover=undefined"
     flags=(--without-gui --disable-man --enable-ccache)
     # Unit tests assume mainnet consensus parameters (e.g. pow_tests), while the
     # functional tests need the low-difficulty build, as in CI.
     case "$1" in
         dev)
-            flags+=("CXXFLAGS=-O1 -g" "CFLAGS=-O1 -g" "LDFLAGS=$ld") ;;
+            flags+=("CXXFLAGS=-O1 -g" "CFLAGS=-O1 -g") ;;
         func)
             flags+=(--enable-low-difficulty-for-development
-                    "CXXFLAGS=-O1 -g" "CFLAGS=-O1 -g" "LDFLAGS=$ld") ;;
+                    "CXXFLAGS=-O1 -g" "CFLAGS=-O1 -g") ;;
         release)
-            flags+=("LDFLAGS=$ld") ;;
+            ;;
         asan)
             # secp256k1's x86_64 field assembly needs more registers than are
             # left under ASan, so build it in plain C (passed to its configure).
             flags+=(--with-asm=no
-                    "CXXFLAGS=-O1 -g $san" "CFLAGS=-O1 -g $san" "LDFLAGS=$ld $san") ;;
+                    "CXXFLAGS=-O1 -g $san" "CFLAGS=-O1 -g $san" "LDFLAGS=$san") ;;
         *) echo "unknown variant: $1" >&2; exit 2 ;;
     esac
 }
@@ -122,17 +119,27 @@ run_unit_suites() {
     if [[ ${#suites[@]} -eq 0 ]]; then
         mapfile -t suites < <("$bin" --list_content 2>&1 | sed -n 's/^\([A-Za-z0-9_]*\)\*$/\1/p')
     fi
+    # An empty list means test_bitcoin failed to list its suites; never report
+    # that as a pass.
+    if [[ ${#suites[@]} -eq 0 ]]; then
+        echo "No unit test suites found; '$bin --list_content' failed?" >&2
+        return 1
+    fi
     local outdir="$DEVBUILD/logs/unit"
     rm -rf "$outdir"; mkdir -p "$outdir"
     export bin outdir
-    printf '%s\n' "${suites[@]}" | xargs -P "${UNIT_JOBS:-$JOBS}" -I{} bash -c '
-        dir="$TMPDIR/unit-{}"; rm -rf "$dir"; mkdir -p "$dir"
-        if TMPDIR="$dir" "$bin" --run_test={} --log_level=test_suite >"$outdir/{}.log" 2>&1; then
-            echo "PASS {}"
+    # Each selector is passed to bash as "$1", never pasted into the script, so
+    # Boost filters such as suite/case, suite/* or !suite reach --run_test as is.
+    # Log and temp dir names replace characters that aren't safe in file names.
+    printf '%s\0' "${suites[@]}" | xargs -0 -P "${UNIT_JOBS:-$JOBS}" -n 1 bash -c '
+        name=$(printf "%s" "$1" | tr -c "A-Za-z0-9_.-" "_")
+        dir="$TMPDIR/unit-$name"; rm -rf "$dir"; mkdir -p "$dir"
+        if TMPDIR="$dir" "$bin" --run_test="$1" --log_level=test_suite >"$outdir/$name.log" 2>&1; then
+            echo "PASS $1"
         else
-            echo "FAIL {}"
+            echo "FAIL $1"
         fi
-        rm -rf "$dir"' | sort | tee "$outdir/summary.txt"
+        rm -rf "$dir"' _ | sort | tee "$outdir/summary.txt"
     local failed
     failed=$(grep -c '^FAIL' "$outdir/summary.txt" || true)
     log "$(grep -c '^PASS' "$outdir/summary.txt") passed, $failed failed (logs: .devbuild/logs/unit/)"
