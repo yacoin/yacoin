@@ -461,6 +461,11 @@ CLEANFILES += support/*.gcda support/*.gcno
 CLEANFILES += univalue/*.gcda univalue/*.gcno
 CLEANFILES += wallet/*.gcda wallet/*.gcno
 CLEANFILES += wallet/test/*.gcda wallet/test/*.gcno
+CLEANFILES += rpc/*.gcda rpc/*.gcno
+CLEANFILES += tokens/*.gcda tokens/*.gcno
+CLEANFILES += scrypt-jane/*.gcda scrypt-jane/*.gcno
+CLEANFILES += leveldb/*/*.gcda leveldb/*/*.gcno
+CLEANFILES += leveldb/helpers/memenv/*.gcda leveldb/helpers/memenv/*.gcno
 
 DISTCLEANFILES = obj/build.h
 

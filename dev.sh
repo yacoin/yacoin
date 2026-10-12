@@ -48,13 +48,16 @@ Usage: ./dev.sh <command> [args]
   check                   Full "make check" on build/dev (serial, as upstream)
   ftest [test...]         Functional tests on build/func, serially (-j 1)
   asan [suite...]         Build and run unit tests with ASan + UBSan
+  cov                     Unit, functional and combined coverage reports
+                          (needs lcov) in .devbuild/coverage/
   all                     dev build, unit, ftest and release build; runs every
                           step and prints a summary
   ccache-stats            Show ccache statistics
 
 Variants: dev (mainnet consensus, no GUI, -O1 -g), func (dev + low difficulty),
           release (default optimisation),
-          asan (dev + AddressSanitizer/UndefinedBehaviorSanitizer)
+          asan (dev + AddressSanitizer/UndefinedBehaviorSanitizer),
+          cov-unit and cov-func (coverage builds used by "cov")
 EOF
 }
 
@@ -82,9 +85,27 @@ cmd_depends() {
 # Runs autogen.sh when configure or the helper files it needs are missing.
 # The helpers in build-aux/ aren't tracked by git, so a clone that already
 # has a configure script can still be missing them.
+# Also reruns it when the autotools inputs changed since the last run, because
+# new build directories use configure and the Makefile.in files directly.
+# Compares content, not timestamps, so a branch switch alone doesn't trigger it.
+# Only tracked files are hashed (including the secp256k1 and univalue
+# subprojects), so files that autogen.sh itself generates don't change it;
+# aclocal.m4 is tracked but regenerated, so it's excluded. Git pathspec
+# wildcards also match across directories. Without git (e.g. a source
+# tarball) the hash is constant, so autogen only runs when files are missing.
+autotools_inputs_sum() {
+    (cd "$ROOT" && git ls-files -z -- '*configure.ac' '*Makefile.am' 'src/Makefile*.include' \
+        '*.m4' ':!aclocal.m4' 2>/dev/null | xargs -0 -r cat 2>/dev/null |
+        sha256sum | cut -d' ' -f1) || true
+}
+
 ensure_autogen() {
-    if [[ ! -x "$ROOT/configure" || ! -f "$ROOT/build-aux/install-sh" || ! -f "$ROOT/build-aux/ltmain.sh" ]]; then
+    local sum stamp="$DEVBUILD/autogen.sum"
+    sum=$(autotools_inputs_sum)
+    if [[ ! -x "$ROOT/configure" || ! -f "$ROOT/build-aux/install-sh" ||
+          ! -f "$ROOT/build-aux/ltmain.sh" || "$(cat "$stamp" 2>/dev/null)" != "$sum" ]]; then
         (cd "$ROOT" && ./autogen.sh)
+        echo "$sum" > "$stamp"
     fi
 }
 
@@ -107,6 +128,12 @@ variant_flags() {
             # left under ASan, so build it in plain C (passed to its configure).
             flags+=(--with-asm=no
                     "CXXFLAGS=-O1 -g $san" "CFLAGS=-O1 -g $san" "LDFLAGS=$san") ;;
+        # Coverage builds: -O0 so lines and branches map exactly to the source.
+        cov-unit)
+            flags+=(--enable-lcov "CXXFLAGS=-O0 -g" "CFLAGS=-O0 -g") ;;
+        cov-func)
+            flags+=(--enable-lcov --enable-low-difficulty-for-development
+                    "CXXFLAGS=-O0 -g" "CFLAGS=-O0 -g") ;;
         *) echo "unknown variant: $1" >&2; exit 2 ;;
     esac
 }
@@ -206,6 +233,59 @@ cmd_asan() {
         run_unit_suites asan "$BUILD_ROOT/asan/src/test/test_bitcoin" "$@"
 }
 
+# Unit test coverage (mainnet build) and functional test coverage
+# (low-difficulty build), then both merged. The Makefile targets capture
+# coverage even when tests fail, so all reports are written either way.
+cmd_cov() {
+    local out="$DEVBUILD/coverage" status=0 v
+    ensure_dirs
+    # Only configure here: the make targets build what they need.
+    for v in cov-unit cov-func; do
+        [[ -f "$BUILD_ROOT/$v/Makefile" ]] || cmd_configure "$v"
+    done
+    # Delete old reports here too, not only in the make targets: if make fails
+    # before a recipe runs, an old report must not be shown as this run's.
+    # A report that exists after make comes from this run, even if tests failed.
+    rm -rf "$BUILD_ROOT/cov-unit/test_bitcoin.coverage" "$BUILD_ROOT/cov-unit/test_bitcoin_coverage.info" \
+        "$BUILD_ROOT/cov-func/functional_test.coverage" "$BUILD_ROOT/cov-func/functional_test_coverage.info"
+    make -C "$BUILD_ROOT/cov-unit" -j"$JOBS" cov-unit || status=1
+    make -C "$BUILD_ROOT/cov-func" -j"$JOBS" cov-functional || status=1
+    # Use the lcov and genhtml settings configure and Makefile.am chose, so the
+    # merged report matches the per-build reports. Read after make, which may
+    # have regenerated the Makefile.
+    local mk="$BUILD_ROOT/cov-unit/Makefile" lcov genhtml
+    read -ra lcov <<< "$(sed -n 's/^LCOV = //p' "$mk") $(sed -n 's/^LCOV_OPTS = //p' "$mk")"
+    read -ra genhtml <<< "$(sed -n 's/^GENHTML = //p' "$mk") $(sed -n 's/^GENHTML_OPTS = //p' "$mk")"
+    rm -rf "$out"; mkdir -p "$out"
+    local parts=() src_dir src_info part
+    for part in unit functional; do
+        if [[ $part == unit ]]; then
+            src_dir="$BUILD_ROOT/cov-unit/test_bitcoin.coverage"
+            src_info="$BUILD_ROOT/cov-unit/test_bitcoin_coverage.info"
+        else
+            src_dir="$BUILD_ROOT/cov-func/functional_test.coverage"
+            src_info="$BUILD_ROOT/cov-func/functional_test_coverage.info"
+        fi
+        if [[ -f "$src_info" && -d "$src_dir" ]]; then
+            cp -r "$src_dir" "$out/$part"; cp "$src_info" "$out/$part.info"; parts+=("$part")
+        else
+            echo "No $part coverage report was produced." >&2; status=1
+        fi
+    done
+    # Both builds record the same absolute source paths, so lcov merges them
+    # per file. See doc/developer-build.md for the limits of this merge.
+    if [[ ${#parts[@]} -eq 2 ]]; then
+        "${lcov[@]}" -q -a "$out/unit.info" -a "$out/functional.info" -o "$out/total.info"
+        "${genhtml[@]}" -q "$out/total.info" -o "$out/total"
+        parts+=(total)
+    fi
+    for part in "${parts[@]}"; do
+        log "Coverage: $part (${out#"$ROOT"/}/$part/index.html)"
+        "${lcov[@]}" --summary "$out/$part.info" 2>&1 | grep -E '^ +(lines|functions|branches)' || true
+    done
+    [[ "$status" -eq 0 ]] || { echo "Tests failed or a report is missing; see ${BUILD_ROOT#"$ROOT"/}/cov-*/*.log" >&2; return 1; }
+}
+
 # Runs every step even if an earlier one fails, then prints a summary. Each
 # step runs as its own dev.sh process: inside an "if", bash ignores set -e in
 # functions, so calling the functions directly would hide failures.
@@ -225,7 +305,7 @@ cmd_all() {
 }
 
 case "${1:-}" in
-    depends|configure|build|unit|check|ftest|asan|all)
+    depends|configure|build|unit|check|ftest|asan|cov|all)
         c="$1"; shift; timed "cmd_$c" "$@" ;;
     # configure picks up the pinned ccache built by depends, so query that one.
     ccache-stats) "$DEPENDS_PREFIX/native/bin/ccache" -s ;;

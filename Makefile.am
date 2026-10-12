@@ -62,11 +62,6 @@ DIST_DOCS = $(wildcard doc/*.md) $(wildcard doc/release-notes/*.md)
 #  $(OSX_DSSTORE_GEN) \
 #  $(top_srcdir)/contrib/macdeploy/detached-sig-apply.sh \
 #  $(top_srcdir)/contrib/macdeploy/detached-sig-create.sh
-#
-#COVERAGE_INFO = baseline.info \
-#  test_bitcoin_filtered.info total_coverage.info \
-#  baseline_filtered.info functional_test.info functional_test_filtered.info \
-#  test_bitcoin_coverage.info test_bitcoin.info
 
 dist-hook:
 	-$(GIT) archive --format=tar HEAD -- src/clientversion.cpp | $(AMTAR) -C $(top_distdir) -xf -
@@ -182,59 +177,74 @@ release: all-recursive
 	$(STRIP) $(BITCOIN_CLI_BIN) -o $(top_builddir)/release/yacoin-cli
 	$(STRIP) $(BITCOIN_QT_BIN) -o $(top_builddir)/release/yacoin-qt
 
-# if USE_LCOV
+COVERAGE_UNIT_FILES = unit_baseline.info test_bitcoin.info test_bitcoin_all.info \
+  test_bitcoin_coverage.info test_bitcoin.log test_bitcoin.status
+COVERAGE_FUNCTIONAL_FILES = functional_baseline.info functional_test.info \
+  functional_test_all.info functional_test_coverage.info functional_test.log \
+  functional_test.status
 
-# baseline.info:
-# 	$(LCOV) -c -i -d $(abs_builddir)/src -o $@
+if USE_LCOV
+# Coverage of the unit tests (cov-unit) and of the functional tests
+# (cov-functional). They need differently configured builds: the unit tests
+# assume mainnet consensus, the functional tests need
+# --enable-low-difficulty-for-development. dev.sh builds both and merges them.
+#
+# Each target zeroes the counters, records a baseline (so files that never run
+# still count), runs the tests, captures, removes vendored and test code, and
+# writes an HTML report plus a summary. Coverage is captured even if tests
+# fail; the target fails afterwards in that case.
+#
+# -b points lcov at the compile directory: with ccache's base_dir the objects
+# record source paths relative to src/.
 
-# baseline_filtered.info: baseline.info
-# 	$(LCOV) -r $< "/usr/include/*" -o $@
+LCOV_CAPTURE = $(LCOV) $(LCOV_OPTS) -d $(abs_builddir)/src -b $(abs_builddir)/src
+# lcov 1.x only: lcov 2.x rejects -r patterns that match nothing.
+LCOV_FILTER = "/usr/*" "*/depends/*" "*/src/leveldb/*" "*/src/secp256k1/*" \
+  "*/src/univalue/*" "*/src/crypto/ctaes/*" "*/src/test/*" "*/src/wallet/test/*"
+GENHTML_OPTS = --branch-coverage --demangle-cpp -s
 
-# leveldb_baseline.info: baseline_filtered.info
-# 	$(LCOV) -c -i -d $(abs_builddir)/src/leveldb -b $(abs_builddir)/src/leveldb -o $@
+cov-unit:
+	rm -rf test_bitcoin.coverage/ $(COVERAGE_UNIT_FILES)
+	@# Build everything, so the baseline has no stale .gcno files.
+	$(MAKE) all
+	$(LCOV_CAPTURE) -z
+	$(LCOV_CAPTURE) -c -i -o unit_baseline.info
+	$(abs_builddir)/src/test/test_bitcoin$(EXEEXT) > test_bitcoin.log 2>&1; echo $$? > test_bitcoin.status
+	@# A crashed test run writes no counters, and lcov 1.x then writes an
+	@# empty tracefile; fall back to the baseline (0%) so a report is still made.
+	$(LCOV_CAPTURE) -c -t test_bitcoin -o test_bitcoin.info || true
+	grep -q '^SF:' test_bitcoin.info 2>/dev/null || cp unit_baseline.info test_bitcoin.info
+	$(LCOV) $(LCOV_OPTS) -a unit_baseline.info -a test_bitcoin.info -o test_bitcoin_all.info
+	$(LCOV) $(LCOV_OPTS) -r test_bitcoin_all.info $(LCOV_FILTER) -o test_bitcoin_coverage.info
+	$(GENHTML) $(GENHTML_OPTS) test_bitcoin_coverage.info -o test_bitcoin.coverage
+	$(LCOV) $(LCOV_OPTS) --summary test_bitcoin_coverage.info
+	@test "`cat test_bitcoin.status`" = 0 || { echo "test_bitcoin failed (see test_bitcoin.log); coverage was captured anyway" >&2; exit 1; }
 
-# leveldb_baseline_filtered.info: leveldb_baseline.info
-# 	$(LCOV) -r $< "/usr/include/*" -o $@
+cov-functional:
+	rm -rf functional_test.coverage/ $(COVERAGE_FUNCTIONAL_FILES)
+	@# Build everything, so the baseline has no stale .gcno files.
+	$(MAKE) all
+	@# test_runner.py finds config.ini relative to its own path, so out-of-tree
+	@# builds need a link to the runner inside the build directory.
+	$(MKDIR_P) test/functional
+	if test "$(abs_top_srcdir)" != "$(abs_top_builddir)"; then \
+	  ln -sf $(abs_top_srcdir)/test/functional/test_runner.py test/functional/test_runner.py; fi
+	$(LCOV_CAPTURE) -z
+	$(LCOV_CAPTURE) -c -i -o functional_baseline.info
+	test/functional/test_runner.py -j 1 --tmpdirprefix=$(abs_builddir)/test/tmp > functional_test.log 2>&1; echo $$? > functional_test.status
+	@# A crashed test run writes no counters, and lcov 1.x then writes an
+	@# empty tracefile; fall back to the baseline (0%) so a report is still made.
+	$(LCOV_CAPTURE) -c -t functional_tests -o functional_test.info || true
+	grep -q '^SF:' functional_test.info 2>/dev/null || cp functional_baseline.info functional_test.info
+	$(LCOV) $(LCOV_OPTS) -a functional_baseline.info -a functional_test.info -o functional_test_all.info
+	$(LCOV) $(LCOV_OPTS) -r functional_test_all.info $(LCOV_FILTER) -o functional_test_coverage.info
+	$(GENHTML) $(GENHTML_OPTS) functional_test_coverage.info -o functional_test.coverage
+	$(LCOV) $(LCOV_OPTS) --summary functional_test_coverage.info
+	@test "`cat functional_test.status`" = 0 || { echo "functional tests failed (see functional_test.log); coverage was captured anyway" >&2; exit 1; }
 
-# baseline_filtered_combined.info: leveldb_baseline_filtered.info baseline_filtered.info
-# 	$(LCOV) -a leveldb_baseline_filtered.info -a baseline_filtered.info -o $@
+.PHONY: cov-unit cov-functional
+endif
 
-# test_bitcoin.info: baseline_filtered_combined.info
-# 	$(MAKE) -C src/ check
-# 	$(LCOV) -c -d $(abs_builddir)/src -t test_bitcoin -o $@
-# 	$(LCOV) -z -d $(abs_builddir)/src
-# 	$(LCOV) -z -d $(abs_builddir)/src/leveldb
-
-# test_bitcoin_filtered.info: test_bitcoin.info
-# 	$(LCOV) -r $< "/usr/include/*" -o $@
-
-# block_test.info: test_bitcoin_filtered.info
-# 	$(MKDIR_P) qa/tmp
-# 	-@TIMEOUT=15 qa/pull-tester/run-bitcoind-for-test.sh $(JAVA) -jar $(JAVA_COMPARISON_TOOL) qa/tmp/compTool 0
-# 	$(LCOV) -c -d $(abs_builddir)/src --t BitcoinJBlockTest -o $@
-# 	$(LCOV) -z -d $(abs_builddir)/src
-# 	$(LCOV) -z -d $(abs_builddir)/src/leveldb
-
-# block_test_filtered.info: block_test.info
-# 	$(LCOV) -r $< "/usr/include/*" -o $@
-
-# test_bitcoin_coverage.info: baseline_filtered_combined.info test_bitcoin_filtered.info
-# 	$(LCOV) -a baseline_filtered.info -a leveldb_baseline_filtered.info -a test_bitcoin_filtered.info -o $@
-
-# total_coverage.info:  baseline_filtered_combined.info test_bitcoin_filtered.info block_test_filtered.info
-# 	$(LCOV) -a baseline_filtered.info -a leveldb_baseline_filtered.info -a test_bitcoin_filtered.info -a block_test_filtered.info -o $@ | $(GREP) "\%" | $(AWK) '{ print substr($$3,2,50) "/" $$5 }' > coverage_percent.txt
-
-# test_bitcoin.coverage/.dirstamp:  test_bitcoin_coverage.info
-# 	$(GENHTML) -s $< -o $(@D)
-# 	@touch $@
-
-# total.coverage/.dirstamp: total_coverage.info
-# 	$(GENHTML) -s $< -o $(@D)
-# 	@touch $@
-
-# cov: test_bitcoin.coverage/.dirstamp total.coverage/.dirstamp
-
-# endif
 
 # if USE_COMPARISON_TOOL
 # check-local:
@@ -248,10 +258,9 @@ EXTRA_DIST = $(top_srcdir)/share/genbuild.sh qa/pull-tester/rpc-tests.sh qa/pull
 
 CLEANFILES = $(OSX_DMG) $(BITCOIN_WIN_INSTALLER)
 
-.INTERMEDIATE: $(COVERAGE_INFO)
-
 DISTCHECK_CONFIGURE_FLAGS = --enable-man
 
 clean-local:
-	rm -rf coverage_percent.txt test_bitcoin.coverage/ total.coverage/ test/tmp/ cache/ $(OSX_APP)
+	rm -rf test_bitcoin.coverage/ functional_test.coverage/ test/tmp/ cache/ $(OSX_APP)
+	rm -f $(COVERAGE_UNIT_FILES) $(COVERAGE_FUNCTIONAL_FILES)
 	rm -rf test/functional/__pycache__
