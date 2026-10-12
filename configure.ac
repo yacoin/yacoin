@@ -88,6 +88,7 @@ AC_PATH_PROG(JAVA, java)
 dnl Python 3.x is supported from 3.4 on (see https://github.com/bitcoin/bitcoin/issues/7893)
 AC_PATH_PROGS([PYTHON], [python3.6 python3.5 python3.4 python3 python2.7 python2 python])
 AC_PATH_PROG(GENHTML, genhtml)
+AC_PATH_PROG(GENINFO, geninfo)
 AC_PATH_PROG([GIT], [git])
 AC_PATH_PROG(CCACHE,ccache)
 AC_PATH_PROG(XGETTEXT,xgettext)
@@ -489,19 +490,30 @@ if test x$use_lcov = xyes; then
   if test x$PYTHON = x; then
     AC_MSG_ERROR("lcov testing requested but python not found")
   fi
-  if test x$JAVA = x; then
-    AC_MSG_ERROR("lcov testing requested but java not found")
-  fi
   if test x$GENHTML = x; then
     AC_MSG_ERROR("lcov testing requested but genhtml not found")
   fi
-  if test x$use_comparison_tool = x; then
-    AC_MSG_ERROR("lcov testing requested but comparison tool was not specified")
+  if test x$GENINFO = x; then
+    AC_MSG_ERROR("lcov testing requested but geninfo not found")
   fi
+  dnl The coverage targets use lcov 1.x options; lcov 2.x renamed or tightened them.
+  lcov_version=`$LCOV --version 2>/dev/null`
+  if ! echo "$lcov_version" | grep -q "version 1\."; then
+    AC_MSG_ERROR([lcov testing requires lcov 1.x, found: $lcov_version])
+  fi
+  dnl gcov must match the compiler version (e.g. gcov 11 for g++ 11).
   LCOV="$LCOV --gcov-tool=$GCOV"
-  AX_CHECK_COMPILE_FLAG([--coverage],[CXXFLAGS="$CXXFLAGS --coverage"],
+  GENINFO="$GENINFO --gcov-tool=$GCOV"
+  dnl lcov 1.x drops branch data unless this is passed to every lcov call.
+  dnl Exception edges would make the C++ branch numbers mostly noise.
+  LCOV_OPTS="--rc lcov_branch_coverage=1 --rc geninfo_no_exception_branch=1"
+  dnl scrypt-jane (the scrypt-chacha PoW) is C, so instrument C as well.
+  AX_CHECK_COMPILE_FLAG([--coverage],[CXXFLAGS="$CXXFLAGS --coverage"; CFLAGS="$CFLAGS --coverage"],
     [AC_MSG_ERROR("lcov testing requested but --coverage flag does not work")])
+  AX_CHECK_LINK_FLAG([[--coverage]], [LDFLAGS="$LDFLAGS --coverage"],
+    [AC_MSG_ERROR("lcov testing requested but --coverage linker flag does not work")])
 fi
+AC_SUBST(LCOV_OPTS)
 
 dnl Require little endian
 AC_C_BIGENDIAN([AC_MSG_ERROR("Big Endian not supported")])

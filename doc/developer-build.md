@@ -104,6 +104,69 @@ same as a serial run. Per-suite logs and `summary.txt` are written to
 Functional tests run serially (`-j 1`) for now; running them in parallel
 hasn't been verified. Their data directories go to `.devbuild/tmp/`.
 
+## Code coverage
+
+Needs `lcov` (`sudo apt install lcov`; Ubuntu 22.04 ships lcov 1.15, which
+works with gcc 11). `gcov` must match the compiler version.
+
+```sh
+./dev.sh cov
+```
+
+The unit tests need mainnet consensus and the functional tests need the
+low-difficulty build, so no single build can run both. `./dev.sh cov` uses
+two coverage builds (`--enable-lcov`, `-O0 -g`):
+
+| Build | Runs | Make target |
+|---|---|---|
+| `build/cov-unit` | `test_bitcoin` (all unit tests) | `make cov-unit` |
+| `build/cov-func` | All functional tests, serially | `make cov-functional` |
+
+Each target zeroes the counters, records a baseline (so files that are never
+executed still count), runs the tests, and keeps the coverage even if tests
+fail. It then removes vendored and test code (leveldb, secp256k1, univalue, ctaes,
+`src/test`, `src/wallet/test`) and writes an HTML report. `./dev.sh cov`
+then merges both results and writes line, function and branch coverage to
+`.devbuild/coverage/`:
+
+- `unit/index.html`
+- `functional/index.html`
+- `total/index.html`, with both merged
+
+Notes:
+
+- The merged report combines two builds. Lines that exist in only one build
+  (inside `LOW_DIFFICULTY_FOR_DEVELOPMENT` blocks) only have that build's
+  counts. Branches are merged by position, so on the few lines whose
+  conditions differ between the builds the merged branch numbers are only
+  approximate. Line and function coverage aren't affected.
+- Only lcov 1.x is supported, and configure checks for it. lcov 2.x rejects
+  filter patterns that match nothing and has renamed the branch-coverage option.
+- With both builds cached, a full run takes about 27 minutes on 8 cores:
+  unit coverage about 5½ minutes, functional coverage about 21 minutes. Most
+  of that is the serial functional tests (about 20 minutes at `-O0`) and
+  `transaction_tests/test_big_transaction` (about 3 minutes). Building both
+  `-O0` variants from scratch adds about 13 minutes.
+- To keep that time down, lcov captures run `geninfo` in parallel
+  (`contrib/devtools/coverage-capture.sh`), the baseline is captured while
+  the tests run, and the unit test suites run in parallel
+  (`contrib/devtools/run-unit-suites.sh`, the runner `./dev.sh unit` uses).
+  `COV_JOBS` sets the number of processes (default: all cores), e.g.
+  `make cov-unit COV_JOBS=4`.
+- Branch coverage excludes exception edges
+  (`geninfo_no_exception_branch=1`). Without that, C++ branch numbers are
+  mostly noise.
+- Assembly (`scrypt-x86_64.S`) and the vendored libraries aren't measured.
+- Nodes that the functional tests kill with SIGKILL don't write their
+  counters, so code that only those nodes ran is under-reported.
+- The targets also work without `dev.sh`: configure a build with
+  `--enable-lcov` and run `make cov-unit` or `make cov-functional` in it.
+  With depends, make re-runs configure by itself when `configure.ac` or a
+  `Makefile.am` changed, and that re-run only finds the depends libraries if
+  `CONFIG_SITE` is set for make too, or if the build was configured with
+  `--prefix=$PWD/depends/<host>`. `dev.sh` exports `CONFIG_SITE` for this
+  reason.
+
 ## Reference timings
 
 Ubuntu 22.04, 8 cores, 15 GB RAM.
