@@ -153,6 +153,11 @@ Notes:
   counters, so code that only those nodes ran is under-reported.
 - The targets also work without `dev.sh`: configure a build with
   `--enable-lcov` and run `make cov-unit` or `make cov-functional` in it.
+  With depends, make re-runs configure by itself when `configure.ac` or a
+  `Makefile.am` changed, and that re-run only finds the depends libraries if
+  `CONFIG_SITE` is set for make too, or if the build was configured with
+  `--prefix=$PWD/depends/<host>`. `dev.sh` exports `CONFIG_SITE` for this
+  reason.
 
 ## Reference timings
 
