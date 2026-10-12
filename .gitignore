@@ -99,11 +99,16 @@ build-aux/test-driver
 *.gcda
 *.gcno
 /unit_baseline.info
+/unit_baseline.log
 /test_bitcoin*.info
 /test_bitcoin.log
+/test_bitcoin.logs/
 /test_bitcoin.status
 /test_bitcoin.coverage/
 /functional_*.info
+/functional_baseline.log
 /functional_test.log
 /functional_test.status
 /functional_test.coverage/
+/*.capture-failed
+/*.info.parts/

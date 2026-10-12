@@ -172,44 +172,12 @@ cmd_build() {
     fi
 }
 
-# Runs Boost test suites as separate processes. Each process gets its own
-# TMPDIR, because the test fixtures create their datadirs in the temp dir.
-# Logs and temp dirs are per variant, so e.g. unit and asan can run at once.
+# Runs Boost test suites as separate parallel processes (see the script).
+# Logs are per variant, so e.g. unit and asan can run at the same time.
 run_unit_suites() {
     local variant="$1" bin="$2"; shift 2
-    local suites=("$@")
-    if [[ ${#suites[@]} -eq 0 ]]; then
-        mapfile -t suites < <("$bin" --list_content 2>&1 | sed -n 's/^\([A-Za-z0-9_]*\)\*$/\1/p')
-    fi
-    # An empty list means test_bitcoin failed to list its suites; never report
-    # that as a pass.
-    if [[ ${#suites[@]} -eq 0 ]]; then
-        echo "No unit test suites found; '$bin --list_content' failed?" >&2
-        return 1
-    fi
-    local outdir="$DEVBUILD/logs/unit-$variant"
-    local tmproot="$TMPDIR/unit-$variant"
-    rm -rf "$outdir" "$tmproot"; mkdir -p "$outdir" "$tmproot"
-    export bin outdir tmproot
-    # Each selector is passed to bash as "$2", never pasted into the script, so
-    # Boost filters such as suite/case, suite/* or !suite reach --run_test as is.
-    # Log and temp dir names are the selector's index plus its characters that
-    # are safe in file names, so different selectors never share them.
-    local i
-    for i in "${!suites[@]}"; do printf '%s\0%s\0' "$i" "${suites[$i]}"; done |
-        xargs -0 -P "${UNIT_JOBS:-$JOBS}" -n 2 bash -c '
-            name="$1-$(printf "%s" "$2" | tr -c "A-Za-z0-9_.-" "_")"
-            dir="$tmproot/$name"; mkdir -p "$dir"
-            if TMPDIR="$dir" "$bin" --run_test="$2" --log_level=test_suite >"$outdir/$name.log" 2>&1; then
-                echo "PASS $2"
-            else
-                echo "FAIL $2"
-            fi
-            rm -rf "$dir"' _ | sort -k2 | tee "$outdir/summary.txt"
-    local failed
-    failed=$(grep -c '^FAIL' "$outdir/summary.txt" || true)
-    log "$(grep -c '^PASS' "$outdir/summary.txt") passed, $failed failed (logs: ${outdir#"$ROOT"/})"
-    [[ "$failed" -eq 0 ]]
+    "$ROOT/contrib/devtools/run-unit-suites.sh" "$bin" "$DEVBUILD/logs/unit-$variant" \
+        "${UNIT_JOBS:-$JOBS}" "$@"
 }
 
 cmd_unit() {
@@ -248,8 +216,8 @@ cmd_cov() {
     # A report that exists after make comes from this run, even if tests failed.
     rm -rf "$BUILD_ROOT/cov-unit/test_bitcoin.coverage" "$BUILD_ROOT/cov-unit/test_bitcoin_coverage.info" \
         "$BUILD_ROOT/cov-func/functional_test.coverage" "$BUILD_ROOT/cov-func/functional_test_coverage.info"
-    make -C "$BUILD_ROOT/cov-unit" -j"$JOBS" cov-unit || status=1
-    make -C "$BUILD_ROOT/cov-func" -j"$JOBS" cov-functional || status=1
+    make -C "$BUILD_ROOT/cov-unit" -j"$JOBS" COV_JOBS="$JOBS" cov-unit || status=1
+    make -C "$BUILD_ROOT/cov-func" -j"$JOBS" COV_JOBS="$JOBS" cov-functional || status=1
     # Use the lcov and genhtml settings configure and Makefile.am chose, so the
     # merged report matches the per-build reports. Read after make, which may
     # have regenerated the Makefile.

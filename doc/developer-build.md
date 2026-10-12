@@ -142,9 +142,17 @@ Notes:
   approximate. Line and function coverage aren't affected.
 - Only lcov 1.x is supported, and configure checks for it. lcov 2.x rejects
   filter patterns that match nothing and has renamed the branch-coverage option.
-- A full run takes 40 to 50 minutes on 8 cores: the two `-O0` builds (about
-  13 minutes when nothing is cached), 5 minutes of unit tests, 19 minutes of
-  functional tests and about 13 minutes of lcov capture.
+- With both builds cached, a full run takes about 27 minutes on 8 cores:
+  unit coverage about 5½ minutes, functional coverage about 21 minutes. Most
+  of that is the serial functional tests (about 20 minutes at `-O0`) and
+  `transaction_tests/test_big_transaction` (about 3 minutes). Building both
+  `-O0` variants from scratch adds about 13 minutes.
+- To keep that time down, lcov captures run `geninfo` in parallel
+  (`contrib/devtools/coverage-capture.sh`), the baseline is captured while
+  the tests run, and the unit test suites run in parallel
+  (`contrib/devtools/run-unit-suites.sh`, the runner `./dev.sh unit` uses).
+  `COV_JOBS` sets the number of processes (default: all cores), e.g.
+  `make cov-unit COV_JOBS=4`.
 - Branch coverage excludes exception edges
   (`geninfo_no_exception_branch=1`). Without that, C++ branch numbers are
   mostly noise.
