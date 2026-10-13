@@ -2,10 +2,14 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#include "chainparams.h"
 #include "main.h"
+#include "pow.h"
 #include "primitives/block.h"
 #include "scrypt.h"
+#include "streams.h"
 #include "utilstrencodings.h"
+#include "version.h"
 
 extern "C" {
 #include "scrypt-jane/scrypt-jane.h"
@@ -153,6 +157,35 @@ BOOST_AUTO_TEST_CASE(new_header_hash_uses_hardfork_nfactor)
         // CalculateHash, not GetHash: GetHash caches the result per header
         BOOST_CHECK(header.CalculateHash() == expected);
     }
+}
+
+/* Mainnet block 1,911,210 (`getblockheader <hash> false`): the real header hashes to
+ * its block hash at N-factor 21 and meets its own target */
+BOOST_AUTO_TEST_CASE(mainnet_header_hash)
+{
+    ConsensusGlobalsGuard globals;
+    nFactorAtHardfork = 21;
+
+    CDataStream stream(ParseHex("07000000bf24dff3e63105d81257ed9842c0aa82d8af213b84115feb9ec8a55e7d0e0000"
+                                "299e1fcc76f2681623ff40bbbc3b43c780fae691b0dbb7657d7acb3489d55c85"
+                                "8a7f446400000000ffff0f1e80000a56"),
+                       SER_NETWORK, PROTOCOL_VERSION);
+    CBlockHeader header;
+    stream >> header;
+    BOOST_CHECK(stream.empty());
+    BOOST_CHECK_EQUAL(header.nVersion, VERSION_of_block_for_yac_05x_new);
+    BOOST_CHECK_EQUAL(header.hashPrevBlock.GetHex(), "00000e7d5ea5c89eeb5f11843b21afd882aac04298ed5712d80531e6f3df24bf");
+    BOOST_CHECK_EQUAL(header.nTime, 1682210698);
+    BOOST_CHECK_EQUAL(header.nBits, 0x1e0fffffU);
+
+    const uint256 hash = header.CalculateHash();
+    BOOST_CHECK_EQUAL(hash.GetHex(), "000009e3b1cc249ba64c3749430b96cf0f3c25acbb2bd3cb0b69e3b28288607b");
+    const auto chainParams = CreateChainParams(CBaseChainParams::MAIN);
+    BOOST_CHECK(CheckProofOfWork(hash, header.nBits, chainParams->GetConsensus()));
+
+    // The same header at another N-factor hashes differently
+    nFactorAtHardfork = 20;
+    BOOST_CHECK(header.CalculateHash() != hash);
 }
 
 BOOST_AUTO_TEST_SUITE_END()
