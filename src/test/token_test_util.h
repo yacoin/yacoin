@@ -122,6 +122,18 @@ inline CTransaction IssueTx(const CNewToken& token)
     return CTransaction(mtx);
 }
 
+/** Sub-token issue tx: YAC lock, parent owner token change, owner token, new token last */
+inline CTransaction SubIssueTx(const CNewToken& token, const std::string& parent)
+{
+    CMutableTransaction mtx;
+    mtx.vin.push_back(CTxIn(COutPoint(uint256S("0x04"), 0)));
+    mtx.vout.push_back(TokenLockOutput(ETokenType::SUB));
+    mtx.vout.push_back(CTxOut(0, TransferTokenScript(CTokenTransfer(parent + OWNER_TAG, OWNER_TOKEN_AMOUNT))));
+    mtx.vout.push_back(CTxOut(0, OwnerTokenScript(token)));
+    mtx.vout.push_back(CTxOut(0, NewTokenScript(token)));
+    return CTransaction(mtx);
+}
+
 /** Reissue tx: YAC lock, owner token change, reissue last */
 inline CTransaction ReissueTx(const CReissueToken& reissue)
 {

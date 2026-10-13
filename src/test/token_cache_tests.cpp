@@ -32,7 +32,9 @@ static SpentCoins OwnerCoin(const CTransaction& tx)
 }
 
 /** Token side of ConnectBlock for one tx: spend its token inputs (SpendCoin),
- * then AddCoins with the token cache, collecting reissue undo data */
+ * then AddCoins with the token cache, collecting reissue undo data.
+ * ConnectTokenTx and DisconnectTokenTx are hand copies of validation.cpp
+ * (ConnectBlock, DisconnectBlock, ApplyTxInUndo): keep them in sync with it. */
 static void ConnectTokenTx(CTokensCache& cache, const CTransaction& tx, std::vector<std::pair<std::string, CBlockTokenUndo> >& vUndo, const SpentCoins& vSpent = {})
 {
     for (const auto& spent : vSpent)
@@ -191,6 +193,49 @@ BOOST_AUTO_TEST_CASE(unique_issue_and_undo)
         BOOST_CHECK(cache.ContainsToken("ABC"));
         if (fIndex)
             BOOST_CHECK_EQUAL(Balance(cache, "ABC!", TestTokenAddress()), OWNER_TOKEN_AMOUNT);
+    }
+}
+
+/* A sub-token issue spends and returns the parent owner token; the undo removes the
+ * sub-token and its owner token and gives the parent owner token back */
+BOOST_AUTO_TEST_CASE(sub_issue_and_undo)
+{
+    for (bool fIndex : {true, false}) {
+        ResetTokens(fIndex);
+        CTokensCache cache;
+        const std::string address = TestTokenAddress();
+        std::vector<std::pair<std::string, CBlockTokenUndo> > vUndo;
+        CTransaction issue = IssueTx(CNewToken("ABC", 1000 * COIN, 0, 1, 0, ""));
+        ConnectTokenTx(cache, issue, vUndo);
+
+        CNewToken sub("ABC/SUB", 50 * COIN, 1, 1, 0, "");
+        CTransaction subIssue = SubIssueTx(sub, "ABC");
+        BOOST_CHECK(subIssue.IsNewToken());
+        ConnectTokenTx(cache, subIssue, vUndo, OwnerCoin(issue));
+        BOOST_CHECK(vUndo.empty());
+        BOOST_CHECK(cache.ContainsToken("ABC/SUB"));
+        CheckMetaData(cache, sub);
+        // Balance() is -1 without the token index, so those runs only check metadata
+        if (fIndex) {
+            BOOST_CHECK_EQUAL(Balance(cache, "ABC/SUB", address), 50 * COIN);
+            BOOST_CHECK_EQUAL(Balance(cache, "ABC/SUB!", address), OWNER_TOKEN_AMOUNT);
+            BOOST_CHECK_EQUAL(Balance(cache, "ABC!", address), OWNER_TOKEN_AMOUNT);
+        }
+
+        BOOST_CHECK(DisconnectTokenTx(cache, subIssue, vUndo, OwnerCoin(issue)));
+        BOOST_CHECK(!cache.ContainsToken("ABC/SUB"));
+        CNewToken stored;
+        BOOST_CHECK(!cache.GetTokenMetaDataIfExists("ABC/SUB", stored));
+        BOOST_CHECK(cache.ContainsToken("ABC"));
+        if (fIndex) {
+            BOOST_CHECK_EQUAL(Balance(cache, "ABC/SUB", address), 0);
+            BOOST_CHECK_EQUAL(Balance(cache, "ABC/SUB!", address), 0);
+            BOOST_CHECK_EQUAL(Balance(cache, "ABC!", address), OWNER_TOKEN_AMOUNT);
+        }
+
+        // The parent owner token is spendable again and the sub name is free
+        ConnectTokenTx(cache, subIssue, vUndo, OwnerCoin(issue));
+        BOOST_CHECK(cache.ContainsToken("ABC/SUB"));
     }
 }
 

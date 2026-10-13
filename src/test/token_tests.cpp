@@ -11,7 +11,7 @@
 #include "script/script.h"
 #include "tokens/tokens.h"
 #include "utilstrencodings.h"
-#include "wallet/wallet.h"
+#include "wallet/wallet.h" // CTokenOutputEntry
 
 #include "test/test_bitcoin.h"
 #include "test/token_test_util.h"
@@ -175,6 +175,10 @@ BOOST_AUTO_TEST_CASE(new_token_script_round_trip)
         CNewToken("ABC", 1000 * COIN, 0, 1, 0, ""),
         CNewToken("MAX_TOKEN_IS_30_CHARACTERS_LNG", 21 * COIN + 5, 6, 0, 1, strIpfs),
     };
+    // Script size from which the payload push needs OP_PUSHDATA1 (script.cpp IsTokenScript),
+    // and where the token data starts: after the "yac" marker and the type byte
+    const size_t PUSHDATA1_SCRIPT_SIZE = 105;
+    const int SHORT_DATA_START = 27 + 4, LONG_DATA_START = 28 + 4;
     for (const CNewToken& token : tokens) {
         CScript script = NewTokenScript(token);
         int nType = -1;
@@ -183,7 +187,7 @@ BOOST_AUTO_TEST_CASE(new_token_script_round_trip)
         BOOST_CHECK(script.IsTokenScript(nType, fIsOwner, nStart));
         BOOST_CHECK_EQUAL(nType, TX_NEW_TOKEN);
         BOOST_CHECK(!fIsOwner);
-        BOOST_CHECK_EQUAL(nStart, script.size() < 105 ? 31 : 32);
+        BOOST_CHECK_EQUAL(nStart, script.size() < PUSHDATA1_SCRIPT_SIZE ? SHORT_DATA_START : LONG_DATA_START);
         BOOST_CHECK(IsScriptNewToken(script));
         BOOST_CHECK(!IsScriptNewUniqueToken(script));
         BOOST_CHECK(!IsScriptOwnerToken(script));
@@ -217,8 +221,8 @@ BOOST_AUTO_TEST_CASE(new_token_script_round_trip)
         BOOST_CHECK_EQUAL(strName, token.strName);
         BOOST_CHECK_EQUAL(nAmount, token.nAmount);
     }
-    BOOST_CHECK(NewTokenScript(tokens[0]).size() < 105);
-    BOOST_CHECK(NewTokenScript(tokens[1]).size() >= 105);
+    BOOST_CHECK(NewTokenScript(tokens[0]).size() < PUSHDATA1_SCRIPT_SIZE);
+    BOOST_CHECK(NewTokenScript(tokens[1]).size() >= PUSHDATA1_SCRIPT_SIZE);
 }
 
 BOOST_AUTO_TEST_CASE(owner_transfer_reissue_unique_scripts)
