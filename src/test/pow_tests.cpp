@@ -108,7 +108,9 @@ BOOST_AUTO_TEST_CASE(get_next_work_one_third_highest_difficulty)
 }
 
 
-// nBits used by the synthetic chains below: an ordinary difficulty and a much higher one
+// nBits used by the synthetic chains below: an ordinary difficulty and a much higher one.
+// These tests assume the mainnet powLimit (~0 >> 20); a LOW_DIFFICULTY_FOR_DEVELOPMENT
+// build (powLimit ~0 >> 3) fails them.
 static const unsigned int NBITS_EASY = 0x1d0fffff;
 static const unsigned int NBITS_HARD = 0x1c0fffff;
 static const ::int64_t SPACING = 60;
@@ -239,7 +241,9 @@ BOOST_AUTO_TEST_CASE(next_target_pre_fork_exponential)
 BOOST_AUTO_TEST_CASE(calculate_next_work_clamps_timespan)
 {
     ConsensusGlobalsGuard globals;
-    globals.Set(1, 10); // genesis (powLimit) is below the fork, so the floor is powLimit
+    // The active chain is only genesis (height 0), with no blocks at or above the
+    // fork, so the difficulty floor is powLimit
+    globals.Set(1, 10);
     const Consensus::Params& params = Params().GetConsensus();
     const ::int64_t nNominal = 10 * params.nPowTargetSpacing;
     CBlockIndex last;

@@ -18,7 +18,8 @@
 
 BOOST_FIXTURE_TEST_SUITE(main_tests, TestingSetup)
 
-/** Pre-fork reward for a target powLimit / nDivisor */
+/** Pre-fork reward for a target powLimit / nDivisor. The reward tests assume the
+ * mainnet powLimit (~0 >> 20) and fail in a LOW_DIFFICULTY_FOR_DEVELOPMENT build. */
 static ::int64_t PreForkReward(unsigned int nDivisor, ::int64_t nFees = 0)
 {
     CBigNum bnTarget;
@@ -114,6 +115,11 @@ BOOST_AUTO_TEST_CASE(post_fork_epoch_reward)
 
     // Blocks before the fork still use the pre-fork curve
     BOOST_CHECK_EQUAL(GetProofOfWorkReward(Params().GetConsensus().powLimit.GetCompact(), 0, 19), MAX_MINT_PROOF_OF_WORK);
+
+    // Pins the 2% rate: 100,019,000 YAC * 0.02 / 525,960 = 3.803293 YAC
+    // (nInflation is a double, so the reward is computed in floating point)
+    BuildSupplyChain(chain, 19);
+    BOOST_CHECK_EQUAL(GetProofOfWorkReward(0, 0, 20), 3803293);
 }
 
 /* Fork inside the first epoch interval: the first epoch starts at the fork */
@@ -129,7 +135,9 @@ BOOST_AUTO_TEST_CASE(post_fork_epoch_reward_fork_before_first_interval)
     BuildSupplyChain(chain, 9);
     BOOST_CHECK_EQUAL(GetProofOfWorkReward(0, 0, 10), EpochReward(MoneySupplyAt(9)));
 
-    // Fork at 0 (the unit-test default): the first epoch reads the genesis block's supply
+    // Fork at 0 (the unit-test default): the first epoch reads the genesis block's supply.
+    // This is incidental: the epoch-start height - 1 is -1, and FindBlockByHeight
+    // returns genesis for any height <= 0.
     globals.Set(0, 10);
     BuildSupplyChain(chain, 2);
     BOOST_CHECK_EQUAL(GetProofOfWorkReward(0, 0, 3), EpochReward(chain.Genesis()->nMoneySupply));

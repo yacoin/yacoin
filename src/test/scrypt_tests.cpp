@@ -183,8 +183,8 @@ BOOST_AUTO_TEST_CASE(mainnet_header_hash)
     const auto chainParams = CreateChainParams(CBaseChainParams::MAIN);
     BOOST_CHECK(CheckProofOfWork(hash, header.nBits, chainParams->GetConsensus()));
 
-    // The same header at another N-factor hashes differently
-    nFactorAtHardfork = 20;
+    // The same header at another N-factor hashes differently (a small one, to save memory)
+    nFactorAtHardfork = 4;
     BOOST_CHECK(header.CalculateHash() != hash);
 }
 
