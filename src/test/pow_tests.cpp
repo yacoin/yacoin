@@ -47,13 +47,15 @@ BOOST_AUTO_TEST_CASE(get_next_work_pow_limit)
     const auto chainParams = CreateChainParams(CBaseChainParams::MAIN);
     // Yacoin expected spacing: 1260000
     // Actual spacing: 2055491
-    // => lower difficulty, higher target, but the upper bound limit is 0x1e0fffff (00000fffffffffffffffffffffffffffffffffffffffffffffffffffffffffff)
+    // => lower difficulty, higher target, but the upper bound limit is powLimit
+    //    (0x1e0fffff on mainnet, 00000fffffffffffffffffffffffffffffffffffffffffffffffffffffffffff)
     // => keep target
+    const unsigned int nPowLimitBits = chainParams->GetConsensus().powLimit.GetCompact();
     int64_t nLastRetargetTime = 1231006505; // Block #0
     CBlockIndex pindexLast;
     pindexLast.nHeight = 2015;
     pindexLast.nTime = 1233061996;  // Block #2015
-    pindexLast.nBits = 0x1e0fffff;
+    pindexLast.nBits = nPowLimitBits;
 
     // Retarget
     CBigNum bnNewTarget = CBigNum().SetCompact(pindexLast.nBits);
@@ -64,7 +66,7 @@ BOOST_AUTO_TEST_CASE(get_next_work_pow_limit)
     unsigned int retargetWork = bnNewTarget.GetCompact();
 
     unsigned int nextWork = CalculateNextWorkRequired(&pindexLast, nLastRetargetTime, chainParams->GetConsensus());
-    BOOST_CHECK_EQUAL(nextWork, 0x1e0fffff);
+    BOOST_CHECK_EQUAL(nextWork, nPowLimitBits);
     BOOST_CHECK(nextWork < retargetWork);
 }
 
@@ -108,9 +110,7 @@ BOOST_AUTO_TEST_CASE(get_next_work_one_third_highest_difficulty)
 }
 
 
-// nBits used by the synthetic chains below: an ordinary difficulty and a much higher one.
-// These tests assume the mainnet powLimit (~0 >> 20); a LOW_DIFFICULTY_FOR_DEVELOPMENT
-// build (powLimit ~0 >> 3) fails them.
+// nBits used by the synthetic chains below: an ordinary difficulty and a much higher one
 static const unsigned int NBITS_EASY = 0x1d0fffff;
 static const unsigned int NBITS_HARD = 0x1c0fffff;
 static const ::int64_t SPACING = 60;

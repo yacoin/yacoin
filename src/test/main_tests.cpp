@@ -18,8 +18,7 @@
 
 BOOST_FIXTURE_TEST_SUITE(main_tests, TestingSetup)
 
-/** Pre-fork reward for a target powLimit / nDivisor. The reward tests assume the
- * mainnet powLimit (~0 >> 20) and fail in a LOW_DIFFICULTY_FOR_DEVELOPMENT build. */
+/** Pre-fork reward for a target powLimit / nDivisor */
 static ::int64_t PreForkReward(unsigned int nDivisor, ::int64_t nFees = 0)
 {
     CBigNum bnTarget;
