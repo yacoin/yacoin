@@ -106,12 +106,13 @@ struct ValidationSetup : public TestChain100Setup {
     CBlock BuildBlock(const std::vector<CTransaction>& txs) { return BuildBlock(txs, scriptPubKey); }
 
     /** TestBlockValidity on top of the tip: "" if valid, else the reject reason (the debug message if it has none) */
-    static std::string Validity(const CBlock& block)
+    static std::string Validity(const CBlock& block, bool fCheckPOW = true)
     {
         LOCK(cs_main);
         CValidationState state;
-        if (TestBlockValidity(state, Params(), block, chainActive.Tip())) return "";
-        return state.GetRejectReason().empty() ? state.GetDebugMessage() : state.GetRejectReason();
+        if (TestBlockValidity(state, Params(), block, chainActive.Tip(), fCheckPOW)) return "";
+        if (!state.GetRejectReason().empty()) return state.GetRejectReason();
+        return state.GetDebugMessage().empty() ? "no reason" : state.GetDebugMessage();
     }
 
     /** Submit a block; true if it became the tip */
@@ -195,6 +196,16 @@ BOOST_AUTO_TEST_CASE(test_block_validity)
     block.nVersion = VERSION_of_block_for_yac_05x_new - 1;
     BOOST_CHECK_EQUAL(Validity(block).substr(0, 11), "bad-version");
 
+    // Proof of work: a nonce whose hash misses the target. The failure has no reject
+    // reason, so also check that the block is valid when proof of work isn't checked.
+    block = BuildBlock({spend});
+    for (int i = 0; i < 1000 && CheckProofOfWork(block.GetHash(), block.nBits, Params().GetConsensus()); i++)
+        ++block.nNonce;
+    block.fChecked = false;
+    BOOST_REQUIRE(!CheckProofOfWork(block.GetHash(), block.nBits, Params().GetConsensus()));
+    BOOST_CHECK_EQUAL(Validity(block), "no reason");
+    BOOST_CHECK_EQUAL(Validity(block, false), "");
+
     // Block structure
     block = BuildBlock({spend});
     block.hashMerkleRoot = InsecureRand256();
@@ -219,6 +230,12 @@ BOOST_AUTO_TEST_CASE(test_block_validity)
     block.vtx[0].vin[0].scriptSig = CScript() << (nHeight + 5) << OP_0;
     Solve(block);
     BOOST_CHECK_EQUAL(Validity(block), "bad-cb-height");
+
+    // A block can't be older than its transactions
+    block = BuildBlock({spend});
+    block.vtx[1] = Spend(matureCoinbases[0], 0, CENT, [&](CMutableTransaction& tx) { tx.nTime = block.nTime + 1; });
+    Solve(block);
+    BOOST_CHECK_EQUAL(Validity(block), "bad-tx-time");
 
     // Transactions in context
     CTransaction locked = Spend(matureCoinbases[1], 0, CENT, [&](CMutableTransaction& tx) {
@@ -346,8 +363,9 @@ BOOST_AUTO_TEST_CASE(verify_db)
     CBlockIndex* pindexTip = Tip();
     const COutPoint spent(spend1.GetHash(), 0);
 
-    // Level 3 (memory-only disconnect) runs while the coin caches fit in nCoinCacheUsage,
-    // which a chain this small always does; VerifyDB works on its own cache
+    // Level 4 includes level 3's memory-only disconnect, which runs while the coin caches
+    // fit in nCoinCacheUsage (always, for a chain this small), so every block is
+    // disconnected and then reconnected. VerifyDB works on its own cache.
     BOOST_CHECK(CVerifyDB().VerifyDB(Params(), pcoinsTip, 4, 0));
     // Nothing leaks into the real chain state
     BOOST_CHECK(Tip() == pindexTip);
