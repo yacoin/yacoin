@@ -205,7 +205,7 @@ struct AddressIndexSetup : public AddressIndexOn, public TestChain100Setup {
      *  P2SH of OP_TRUE, bare OP_TRUE */
     CTransaction Sign(CMutableTransaction& mtx, const std::vector<CScript>& prevScripts)
     {
-        const CKey* keys[] = {&coinbaseKey, &keyB, &keyF};
+        const CKey* keys[] = {&coinbaseKey, &keyB, &keyF, &keyU};
         for (size_t i = 0; i < mtx.vin.size(); i++) {
             const CScript& prev = prevScripts[i];
             if (prev == scriptS) {
@@ -554,9 +554,17 @@ BOOST_FIXTURE_TEST_CASE(key_serialization, BasicTestingSetup)
     // Unspent key and value
     CAddressUnspentKey ukey(1, h, "TOKEN", txid, 9);
     std::vector<unsigned char> ub = Bytes(ukey);
-    BOOST_CHECK_EQUAL(ub.size(), 58U + 5);
+    BOOST_REQUIRE_EQUAL(ub.size(), 58U + 5);
+    BOOST_CHECK_EQUAL(ub[0], 1);
+    BOOST_CHECK(std::equal(h.begin(), h.end(), ub.begin() + 1));
+    BOOST_CHECK_EQUAL(ub[21], 5);
+    BOOST_CHECK_EQUAL(std::string(ub.begin() + 22, ub.begin() + 27), "TOKEN");
+    BOOST_CHECK(std::equal(txid.begin(), txid.end(), ub.begin() + 27));
+    BOOST_CHECK(std::vector<unsigned char>(ub.begin() + 59, ub.end()) == std::vector<unsigned char>({9, 0, 0, 0}));
     CAddressUnspentValue uval(123, CScript() << OP_TRUE, 77);
     BOOST_CHECK(!uval.IsNull());
+    // Value: amount (8 bytes LE), script with its length, height (4 bytes LE)
+    BOOST_CHECK(Bytes(uval) == std::vector<unsigned char>({123, 0, 0, 0, 0, 0, 0, 0, 1, OP_TRUE, 77, 0, 0, 0}));
     CAddressUnspentKey uback;
     CAddressUnspentValue vback;
     CDataStream us(SER_DISK, CLIENT_VERSION);
@@ -720,6 +728,7 @@ BOOST_FIXTURE_TEST_CASE(address_index_height_range, TestingSetup)
     // start 0: from the first entry, end still applies
     CHECK_HEIGHTS(Heights(db, h1, "YAC", 0, 256), 255, 256);
     CHECK_HEIGHTS(Heights(db, h1, "YAC", -1, 256), 255, 256);
+    CHECK_HEIGHTS(Heights(db, h1, "YAC", 256, -1), 255, 256, 65536);
     // start is only used together with end (the RPC always passes both)
     CHECK_HEIGHTS(Heights(db, h1, "YAC", 256, 0), 255, 256, 65536);
     CHECK_HEIGHTS(Heights(db, h1, "YAC", 0, 0), 255, 256, 65536);
@@ -950,6 +959,8 @@ BOOST_AUTO_TEST_CASE(reorg_replaces_entries)
     const std::vector<std::string> indexP = DumpIndex(*pblocktree), unspentP = DumpUnspent(*pblocktree);
     BuildX();
     BOOST_REQUIRE(Submit(blockX));
+    CBlockIndex* pindexX = Tip();
+    const std::vector<std::string> indexX = DumpIndex(*pblocktree), unspentX = DumpUnspent(*pblocktree);
 
     // Y1 spends tx0's keyB output (also spent by X) to keyC; Y2 makes that branch longer
     CMutableTransaction m;
@@ -974,6 +985,47 @@ BOOST_AUTO_TEST_CASE(reorg_replaces_entries)
     expUnspent.push_back(Str(created.first, created.second));
     CHECK_SAME(Sorted(DumpIndex(*pblocktree)), Sorted(expIndex));
     CHECK_SAME(Sorted(DumpUnspent(*pblocktree)), Sorted(expUnspent));
+
+    // Two more blocks on X (coinbases not indexed): back to exactly X's entries
+    CBlock x2 = BuildOn(pindexX, CScript() << OP_TRUE << std::vector<unsigned char>(1, 4), {});
+    BOOST_CHECK(!Submit(x2));
+    CBlockIndex* pindexX2;
+    {
+        LOCK(cs_main);
+        pindexX2 = mapBlockIndex.at(x2.GetHash());
+    }
+    BOOST_REQUIRE(Submit(BuildOn(pindexX2, CScript() << OP_TRUE << std::vector<unsigned char>(1, 5), {})));
+    CHECK_SAME(DumpIndex(*pblocktree), indexX);
+    CHECK_SAME(DumpUnspent(*pblocktree), unspentX);
+}
+
+/* Spending an uncompressed P2PK output, and undoing the spend */
+BOOST_AUTO_TEST_CASE(uncompressed_p2pk_spend)
+{
+    BuildP();
+    BOOST_REQUIRE(Submit(blockP));
+    // A keyU output at index 0, spent by input 0 of the next block
+    CMutableTransaction m1;
+    m1.vin.emplace_back(COutPoint(tx0.GetHash(), 12));
+    m1.vout.emplace_back(tx0.vout[12].nValue - u / 10, CScript() << ToByteVector(keyU.GetPubKey()) << OP_CHECKSIG);
+    CTransaction txU = Sign(m1, {tx0.vout[12].scriptPubKey});
+    BOOST_REQUIRE(Submit(BuildBlock({txU})));
+    const std::vector<std::string> index1 = DumpIndex(*pblocktree), unspent1 = DumpUnspent(*pblocktree);
+    CMutableTransaction m2;
+    m2.vin.emplace_back(COutPoint(txU.GetHash(), 0));
+    m2.vout.emplace_back(txU.vout[0].nValue - u / 10, P2PKH(idB));
+    CTransaction spendU = Sign(m2, {txU.vout[0].scriptPubKey});
+    CBlock block2 = BuildBlock({spendU});
+    BOOST_REQUIRE(Submit(block2));
+
+    const CAmount v = txU.vout[0].nValue;
+    CHECK_SAME(Strs(Index(idU, 1)), (Strs<CAddressIndexKey, CAmount>({Recv(1, idU, YAC, 13, 1, tx0, 6, u),
+        Recv(1, idU, YAC, 14, 1, txU, 0, v), Spend(1, idU, YAC, 15, 1, spendU, 0, v)})));
+    CHECK_SAME(Strs(Unspent(idU, 1, YAC)), (Strs<CAddressUnspentKey, CAddressUnspentValue>({Utxo(1, idU, YAC, tx0, 6, u, 13)})));
+
+    Invalidate(block2);
+    CHECK_SAME(DumpIndex(*pblocktree), index1);
+    CHECK_SAME(DumpUnspent(*pblocktree), unspent1);
 }
 
 /* Token outputs are indexed per token name (owner tokens included), and undone on disconnect */
@@ -986,8 +1038,9 @@ BOOST_AUTO_TEST_CASE(token_entries)
     const COutPoint fund(uint256S("0xf0f0f0f0"), 0);
     {
         LOCK(cs_main);
-        pcoinsTip->AddCoin(fund, Coin(CTxOut(nFund, P2PKH(idF)), 1, false, false, (int)coinbases[0].nTime), false);
+        pcoinsTip->AddCoin(fund, Coin(CTxOut(nFund, P2PKH(idF)), Tip()->nHeight, false, false, (int)coinbases[0].nTime), false);
     }
+    const std::vector<std::string> index0 = DumpIndex(*pblocktree), unspent0 = DumpUnspent(*pblocktree);
 
     CNewToken newToken("ADDR", 1000 * COIN, 0, 1, 0, "");
     CScript ownerScript = P2PKH(idA), issueScript = P2PKH(idA);
@@ -1014,7 +1067,9 @@ BOOST_AUTO_TEST_CASE(token_entries)
     yac.push_back(Recv(1, idA, YAC, 13, 1, issue, 0, 10 * COIN - CENT));
     CHECK_SAME(Strs(Index(idA, 1, YAC)), Strs(yac));
     // The lock output is a YAC receipt of its key
-    const uint160 idLock = Hash(1);
+    CTxDestination lockDest;
+    BOOST_REQUIRE(ExtractDestination(TokenLockOutput(ETokenType::YATOKEN).scriptPubKey, lockDest));
+    const uint160 idLock = boost::get<CKeyID>(lockDest);
     CHECK_SAME(Strs(Index(idLock, 1)), (Strs<CAddressIndexKey, CAmount>({Recv(1, idLock, YAC, 13, 1, issue, 1, nLock)})));
     CHECK_SAME(Strs(Unspent(idLock, 1, "")), (Strs<CAddressUnspentKey, CAddressUnspentValue>({Utxo(1, idLock, YAC, issue, 1, nLock, 13)})));
     // The funding coin: spend only, no unspent record
@@ -1055,7 +1110,7 @@ BOOST_AUTO_TEST_CASE(token_entries)
     BOOST_CHECK_EQUAL(Balance(Index(idA, 1, YAC)), UnspentSum(Unspent(idA, 1, YAC)));
 
     // Height ranges on a token
-    BOOST_CHECK_EQUAL(Index(idA, 1, "ADDR", 13, 13).size(), 1U);
+    CHECK_SAME(Strs(Index(idA, 1, "ADDR", 13, 13)), Strs(addr1));
     CHECK_SAME(Strs(Index(idA, 1, "ADDR", 14, 14)), (Strs<CAddressIndexKey, CAmount>({
         Spend(1, idA, "ADDR", 14, 1, transfer, 0, 1000 * COIN), Recv(1, idA, "ADDR", 14, 1, transfer, 2, 600 * COIN)})));
     BOOST_CHECK(Index(idA, 1, "ADDR", 15, 20).empty());
@@ -1065,6 +1120,16 @@ BOOST_AUTO_TEST_CASE(token_entries)
     BOOST_REQUIRE(Tip()->GetBlockHash() == t1.GetHash());
     CHECK_SAME(DumpIndex(*pblocktree), indexT1);
     CHECK_SAME(DumpUnspent(*pblocktree), unspentT1);
+
+    // Disconnecting the issue too removes the token and lock records; the funding coin
+    // comes back as an unspent record
+    Invalidate(t1);
+    BOOST_REQUIRE(Tip()->nHeight == 12);
+    std::vector<std::string> expUnspent = unspent0;
+    expUnspent.push_back(Str(CAddressUnspentKey(1, idF, fund.hash, 0), CAddressUnspentValue(nFund, P2PKH(idF), 12)));
+    CHECK_SAME(DumpIndex(*pblocktree), index0);
+    CHECK_SAME(Sorted(DumpUnspent(*pblocktree)), Sorted(expUnspent));
+    BOOST_CHECK(Index(idA, 1, "ADDR").empty() && Index(idA, 1, "ADDR!").empty());
 }
 
 /* GetAddressIndex with a token name and a height range, on the chain */
@@ -1138,6 +1203,8 @@ BOOST_AUTO_TEST_CASE(index_switched_off)
     BOOST_REQUIRE(Submit(blockP));
     CHECK_SAME(DumpIndex(*pblocktree), index0);
     CHECK_SAME(DumpUnspent(*pblocktree), unspent0);
+    // Switched back on without a reindex: P stays missing from the index (spent coinbase 1
+    // still listed as unspent); a reindex is what rebuilds it
     fAddressIndex = true;
 
     // The getters pass through to the database
