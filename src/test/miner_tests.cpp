@@ -403,20 +403,22 @@ BOOST_AUTO_TEST_CASE(child_of_two_packages)
         tx.vout[0].scriptPubKey = CScript() << OP_TRUE;
         return CTransaction(tx);
     };
-    // Fee rates in multiples of the minimum: parent1 50, parent2 10, child 2, other 3
+    // Fee rates in multiples of the minimum: parent1 50, parent2 10, child 2, other 3 and 1.5
     CTransaction parent1 = fakeTx({COutPoint(InsecureRand256(), 0)});
     CTransaction parent2 = fakeTx({COutPoint(InsecureRand256(), 0)});
     CTransaction other = fakeTx({COutPoint(InsecureRand256(), 0)});
+    CTransaction other2 = fakeTx({COutPoint(InsecureRand256(), 0)});
     CTransaction child = fakeTx({COutPoint(parent1.GetHash(), 0), COutPoint(parent2.GetHash(), 0)});
-    for (const auto& txMultiple : std::vector<std::pair<CTransaction, int>>{{parent1, 50}, {parent2, 10}, {other, 3}, {child, 2}}) {
-        const CTransaction& tx = txMultiple.first;
-        CAmount nFee = txMultiple.second * GetMinFee(::GetSerializeSize(tx, SER_NETWORK, PROTOCOL_VERSION));
+    for (const auto& txTenths : std::vector<std::pair<CTransaction, int>>{{parent1, 500}, {parent2, 100}, {other, 30}, {other2, 15}, {child, 20}}) {
+        const CTransaction& tx = txTenths.first;
+        CAmount nFee = txTenths.second * GetMinFee(::GetSerializeSize(tx, SER_NETWORK, PROTOCOL_VERSION)) / 10;
         mempool.addUnchecked(tx.GetHash(), entry.Fee(nFee).FromTx(tx));
     }
 
     // parent1 first; then parent2 alone beats the child's remaining package (parent2 +
-    // child); with both parents in, the child (2) ranks after the other tx (3)
-    BOOST_CHECK(TemplateTxs() == std::vector<uint256>({parent1.GetHash(), parent2.GetHash(), other.GetHash(), child.GetHash()}));
+    // child). With both parents in, the child ranks by its own fee and size (2): after
+    // the other tx at 3, before the one at 1.5
+    BOOST_CHECK(TemplateTxs() == std::vector<uint256>({parent1.GetHash(), parent2.GetHash(), other.GetHash(), child.GetHash(), other2.GetHash()}));
 }
 
 BOOST_AUTO_TEST_SUITE_END()

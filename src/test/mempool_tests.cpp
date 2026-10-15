@@ -582,12 +582,13 @@ BOOST_AUTO_TEST_CASE(MempoolPrioritiseBeforeEntryTest)
     CMutableTransaction txC = MakeTx({COutPoint(txA.GetHash(), 1)}, 8 * COIN);
     const uint256 hashA = txA.GetHash(), hashB = txB.GetHash(), hashC = txC.GetHash();
 
-    BOOST_CHECK_EQUAL(StoredDelta(pool, hashB), 0);
+    CAmount nFee = 1000;
+    pool.ApplyDelta(hashB, nFee);
+    BOOST_CHECK_EQUAL(nFee, 1000);
     unsigned int nUpdated = pool.GetTransactionsUpdated();
     pool.PrioritiseTransaction(hashB, 700);
     BOOST_CHECK_EQUAL(pool.size(), 0U);
     BOOST_CHECK_EQUAL(pool.GetTransactionsUpdated(), nUpdated);
-    CAmount nFee = 1000;
     pool.ApplyDelta(hashB, nFee);
     BOOST_CHECK_EQUAL(nFee, 1700);
 
@@ -636,7 +637,7 @@ BOOST_AUTO_TEST_CASE(MempoolPrioritiseRemovalTest)
     pool.PrioritiseTransaction(hashB, 300);
     CTransactionRef refB = Entry(pool, hashB).GetSharedTx();
 
-    // Evicted (e.g. a reorg that drops it): the delta stays for when it comes back
+    // Removed (e.g. a reorg that drops it): the delta stays for when it comes back
     pool.removeRecursive(*refB);
     BOOST_CHECK_EQUAL(pool.size(), 1U);
     BOOST_CHECK_EQUAL(Entry(pool, hashA).GetModFeesWithDescendants(), 1000);
@@ -672,6 +673,7 @@ BOOST_AUTO_TEST_CASE(MempoolPrioritiseRemovalTest)
     // A tx doesn't conflict with itself
     pool.removeConflicts(txT);
     BOOST_CHECK_EQUAL(pool.size(), 3U);
+    BOOST_CHECK_EQUAL(StoredDelta(pool, txT.GetHash()), 100);
     pool.removeForBlock({CTransaction(txT1)});
     BOOST_CHECK_EQUAL(pool.size(), 1U);
     BOOST_CHECK(!pool.exists(txT.GetHash()));
@@ -842,6 +844,8 @@ BOOST_AUTO_TEST_CASE(MempoolAncestorLimitsTest)
     BOOST_CHECK_EQUAL(ancestors.size(), 1U);
 }
 
+/* Descendant walks, input and chain-limit queries, and mempool coins seen through
+ * CCoinsViewMemPool */
 BOOST_AUTO_TEST_CASE(MempoolQueryHelpersTest)
 {
     CTxMemPool pool;
@@ -895,8 +899,11 @@ BOOST_AUTO_TEST_CASE(MempoolUpdateTransactionsFromBlockTest)
     const std::vector<CMutableTransaction> inOrder = {txP1, txP2, txP3, txC, txC2};
 
     CTxMemPool reference, reorg;
-    for (CTxMemPool* pool : {&reference, &reorg})
+    // Deltas on a block tx and on an outside child: both pools must sum modified fees
+    for (CTxMemPool* pool : {&reference, &reorg}) {
         pool->PrioritiseTransaction(txP2.GetHash(), 600);
+        pool->PrioritiseTransaction(txC.GetHash(), 70);
+    }
     for (size_t i : {0, 1, 2, 3, 4})
         reference.addUnchecked(inOrder[i].GetHash(), entry.Fee(1000 * (i + 1)).FromTx(inOrder[i]));
     for (size_t i : {3, 4, 0, 1, 2}) // the children first, as during a reorg
