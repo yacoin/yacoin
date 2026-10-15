@@ -12,8 +12,11 @@
 #include "test/test_bitcoin.h"
 
 #include <stdint.h>
+#include <cstdio>
 #include <vector>
 
+#include <boost/algorithm/string.hpp>
+#include <boost/program_options/errors.hpp>
 #include <boost/test/unit_test.hpp>
 
 BOOST_FIXTURE_TEST_SUITE(util_tests, BasicTestingSetup)
@@ -108,6 +111,22 @@ public:
     {
         return mapMultiArgs;
     };
+
+    // Reach the protected maps of any ArgsManager (gArgs included) through a pointer to
+    // member formed in this derived class, so fixtures can save and restore gArgs.
+    static std::map<std::string, std::string>& MapArgsOf(ArgsManager& a)
+    {
+        return a.*(&TestArgsManager::mapArgs);
+    }
+    static std::map<std::string, std::vector<std::string> >& MapMultiArgsOf(ArgsManager& a)
+    {
+        return a.*(&TestArgsManager::mapMultiArgs);
+    }
+    static void EraseArg(ArgsManager& a, const std::string& strArg)
+    {
+        MapArgsOf(a).erase(strArg);
+        MapMultiArgsOf(a).erase(strArg);
+    }
 };
 
 BOOST_AUTO_TEST_CASE(util_ParseParameters)
@@ -595,6 +614,513 @@ BOOST_AUTO_TEST_CASE(test_ParseFixedPoint)
     BOOST_CHECK(!ParseFixedPoint("1.1e", 8, &amount));
     BOOST_CHECK(!ParseFixedPoint("1.1e-", 8, &amount));
     BOOST_CHECK(!ParseFixedPoint("1.", 8, &amount));
+}
+
+static void WriteFile(const fs::path& p, const std::string& s)
+{
+    // Binary mode, so CR/LF bytes reach the file exactly as given on every platform
+    FILE* f = fsbridge::fopen(p, "wb");
+    BOOST_REQUIRE(f);
+    size_t written = fwrite(s.data(), 1, s.size(), f);
+    fclose(f);
+    BOOST_REQUIRE_EQUAL(written, s.size());
+}
+
+static std::string ReadFile(const fs::path& p)
+{
+    FILE* f = fsbridge::fopen(p, "rb");
+    BOOST_REQUIRE(f);
+    std::string s;
+    std::vector<char> buf(1 << 16);
+    size_t n;
+    while ((n = fread(buf.data(), 1, buf.size(), f)) > 0)
+        s.append(buf.data(), n);
+    fclose(f);
+    return s;
+}
+
+/** Gives a test case its own datadir (gArgs -datadir) and restores gArgs afterwards. */
+struct UtilDataDirSetup : public BasicTestingSetup {
+    fs::path pathTemp;
+    std::map<std::string, std::string> savedArgs;
+    std::map<std::string, std::vector<std::string> > savedMultiArgs;
+
+    UtilDataDirSetup()
+    {
+        savedArgs = TestArgsManager::MapArgsOf(gArgs);
+        savedMultiArgs = TestArgsManager::MapMultiArgsOf(gArgs);
+        pathTemp = fs::system_complete(fs::temp_directory_path() /
+            strprintf("test_bitcoin_util_%lu_%i", (unsigned long)GetTime(), (int)InsecureRandRange(100000)));
+        fs::create_directories(pathTemp);
+        // Earlier suites may leave -conf or -datadir behind
+        TestArgsManager::EraseArg(gArgs, "-conf");
+        gArgs.ForceSetArg("-datadir", pathTemp.string());
+        ClearDatadirCache();
+    }
+
+    ~UtilDataDirSetup()
+    {
+        // Leave both datadir caches filled, as TestingSetup does: an empty cache would make
+        // the next GetDataDir() recompute from whatever args are restored (possibly $HOME).
+        gArgs.ForceSetArg("-datadir", pathTemp.string());
+        GetDataDir(false);
+        GetDataDir(true);
+        TestArgsManager::MapArgsOf(gArgs) = savedArgs;
+        TestArgsManager::MapMultiArgsOf(gArgs) = savedMultiArgs;
+        boost::system::error_code ec;
+        fs::remove_all(pathTemp, ec);
+    }
+};
+
+BOOST_FIXTURE_TEST_CASE(util_GetConfigFile, UtilDataDirSetup)
+{
+    BOOST_CHECK(GetDataDir(false) == pathTemp);
+    // Relative names resolve against the datadir, absolute paths are used as they are
+    BOOST_CHECK(GetConfigFile("x.conf") == pathTemp / "x.conf");
+    const fs::path abs = pathTemp / "sub" / "a.conf";
+    BOOST_CHECK(GetConfigFile(abs.string()) == abs);
+}
+
+BOOST_FIXTURE_TEST_CASE(util_ReadConfigFile_syntax, UtilDataDirSetup)
+{
+    const fs::path conf = pathTemp / "syntax.conf";
+    WriteFile(conf,
+        "# full-line comment\n"
+        "   # indented comment\n"
+        "\n"
+        "foo=1\n"
+        "  spaced   =   value with spaces  \n"
+        "tabbed\t=\tx\t\n"
+        "crlf=yes\r\n"
+        "empty=\n"
+        "blank=   \n"
+        "eq=a=b=c\n"
+        "hash=abc#def\n"
+        "foo=2\n"
+        "nofoo=1\n"
+        "Case=Upper\n"
+        "case=lower\n"
+        "nobar=1\n"
+        "nobaz=0\n"
+        "noqux=\n"
+        "no=1\n"
+        "nfoo=1\n"
+        "-dash=1\n"
+        "[sect]\n"
+        "inner=1\n");
+    TestArgsManager testArgs;
+    testArgs.ReadConfigFile(conf.string());
+
+    // In the file the first value wins; every value (also from -nofoo) is kept in order
+    BOOST_CHECK_EQUAL(testArgs.GetArg("-foo", ""), "1");
+    BOOST_CHECK(testArgs.GetArgs("-foo") == std::vector<std::string>({"1", "2", "0"}));
+    // Whitespace around names and values is trimmed (also tabs and a CR), not inside values
+    BOOST_CHECK_EQUAL(testArgs.GetArg("-spaced", ""), "value with spaces");
+    BOOST_CHECK_EQUAL(testArgs.GetArg("-tabbed", ""), "x");
+    BOOST_CHECK_EQUAL(testArgs.GetArg("-crlf", ""), "yes");
+    // An empty value is set and counts as true
+    BOOST_CHECK(testArgs.IsArgSet("-empty"));
+    BOOST_CHECK_EQUAL(testArgs.GetArg("-empty", "default"), "");
+    BOOST_CHECK(testArgs.GetBoolArg("-empty", false));
+    BOOST_CHECK_EQUAL(testArgs.GetArg("-blank", "default"), "");
+    // Split at the first '=', and '#' starts a comment even inside a value
+    BOOST_CHECK_EQUAL(testArgs.GetArg("-eq", ""), "a=b=c");
+    BOOST_CHECK_EQUAL(testArgs.GetArg("-hash", ""), "abc");
+    // Names are case sensitive
+    BOOST_CHECK_EQUAL(testArgs.GetArg("-Case", ""), "Upper");
+    BOOST_CHECK_EQUAL(testArgs.GetArg("-case", ""), "lower");
+    // noX=v becomes -X=!v; an empty value counts as true, so noqux= disables -qux
+    BOOST_CHECK_EQUAL(testArgs.GetArg("-bar", ""), "0");
+    BOOST_CHECK(!testArgs.IsArgSet("-nobar"));
+    BOOST_CHECK_EQUAL(testArgs.GetArg("-baz", ""), "1");
+    BOOST_CHECK_EQUAL(testArgs.GetArg("-qux", ""), "0");
+    // Only names longer than "no" that start with "no" are negations
+    BOOST_CHECK_EQUAL(testArgs.GetArg("-no", ""), "1");
+    BOOST_CHECK_EQUAL(testArgs.GetArg("-nfoo", ""), "1");
+    // A leading dash in the file gives a "--" key that no option lookup uses
+    BOOST_CHECK(testArgs.IsArgSet("--dash"));
+    BOOST_CHECK(!testArgs.IsArgSet("-dash"));
+    // Keys after a section header get the section as prefix
+    BOOST_CHECK_EQUAL(testArgs.GetArg("-sect.inner", ""), "1");
+    BOOST_CHECK(!testArgs.IsArgSet("-inner"));
+    // Nothing else (e.g. from the comment lines) was added
+    BOOST_CHECK_EQUAL(testArgs.GetMapArgs().size(), 17U);
+}
+
+BOOST_FIXTURE_TEST_CASE(util_ReadConfigFile_cmdline_wins, UtilDataDirSetup)
+{
+    const fs::path conf = pathTemp / "cmdline.conf";
+    WriteFile(conf, "foo=file\nbar=1\nnobaz=1\nnew=conf\n");
+    TestArgsManager testArgs;
+    const char* argv[] = {"prog", "-foo=cmd", "-nobar", "-baz=1"};
+    testArgs.ParseParameters(4, argv);
+    testArgs.ReadConfigFile(conf.string());
+
+    // Command line values win, but the file values are still appended after them
+    BOOST_CHECK_EQUAL(testArgs.GetArg("-foo", ""), "cmd");
+    BOOST_CHECK(testArgs.GetArgs("-foo") == std::vector<std::string>({"cmd", "file"}));
+    BOOST_CHECK(!testArgs.GetBoolArg("-bar", true));
+    BOOST_CHECK(testArgs.GetArgs("-bar") == std::vector<std::string>({"0", "1"}));
+    BOOST_CHECK(testArgs.GetBoolArg("-baz", false));
+    BOOST_CHECK(testArgs.GetArgs("-baz") == std::vector<std::string>({"1", "0"}));
+    BOOST_CHECK_EQUAL(testArgs.GetArg("-new", ""), "conf");
+}
+
+BOOST_FIXTURE_TEST_CASE(util_ReadConfigFile_empty, UtilDataDirSetup)
+{
+    const fs::path conf = pathTemp / "empty.conf";
+    for (const std::string& body : {std::string(), std::string("# only a comment\n\n   \n")}) {
+        WriteFile(conf, body);
+        TestArgsManager testArgs;
+        testArgs.ReadConfigFile(conf.string());
+        BOOST_CHECK(testArgs.GetMapArgs().empty());
+        BOOST_CHECK(testArgs.GetMapMultiArgs().empty());
+        // An existing (even empty) file is not replaced by a generated one
+        BOOST_CHECK(ReadFile(conf) == body);
+        BOOST_CHECK(!fs::exists(pathTemp / "yacoin.conf"));
+    }
+}
+
+static bool MentionsJustakey(const boost::program_options::invalid_config_file_syntax& e)
+{
+    return std::string(e.what()).find("'justakey'") != std::string::npos;
+}
+
+BOOST_FIXTURE_TEST_CASE(util_ReadConfigFile_invalid_line, UtilDataDirSetup)
+{
+    const fs::path conf = pathTemp / "invalid.conf";
+    WriteFile(conf, "a=1\njustakey\nb=2\n");
+    TestArgsManager testArgs;
+    BOOST_CHECK_EXCEPTION(testArgs.ReadConfigFile(conf.string()),
+                          boost::program_options::invalid_config_file_syntax, MentionsJustakey);
+    // Parsing stops at the bad line (yacoind aborts startup on the exception)
+    BOOST_CHECK_EQUAL(testArgs.GetArg("-a", ""), "1");
+    BOOST_CHECK(!testArgs.IsArgSet("-b"));
+
+    // A line with an empty name is rejected as well
+    WriteFile(conf, "=v\n");
+    TestArgsManager testArgs2;
+    BOOST_CHECK_THROW(testArgs2.ReadConfigFile(conf.string()), std::exception);
+    BOOST_CHECK(testArgs2.GetMapArgs().empty());
+}
+
+BOOST_FIXTURE_TEST_CASE(util_ReadConfigFile_creates_default, UtilDataDirSetup)
+{
+    // A missing config file is generated (named by gArgs -conf, here the default) and read
+    const fs::path conf = pathTemp / YACOIN_CONF_FILENAME;
+    BOOST_REQUIRE(!fs::exists(conf));
+    TestArgsManager testArgs;
+    testArgs.ReadConfigFile(YACOIN_CONF_FILENAME);
+    BOOST_CHECK(fs::exists(conf));
+    BOOST_CHECK_EQUAL(testArgs.GetArg("-rpcuser", ""), "user");
+    BOOST_CHECK_EQUAL(testArgs.GetArg("-rpcport", ""), "7687");
+    BOOST_CHECK_EQUAL(testArgs.GetArg("-port", ""), "7688");
+    BOOST_CHECK_EQUAL(testArgs.GetArg("-daemon", ""), "0");
+    BOOST_CHECK_EQUAL(testArgs.GetArg("-server", ""), "0");
+    BOOST_CHECK_EQUAL(testArgs.GetArg("-rpcallowip", ""), "127.0.0.1");
+    BOOST_CHECK_EQUAL(testArgs.GetArg("-testnet", ""), "0");
+    BOOST_CHECK_EQUAL(testArgs.GetMapArgs().size(), 8U);
+
+    // Once it exists it is read, not regenerated
+    const std::string before = ReadFile(conf);
+    TestArgsManager testArgs2;
+    testArgs2.ReadConfigFile(YACOIN_CONF_FILENAME);
+    BOOST_CHECK(ReadFile(conf) == before);
+    BOOST_CHECK(testArgs2.GetMapArgs() == testArgs.GetMapArgs());
+    BOOST_CHECK(testArgs2.GetMapMultiArgs() == testArgs.GetMapMultiArgs());
+
+    // If the file can't be created (missing directory) the read quietly does nothing
+    gArgs.ForceSetArg("-conf", "missingdir/x.conf");
+    TestArgsManager testArgs3;
+    testArgs3.ReadConfigFile("missingdir/x.conf");
+    BOOST_CHECK(testArgs3.GetMapArgs().empty());
+    BOOST_CHECK(!fs::exists(pathTemp / "missingdir"));
+
+    // A missing file under another name than gArgs -conf is not created and nothing is read
+    TestArgsManager::EraseArg(gArgs, "-conf");
+    TestArgsManager testArgs4;
+    testArgs4.ReadConfigFile("other.conf");
+    BOOST_CHECK(testArgs4.GetMapArgs().empty());
+    BOOST_CHECK(!fs::exists(pathTemp / "other.conf"));
+
+    // createConf writes to the file named by gArgs -conf
+    gArgs.ForceSetArg("-conf", "custom.conf");
+    createConf();
+    TestArgsManager testArgs5;
+    testArgs5.ReadConfigFile((pathTemp / "custom.conf").string());
+    BOOST_CHECK_EQUAL(testArgs5.GetArg("-rpcuser", ""), "user");
+    BOOST_CHECK_EQUAL(testArgs5.GetArg("-rpcallowip", ""), "127.0.0.1");
+    BOOST_CHECK_EQUAL(testArgs5.GetMapArgs().size(), 8U);
+}
+
+BOOST_FIXTURE_TEST_CASE(util_ReadConfigFile_datadir, UtilDataDirSetup)
+{
+    const fs::path dir2 = pathTemp / "other";
+    fs::create_directories(dir2);
+    const fs::path conf = pathTemp / YACOIN_CONF_FILENAME;
+    WriteFile(conf, "datadir=" + dir2.string() + "\n");
+
+    // -datadir on the command line wins over the file
+    BOOST_CHECK(GetDataDir(false) == pathTemp);
+    gArgs.ReadConfigFile(YACOIN_CONF_FILENAME);
+    BOOST_CHECK_EQUAL(gArgs.GetArg("-datadir", ""), pathTemp.string());
+    BOOST_CHECK(GetDataDir(false) == pathTemp);
+
+    // Without it, the file's datadir takes effect at once: reading the file clears the
+    // cached datadir (read by absolute path, so the old datadir isn't consulted)
+    TestArgsManager::EraseArg(gArgs, "-datadir");
+    BOOST_CHECK(GetDataDir(false) == pathTemp); // still cached
+    gArgs.ReadConfigFile(conf.string());
+    BOOST_CHECK(GetDataDir(false) == dir2);
+    BOOST_CHECK(GetDataDir(true) == dir2);
+
+    // A datadir that doesn't exist gives an empty path
+    WriteFile(conf, "datadir=" + (pathTemp / "missing").string() + "\n");
+    TestArgsManager::EraseArg(gArgs, "-datadir");
+    gArgs.ReadConfigFile(conf.string());
+    BOOST_CHECK(GetDataDir(false).empty());
+    BOOST_CHECK(!fs::exists(pathTemp / "missing"));
+}
+
+/** Saves and restores the logging globals. */
+struct LogStateSetup : public BasicTestingSetup {
+    const uint32_t savedCategories = logCategories;
+    const bool savedDebugLog = fPrintToDebugLog;
+    const bool savedConsole = fPrintToConsole;
+    const bool savedTimestamps = fLogTimestamps;
+    const bool savedTimeMicros = fLogTimeMicros;
+    const int64_t savedMockTime = GetMockTime();
+
+    ~LogStateSetup()
+    {
+        logCategories = savedCategories;
+        fPrintToDebugLog = savedDebugLog;
+        fPrintToConsole = savedConsole;
+        fLogTimestamps = savedTimestamps;
+        fLogTimeMicros = savedTimeMicros;
+        SetMockTime(savedMockTime);
+    }
+};
+
+BOOST_FIXTURE_TEST_CASE(util_LogCategories, LogStateSetup)
+{
+    uint32_t flag = 0xDEADBEEF;
+    const std::string net("net");
+    BOOST_CHECK(!GetLogCategory(nullptr, &net));
+    BOOST_CHECK(!GetLogCategory(&flag, nullptr));
+    // Unknown names (matching is exact and case sensitive) leave the flag untouched
+    for (const std::string& bad : {"NET", "foo", " net", "net "}) {
+        BOOST_CHECK(!GetLogCategory(&flag, &bad));
+        BOOST_CHECK_EQUAL(flag, 0xDEADBEEF);
+    }
+    const std::vector<std::pair<std::string, uint32_t> > known = {
+        {"", BCLog::ALL}, {"0", BCLog::NONE}, {"1", BCLog::ALL}, {"all", BCLog::ALL},
+        {"net", BCLog::NET}, {"rpc", BCLog::RPC}, {"leveldb", BCLog::LEVELDB}};
+    for (const auto& k : known) {
+        flag = 0xDEADBEEF;
+        BOOST_CHECK(GetLogCategory(&flag, &k.first));
+        BOOST_CHECK_EQUAL(flag, k.second);
+    }
+
+    // The list leaves out the special entries 0, 1 and all
+    const std::string list = ListLogCategories();
+    BOOST_CHECK_EQUAL(list, "net, tor, mempool, http, bench, zmq, db, rpc, estimatefee, addrman, "
+        "selectcoins, reindex, cmpctblock, rand, prune, proxy, mempoolrej, libevent, coindb, qt, leveldb");
+
+    // Every listed name parses to its own single bit
+    std::vector<std::string> names;
+    boost::split(names, list, boost::is_any_of(","));
+    BOOST_REQUIRE_EQUAL(names.size(), 21U);
+    uint32_t all = 0;
+    for (std::string& name : names) {
+        boost::trim(name);
+        BOOST_REQUIRE(GetLogCategory(&flag, &name));
+        BOOST_CHECK(flag != 0 && (flag & (flag - 1)) == 0);
+        BOOST_CHECK((all & flag) == 0);
+        all |= flag;
+    }
+    BOOST_CHECK_EQUAL(all, (1U << 21) - 1);
+
+    // Active flags follow logCategories, in the same order as the list
+    for (uint32_t cats : {(uint32_t)BCLog::NONE, (uint32_t)(BCLog::NET | BCLog::LEVELDB), (uint32_t)BCLog::ALL}) {
+        logCategories = cats;
+        const std::vector<CLogCategoryActive> active = ListActiveLogCategories();
+        BOOST_REQUIRE_EQUAL(active.size(), names.size());
+        for (size_t i = 0; i < active.size(); ++i) {
+            BOOST_CHECK_EQUAL(active[i].category, names[i]);
+            const bool expected = cats == BCLog::ALL || (cats != BCLog::NONE && (i == 0 || i == 20));
+            BOOST_CHECK_EQUAL(active[i].active, expected);
+        }
+    }
+}
+
+BOOST_FIXTURE_TEST_CASE(util_LogPrintStr_timestamps, LogStateSetup)
+{
+    // Without an open debug.log the text is buffered where tests can't see it, so only the
+    // returned lengths are checked. A stamp is "YYYY-mm-dd HH:MM:SS " (20 chars).
+    const int stamp = 20;
+    fPrintToConsole = false;
+    fPrintToDebugLog = true;
+    fLogTimeMicros = false;
+    SetMockTime(0);
+
+    fLogTimestamps = false;
+    BOOST_CHECK_EQUAL(LogPrintStr("abc\n"), 4);
+
+    fLogTimestamps = true;
+    LogPrintStr("\n"); // start on a fresh line whatever was logged before
+    BOOST_CHECK_EQUAL(LogPrintStr("abc"), stamp + 3);
+    BOOST_CHECK_EQUAL(LogPrintStr("def\n"), 4); // continuation of the same line
+    BOOST_CHECK_EQUAL(LogPrintStr(""), stamp);  // stamped, and doesn't end the line
+    BOOST_CHECK_EQUAL(LogPrintStr("\n"), 1);
+
+    fLogTimeMicros = true;
+    BOOST_CHECK_EQUAL(LogPrintStr("x\n"), stamp + 7 + 2); // ".123456"
+    fLogTimeMicros = false;
+
+    SetMockTime(1317425777);
+    BOOST_CHECK_EQUAL(LogPrintStr("x\n"), stamp + 32 + 2); // " (mocktime: 2011-09-30 23:36:17)"
+}
+
+BOOST_FIXTURE_TEST_CASE(util_ShrinkDebugFile, UtilDataDirSetup)
+{
+    const fs::path log = pathTemp / "debug.log";
+    BOOST_CHECK_EQUAL(GetDebugLogPathName(), log.string());
+
+    // No debug.log: nothing happens and none is created
+    ShrinkDebugFile();
+    BOOST_CHECK(!fs::exists(log));
+
+    // Position-dependent text without CR/LF (the file is opened in text mode), so a tail
+    // taken at the wrong offset doesn't compare equal
+    std::string content(11000001, ' ');
+    for (size_t i = 0; i < content.size(); ++i)
+        content[i] = 'a' + (i * 7 + i / 26) % 26;
+
+    // Up to 11,000,000 bytes the file is left alone
+    const std::string limit = content.substr(0, 11000000);
+    WriteFile(log, limit);
+    ShrinkDebugFile();
+    BOOST_CHECK(ReadFile(log) == limit);
+
+    // One byte more and only the last 10,000,000 bytes are kept
+    WriteFile(log, content);
+    ShrinkDebugFile();
+    const std::string shrunk = ReadFile(log);
+    BOOST_CHECK_EQUAL(shrunk.size(), 10000000U);
+    BOOST_CHECK(shrunk == content.substr(1000001));
+}
+
+BOOST_FIXTURE_TEST_CASE(util_GetFilesize_TryCreateDirectories, UtilDataDirSetup)
+{
+    const fs::path file = pathTemp / "five";
+    WriteFile(file, "12345");
+    FILE* f = fsbridge::fopen(file, "rb");
+    BOOST_REQUIRE(f);
+    BOOST_REQUIRE_EQUAL(fseek(f, 2, SEEK_SET), 0);
+    BOOST_CHECK_EQUAL(GetFilesize(f), 5);
+    BOOST_CHECK_EQUAL(ftell(f), 2); // the position is restored
+    fclose(f);
+
+    BOOST_CHECK(TryCreateDirectories(pathTemp / "new" / "sub"));
+    BOOST_CHECK(fs::is_directory(pathTemp / "new" / "sub"));
+    BOOST_CHECK(!TryCreateDirectories(pathTemp / "new" / "sub")); // already there
+    // A regular file in the way is an error that is passed on
+    BOOST_CHECK_THROW(TryCreateDirectories(file), fs::filesystem_error);
+}
+
+BOOST_AUTO_TEST_CASE(util_WildcardMatch)
+{
+    BOOST_CHECK(WildcardMatch("", ""));
+    BOOST_CHECK(WildcardMatch("abc", "abc"));
+    BOOST_CHECK(!WildcardMatch("a", ""));
+    BOOST_CHECK(!WildcardMatch("abc", "ab"));
+    BOOST_CHECK(!WildcardMatch("ab", "abc"));
+    BOOST_CHECK(!WildcardMatch("abc", "abd"));
+    BOOST_CHECK(!WildcardMatch("ABC", "abc")); // case sensitive
+    // '?' matches exactly one character
+    BOOST_CHECK(WildcardMatch("a", "?"));
+    BOOST_CHECK(!WildcardMatch("", "?"));
+    BOOST_CHECK(!WildcardMatch("ab", "?"));
+    BOOST_CHECK(WildcardMatch("abc", "a?c"));
+    BOOST_CHECK(!WildcardMatch("ac", "a?c"));
+    BOOST_CHECK(!WildcardMatch("ab", "ab?"));
+    // '*' matches any run, including an empty one
+    BOOST_CHECK(WildcardMatch("", "*"));
+    BOOST_CHECK(WildcardMatch("abc", "*"));
+    BOOST_CHECK(WildcardMatch("abc", "a*"));
+    BOOST_CHECK(WildcardMatch("abc", "abc*"));
+    BOOST_CHECK(WildcardMatch("abc", "a**c"));
+    BOOST_CHECK(!WildcardMatch("abc", "*d"));
+    BOOST_CHECK(!WildcardMatch("abc", "a*b"));
+    // These need backtracking: the first candidate for '*' isn't the right one
+    BOOST_CHECK(WildcardMatch("abc", "*c"));
+    BOOST_CHECK(WildcardMatch("abcbc", "a*bc"));
+    BOOST_CHECK(WildcardMatch("aXbXc", "a*b*c"));
+    BOOST_CHECK(WildcardMatch("127.0.0.1", "127.0.0.*"));
+    BOOST_CHECK(!WildcardMatch("127.0.0.10", "127.0.0.?"));
+    // std::string overload
+    BOOST_CHECK(WildcardMatch(std::string("x.y"), std::string("?.*")));
+    BOOST_CHECK(!WildcardMatch(std::string("xy"), std::string("?.*")));
+}
+
+BOOST_AUTO_TEST_CASE(util_ParseString)
+{
+    typedef std::vector<std::string> V;
+    // Empty input adds nothing; results are appended, never cleared
+    V v{"keep"};
+    ParseString("", ',', v);
+    BOOST_CHECK(v == V({"keep"}));
+    ParseString("abc", ',', v);
+    BOOST_CHECK(v == V({"keep", "abc"}));
+
+    const std::vector<std::pair<std::string, V> > cases = {
+        {"a,b,c", {"a", "b", "c"}}, {"a,,b", {"a", "", "b"}}, {",a", {"", "a"}},
+        {"a,", {"a", ""}}, {",", {"", ""}}};
+    for (const auto& c : cases) {
+        V out;
+        ParseString(c.first, ',', out);
+        BOOST_CHECK_MESSAGE(out == c.second, "ParseString(\"" + c.first + "\")");
+    }
+    V spaces;
+    ParseString("1 2", ' ', spaces);
+    BOOST_CHECK(spaces == V({"1", "2"}));
+}
+
+BOOST_AUTO_TEST_CASE(util_DumpString)
+{
+    // Bytes up to space, from 128 up, and '%' are escaped as lowercase hex
+    BOOST_CHECK_EQUAL(EncodeDumpString(" "), "%20");
+    BOOST_CHECK_EQUAL(EncodeDumpString("!"), "!");
+    BOOST_CHECK_EQUAL(EncodeDumpString(std::string(1, '\0')), "%00");
+    BOOST_CHECK_EQUAL(EncodeDumpString("\x7f"), "\x7f");
+    BOOST_CHECK_EQUAL(EncodeDumpString("\x80"), "%80");
+    BOOST_CHECK_EQUAL(EncodeDumpString("\xff"), "%ff");
+    BOOST_CHECK_EQUAL(EncodeDumpString("a b%"), "a%20b%25");
+
+    BOOST_CHECK_EQUAL(DecodeDumpString(""), "");
+    BOOST_CHECK_EQUAL(DecodeDumpString("%41"), "A");
+    BOOST_CHECK_EQUAL(DecodeDumpString("x%41y"), "xAy");
+    BOOST_CHECK_EQUAL(DecodeDumpString("%6a%6A"), "jj");
+    BOOST_CHECK_EQUAL(DecodeDumpString("%00"), std::string(1, '\0'));
+    // A '%' without two following characters is kept as it is
+    BOOST_CHECK_EQUAL(DecodeDumpString("%"), "%");
+    BOOST_CHECK_EQUAL(DecodeDumpString("%4"), "%4");
+    BOOST_CHECK_EQUAL(DecodeDumpString("a%2"), "a%2");
+
+    // Round trip over all byte values
+    std::string all;
+    for (int c = 0; c < 256; ++c)
+        all += (char)c;
+    const std::string encoded = EncodeDumpString(all);
+    for (unsigned char c : encoded)
+        BOOST_CHECK(c > 32 && c < 128);
+    BOOST_CHECK(DecodeDumpString(encoded) == all);
+
+    BOOST_CHECK_EQUAL(EncodeDumpTime(1317425777), "2011-09-30T23:36:17Z");
+    BOOST_CHECK_EQUAL(DecodeDumpTime("2011-09-30T23:36:17Z"), 1317425777);
+    BOOST_CHECK_EQUAL(DecodeDumpTime("garbage"), 0);
+    BOOST_CHECK_EQUAL(DecodeDumpTime(""), 0);
 }
 
 BOOST_AUTO_TEST_SUITE_END()
