@@ -1,56 +1,43 @@
 // Copyright (c) 2015-2016 The Bitcoin Core developers
+// Copyright (c) 2026 The Yacoin Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-#include "consensus/merkle.h"
+// YACoin computes merkle roots with CBlock::BuildMerkleTree (there is no
+// consensus/merkle.h), so Bitcoin's comparison of the old and new code is
+// replaced by a comparison with a small reference implementation here.
+
+#include "chainparams.h"
+#include "consensus/validation.h"
+#include "hash.h"
+#include "random.h"
+#include "validation.h"
+
 #include "test/test_bitcoin.h"
 
 #include <boost/test/unit_test.hpp>
 
-BOOST_FIXTURE_TEST_SUITE(merkle_tests, TestingSetup)
+BOOST_FIXTURE_TEST_SUITE(merkle_tests, BasicTestingSetup)
 
-// Older version of the merkle root computation code, for comparison.
-static uint256 BlockBuildMerkleTree(const CBlock& block, bool* fMutated, std::vector<uint256>& vMerkleTree)
+/** Reference merkle root: hash pairs level by level, pairing an odd last hash with itself */
+static uint256 ReferenceMerkleRoot(std::vector<uint256> level)
 {
-    vMerkleTree.clear();
-    vMerkleTree.reserve(block.vtx.size() * 2 + 16); // Safe upper bound for the number of total nodes.
-    for (std::vector<CTransactionRef>::const_iterator it(block.vtx.begin()); it != block.vtx.end(); ++it)
-        vMerkleTree.push_back((*it)->GetHash());
-    int j = 0;
-    bool mutated = false;
-    for (int nSize = block.vtx.size(); nSize > 1; nSize = (nSize + 1) / 2)
-    {
-        for (int i = 0; i < nSize; i += 2)
-        {
-            int i2 = std::min(i+1, nSize-1);
-            if (i2 == i + 1 && i2 + 1 == nSize && vMerkleTree[j+i] == vMerkleTree[j+i2]) {
-                // Two identical hashes at the end of the list at a particular level.
-                mutated = true;
-            }
-            vMerkleTree.push_back(Hash(vMerkleTree[j+i].begin(), vMerkleTree[j+i].end(),
-                                       vMerkleTree[j+i2].begin(), vMerkleTree[j+i2].end()));
-        }
-        j += nSize;
+    if (level.empty()) return uint256();
+    while (level.size() > 1) {
+        if (level.size() % 2) level.push_back(level.back());
+        std::vector<uint256> next;
+        for (size_t i = 0; i < level.size(); i += 2)
+            next.push_back(Hash(level[i].begin(), level[i].end(), level[i + 1].begin(), level[i + 1].end()));
+        level = next;
     }
-    if (fMutated) {
-        *fMutated = mutated;
-    }
-    return (vMerkleTree.empty() ? uint256() : vMerkleTree.back());
+    return level[0];
 }
 
-// Older version of the merkle branch computation code, for comparison.
-static std::vector<uint256> BlockGetMerkleBranch(const CBlock& block, const std::vector<uint256>& vMerkleTree, int nIndex)
+static std::vector<uint256> TxHashes(const CBlock& block)
 {
-    std::vector<uint256> vMerkleBranch;
-    int j = 0;
-    for (int nSize = block.vtx.size(); nSize > 1; nSize = (nSize + 1) / 2)
-    {
-        int i = std::min(nIndex^1, nSize-1);
-        vMerkleBranch.push_back(vMerkleTree[j+i]);
-        nIndex >>= 1;
-        j += nSize;
-    }
-    return vMerkleBranch;
+    std::vector<uint256> hashes;
+    for (const CTransaction& tx : block.vtx) hashes.push_back(tx.GetHash());
+    return hashes;
 }
 
 static inline int ctz(uint32_t i) {
@@ -85,13 +72,13 @@ BOOST_AUTO_TEST_CASE(merkle_test)
             for (int j = 0; j < ntx; j++) {
                 CMutableTransaction mtx;
                 mtx.nLockTime = j;
-                block.vtx[j] = MakeTransactionRef(std::move(mtx));
+                block.vtx[j] = CTransaction(mtx);
             }
             // Compute the root of the block before mutating it.
-            bool unmutatedMutated = false;
-            uint256 unmutatedRoot = BlockMerkleRoot(block, &unmutatedMutated);
-            BOOST_CHECK(unmutatedMutated == false);
-            // Optionally mutate by duplicating the last transactions, resulting in the same merkle root.
+            uint256 unmutatedRoot = block.BuildMerkleTree();
+            BOOST_CHECK(unmutatedRoot == ReferenceMerkleRoot(TxHashes(block)));
+            // Optionally mutate by duplicating the last transactions, resulting in the same merkle root
+            // (CVE-2012-2459: CheckBlock rejects such blocks as duplicate transactions instead).
             block.vtx.resize(ntx3);
             for (int j = 0; j < duplicate1; j++) {
                 block.vtx[ntx + j] = block.vtx[ntx + j - duplicate1];
@@ -102,18 +89,10 @@ BOOST_AUTO_TEST_CASE(merkle_test)
             for (int j = 0; j < duplicate3; j++) {
                 block.vtx[ntx2 + j] = block.vtx[ntx2 + j - duplicate3];
             }
-            // Compute the merkle root and merkle tree using the old mechanism.
-            bool oldMutated = false;
-            std::vector<uint256> merkleTree;
-            uint256 oldRoot = BlockBuildMerkleTree(block, &oldMutated, merkleTree);
-            // Compute the merkle root using the new mechanism.
-            bool newMutated = false;
-            uint256 newRoot = BlockMerkleRoot(block, &newMutated);
-            BOOST_CHECK(oldRoot == newRoot);
-            BOOST_CHECK(newRoot == unmutatedRoot);
-            BOOST_CHECK((newRoot == uint256()) == (ntx == 0));
-            BOOST_CHECK(oldMutated == newMutated);
-            BOOST_CHECK(newMutated == !!mutate);
+            uint256 root = block.BuildMerkleTree();
+            BOOST_CHECK(root == ReferenceMerkleRoot(TxHashes(block)));
+            BOOST_CHECK(root == unmutatedRoot);
+            BOOST_CHECK((root == uint256()) == (ntx == 0));
             // If no mutation was done (once for every ntx value), try up to 16 branches.
             if (mutate == 0) {
                 for (int loop = 0; loop < std::min(ntx, 16); loop++) {
@@ -122,14 +101,80 @@ BOOST_AUTO_TEST_CASE(merkle_test)
                     if (ntx > 16) {
                         mtx = InsecureRandRange(ntx);
                     }
-                    std::vector<uint256> newBranch = BlockMerkleBranch(block, mtx);
-                    std::vector<uint256> oldBranch = BlockGetMerkleBranch(block, merkleTree, mtx);
-                    BOOST_CHECK(oldBranch == newBranch);
-                    BOOST_CHECK(ComputeMerkleRootFromBranch(block.vtx[mtx]->GetHash(), newBranch, mtx) == oldRoot);
+                    std::vector<uint256> branch = block.GetMerkleBranch(mtx);
+                    BOOST_CHECK(CBlock::CheckMerkleBranch(block.vtx[mtx].GetHash(), branch, mtx) == root);
+                    // The branch doesn't prove a different transaction
+                    if (ntx > 1) {
+                        int other = (mtx + 1) % ntx;
+                        BOOST_CHECK(CBlock::CheckMerkleBranch(block.vtx[other].GetHash(), branch, mtx) != root);
+                    }
                 }
             }
         }
     }
+    BOOST_CHECK(CBlock::CheckMerkleBranch(uint256S("0x01"), {}, -1) == uint256());
+}
+
+BOOST_AUTO_TEST_CASE(genesis_merkle_root)
+{
+    for (const std::string& chain : {CBaseChainParams::MAIN, CBaseChainParams::REGTEST}) {
+        const auto params = CreateChainParams(chain);
+        CBlock genesis = params->GenesisBlock();
+        BOOST_CHECK(genesis.BuildMerkleTree() == uint256S("0x678b76419ff06676a591d3fa9d57d7f7b26d8021b7cc69dde925f39d4cf2244f"));
+        BOOST_CHECK(genesis.hashMerkleRoot == genesis.BuildMerkleTree());
+    }
+}
+
+/** A minimal block that passes CheckBlock without proof of work: coinbase plus n spends */
+static CBlock BlockWithTxs(int nTxs)
+{
+    CBlock block;
+    CMutableTransaction coinbase;
+    coinbase.vin.resize(1);
+    coinbase.vin[0].scriptSig = CScript() << OP_1 << OP_2;
+    coinbase.vout.resize(1);
+    coinbase.vout[0].nValue = COIN;
+    block.vtx.push_back(CTransaction(coinbase));
+    for (int i = 0; i < nTxs; i++) {
+        CMutableTransaction tx;
+        tx.vin.resize(1);
+        tx.vin[0].prevout = COutPoint(InsecureRand256(), 0);
+        tx.vout.resize(1);
+        tx.vout[0].nValue = COIN;
+        tx.vout[0].scriptPubKey = CScript() << OP_TRUE;
+        block.vtx.push_back(CTransaction(tx));
+    }
+    block.nTime = block.GetMaxTransactionTime();
+    block.hashMerkleRoot = block.BuildMerkleTree();
+    return block;
+}
+
+/* The merkle root can't tell a block from one with its last transactions
+ * duplicated; CheckBlock has to catch that, without marking the header invalid */
+BOOST_AUTO_TEST_CASE(check_block_merkle_and_duplicates)
+{
+    const Consensus::Params& params = Params().GetConsensus();
+    CBlock block = BlockWithTxs(2); // 3 transactions
+    CValidationState state;
+    BOOST_CHECK(CheckBlock(block, state, params, false, true));
+
+    CBlock mutated = block;
+    mutated.vtx.push_back(mutated.vtx.back());
+    BOOST_CHECK(mutated.BuildMerkleTree() == block.hashMerkleRoot);
+    CValidationState stateDup;
+    BOOST_CHECK(!CheckBlock(mutated, stateDup, params, false, true));
+    BOOST_CHECK_EQUAL(stateDup.GetRejectReason(), "bad-txns-duplicate");
+    BOOST_CHECK(stateDup.CorruptionPossible());
+
+    CBlock badRoot = block;
+    badRoot.hashMerkleRoot = InsecureRand256();
+    CValidationState stateRoot;
+    BOOST_CHECK(!CheckBlock(badRoot, stateRoot, params, false, true));
+    BOOST_CHECK_EQUAL(stateRoot.GetRejectReason(), "bad-txnmrklroot");
+    BOOST_CHECK(stateRoot.CorruptionPossible());
+    // Without the merkle check the wrong root isn't noticed
+    CValidationState stateNoCheck;
+    BOOST_CHECK(CheckBlock(badRoot, stateNoCheck, params, false, false));
 }
 
 BOOST_AUTO_TEST_SUITE_END()
