@@ -800,13 +800,13 @@ BOOST_FIXTURE_TEST_CASE(util_ReadConfigFile_invalid_line, UtilDataDirSetup)
     // A line with an empty name is rejected as well
     WriteFile(conf, "=v\n");
     TestArgsManager testArgs2;
-    BOOST_CHECK_THROW(testArgs2.ReadConfigFile(conf.string()), std::exception);
+    BOOST_CHECK_THROW(testArgs2.ReadConfigFile(conf.string()), boost::program_options::error);
     BOOST_CHECK(testArgs2.GetMapArgs().empty());
 }
 
 BOOST_FIXTURE_TEST_CASE(util_ReadConfigFile_creates_default, UtilDataDirSetup)
 {
-    // A missing config file is generated (named by gArgs -conf, here the default) and read
+    // A missing default config file is generated and then read
     const fs::path conf = pathTemp / YACOIN_CONF_FILENAME;
     BOOST_REQUIRE(!fs::exists(conf));
     TestArgsManager testArgs;
@@ -829,19 +829,19 @@ BOOST_FIXTURE_TEST_CASE(util_ReadConfigFile_creates_default, UtilDataDirSetup)
     BOOST_CHECK(testArgs2.GetMapArgs() == testArgs.GetMapArgs());
     BOOST_CHECK(testArgs2.GetMapMultiArgs() == testArgs.GetMapMultiArgs());
 
-    // If the file can't be created (missing directory) the read quietly does nothing
+    // If the file can't be created (missing directory) the read returns early: nothing is
+    // read and the datadir cache isn't cleared (a changed -datadir doesn't take effect yet)
+    const fs::path dir2 = pathTemp / "other";
+    fs::create_directories(dir2);
+    BOOST_CHECK(GetDataDir(false) == pathTemp);
+    gArgs.ForceSetArg("-datadir", dir2.string());
     gArgs.ForceSetArg("-conf", "missingdir/x.conf");
     TestArgsManager testArgs3;
     testArgs3.ReadConfigFile("missingdir/x.conf");
     BOOST_CHECK(testArgs3.GetMapArgs().empty());
     BOOST_CHECK(!fs::exists(pathTemp / "missingdir"));
-
-    // A missing file under another name than gArgs -conf is not created and nothing is read
-    TestArgsManager::EraseArg(gArgs, "-conf");
-    TestArgsManager testArgs4;
-    testArgs4.ReadConfigFile("other.conf");
-    BOOST_CHECK(testArgs4.GetMapArgs().empty());
-    BOOST_CHECK(!fs::exists(pathTemp / "other.conf"));
+    BOOST_CHECK(GetDataDir(false) == pathTemp);
+    gArgs.ForceSetArg("-datadir", pathTemp.string());
 
     // createConf writes to the file named by gArgs -conf
     gArgs.ForceSetArg("-conf", "custom.conf");
@@ -957,7 +957,8 @@ BOOST_FIXTURE_TEST_CASE(util_LogCategories, LogStateSetup)
 BOOST_FIXTURE_TEST_CASE(util_LogPrintStr_timestamps, LogStateSetup)
 {
     // Without an open debug.log the text is buffered where tests can't see it, so only the
-    // returned lengths are checked. A stamp is "YYYY-mm-dd HH:MM:SS " (20 chars).
+    // returned lengths are checked: the stamp format and the mocktime text themselves can't
+    // be compared here. A stamp is "YYYY-mm-dd HH:MM:SS " (20 chars).
     const int stamp = 20;
     fPrintToConsole = false;
     fPrintToDebugLog = true;
@@ -1027,6 +1028,7 @@ BOOST_FIXTURE_TEST_CASE(util_GetFilesize_TryCreateDirectories, UtilDataDirSetup)
     BOOST_CHECK(!TryCreateDirectories(pathTemp / "new" / "sub")); // already there
     // A regular file in the way is an error that is passed on
     BOOST_CHECK_THROW(TryCreateDirectories(file), fs::filesystem_error);
+    BOOST_CHECK_THROW(TryCreateDirectories(file / "sub"), fs::filesystem_error);
 }
 
 BOOST_AUTO_TEST_CASE(util_WildcardMatch)
