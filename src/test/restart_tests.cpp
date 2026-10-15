@@ -39,7 +39,11 @@
 #include "test/token_test_util.h"
 
 #include <fcntl.h>
+#ifdef WIN32
+#include <io.h> // dup, dup2, open, close
+#else
 #include <unistd.h>
+#endif
 
 #include <atomic>
 #include <fstream>
@@ -827,7 +831,7 @@ BOOST_AUTO_TEST_CASE(restart_restores_tokens)
         {{"RELOAD", addrA}, 600 * COIN}, {{"RELOAD", addrB}, 400 * COIN}, {{"RELOAD!", addrA}, OWNER_TOKEN_AMOUNT}};
     BOOST_CHECK(ptokens->mapTokensAddressAmount == expected);
 
-    // T3's transfer is validated against the reloaded token state
+    // T3 is connected again on top of the token state written at T2
     CValidationState state;
     BOOST_REQUIRE(ActivateBestChain(state, Params()));
     BOOST_CHECK(Tip()->GetBlockHash() == t3.GetHash());
@@ -887,7 +891,8 @@ BOOST_AUTO_TEST_CASE(load_block_index_rejects_corrupt_or_missing_data)
     BOOST_CHECK(!LoadIndexOnly());
 
     // The same header as proof of stake isn't checked against a work target
-    crafted.nFlags = CBlockIndex::BLOCK_PROOF_OF_STAKE;
+    crafted.nFlags = CBlockIndex::BLOCK_PROOF_OF_STAKE | CBlockIndex::BLOCK_STAKE_MODIFIER;
+    crafted.nStakeModifier = 0x1234567890abcdefULL;
     crafted.prevoutStake = COutPoint(uint256S("0xabc"), 1);
     crafted.nStakeTime = 1234;
     crafted.hashProofOfStake = uint256S("0x99");
@@ -903,6 +908,8 @@ BOOST_AUTO_TEST_CASE(load_block_index_rejects_corrupt_or_missing_data)
         BOOST_CHECK(p->pprev && p->pprev->GetBlockHash() == hashTip);
         BOOST_CHECK_EQUAL(p->nHeight, crafted.nHeight);
         BOOST_CHECK(p->IsProofOfStake());
+        BOOST_CHECK_EQUAL(p->nFlags, crafted.nFlags);
+        BOOST_CHECK_EQUAL(p->nStakeModifier, 0x1234567890abcdefULL);
         BOOST_CHECK(p->prevoutStake == crafted.prevoutStake);
         BOOST_CHECK_EQUAL(p->nStakeTime, 1234U);
         BOOST_CHECK(p->hashProofOfStake == crafted.hashProofOfStake);
@@ -943,18 +950,23 @@ BOOST_AUTO_TEST_CASE(load_block_index_reads_flags_and_block_hash_index)
 {
     BOOST_REQUIRE(Restart());
 
-    // Flags stored in the block tree database win over the globals
+    // Flags stored in the block tree database win over the globals (checked right after
+    // LoadBlockIndex: Reload reads the tokenindex flag itself, as init does)
     for (bool fValue : {false, true}) {
         BOOST_REQUIRE(pblocktree->WriteFlag("txindex", fValue));
         BOOST_REQUIRE(pblocktree->WriteFlag("tokenindex", fValue));
         BOOST_REQUIRE(pblocktree->WriteFlag("addressindex", fValue));
         fTxIndex = fTokenIndex = fAddressIndex = !fValue;
-        BOOST_REQUIRE(Reload(false));
+        BOOST_CHECK(LoadIndexOnly());
         BOOST_CHECK_EQUAL(fTxIndex, fValue);
         BOOST_CHECK_EQUAL(fTokenIndex, fValue);
         BOOST_CHECK_EQUAL(fAddressIndex, fValue);
     }
+    // The rest of the test runs without the address index
+    BOOST_REQUIRE(pblocktree->WriteFlag("addressindex", false));
     fAddressIndex = false;
+    BOOST_REQUIRE(Reload(false));
+    BOOST_CHECK(!fAddressIndex);
 
     // An interrupted reindex continues
     BOOST_REQUIRE(pblocktree->WriteReindexing(true));
@@ -1095,6 +1107,10 @@ BOOST_AUTO_TEST_CASE(import_blocks_into_fresh_datadir)
         CAutoFile out(fsbridge::fopen(file1, "wb"), SER_DISK, CLIENT_VERSION);
         AppendBytes(out, std::vector<unsigned char>(10, 'x'));
         AppendBytes(out, {Params().MessageStart()[0], 0, 0, 0}); // not a message start
+        // The size bounds are exercised for coverage only: a size that is rejected and a size
+        // that is accepted but can't be deserialized both just resume the scan, so an
+        // off-by-one in the bounds would only show with a real block of exactly 80 bytes
+        // (impossible: a block has a coinbase) or MAX_BLOCK_SERIALIZED_SIZE bytes.
         AppendHeaderOnly(out, 79); // too small for a block
         AppendHeaderOnly(out, MAX_BLOCK_SERIALIZED_SIZE + 1); // too large
         for (int h = 0; h <= 3; h++) AppendBlock(out, b[h]);
@@ -1263,15 +1279,21 @@ BOOST_AUTO_TEST_CASE(reindex_rebuilds_index_from_block_files)
 
 BOOST_AUTO_TEST_CASE(mempool_dump_and_load_round_trip)
 {
-    AdvanceTime();
-    CTransaction tx1 = Spend(coinbases[0]);
-    CTransaction tx2 = Spend(tx1);
-    CTransaction tx3 = Spend(coinbases[1]);
-    for (const CTransaction& tx : {tx1, tx2, tx3}) {
+    // Entries accepted at different times
+    auto accept = [](const CTransaction& tx) {
         LOCK(cs_main);
         CValidationState state;
         BOOST_REQUIRE(AcceptToMemoryPool(mempool, state, MakeTransactionRef(tx), nullptr));
-    }
+    };
+    AdvanceTime();
+    CTransaction tx1 = Spend(coinbases[0]);
+    accept(tx1);
+    SetMockTime(GetTime() + 5);
+    CTransaction tx2 = Spend(tx1);
+    accept(tx2);
+    SetMockTime(GetTime() + 5);
+    CTransaction tx3 = Spend(coinbases[1]);
+    accept(tx3);
     mempool.PrioritiseTransaction(tx3.GetHash(), 5 * CENT);
     mempool.PrioritiseTransaction(uint256S("0xdead"), 7);
 
@@ -1279,6 +1301,8 @@ BOOST_AUTO_TEST_CASE(mempool_dump_and_load_round_trip)
     for (const TxMempoolInfo& i : mempool.infoAll()) info[i.tx->GetHash()] = std::make_pair(i.nTime, i.nFeeDelta);
     std::map<uint256, CAmount> deltas = mempool.mapDeltas;
     BOOST_CHECK_EQUAL(info.size(), 3U);
+    BOOST_CHECK_EQUAL(info[tx2.GetHash()].first, info[tx1.GetHash()].first + 5);
+    BOOST_CHECK_EQUAL(info[tx3.GetHash()].first, info[tx1.GetHash()].first + 10);
     BOOST_CHECK_EQUAL(deltas.size(), 2U);
 
     DumpMempool();
@@ -1364,8 +1388,9 @@ BOOST_AUTO_TEST_CASE(load_mempool_edge_cases)
     WriteMempoolFile(path, 1, {{tx1, nNow - nExpiry, 3}, {tx1, nNow - nExpiry + 1, 0}, {tx1, nNow, 5}, {tx3, nNow, 4 * CENT}});
     {
         LogCapture capture(DataFile("mempool.log"));
-        BOOST_CHECK(LoadMempool());
-        std::string log = capture.Stop();
+        bool fLoaded = LoadMempool();
+        std::string log = capture.Stop(); // no checks while stdout is captured
+        BOOST_CHECK(fLoaded);
         BOOST_CHECK(Contains(log, "Imported mempool transactions from disk: 2 successes, 1 failed, 1 expired"));
     }
     BOOST_CHECK_EQUAL(mempool.size(), 2U);
@@ -1424,7 +1449,11 @@ BOOST_FIXTURE_TEST_CASE(load_block_reward_and_highest_diff, TestingSetup)
     ConsensusGlobalsGuard guard;
     SyntheticChain chain;
     CBlockIndex* genesis = chain.Genesis();
-    const ::int64_t nGenesisSupply = genesis->nMoneySupply;
+    struct SupplyRestore {
+        CBlockIndex* p;
+        ::int64_t nSupply;
+        ~SupplyRestore() { p->nMoneySupply = nSupply; }
+    } restore{genesis, genesis->nMoneySupply};
     genesis->nMoneySupply = 7000 * COIN;
     const unsigned int nLimitBits = Params().GetConsensus().powLimit.GetCompact();
     CBlockIndex* tip = genesis;
@@ -1484,7 +1513,6 @@ BOOST_FIXTURE_TEST_CASE(load_block_reward_and_highest_diff, TestingSetup)
     BOOST_CHECK_EQUAL(LogValue(log, "Current block reward = "), "0");
     BOOST_CHECK_EQUAL(LogValue(log, "Minimum difficulty target = "), target(nLimitBits));
 
-    genesis->nMoneySupply = nGenesisSupply;
 }
 
 BOOST_FIXTURE_TEST_CASE(load_tokens_from_database, TokenTestingSetup)
