@@ -74,6 +74,10 @@ BITCOIN_TESTS =\
   test/test_bitcoin.h \
   test/test_bitcoin_main.cpp \
   test/timedata_tests.cpp \
+  test/token_cache_tests.cpp \
+  test/token_test_util.h \
+  test/token_tests.cpp \
+  test/token_tx_tests.cpp \
   test/torcontrol_tests.cpp \
   test/transaction_tests.cpp \
   test/txvalidationcache_tests.cpp \

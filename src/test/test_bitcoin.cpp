@@ -115,6 +115,7 @@ TestingSetup::~TestingSetup()
         delete pcoinsdbview;
         delete pblocktree;
         delete ptokens;
+        ptokens = nullptr;
         fs::remove_all(pathTemp);
 }
 
