@@ -66,7 +66,7 @@ static std::vector<std::string> TransfersOf(const CTransaction& tx)
     return result;
 }
 
-static std::string T(const std::string& name, CAmount amount, const std::string& address)
+static std::string TransferOut(const std::string& name, CAmount amount, const std::string& address)
 {
     return strprintf("%s %d %s", name, amount, address);
 }
@@ -428,10 +428,15 @@ BOOST_AUTO_TEST_CASE(issue_reissue_and_balances)
     BOOST_CHECK_EQUAL(ownerAddress, tokenAddress);
     BOOST_CHECK_EQUAL(CountValue(issue, GetLockAmount(ETokenType::YATOKEN)), 1);
     BOOST_CHECK(TransfersOf(issue).empty());
+    // Exactly one YAC change output, paying the new change key
+    int nChange = 0;
     for (const CTxOut& out : issue.vout) {
-        if (!out.scriptPubKey.IsTokenScript() && out.nValue != L)
+        if (!out.scriptPubKey.IsTokenScript() && out.nValue != L) {
             BOOST_CHECK(out.scriptPubKey == GetScriptForDestination(cc.destChange));
+            nChange++;
+        }
     }
+    BOOST_CHECK_EQUAL(nChange, 1);
     Commit(wallet.get(), wtx, reservekey, nFee);
 
     CNewToken meta;
@@ -460,7 +465,7 @@ BOOST_AUTO_TEST_CASE(issue_reissue_and_balances)
     BOOST_CHECK_EQUAL((int)parsed.nReissuable, 1);
     BOOST_CHECK_EQUAL(parsed.strIPFSHash, "");
     BOOST_CHECK_EQUAL(reissueAddress, tokenAddress);
-    CHECK_LIST(TransfersOf(*reissueTx), {T("TOKENA!", OWNER_TOKEN_AMOUNT, changeAddress)});
+    CHECK_LIST(TransfersOf(*reissueTx), {TransferOut("TOKENA!", OWNER_TOKEN_AMOUNT, changeAddress)});
     BOOST_CHECK(Spends(*reissueTx, COutPoint(issue.GetHash(), ownerIndex)));
     BOOST_CHECK_EQUAL(CountValue(*reissueTx, GetReissueTokenLockAmount()), 1);
 
@@ -476,6 +481,7 @@ BOOST_AUTO_TEST_CASE(issue_reissue_and_balances)
     BOOST_CHECK_EQUAL(Balance("TOKENA", 4), 0);
     std::vector<std::string> outputNames;
     CHECK_LIST(MyBalances("", 0, &outputNames), {"TOKENA=1500000000", "TOKENA!=1000000"});
+    CHECK_LIST(outputNames, {"TOKENA", "TOKENA!"});
     std::map<std::string, std::vector<COutput> > outputs;
     std::map<std::string, CAmount> amounts;
     BOOST_CHECK(GetAllMyTokenBalances(outputs, amounts));
@@ -497,7 +503,7 @@ BOOST_AUTO_TEST_CASE(sub_and_unique_issue_and_listing)
     BOOST_REQUIRE(OwnerFromTransaction(*subTx, ownerName, ownerAddress));
     BOOST_CHECK_EQUAL(ownerName, "TOKENA/SUB!");
     BOOST_CHECK_EQUAL(ownerAddress, tokenAddress);
-    CHECK_LIST(TransfersOf(*subTx), {T("TOKENA!", OWNER_TOKEN_AMOUNT, changeAddress)});
+    CHECK_LIST(TransfersOf(*subTx), {TransferOut("TOKENA!", OWNER_TOKEN_AMOUNT, changeAddress)});
     BOOST_CHECK(Spends(*subTx, COutPoint(issue->GetHash(), issueOwner)));
     BOOST_CHECK_EQUAL(CountValue(*subTx, GetLockAmount(ETokenType::SUB)), 1);
     BOOST_CHECK_EQUAL(Balance("TOKENA/SUB"), 50 * COIN);
@@ -514,7 +520,7 @@ BOOST_AUTO_TEST_CASE(sub_and_unique_issue_and_listing)
     for (const CTxOut& out : uniqueTx->vout)
         BOOST_CHECK(!IsScriptOwnerToken(out.scriptPubKey));
     BOOST_CHECK_EQUAL(CountValue(*uniqueTx, 2 * GetLockAmount(ETokenType::UNIQUE)), 1);
-    CHECK_LIST(TransfersOf(*uniqueTx), {T("TOKENA!", OWNER_TOKEN_AMOUNT, changeAddress)});
+    CHECK_LIST(TransfersOf(*uniqueTx), {TransferOut("TOKENA!", OWNER_TOKEN_AMOUNT, changeAddress)});
     BOOST_CHECK(Spends(*uniqueTx, COutPoint(subTx->GetHash(), subOwnerChange)));
     BOOST_CHECK_EQUAL(Balance("TOKENA#TAG1"), UNIQUE_TOKEN_AMOUNT);
     BOOST_CHECK_EQUAL(Balance("TOKENA#TAG2"), UNIQUE_TOKEN_AMOUNT);
@@ -561,7 +567,7 @@ BOOST_AUTO_TEST_CASE(transfer_tokens)
 
     // One transfer: the rest comes back to the change address, no lock
     CTransactionRef t1 = Transfer({{CTokenTransfer("TOKENA", 300 * COIN), addrX}});
-    CHECK_LIST(TransfersOf(*t1), {T("TOKENA", 300 * COIN, addrX), T("TOKENA", 700 * COIN, changeAddress)});
+    CHECK_LIST(TransfersOf(*t1), {TransferOut("TOKENA", 300 * COIN, addrX), TransferOut("TOKENA", 700 * COIN, changeAddress)});
     BOOST_CHECK_EQUAL(CountValue(*t1, L), 0);
     BOOST_CHECK(Spends(*t1, COutPoint(issue->GetHash(), issue->vout.size() - 1)));
     BOOST_CHECK_EQUAL(Balance("TOKENA"), 700 * COIN);
@@ -570,14 +576,15 @@ BOOST_AUTO_TEST_CASE(transfer_tokens)
     CTransactionRef t2 = Transfer({{CTokenTransfer("TOKENA", 100 * COIN), addrX},
                                    {CTokenTransfer("TOKENA/SUB", 10 * COIN), addrY},
                                    {CTokenTransfer("TOKENA/SUB!", OWNER_TOKEN_AMOUNT), addrY}});
-    CHECK_LIST(TransfersOf(*t2), {T("TOKENA", 100 * COIN, addrX), T("TOKENA", 600 * COIN, changeAddress),
-                                  T("TOKENA/SUB", 10 * COIN, addrY), T("TOKENA/SUB", 40 * COIN, changeAddress),
-                                  T("TOKENA/SUB!", OWNER_TOKEN_AMOUNT, addrY)});
+    CHECK_LIST(TransfersOf(*t2), {TransferOut("TOKENA", 100 * COIN, addrX), TransferOut("TOKENA", 600 * COIN, changeAddress),
+                                  TransferOut("TOKENA/SUB", 10 * COIN, addrY), TransferOut("TOKENA/SUB", 40 * COIN, changeAddress),
+                                  TransferOut("TOKENA/SUB!", OWNER_TOKEN_AMOUNT, addrY)});
     BOOST_CHECK_EQUAL(Balance("TOKENA"), 600 * COIN);
     BOOST_CHECK_EQUAL(Balance("TOKENA/SUB"), 40 * COIN);
     BOOST_CHECK_EQUAL(Balance("TOKENA/SUB!"), 0);
     RpcError error(0, "");
     BOOST_CHECK(!VerifyWalletHasToken("TOKENA/SUB!", error));
+    BOOST_CHECK_EQUAL(error.first, RPC_INVALID_REQUEST);
     BOOST_CHECK_EQUAL(error.second, "Wallet doesn't have token: TOKENA/SUB!");
 
     // Errors
@@ -587,8 +594,11 @@ BOOST_AUTO_TEST_CASE(transfer_tokens)
                RPC_INVALID_ADDRESS_OR_KEY, "Invalid Yacoin address: notanaddress");
     CHECK_FAIL(TryTransfer(wallet.get(), {{CTokenTransfer("NOPE", COIN), addrX}}, cc),
                RPC_INVALID_REQUEST, "Wallet doesn't have token: NOPE");
+    const std::string ownerAmountError = "When transferring an 'Ownership Token' the amount must always be 1. Please try again with the amount of 1";
     CHECK_FAIL(TryTransfer(wallet.get(), {{CTokenTransfer("TOKENA!", 2 * OWNER_TOKEN_AMOUNT), addrX}}, cc),
-               RPC_INVALID_PARAMS, "When transferring an 'Ownership Token' the amount must always be 1. Please try again with the amount of 1");
+               RPC_INVALID_PARAMS, ownerAmountError);
+    CHECK_FAIL(TryTransfer(wallet.get(), {{CTokenTransfer("TOKENA!", OWNER_TOKEN_AMOUNT / 2), addrX}}, cc),
+               RPC_INVALID_PARAMS, ownerAmountError);
     {
         NullGuard<CTokensCache> noTokens(ptokens);
         CHECK_FAIL(TryTransfer(wallet.get(), {{CTokenTransfer("TOKENA", COIN), addrX}}, cc),
@@ -602,6 +612,11 @@ BOOST_AUTO_TEST_CASE(transfer_tokens)
                RPC_TRANSACTION_ERROR, "Transaction must have at least one recipient");
     BOOST_CHECK_EQUAL(chainActive.Height(), nHeight);
     BOOST_CHECK_EQUAL(Balance("TOKENA"), 600 * COIN);
+
+    // Sending everything leaves no token change
+    CTransactionRef t3 = Transfer({{CTokenTransfer("TOKENA", 600 * COIN), addrX}});
+    CHECK_LIST(TransfersOf(*t3), {TransferOut("TOKENA", 600 * COIN, addrX)});
+    BOOST_CHECK_EQUAL(Balance("TOKENA"), 0);
 }
 
 BOOST_AUTO_TEST_CASE(second_wallet_funds_and_ownership)
@@ -619,6 +634,8 @@ BOOST_AUTO_TEST_CASE(second_wallet_funds_and_ownership)
                RPC_WALLET_INSUFFICIENT_FUNDS, "This wallet doesn't contain any YAC, transfering an token requires a network fee");
 
     {
+        // The balance and has-token lookups (also inside the Create* functions) read
+        // vpwallets[0], so the second wallet has to be first there while it acts
         VpWalletsGuard onlyB({&b});
         BOOST_CHECK_EQUAL(Balance("TOKENA"), 5 * COIN);
         BOOST_CHECK_EQUAL(Balance("TOKENA!"), OWNER_TOKEN_AMOUNT);
@@ -689,10 +706,9 @@ BOOST_AUTO_TEST_CASE(issue_and_reissue_errors)
     CHECK_FAIL(TryIssue(wallet.get(), {TokenB()}, tokenAddress, ccSmall), RPC_WALLET_ERROR, "Insufficient funds");
     CHECK_FAIL(TryIssue(&locked, {TokenB()}, tokenAddress, CCoinControl()),
                RPC_WALLET_KEYPOOL_RAN_OUT, "Keypool ran out, please call keypoolrefill first");
-    // The destination isn't checked up front; the wallet refuses it
-    CreateResult r = TryIssue(wallet.get(), {TokenB()}, "", cc);
-    BOOST_CHECK(!r.ok);
-    BOOST_CHECK_EQUAL(r.error.first, RPC_WALLET_ERROR);
+    // The destination isn't checked up front; the wallet refuses it. The error currently
+    // carries no message. (TryIssue starts the fee at 0, so no fee message is added.)
+    CHECK_FAIL(TryIssue(wallet.get(), {TokenB()}, "", cc), RPC_WALLET_ERROR, "");
 
     const CReissueToken reissue("TOKENA", COIN, -1, 1, "");
     CHECK_FAIL(TryReissue(wallet.get(), reissue, "bad", cc), RPC_INVALID_ADDRESS_OR_KEY, "Invalid Yacoin address: bad");

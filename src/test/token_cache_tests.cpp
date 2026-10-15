@@ -538,10 +538,11 @@ BOOST_AUTO_TEST_CASE(unique_tx_contextual_check)
     ConnectTokenTx(cache, UniqueTx("ABC", {"TAG1"}), vUndo, OwnerCoin(issue));
     std::string strError;
 
-    // Only unique token outputs are checked: a tx without outputs and a plain issue pass
+    // Only unique token outputs are checked: a tx without outputs passes, and so does a
+    // plain issue, even of a name that already exists (that is checked elsewhere)
     BOOST_CHECK(ContextualCheckUniqueTokenTx(&cache, strError, CTransaction(CMutableTransaction())));
     BOOST_CHECK_EQUAL(strError, "");
-    BOOST_CHECK(ContextualCheckUniqueTokenTx(&cache, strError, IssueTx(CNewToken("XYZ", COIN, 0, 1, 0, ""))));
+    BOOST_CHECK(ContextualCheckUniqueTokenTx(&cache, strError, issue));
     BOOST_CHECK_EQUAL(strError, "");
     BOOST_CHECK(ContextualCheckUniqueTokenTx(&cache, strError, UniqueTx("ABC", {"NEW1", "NEW2"})));
 
