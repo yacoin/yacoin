@@ -24,7 +24,8 @@
 
 #include <boost/test/unit_test.hpp>
 
-/** Regtest chain whose first coinbases are mature (the mempool is cleared by TestingSetup's teardown) */
+/** Regtest chain whose first coinbases are mature. TestingSetup's teardown clears the
+ * mempool but not its fee deltas, which this fixture clears itself. */
 struct MinerTestingSetup : public TestChain100Setup {
     std::vector<CTransaction> matureCoinbases;
     CScript scriptPubKey;
@@ -37,6 +38,29 @@ struct MinerTestingSetup : public TestChain100Setup {
         matureCoinbases = coinbaseTxns;
         for (int i = 0; i < COINBASE_MATURITY_AFTER_HARDFORK; i++)
             CreateAndProcessBlock({}, scriptPubKey);
+    }
+
+    ~MinerTestingSetup()
+    {
+        LOCK(mempool.cs);
+        mempool.mapDeltas.clear();
+    }
+
+    /** Hashes of the template's transactions after the coinbase */
+    std::vector<uint256> TemplateTxs()
+    {
+        std::vector<uint256> vHashes;
+        std::unique_ptr<CBlockTemplate> pblocktemplate = BlockAssembler().CreateNewBlock(scriptPubKey);
+        for (size_t i = 1; i < pblocktemplate->block.vtx.size(); i++)
+            vHashes.push_back(pblocktemplate->block.vtx[i].GetHash());
+        return vHashes;
+    }
+
+    CAmount StoredDelta(const uint256& hash)
+    {
+        CAmount nDelta = 0;
+        mempool.ApplyDelta(hash, nDelta);
+        return nDelta;
     }
 
     /** Signed spend of a mature coinbase back to the coinbase key, paying nFee */
@@ -283,6 +307,116 @@ BOOST_AUTO_TEST_CASE(increment_extra_nonce)
     block.hashPrevBlock = InsecureRand256();
     IncrementExtraNonce(&block, pindexPrev, nExtraNonce);
     BOOST_CHECK_EQUAL(nExtraNonce, 1U);
+}
+
+/* A fee delta, set before or after the tx enters the mempool, decides its place in the
+ * template, while the template still reports the real fee */
+BOOST_AUTO_TEST_CASE(prioritised_template_order)
+{
+    const CAmount k = GetMinFee(1000);
+    CTransaction low = Spend(matureCoinbases[0], k);
+    CTransaction medium = Spend(matureCoinbases[1], 20 * k);
+    CTransaction high = Spend(matureCoinbases[2], 50 * k);
+    mempool.PrioritiseTransaction(low.GetHash(), 100 * k);
+    BOOST_CHECK(!mempool.exists(low.GetHash()));
+    for (const CTransaction& tx : {low, medium, high})
+        BOOST_CHECK(ToMemPool(tx));
+    BOOST_CHECK_EQUAL(mempool.info(low.GetHash()).nFeeDelta, 100 * k);
+
+    std::unique_ptr<CBlockTemplate> pblocktemplate = BlockAssembler().CreateNewBlock(scriptPubKey);
+    BOOST_REQUIRE_EQUAL(pblocktemplate->block.vtx.size(), 4U);
+    BOOST_CHECK(pblocktemplate->block.vtx[1].GetHash() == low.GetHash());
+    BOOST_CHECK(pblocktemplate->block.vtx[2].GetHash() == high.GetHash());
+    BOOST_CHECK(pblocktemplate->block.vtx[3].GetHash() == medium.GetHash());
+    BOOST_CHECK_EQUAL(pblocktemplate->vTxFees[1], k);
+
+    mempool.PrioritiseTransaction(high.GetHash(), -45 * k);
+    BOOST_CHECK(TemplateTxs() == std::vector<uint256>({low.GetHash(), medium.GetHash(), high.GetHash()}));
+
+    // A modified fee below the minimum keeps the tx out of the block
+    mempool.PrioritiseTransaction(medium.GetHash(), -20 * k);
+    pblocktemplate = BlockAssembler().CreateNewBlock(scriptPubKey);
+    BOOST_REQUIRE_EQUAL(pblocktemplate->block.vtx.size(), 3U);
+    BOOST_CHECK(pblocktemplate->block.vtx[1].GetHash() == low.GetHash());
+    BOOST_CHECK(pblocktemplate->block.vtx[2].GetHash() == high.GetHash());
+
+    // Mining forgets the deltas of the mined txs only
+    BOOST_CHECK(MineTemplate(pblocktemplate->block));
+    BOOST_CHECK_EQUAL(mempool.size(), 1U);
+    BOOST_CHECK(mempool.exists(medium.GetHash()));
+    BOOST_CHECK_EQUAL(StoredDelta(low.GetHash()), 0);
+    BOOST_CHECK_EQUAL(StoredDelta(high.GetHash()), 0);
+    BOOST_CHECK_EQUAL(StoredDelta(medium.GetHash()), -20 * k);
+}
+
+/* Deltas on a parent and on its child move them between packages */
+BOOST_AUTO_TEST_CASE(prioritised_parent_and_child)
+{
+    const CAmount k = GetMinFee(1000);
+    CTransaction parent = Spend(matureCoinbases[0], k);
+    CTransaction child = Spend(parent, 4 * k);
+    CTransaction other = Spend(matureCoinbases[1], 3 * k);
+    for (const CTransaction& tx : {parent, child, other})
+        BOOST_CHECK(ToMemPool(tx));
+    const uint256 hashP = parent.GetHash(), hashC = child.GetHash(), hashU = other.GetHash();
+
+    // Parent and child as a package (2.5k per tx) lose to the other tx (3k)
+    BOOST_CHECK(TemplateTxs() == std::vector<uint256>({hashU, hashP, hashC}));
+
+    // The prioritised parent goes first on its own; the child (4k) then beats the other tx
+    mempool.PrioritiseTransaction(hashP, 10 * k);
+    BOOST_CHECK(TemplateTxs() == std::vector<uint256>({hashP, hashC, hashU}));
+    {
+        LOCK(mempool.cs);
+        BOOST_CHECK_EQUAL(mempool.mapTx.find(hashC)->GetModFeesWithAncestors(), 11 * k + 4 * k);
+    }
+
+    // Lowered to 2k, the child comes after the other tx
+    mempool.PrioritiseTransaction(hashC, -2 * k);
+    {
+        LOCK(mempool.cs);
+        BOOST_CHECK_EQUAL(mempool.mapTx.find(hashP)->GetModFeesWithDescendants(), 11 * k + 2 * k);
+    }
+    std::unique_ptr<CBlockTemplate> pblocktemplate = BlockAssembler().CreateNewBlock(scriptPubKey);
+    BOOST_REQUIRE_EQUAL(pblocktemplate->block.vtx.size(), 4U);
+    BOOST_CHECK(pblocktemplate->block.vtx[1].GetHash() == hashP);
+    BOOST_CHECK(pblocktemplate->block.vtx[2].GetHash() == hashU);
+    BOOST_CHECK(pblocktemplate->block.vtx[3].GetHash() == hashC);
+
+    BOOST_CHECK(MineTemplate(pblocktemplate->block));
+    BOOST_CHECK_EQUAL(mempool.size(), 0U);
+    BOOST_CHECK_EQUAL(StoredDelta(hashP), 0);
+    BOOST_CHECK_EQUAL(StoredDelta(hashC), 0);
+}
+
+/* A child whose two parents enter the block in separate packages: its package is reduced
+ * by each parent, after which it ranks by its own fee rate */
+BOOST_AUTO_TEST_CASE(child_of_two_packages)
+{
+    TestMemPoolEntryHelper entry;
+    entry.nHeight = 1;
+    auto fakeTx = [](const std::vector<COutPoint>& vPrevouts) {
+        CMutableTransaction tx;
+        for (const COutPoint& prevout : vPrevouts) tx.vin.push_back(CTxIn(prevout));
+        tx.vout.resize(1);
+        tx.vout[0].nValue = COIN;
+        tx.vout[0].scriptPubKey = CScript() << OP_TRUE;
+        return CTransaction(tx);
+    };
+    // Fee rates in multiples of the minimum: parent1 50, parent2 10, child 2, other 3
+    CTransaction parent1 = fakeTx({COutPoint(InsecureRand256(), 0)});
+    CTransaction parent2 = fakeTx({COutPoint(InsecureRand256(), 0)});
+    CTransaction other = fakeTx({COutPoint(InsecureRand256(), 0)});
+    CTransaction child = fakeTx({COutPoint(parent1.GetHash(), 0), COutPoint(parent2.GetHash(), 0)});
+    for (const auto& txMultiple : std::vector<std::pair<CTransaction, int>>{{parent1, 50}, {parent2, 10}, {other, 3}, {child, 2}}) {
+        const CTransaction& tx = txMultiple.first;
+        CAmount nFee = txMultiple.second * GetMinFee(::GetSerializeSize(tx, SER_NETWORK, PROTOCOL_VERSION));
+        mempool.addUnchecked(tx.GetHash(), entry.Fee(nFee).FromTx(tx));
+    }
+
+    // parent1 first; then parent2 alone beats the child's remaining package (parent2 +
+    // child); with both parents in, the child (2) ranks after the other tx (3)
+    BOOST_CHECK(TemplateTxs() == std::vector<uint256>({parent1.GetHash(), parent2.GetHash(), other.GetHash(), child.GetHash()}));
 }
 
 BOOST_AUTO_TEST_SUITE_END()
