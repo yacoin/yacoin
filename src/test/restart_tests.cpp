@@ -40,7 +40,8 @@
 
 #include <fcntl.h>
 #ifdef WIN32
-#include <io.h> // dup, dup2, open, close
+#include <io.h>
+#include <sys/stat.h>
 #else
 #include <unistd.h>
 #endif
@@ -81,6 +82,22 @@ RawValue TruncatedValue(const T& obj)
     return raw;
 }
 
+// File descriptor calls: the C runtime's underscore names on Windows (as util.cpp uses), POSIX
+// elsewhere
+#ifdef WIN32
+int StdoutFd() { return _fileno(stdout); }
+int DupFd(int fd) { return _dup(fd); }
+int Dup2Fd(int from, int to) { return _dup2(from, to); }
+int CloseFd(int fd) { return _close(fd); }
+int OpenForWrite(const char* path) { return _open(path, _O_WRONLY | _O_CREAT | _O_TRUNC, _S_IREAD | _S_IWRITE); }
+#else
+int StdoutFd() { return fileno(stdout); }
+int DupFd(int fd) { return dup(fd); }
+int Dup2Fd(int from, int to) { return dup2(from, to); }
+int CloseFd(int fd) { return close(fd); }
+int OpenForWrite(const char* path) { return open(path, O_WRONLY | O_CREAT | O_TRUNC, 0600); }
+#endif
+
 /** Sends log output (LogPrintf goes to stdout with fPrintToConsole) into a file while alive */
 class LogCapture
 {
@@ -88,10 +105,10 @@ public:
     explicit LogCapture(const fs::path& path) : m_path(path)
     {
         fflush(stdout);
-        m_saved = dup(fileno(stdout));
-        int fd = open(path.string().c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0600);
-        dup2(fd, fileno(stdout));
-        close(fd);
+        m_saved = DupFd(StdoutFd());
+        int fd = OpenForWrite(path.string().c_str());
+        Dup2Fd(fd, StdoutFd());
+        CloseFd(fd);
         m_prevConsole = fPrintToConsole;
         fPrintToConsole = true;
     }
@@ -111,8 +128,8 @@ private:
     {
         if (m_saved < 0) return;
         fflush(stdout);
-        dup2(m_saved, fileno(stdout));
-        close(m_saved);
+        Dup2Fd(m_saved, StdoutFd());
+        CloseFd(m_saved);
         m_saved = -1;
         fPrintToConsole = m_prevConsole;
     }
@@ -463,7 +480,8 @@ struct RestartSetup : public TestChain100Setup {
     }
 
     /** init.cpp's load sequence (AppInitMain, "Loading block index") without a flush first:
-     *  whatever wasn't written to the databases is lost, as in a crash. */
+     *  whatever wasn't written to the databases is lost, as in a crash.
+     *  Keep in sync with AppInitMain's "Loading block index" step in init.cpp. */
     bool Reload(bool fActivate = true, std::string* pRewardLog = nullptr)
     {
         const CChainParams& params = Params();
@@ -527,7 +545,8 @@ struct RestartSetup : public TestChain100Setup {
     }
 
     /** A new data directory: empty databases and no block files, then init's steps up to the
-     *  connected genesis block */
+     *  connected genesis block. Keep in sync with AppInitMain's "Loading block index" step in
+     *  init.cpp. */
     void FreshNode(bool fRemoveBlocks = true)
     {
         {
@@ -658,6 +677,9 @@ BOOST_AUTO_TEST_CASE(restart_restores_block_index)
     BOOST_CHECK_EQUAL(LogValue(rewardBefore, strReward), LogValue(rewardAfter, strReward));
     BOOST_CHECK_EQUAL(LogValue(rewardBefore, strTarget), LogValue(rewardAfter, strTarget));
     BOOST_CHECK_EQUAL(LogValue(rewardBefore, strEpoch), LogValue(rewardAfter, strEpoch));
+    // The log divides the supply by the blocks per year before applying the inflation, the
+    // coinbase (GetProofOfWorkReward) multiplies first. They agree for this chain's supply but
+    // can differ by a satoshi for others.
     BOOST_CHECK_EQUAL(LogValue(rewardAfter, strReward), std::to_string(b17.vtx[0].vout[0].nValue));
 
     // LoadChainTip: nothing to do when the tip already matches the coins, otherwise it follows them
@@ -1217,7 +1239,7 @@ BOOST_AUTO_TEST_CASE(reindex_rebuilds_index_from_block_files)
         BOOST_CHECK(LoadBlockIndex(Params()));
         BOOST_CHECK(mapBlockIndex.empty());
     }
-    // ThreadImport's reindex loop
+    // ThreadImport's reindex loop (keep in sync with ThreadImport in init.cpp)
     int nFiles = 0;
     for (int nFile = 0; ; nFile++) {
         CDiskBlockPos pos(nFile, 0);
