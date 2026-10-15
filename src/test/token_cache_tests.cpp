@@ -529,6 +529,38 @@ BOOST_AUTO_TEST_CASE(contextual_checks)
     BOOST_CHECK(!ContextualCheckTransferToken(&cache, CTokenTransfer("abc", 1), TestTokenAddress(), strError));
 }
 
+BOOST_AUTO_TEST_CASE(unique_tx_contextual_check)
+{
+    CTokensCache cache;
+    std::vector<std::pair<std::string, CBlockTokenUndo> > vUndo;
+    CTransaction issue = IssueTx(CNewToken("ABC", 100 * COIN, 0, 1, 0, ""));
+    ConnectTokenTx(cache, issue, vUndo);
+    ConnectTokenTx(cache, UniqueTx("ABC", {"TAG1"}), vUndo, OwnerCoin(issue));
+    std::string strError;
+
+    // Only unique token outputs are checked: a tx without outputs and a plain issue pass
+    BOOST_CHECK(ContextualCheckUniqueTokenTx(&cache, strError, CTransaction(CMutableTransaction())));
+    BOOST_CHECK_EQUAL(strError, "");
+    BOOST_CHECK(ContextualCheckUniqueTokenTx(&cache, strError, IssueTx(CNewToken("XYZ", COIN, 0, 1, 0, ""))));
+    BOOST_CHECK_EQUAL(strError, "");
+    BOOST_CHECK(ContextualCheckUniqueTokenTx(&cache, strError, UniqueTx("ABC", {"NEW1", "NEW2"})));
+
+    // Each unique output must be a new, valid unique token; the second one fails here
+    BOOST_CHECK(!ContextualCheckUniqueTokenTx(&cache, strError, UniqueTx("ABC", {"NEW1", "TAG1"})));
+    BOOST_CHECK_EQUAL(strError, "Invalid parameter: token_name 'ABC#TAG1' has already been used");
+    BOOST_CHECK(!ContextualCheckUniqueToken(&cache, CNewToken("ABC#TAG1", UNIQUE_TOKEN_AMOUNT, 0, 0, 0, ""), strError));
+    BOOST_CHECK_EQUAL(strError, "Invalid parameter: token_name 'ABC#TAG1' has already been used");
+
+    CMutableTransaction big(UniqueTx("ABC", {"NEW1"}));
+    big.vout.back() = CTxOut(0, NewTokenScript(CNewToken("ABC#BIG", 2 * UNIQUE_TOKEN_AMOUNT, 0, 0, 0, "")));
+    BOOST_CHECK(!ContextualCheckUniqueTokenTx(&cache, strError, CTransaction(big)));
+    BOOST_CHECK_EQUAL(strError, "Invalid parameter: amount must be 1000000");
+    CMutableTransaction units(UniqueTx("ABC", {"NEW1"}));
+    units.vout.back() = CTxOut(0, NewTokenScript(CNewToken("ABC#UNITS", UNIQUE_TOKEN_AMOUNT, 1, 0, 0, "")));
+    BOOST_CHECK(!ContextualCheckUniqueTokenTx(&cache, strError, CTransaction(units)));
+    BOOST_CHECK_EQUAL(strError, "Invalid parameter: units must be 0");
+}
+
 /* Adapted from Ravencoin's cache_tests, with a small cache */
 BOOST_AUTO_TEST_CASE(lru_cache_eviction)
 {

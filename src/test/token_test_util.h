@@ -166,4 +166,27 @@ inline std::string TestIpfsHash()
     return DecodeTokenData(TEST_IPFS_CIDV0, version);
 }
 
+/** Token DB keys hold length-prefixed strings, so LevelDB orders names and addresses
+ * by length first, then bytewise */
+inline bool DbKeyLess(const std::string& a, const std::string& b)
+{
+    return a.size() != b.size() ? a.size() < b.size() : a < b;
+}
+
+/** "name=amount" for each entry of a token DB listing, for readable collection checks */
+inline std::vector<std::string> Entries(const std::vector<std::pair<std::string, CAmount> >& vec)
+{
+    std::vector<std::string> result;
+    for (const auto& entry : vec)
+        result.push_back(entry.first + "=" + std::to_string(entry.second));
+    return result;
+}
+
+/** Compare a vector<string> with a braced list, printing both on mismatch */
+#define CHECK_LIST(got, ...) do { \
+    const std::vector<std::string> want_ = __VA_ARGS__; \
+    const std::vector<std::string> got_ = (got); \
+    BOOST_CHECK_EQUAL_COLLECTIONS(got_.begin(), got_.end(), want_.begin(), want_.end()); \
+} while (0)
+
 #endif // YACOIN_TEST_TOKEN_TEST_UTIL_H
