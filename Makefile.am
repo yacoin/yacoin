@@ -201,9 +201,12 @@ if USE_LCOV
 # relative to src/.
 
 COV_JOBS ?= $(shell getconf _NPROCESSORS_ONLN 2>/dev/null || echo 4)
-# Functional test scripts run in parallel by cov-functional (gcov merges the
-# counters of concurrent processes under a file lock).
-FTEST_JOBS ?= 4
+# Functional test scripts cov-functional runs in parallel. gcov merges the
+# counters of concurrent processes under a file lock, but at -O0 and next to
+# the baseline capture, timing-sensitive scripts (p2p_invalid_messages' 2 s
+# ping checks during its junk-message flood) failed with 4, so it's serial by
+# default.
+FTEST_JOBS ?= 1
 COV_TOOLS = $(abs_top_srcdir)/contrib/devtools
 COV_CAPTURE = $(COV_TOOLS)/coverage-capture.sh --geninfo "$(GENINFO) $(LCOV_OPTS)" \
   --lcov "$(LCOV) $(LCOV_OPTS)" --dir $(abs_builddir)/src --jobs "$(COV_JOBS)"

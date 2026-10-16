@@ -132,7 +132,7 @@ two coverage builds (`--enable-lcov`, `-O0 -g`):
 | Build | Runs | Make target |
 |---|---|---|
 | `build/cov-unit` | `test_bitcoin` (all unit tests) | `make cov-unit` |
-| `build/cov-func` | All functional tests (`FTEST_JOBS`, default 4, in parallel) | `make cov-functional` |
+| `build/cov-func` | All functional tests (serially unless `FTEST_JOBS` is set) | `make cov-functional` |
 
 Each target zeroes the counters, records a baseline (so files that are never
 executed still count), runs the tests, and keeps the coverage even if tests
@@ -226,5 +226,5 @@ The parallel unit test time is bounded by `transaction_tests/test_big_transactio
     hosts build in `build/<host>/<variant>/`.
   - `JOBS`: make jobs, default the number of cores.
   - `UNIT_JOBS`: parallel unit test suites, default `JOBS`.
-  - `FTEST_JOBS`: parallel functional test scripts in `ftest` and `cov`,
-    default 4.
+  - `FTEST_JOBS`: parallel functional test scripts, default 4 in `ftest`
+    and 1 in `cov`.
