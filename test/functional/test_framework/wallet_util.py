@@ -154,6 +154,11 @@ def assert_yac_fee(node, txid, paytxfee=DEFAULT_PAYTXFEE):
         raise AssertionError("Fee {} of {} ({} bytes) not in [{}, {}]".format(
             fee, txid, size, expected, expected + tolerance))
 
+def coinbase_value(node, block_hash):
+    """Return the total value of the coinbase outputs of a block, in YAC."""
+    coinbase = node.getrawtransaction(node.getblock(block_hash)['tx'][0], 1)
+    return sum(out['value'] for out in coinbase['vout'])
+
 def wipe_chain(node, *, wallet=False):
     """Delete a stopped node's chain data, so it starts like a new node.
 
