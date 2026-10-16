@@ -91,6 +91,7 @@ BASE_SCRIPTS = [
     'wallet_hd.py',
     'feature_reindex.py',
     'feature_hardfork_1_0.py',  # 4
+    'feature_block_limits.py',  # 4
     # vv 3 s or less vv
     'feature_epoch.py',
     'feature_tx_malleability.py',
