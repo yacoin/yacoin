@@ -29,17 +29,7 @@ from test_framework.util import (
     assert_is_hex_string,
     assert_is_hash_string,
 )
-from test_framework.blocktools import (
-    create_block,
-    create_coinbase,
-    TIME_GENESIS_BLOCK,
-)
-from test_framework.messages import (
-    msg_block,
-)
-from test_framework.mininode import (
-    P2PInterface,
-)
+from test_framework.blocktools import TIME_GENESIS_BLOCK
 
 
 class BlockchainTest(BitcoinTestFramework):
