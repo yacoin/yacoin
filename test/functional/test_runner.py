@@ -92,6 +92,7 @@ BASE_SCRIPTS = [
     'feature_reindex.py',
     'feature_hardfork_1_0.py',  # 4
     'feature_block_limits.py',  # 4
+    'rpc_invalidateblock.py',  # 3
     # vv 3 s or less vv
     'feature_epoch.py',
     'feature_tx_malleability.py',
@@ -100,7 +101,6 @@ BASE_SCRIPTS = [
     'feature_token_overflow.py',
     'mining_basic.py',
     'rpc_blockchain.py',
-    'rpc_invalidateblock.py',
     'p2p_disconnect_ban.py',
     'rpc_net.py',
     'feature_describe_redeemscript.py',
