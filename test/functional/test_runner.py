@@ -73,6 +73,7 @@ BASE_SCRIPTS = [
     'p2p_timeouts.py',  # 63: the node's fixed 60 s inactivity check
     'wallet_backup.py',  # 35-60 (transaction relay)
     'wallet_basic.py',  # 35-45
+    'wallet_coinbase_maturity.py',  # 17 (600 blocks)
     'feature_timelock.py',  # 17
     'rpc_rawtransaction.py',  # 15
     'wallet_fee.py',  # 10-19
