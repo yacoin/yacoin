@@ -18,12 +18,17 @@ from .messages import (
     sha256,
     uint256_from_str,
 )
+from .ripemd160 import ripemd160
 
 MAX_SCRIPT_ELEMENT_SIZE = 520
 OPCODE_NAMES = {}
 
 def hash160(s):
-    return hashlib.new('ripemd160', sha256(s)).digest()
+    try:
+        return hashlib.new('ripemd160', sha256(s)).digest()
+    except ValueError:
+        # OpenSSL 3 builds of hashlib may not offer RIPEMD-160.
+        return ripemd160(sha256(s))
 
 def bn2vch(v):
     """Convert number to bitcoin-specific little endian format."""
