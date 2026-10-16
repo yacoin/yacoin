@@ -156,7 +156,9 @@ Notes:
   filter patterns that match nothing and has renamed the branch-coverage option.
 - With both builds cached, a full run takes about 27 minutes on 8 cores:
   unit coverage about 5½ minutes, functional coverage about 21 minutes. Most
-  of that is the serial functional tests (about 20 minutes at `-O0`) and
+  of that was the functional tests run serially (about 20 minutes at `-O0`,
+  measured before they ran in parallel and lost a 10 s sleep per node
+  connection; not re-measured since) and
   `transaction_tests/test_big_transaction` (about 3 minutes). Building both
   `-O0` variants from scratch adds about 13 minutes.
 - To keep that time down, lcov captures run `geninfo` in parallel
@@ -192,7 +194,8 @@ Ubuntu 22.04, 8 cores, 15 GB RAM.
 | Rebuild `test_bitcoin` after changing one source file | 7 s |
 | All unit tests, serial | 29 s |
 | All unit tests, parallel (`./dev.sh unit`) | 15 s |
-| All functional tests, serial | 13 min 40 s |
+| All functional tests, serial (`FTEST_JOBS=1 ./dev.sh ftest`) | 4 min 20 s |
+| All functional tests, 4 in parallel (`./dev.sh ftest`) | 73 s |
 
 The parallel unit test time is bounded by `transaction_tests/test_big_transaction`
 (about 17 s at `-O1`).
