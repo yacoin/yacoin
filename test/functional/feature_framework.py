@@ -9,10 +9,14 @@ Later tests rely on these helpers, so check them against a real node:
   send_signal, wait_for_exit).
 - connect_nodes returns only when both sides finished the handshake, and
   peers() drops YACoin's extra getpeerinfo element.
+- CTransaction computes the node's txids (scriptSigs ignored from version 2
+  on, except for coinbases) and CBlock the merkle root.
 """
 
+from decimal import Decimal
 import signal
 
+from test_framework.messages import COIN, CBlock, CTransaction, FromHex, TX_VERSION
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import (
     assert_equal,
@@ -34,6 +38,7 @@ class FrameworkTest(BitcoinTestFramework):
     def run_test(self):
         self.test_exit_codes()
         self.test_connect_nodes()
+        self.test_txid()
 
     def test_exit_codes(self):
         node = self.nodes[1]
@@ -80,6 +85,53 @@ class FrameworkTest(BitcoinTestFramework):
         assert outbound[0]['version'] != 0 and inbound[0]['version'] != 0
         assert 'verack' in inbound[0]['bytesrecv_per_msg']
         assert 'pong' in outbound[0]['bytesrecv_per_msg']
+
+    def check_txid(self, txid):
+        raw = self.nodes[0].getrawtransaction(txid)
+        tx = FromHex(CTransaction(), raw)
+        assert_equal(tx.serialize().hex(), raw)
+        assert_equal(tx.rehash(), txid)
+        return tx
+
+    def test_txid(self):
+        node = self.nodes[0]
+        node.generate(12)
+        self.sync_blocks()
+
+        self.log.info("Coinbase txid: full serialization")
+        coinbase = self.check_txid(node.getblock(node.getbestblockhash())['tx'][0])
+        assert coinbase.is_coinbase()
+        assert_equal(coinbase.nVersion, TX_VERSION)
+
+        self.log.info("Wallet transaction txids: scriptSigs ignored")
+        one_input = self.check_txid(node.sendtoaddress(address=node.getnewaddress(), amount=Decimal('1.5')))
+        assert_equal(len(one_input.vin), 1)
+        # COIN matches the node's unit.
+        for n, txout in enumerate(node.getrawtransaction(one_input.hash, 1)['vout']):
+            assert_equal(Decimal(one_input.vout[n].nValue) / COIN, txout['value'])
+        many_inputs = self.check_txid(node.sendtoaddress(address=node.getnewaddress(), amount=node.getbalance() - 1))
+        assert len(many_inputs.vin) > 1
+        assert not many_inputs.is_coinbase()
+
+        self.log.info("Merkle root of a block with these transactions")
+        block_hash = node.generate(1)[0]
+        assert_equal(len(node.getblock(block_hash)['tx']), 3)
+        block = FromHex(CBlock(), node.getblock(block_hash, False))
+        assert_equal(block.calc_merkle_root(), int(node.getblock(block_hash)['merkleroot'], 16))
+
+        self.log.info("Version 1 transaction: full serialization")
+        v1 = CTransaction(one_input)
+        v1.nVersion = 1
+        v1.rehash()
+        assert_equal(node.decoderawtransaction(v1.serialize().hex())['txid'], v1.hash)
+        assert v1.hash != one_input.hash
+
+        self.log.info("Signing doesn't change a version 2 txid")
+        utxo = node.listunspent()[0]
+        unsigned = node.createrawtransaction([{"txid": utxo['txid'], "vout": utxo['vout']}], {node.getnewaddress(): Decimal('0.5')})
+        signed = node.signrawtransaction(unsigned)['hex']
+        assert_equal(FromHex(CTransaction(), unsigned).rehash(), FromHex(CTransaction(), signed).rehash())
+        assert_equal(FromHex(CTransaction(), signed).rehash(), node.decoderawtransaction(signed)['txid'])
 
 
 if __name__ == '__main__':
