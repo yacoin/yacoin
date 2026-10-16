@@ -22,6 +22,7 @@ Later tests rely on these helpers, so check them against a real node:
 from decimal import Decimal
 import re
 import signal
+import sys
 
 from test_framework.authproxy import JSONRPCException
 from test_framework.messages import COIN, CBlock, CTransaction, FromHex, TX_VERSION
@@ -162,9 +163,11 @@ class FrameworkTest(BitcoinTestFramework):
         assert_equal(info['subver'], "/python-mininode-tester:0.0.3/")
         assert_equal(info['startingheight'], node.getblockcount())
 
-        self.log.info("local_addr gives a mininode its own source address")
-        node.add_p2p_connection(P2PInterface(), local_addr=("127.0.0.2", 0))
-        assert peers(node)[-1]['addr'].startswith("127.0.0.2:")
+        # Only Linux routes all of 127.0.0.0/8 to the loopback interface.
+        if sys.platform.startswith('linux'):
+            self.log.info("local_addr gives a mininode its own source address")
+            node.add_p2p_connection(P2PInterface(), local_addr=("127.0.0.2", 0))
+            assert peers(node)[-1]['addr'].startswith("127.0.0.2:")
         node.disconnect_p2ps()
 
     def test_mocktime(self):
@@ -206,9 +209,11 @@ class FrameworkTest(BitcoinTestFramework):
         assert_equal(raw_rpc(self.nodes[1], {"method": "getblockcount"}, auth=("alice", "secret"))[0], 200)
         assert_equal(raw_rpc(self.nodes[1], {"method": "getblockcount"}, auth=("alice", "wrong"))[0], 401)
 
-        address = non_loopback_ipv4()
-        self.log.info("non_loopback_ipv4: %s", address)
-        assert address is None or not address.startswith("127.")
+        # netutil reads the interfaces through a Linux-only ioctl.
+        if sys.platform.startswith('linux'):
+            address = non_loopback_ipv4()
+            self.log.info("non_loopback_ipv4: %s", address)
+            assert address is None or not address.startswith("127.")
 
     def test_wallet_helpers(self):
         self.log.info("expected_fee matches the wallet's fees, for a small and a large transaction")

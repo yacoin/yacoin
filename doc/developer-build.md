@@ -226,3 +226,5 @@ The parallel unit test time is bounded by `transaction_tests/test_big_transactio
     hosts build in `build/<host>/<variant>/`.
   - `JOBS`: make jobs, default the number of cores.
   - `UNIT_JOBS`: parallel unit test suites, default `JOBS`.
+  - `FTEST_JOBS`: parallel functional test scripts in `ftest` and `cov`,
+    default 4.
