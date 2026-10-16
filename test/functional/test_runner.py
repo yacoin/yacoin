@@ -96,6 +96,7 @@ BASE_SCRIPTS = [
     'feature_basic_transfer.py',
     'feature_token_overflow.py',
     'mining_basic.py',
+    'mining_getblocktemplate.py',
     'rpc_blockchain.py',
     'rpc_invalidateblock.py',
     'p2p_disconnect_ban.py',
