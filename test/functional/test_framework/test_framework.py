@@ -104,6 +104,10 @@ class BitcoinTestFramework(metaclass=BitcoinTestMetaClass):
         self.block_fork_1_0=0
         # Set by set_mocktime() and mine_with_mocktime(); see there.
         self.mocktime = None
+        # True once set_mocktime() was used. Only then do nodes get the
+        # mocktime at startup: older scripts assign self.mocktime themselves
+        # and expect their nodes to start on real time.
+        self._mocktime_managed = False
         self.set_test_params()
         self.parse_args()        
 
@@ -424,6 +428,9 @@ class BitcoinTestFramework(metaclass=BitcoinTestMetaClass):
                 use_valgrind=self.options.valgrind,
                 block_fork_1_0=self.block_fork_1_0
             ))
+            if self._mocktime_managed:
+                # Nodes added later start on the test's clock too.
+                self.nodes[-1].mocktime = self.mocktime
 
     def start_node(self, i, *args, **kwargs):
         """Start a bitcoind"""
@@ -520,6 +527,7 @@ class BitcoinTestFramework(metaclass=BitcoinTestMetaClass):
         if self.mocktime is not None and t < self.mocktime:
             raise AssertionError("mocktime must only move forward: {} < {}".format(t, self.mocktime))
         self.mocktime = t
+        self._mocktime_managed = True
         for node in self.nodes:
             node.mocktime = t
             if node.running:

@@ -23,6 +23,7 @@ from decimal import Decimal
 import re
 import signal
 import sys
+import time
 
 from test_framework.authproxy import JSONRPCException
 from test_framework.messages import COIN, CBlock, CTransaction, FromHex, TX_VERSION
@@ -47,10 +48,14 @@ class FrameworkTest(BitcoinTestFramework):
         self.setup_clean_chain = True
 
     def setup_network(self):
+        # Set the clock before the nodes exist: they must start on it.
+        self.set_mocktime(int(time.time()))
+        self.start_mocktime = self.mocktime
         # The connection checks connect the nodes themselves.
         self.setup_nodes()
 
     def run_test(self):
+        self.test_mocktime_at_start()
         self.test_exit_codes()
         self.test_connect_nodes()
         self.test_txid()
@@ -59,6 +64,13 @@ class FrameworkTest(BitcoinTestFramework):
         self.test_raw_rpc()
         self.test_wallet_helpers()
         self.test_known_failure()
+
+    def test_mocktime_at_start(self):
+        self.log.info("Nodes added after set_mocktime start on the test's clock")
+        for node in self.nodes:
+            assert "-mocktime=%d" % self.start_mocktime in node.process.args
+        block = self.nodes[0].getblockheader(self.nodes[0].generate(1)[0])
+        assert_equal(block['time'], self.start_mocktime)
 
     def test_exit_codes(self):
         node = self.nodes[1]
