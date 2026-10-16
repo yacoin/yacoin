@@ -201,6 +201,9 @@ if USE_LCOV
 # relative to src/.
 
 COV_JOBS ?= $(shell getconf _NPROCESSORS_ONLN 2>/dev/null || echo 4)
+# Functional test scripts run in parallel by cov-functional (gcov merges the
+# counters of concurrent processes under a file lock).
+FTEST_JOBS ?= 4
 COV_TOOLS = $(abs_top_srcdir)/contrib/devtools
 COV_CAPTURE = $(COV_TOOLS)/coverage-capture.sh --geninfo "$(GENINFO) $(LCOV_OPTS)" \
   --lcov "$(LCOV) $(LCOV_OPTS)" --dir $(abs_builddir)/src --jobs "$(COV_JOBS)"
@@ -245,10 +248,10 @@ cov-functional:
 	if test "$(abs_top_srcdir)" != "$(abs_top_builddir)"; then \
 	  ln -sf $(abs_top_srcdir)/test/functional/test_runner.py test/functional/test_runner.py; fi
 	$(LCOV) $(LCOV_OPTS) -q -z -d $(abs_builddir)/src
-	@# The baseline only reads .gcno files, so it runs while the serial tests run.
+	@# The baseline only reads .gcno files, so it runs while the tests run.
 	nice -n 10 $(COV_CAPTURE) --initial --out functional_baseline.info > functional_baseline.log 2>&1 & pid=$$!; \
 	  trap 'kill $$pid 2>/dev/null' INT TERM HUP; \
-	  test/functional/test_runner.py -j 1 --tmpdirprefix=$(abs_builddir)/test/tmp > functional_test.log 2>&1; \
+	  test/functional/test_runner.py -j $(FTEST_JOBS) --tmpdirprefix=$(abs_builddir)/test/tmp > functional_test.log 2>&1; \
 	  echo $$? > functional_test.status; \
 	  wait $$pid || { cat functional_baseline.log >&2; exit 1; }
 	@# A crashed test run writes no counters, so the capture is empty; that and a
