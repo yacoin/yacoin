@@ -27,6 +27,8 @@ Rules for porting Bitcoin Core wallet tests to YACoin:
 """
 from collections import namedtuple
 from decimal import Decimal
+import os
+import shutil
 
 from test_framework.address import (
     key_to_p2pkh,
@@ -151,3 +153,20 @@ def assert_yac_fee(node, txid, paytxfee=DEFAULT_PAYTXFEE):
     if not expected <= fee <= expected + tolerance:
         raise AssertionError("Fee {} of {} ({} bytes) not in [{}, {}]".format(
             fee, txid, size, expected, expected + tolerance))
+
+def wipe_chain(node, *, wallet=False):
+    """Delete a stopped node's chain data, so it starts like a new node.
+
+    Removes the block files and index, the chainstate, the token database,
+    the mempool and peer files; with wallet=True also the wallet and its BDB
+    environment. The config file and logs stay."""
+    assert not node.running
+    names = ['blocks', 'chainstate', 'tokens', 'mempool.dat', 'peers.dat']
+    if wallet:
+        names += ['wallet.dat', 'database', 'db.log']
+    for name in names:
+        path = os.path.join(node.datadir, name)
+        if os.path.isdir(path):
+            shutil.rmtree(path)
+        elif os.path.exists(path):
+            os.remove(path)
