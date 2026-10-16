@@ -10,6 +10,7 @@ import sys
 from test_framework import messages
 from test_framework.mininode import P2PDataStore, NetworkThread
 from test_framework.test_framework import BitcoinTestFramework
+from test_framework.util import peers
 
 
 class msg_unrecognized:
@@ -96,8 +97,9 @@ class InvalidMessagesTest(BitcoinTestFramework):
 
             # An unknown message type (or *any* message type) over
             # MAX_PROTOCOL_MESSAGE_LENGTH should result in a disconnect.
-            node.p2p.send_message(msg_over_size)
-            node.p2p.wait_for_disconnect(timeout=4)
+            with node.assert_debug_log(['Oversized message from peer=']):
+                node.p2p.send_message(msg_over_size)
+                node.p2p.wait_for_disconnect(timeout=4)
 
             node.disconnect_p2ps()
             conn = node.add_p2p_connection(P2PDataStore())
@@ -174,7 +176,11 @@ class InvalidMessagesTest(BitcoinTestFramework):
 
     def test_size(self):
         conn = self.nodes[0].add_p2p_connection(P2PDataStore())
-        with self.nodes[0].assert_debug_log(['']):
+        # Peer ids only grow, and the previous test's peer may still be listed.
+        peer_id = max(peer['id'] for peer in peers(self.nodes[0]))
+        # A length above MAX_SIZE fails while reading the header, so the
+        # node just drops the connection (no "Oversized message" log line).
+        with self.nodes[0].assert_debug_log(['disconnecting peer=%d\n' % peer_id]):
             msg = conn.build_message(msg_unrecognized(str_data="d"))
             cut_len = (
                 4 +  # magic
