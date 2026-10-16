@@ -76,6 +76,7 @@ BASE_SCRIPTS = [
     'rpc_rawtransaction.py',  # 15
     'feature_tokens.py',  # 11
     'feature_defaultport.py',  # 11
+    'feature_reindex.py',  # 10
     'mempool_reorg.py',  # 5-18
     'wallet_encryption.py',  # 8
     'feature_crash_recovery.py',  # 5
@@ -87,7 +88,6 @@ BASE_SCRIPTS = [
     'p2p_leak.py',
     'wallet_dump.py',
     'wallet_hd.py',
-    'feature_reindex.py',
     # vv 3 s or less vv
     'feature_epoch.py',
     'feature_tx_malleability.py',
