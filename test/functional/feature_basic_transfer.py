@@ -6,37 +6,14 @@
 Test sending and receiving coins 
 """
 
-import copy
-import time
 from decimal import Decimal
 
-from test_framework.blocktools import (
-    create_coinbase,
-    TIME_GENESIS_BLOCK,
-)
-from test_framework.messages import (
-    CBlock,
-    CBlockHeader,
-    BLOCK_HEADER_SIZE
-)
-from test_framework.mininode import (
-    P2PDataStore,
-)
+from test_framework.blocktools import TIME_GENESIS_BLOCK
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import (
     assert_equal,
     assert_approx,
-    assert_raises_rpc_error,
-    connect_nodes,
 )
-from test_framework.script import CScriptNum
-
-
-def assert_template(node, block, expect, rehash=True):
-    if rehash:
-        block.hashMerkleRoot = block.calc_merkle_root()
-    rsp = node.getblocktemplate(template_request={'data': block.serialize().hex(), 'mode': 'proposal', 'rules': ['segwit']})
-    assert_equal(rsp, expect)
 
 
 class BasicTransfer_Test(BitcoinTestFramework):
