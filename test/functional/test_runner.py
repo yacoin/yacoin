@@ -88,6 +88,8 @@ BASE_SCRIPTS = [
     'wallet_dump.py',
     'wallet_hd.py',
     'feature_reindex.py',
+    'rpc_users.py',
+    'interface_rpc.py',
     # vv 3 s or less vv
     'feature_epoch.py',
     'feature_tx_malleability.py',
@@ -104,7 +106,6 @@ BASE_SCRIPTS = [
     'feature_getrpcinfo.py',
     'feature_set_min_fee.py',
     'feature_uptime.py',
-    'interface_rpc.py',
     'interface_http.py',
     'rpc_decodescript.py',
     'rpc_signmessage.py',
