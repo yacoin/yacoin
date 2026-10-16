@@ -88,7 +88,6 @@ class TestNode():
         # Configuration for logging is set as command-line args rather than in the bitcoin.conf file.
         # This means that starting a bitcoind using the temp dir to debug a failed test won't
         # spam debug.log.
-        print("Block fork "+str(block_fork_1_0))
         self.args = [
             self.binary,
             "-datadir=" + self.datadir,
@@ -267,7 +266,10 @@ class TestNode():
             # Do not use wait argument when testing older nodes, e.g. in feature_backwards_compatibility.py
             if self.version is None or self.version >= 180000:
                 self.stop(wait=wait)
-                self.close()
+                # Close the RPC connection. With --usecli there is none, and
+                # self.close() would be sent to yacoin-cli as a command.
+                if self.rpc is not None:
+                    self.rpc.close()
             else:
                 self.stop()
         except http.client.CannotSendRequest:

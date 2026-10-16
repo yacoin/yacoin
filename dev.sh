@@ -165,6 +165,9 @@ cmd_build() {
     local dir="$BUILD_ROOT/$variant"
     ensure_dirs
     [[ -f "$dir/Makefile" ]] || cmd_configure "$variant"
+    # Nothing in "make all" depends on test/config.ini, so changes to
+    # test/config.ini.in would otherwise only reach it on a reconfigure.
+    make -s -C "$dir" test/config.ini
     if [[ -n "${2:-}" ]]; then
         make -C "$dir/src" -j"$JOBS" "$2"
     else
@@ -211,6 +214,7 @@ cmd_cov() {
     for v in cov-unit cov-func; do
         [[ -f "$BUILD_ROOT/$v/Makefile" ]] || cmd_configure "$v"
     done
+    make -s -C "$BUILD_ROOT/cov-func" test/config.ini
     # Delete old reports here too, not only in the make targets: if make fails
     # before a recipe runs, an old report must not be shown as this run's.
     # A report that exists after make comes from this run, even if tests failed.

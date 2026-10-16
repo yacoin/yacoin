@@ -338,7 +338,6 @@ def initialize_datadir(dirname, n, chain, epochinterval=10):
         f.write("rpcpassword=yacoinpwd\n")
         f.write("port=" + str(p2p_port(n)) + "\n")
         f.write("rpcport=" + str(rpc_port(n)) + "\n")
-        f.write("rpcpallowip=127.0.0.1\n")
         f.write("checkblocks=8\n")
         f.write("server=1\n")
         f.write("daemon=0\n")
