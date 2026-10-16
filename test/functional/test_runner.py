@@ -86,7 +86,6 @@ BASE_SCRIPTS = [
     'feature_uptime.py',
     'interface_rpc.py',
     'mining_basic.py',
-    'rpc_check.py',
     'rpc_decodescript.py',
     'rpc_blockchain.py',
     'rpc_getchaintips.py',

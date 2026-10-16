@@ -4,8 +4,8 @@
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
 """Test p2p mempool message.
 
-Test that nodes are disconnected if they send mempool messages when bloom
-filters are not enabled.
+Test that a peer sending a mempool message is disconnected. The node never
+offers NODE_BLOOM, so this applies to every peer that isn't whitelisted.
 """
 
 from test_framework.messages import msg_mempool
@@ -17,7 +17,6 @@ class P2PMempoolTests(BitcoinTestFramework):
     def set_test_params(self):
         self.setup_clean_chain = True
         self.num_nodes = 1
-        self.extra_args = [["-peerbloomfilters=0"]]
 
     def run_test(self):
         # Add a p2p connection

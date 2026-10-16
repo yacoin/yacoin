@@ -114,7 +114,7 @@ class P2PLeakTest(BitcoinTestFramework):
         #Give the node enough time to possibly leak out a message
         time.sleep(5)
 
-        #This node should have been banned
+        # This node should have been disconnected (loopback peers are never banned)
         assert not no_version_bannode.is_connected
 
         self.nodes[0].disconnect_p2ps()
