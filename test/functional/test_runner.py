@@ -74,6 +74,7 @@ BASE_SCRIPTS = [
     'wallet_backup.py',  # 25
     'feature_timelock.py',  # 17
     'rpc_rawtransaction.py',  # 15
+    'feature_hardfork_v1_mempool.py',  # 14
     'feature_tokens.py',  # 11
     'feature_defaultport.py',  # 11
     'feature_block.py',  # 9
