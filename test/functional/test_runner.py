@@ -98,6 +98,7 @@ BASE_SCRIPTS = [
     'feature_basic_transfer.py',
     'feature_token_overflow.py',
     'mining_basic.py',
+    'mining_getblocktemplate_longpoll.py',
     'mining_submitblock.py',
     'mining_getblocktemplate.py',
     'rpc_blockchain.py',
