@@ -362,6 +362,27 @@ class TestNode():
         with open(self.stderr.name, 'rb') as f:
             return f.read().decode('utf-8')
 
+    def crash_check(self, call):
+        """Run call(); if the node died while it ran, fail with its exit code.
+
+        For known_failure checks of crashes: any exception from call() (a
+        dropped connection, or the AssertionError assert_raises_rpc_error
+        makes of it) is followed by a wait of up to 10 s for the process to
+        exit, as a crash can close the socket before the process is gone. A
+        node that exited gives AssertionError("node crashed: exit code ...")
+        and is marked stopped; a live node gets the original exception back.
+        If call() returns, the node must still be running and answering."""
+        try:
+            call()
+        except Exception as e:
+            try:
+                code = self.wait_for_exit(timeout=10)
+            except subprocess.TimeoutExpired:
+                raise e
+            raise AssertionError("node crashed: exit code %s, stderr %r" % (describe_exit_code(code), self.read_stderr()))
+        assert self.process.poll() is None, "node exited"
+        self.getblockcount()
+
     @contextlib.contextmanager
     def assert_debug_log(self, expected_msgs, unexpected_msgs=None, timeout=2):
         if unexpected_msgs is None:
