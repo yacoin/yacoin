@@ -15,7 +15,25 @@ Building a block on the node's tip:
 The template supplies nBits (which changes at retarget heights), the block
 time and the coinbase value (which follows the money supply). These helpers
 build post-fork blocks (version 7) only.
+
+Valid blocks are cheaper to take from a donor node than to build: a node
+that isn't connected to the node under test mines them, and the test
+replays them (submitblock, or P2PDataStore.send_blocks_and_test):
+
+    def setup_network(self):
+        self.setup_nodes()  # node 1 stays unconnected: the donor
+    ...
+    # The donor must share the target's chain up to where it starts mining.
+    connect_nodes(self.nodes[1], 0)
+    self.sync_blocks()
+    disconnect_nodes(self.nodes[1], 0)
+    hashes = self.mine_with_mocktime(self.nodes[1], 2, sync=False)
+    blocks = blocks_from_node(self.nodes[1], hashes)
+
+(mine_with_mocktime's default sync=True would wait for the unconnected
+donor and time out.)
 """
+import copy
 import itertools
 from io import BytesIO
 
@@ -241,6 +259,47 @@ def assert_block_rejected(node, block, reason):
     tip = node.getbestblockhash()
     assert_equal(node.submitblock(block.serialize().hex()), reason)
     assert_equal(node.getbestblockhash(), tip)
+
+
+def blocks_from_node(node, hashes):
+    """The blocks with these hashes, as CBlock objects (getblock h 0).
+
+    The hash of each block is taken from the request rather than computed
+    in Python (10 ms or more per block, and too slow for pre-fork N-factors);
+    the node recomputes the first one from the decoded header."""
+    blocks = []
+    for block_hash in hashes:
+        block = FromHex(CBlock(), node.getblock(block_hash, False))
+        if not blocks:
+            assert_equal(block_hash_rpc(node, block), block_hash)
+        block.sha256 = int(block_hash, 16)
+        block.hash = block_hash
+        blocks.append(block)
+    return blocks
+
+
+def mutate_duplicate_last_tx(block):
+    """A copy of block with its last transaction appended again.
+
+    With an odd number of transactions the merkle root, and so the header
+    and the block hash, stay the same (CVE-2012-2459); the node must reject
+    the copy (bad-txns-duplicate) without marking the block invalid."""
+    assert len(block.vtx) > 1 and len(block.vtx) % 2 == 1, "needs an odd number of transactions, more than one"
+    mutated = copy.deepcopy(block)
+    mutated.vtx.append(mutated.vtx[-1])
+    assert_equal(mutated.calc_merkle_root(), block.hashMerkleRoot)
+    return mutated
+
+
+def mutate_merkle_mismatch(block):
+    """A copy of block whose coinbase output pays one unit more, so the
+    transactions no longer match the merkle root in the unchanged header
+    (bad-txnmrklroot)."""
+    mutated = copy.deepcopy(block)
+    mutated.vtx[0].vout[0].nValue += 1
+    mutated.vtx[0].rehash()
+    assert mutated.calc_merkle_root() != block.hashMerkleRoot
+    return mutated
 
 
 def create_tx_with_script(prevtx, n, script_sig=b"", *, amount, script_pub_key=CScript(), ntime=None):

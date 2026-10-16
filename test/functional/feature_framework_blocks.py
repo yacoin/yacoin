@@ -14,6 +14,8 @@ real node:
 - create_block_yac / solve_block build blocks the node accepts, through
   submitblock and P2P, on the tip (also at a retarget height) and on
   another parent; assert_block_accepted / assert_block_rejected.
+- blocks_from_node takes blocks from an unconnected donor node; the two
+  merkle mutations keep the header and are rejected with their reasons.
 """
 
 from test_framework.messages import (
@@ -36,8 +38,11 @@ from test_framework.blocktools import (
     assert_block_accepted,
     assert_block_rejected,
     block_hash_rpc,
+    blocks_from_node,
     create_block_yac,
     get_template,
+    mutate_duplicate_last_tx,
+    mutate_merkle_mismatch,
     solve_block,
 )
 from test_framework.scrypt_jane import keccak512, scrypt_jane
@@ -45,7 +50,15 @@ from test_framework.mininode import P2PDataStore, P2PInterface, mininode_lock
 from test_framework.script import CScript, OP_CHECKSIG, OP_DUP, OP_EQUALVERIFY, OP_HASH160
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.test_node import TestNode
-from test_framework.util import NFACTOR_AT_HARDFORK, assert_equal, assert_raises_rpc_error, wait_until
+from test_framework.util import (
+    NFACTOR_AT_HARDFORK,
+    assert_equal,
+    assert_raises_rpc_error,
+    connect_nodes,
+    disconnect_nodes,
+    peers,
+    wait_until,
+)
 
 
 class FrameworkBlocksTest(BitcoinTestFramework):
@@ -73,6 +86,7 @@ class FrameworkBlocksTest(BitcoinTestFramework):
         self.test_reject()
         self.test_block_hash()
         self.test_build_blocks()
+        self.test_donor_blocks()
 
     def test_block_serialization(self):
         node = self.nodes[0]
@@ -240,6 +254,44 @@ class FrameworkBlocksTest(BitcoinTestFramework):
 
         self.log.info("solve_block(invalid=True): proof-of-work failures have no reason string (C-S12)")
         assert_block_rejected(node, solve_block(node, create_block_yac(node), invalid=True), "rejected")
+
+    def test_donor_blocks(self):
+        node, donor = self.nodes
+        self.log.info("A donor node shares the chain, then mines blocks with transactions on its own")
+        connect_nodes(donor, 0)
+        self.sync_blocks()
+        disconnect_nodes(donor, 0)
+        # Node 0 keeps only the P2PDataStore connection.
+        wait_until(lambda: peers(donor) == [] and len(peers(node)) == 1)
+        # The donor's wallet spends the coinbases of PRIV_KEYS[0].
+        donor.importprivkey(TestNode.PRIV_KEYS[0].key)
+        hashes = []
+        for _ in range(2):
+            self.set_mocktime(self.mocktime + 60)
+            donor.sendtoaddress(address=donor.getnewaddress(), amount=1)
+            donor.sendtoaddress(address=donor.getnewaddress(), amount=2)
+            hashes += donor.generate(1)
+        blocks = blocks_from_node(donor, hashes)
+        assert_equal([b.hash for b in blocks], hashes)
+        assert_equal([len(b.vtx) for b in blocks], [3, 3])
+
+        self.log.info("A copy with the last transaction duplicated keeps the hash and is rejected; the block is accepted")
+        duplicated = mutate_duplicate_last_tx(blocks[0])
+        duplicated.rehash()
+        assert_equal(duplicated.hash, hashes[0])
+        assert_block_rejected(node, duplicated, "bad-txns-duplicate")
+        assert_block_accepted(node, blocks[0])
+
+        self.log.info("A copy whose transactions don't match the merkle root is rejected; the block is accepted")
+        mismatch = mutate_merkle_mismatch(blocks[1])
+        assert_equal(mismatch.hashMerkleRoot, blocks[1].hashMerkleRoot)
+        assert_block_rejected(node, mismatch, "bad-txnmrklroot")
+        assert_block_accepted(node, blocks[1])
+
+        self.log.info("Further donor blocks reach the node through P2PDataStore")
+        hashes = self.mine_with_mocktime(donor, 3, sync=False)
+        self.store.send_blocks_and_test(blocks_from_node(donor, hashes), node)
+        assert_equal(node.getbestblockhash(), hashes[-1])
 
 
 if __name__ == '__main__':
