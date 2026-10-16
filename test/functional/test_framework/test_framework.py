@@ -242,7 +242,14 @@ class BitcoinTestFramework(metaclass=BitcoinTestMetaClass):
         if not self.options.noshutdown:
             self.log.info("Stopping nodes")
             if self.nodes:
-                self.stop_nodes()
+                try:
+                    self.stop_nodes()
+                except Exception:
+                    # E.g. a node that crashed at shutdown. Fail the test and
+                    # keep the directory rather than escaping main() with a
+                    # bare traceback.
+                    self.log.exception("Stopping nodes failed")
+                    self.success = TestStatus.FAILED
         else:
             for node in self.nodes:
                 node.cleanup_on_exit = False
@@ -445,20 +452,34 @@ class BitcoinTestFramework(metaclass=BitcoinTestMetaClass):
             for node in self.nodes:
                 coverage.write_all_rpc_commands(self.options.coveragedir, node.rpc)
 
-    def stop_node(self, i, expected_stderr='', wait=0):
+    def stop_node(self, i, expected_stderr='', wait=0, *, expected_ret_code=0):
         """Stop a bitcoind test node"""
         self.nodes[i].stop_node(expected_stderr, wait=wait)
-        self.nodes[i].wait_until_stopped()
+        self.nodes[i].wait_until_stopped(expected_ret_code=expected_ret_code)
 
     def stop_nodes(self, wait=0):
-        """Stop multiple bitcoind test nodes"""
+        """Stop multiple bitcoind test nodes.
+
+        Every node is stopped and waited for even if one fails its checks
+        (stderr, exit code); then the first error is raised."""
+        errors = []
         for node in self.nodes:
             # Issue RPC to stop nodes
-            node.stop_node(wait=wait)
+            try:
+                node.stop_node(wait=wait)
+            except Exception as e:
+                errors.append(e)
 
         for node in self.nodes:
             # Wait for nodes to stop
-            node.wait_until_stopped()
+            try:
+                node.wait_until_stopped()
+            except Exception as e:
+                errors.append(e)
+        for e in errors[1:]:
+            self.log.error("Also failed while stopping nodes: %r", e)
+        if errors:
+            raise errors[0]
 
     def restart_node(self, i, extra_args=None):
         """Stop and start a test node"""
@@ -466,7 +487,8 @@ class BitcoinTestFramework(metaclass=BitcoinTestMetaClass):
         self.start_node(i, extra_args)
 
     def wait_for_node_exit(self, i, timeout):
-        self.nodes[i].process.wait(timeout)
+        """Wait for node i to exit; return its exit code (see TestNode.wait_for_exit)."""
+        return self.nodes[i].wait_for_exit(timeout)
 
     def split_network(self):
         """

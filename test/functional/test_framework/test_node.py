@@ -19,6 +19,7 @@ import time
 import urllib.parse
 import collections
 import shlex
+import signal
 import sys
 
 from .authproxy import JSONRPCException
@@ -34,6 +35,16 @@ from .util import (
 )
 
 BITCOIND_PROC_WAIT_TIMEOUT = 60
+
+
+def describe_exit_code(return_code):
+    """Format a Popen return code, naming the signal for negative codes."""
+    if return_code < 0:
+        try:
+            return "{} ({})".format(return_code, signal.Signals(-return_code).name)
+        except ValueError:
+            pass
+    return str(return_code)
 
 
 class FailedToStartError(Exception):
@@ -290,30 +301,58 @@ class TestNode():
 
         del self.p2ps[:]
 
-    def is_node_stopped(self):
+    def _mark_stopped(self):
+        """Reset the state of a node whose process has exited."""
+        self.running = False
+        self.process = None
+        self.rpc_connected = False
+        self.rpc = None
+        # The mininode connections died with the process.
+        del self.p2ps[:]
+        # read_stderr() reopens the file by name.
+        self.stdout.close()
+        self.stderr.close()
+        self.log.debug("Node stopped")
+
+    def is_node_stopped(self, *, expected_ret_code=0):
         """Checks whether the node has stopped.
 
-        Returns True if the node has stopped. False otherwise.
+        Returns True if the node has stopped. False otherwise. Raises an
+        AssertionError if the node exited with a code other than
+        expected_ret_code (the node is marked stopped first, so it can be
+        restarted).
         This method is responsible for freeing resources (self.process)."""
         if not self.running:
             return True
         return_code = self.process.poll()
         if return_code is None:
             return False
-
-        # process has stopped. Assert that it didn't return an error code.
-        # assert return_code == 0, self._node_msg("Node returned non-zero exit code (%d) when stopping" % return_code) # TODO put this back in
-        if return_code != 0:
-            print("WARNING: Node returned non-zero exit code (%d) when stopping" % return_code)
-        self.running = False
-        self.process = None
-        self.rpc_connected = False
-        self.rpc = None
-        self.log.debug("Node stopped")
+        self._mark_stopped()
+        if return_code != expected_ret_code:
+            self._raise_assertion_error("Node returned exit code {}, expected {}, when stopping; stderr: {}".format(
+                describe_exit_code(return_code), expected_ret_code, self.stderr.name))
         return True
 
-    def wait_until_stopped(self, timeout=BITCOIND_PROC_WAIT_TIMEOUT):
-        wait_until(self.is_node_stopped, timeout=timeout)
+    def wait_until_stopped(self, timeout=BITCOIND_PROC_WAIT_TIMEOUT, *, expected_ret_code=0):
+        wait_until(lambda: self.is_node_stopped(expected_ret_code=expected_ret_code), timeout=timeout)
+
+    def send_signal(self, sig):
+        """Send a signal (e.g. signal.SIGTERM) to the node process."""
+        self.process.send_signal(sig)
+
+    def wait_for_exit(self, timeout=BITCOIND_PROC_WAIT_TIMEOUT):
+        """Wait for the node process to exit and return its exit code.
+
+        The code is not checked here (negative means killed by that signal).
+        The node is marked stopped, so it can be started again."""
+        return_code = self.process.wait(timeout)
+        self._mark_stopped()
+        return return_code
+
+    def read_stderr(self):
+        """Return what the node wrote to stderr since it was last started."""
+        with open(self.stderr.name, 'rb') as f:
+            return f.read().decode('utf-8')
 
     @contextlib.contextmanager
     def assert_debug_log(self, expected_msgs, unexpected_msgs=None, timeout=2):
