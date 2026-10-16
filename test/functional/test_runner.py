@@ -74,6 +74,7 @@ BASE_SCRIPTS = [
     'wallet_backup.py',  # 35-60 (transaction relay)
     'feature_timelock.py',  # 17
     'rpc_rawtransaction.py',  # 15
+    'wallet_fee.py',  # 10-19
     'feature_tokens.py',  # 11
     'feature_defaultport.py',  # 11
     'mempool_reorg.py',  # 5-18
@@ -102,7 +103,6 @@ BASE_SCRIPTS = [
     'rpc_net.py',
     'feature_describe_redeemscript.py',
     'feature_getrpcinfo.py',
-    'feature_set_min_fee.py',
     'feature_uptime.py',
     'interface_rpc.py',
     'rpc_decodescript.py',
