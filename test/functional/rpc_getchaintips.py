@@ -8,10 +8,13 @@
 - work on chains of different lengths
 - join the network together again
 - verify that getchaintips now returns two chain tips.
+- invalidate the tip: its entry is "invalid"
+- a side block that was never connected: "valid-headers"
 """
 
+from test_framework.blocktools import create_block_yac, solve_block
 from test_framework.test_framework import BitcoinTestFramework
-from test_framework.util import assert_equal
+from test_framework.util import assert_equal, disconnect_nodes, node_peers, wait_until
 
 class GetChainTipsTest (BitcoinTestFramework):
     def set_test_params(self):
@@ -58,6 +61,28 @@ class GetChainTipsTest (BitcoinTestFramework):
         tips[1]['branchlen'] = 0
         tips[1]['status'] = 'active'
         assert_equal (tips[1], shortTip)
+
+        node = self.nodes[0]
+        disconnect_nodes(node, 1)
+        wait_until(lambda: node_peers(node) == [])
+
+        self.log.info("An invalidated tip is listed as invalid")
+        node.invalidateblock(longTip['hash'])
+        hash50 = node.getblockhash(50)
+        assert_equal(node.getbestblockhash(), hash50)
+
+        self.log.info("A side block that was never connected is listed as valid-headers")
+        # On block 48: less work than the active chain, so it stays a side block.
+        side = solve_block(node, create_block_yac(node, prev=node.getblockhash(48)))
+        assert_equal(node.submitblock(side.serialize().hex()), "inconclusive")
+
+        expected = [
+            {'height': 51, 'hash': longTip['hash'], 'branchlen': 1, 'status': 'invalid'},
+            {'height': 50, 'hash': hash50, 'branchlen': 0, 'status': 'active'},
+            {'height': 49, 'hash': side.hash, 'branchlen': 1, 'status': 'valid-headers'},
+            {'height': 46, 'hash': shortTip['hash'], 'branchlen': 5, 'status': 'valid-fork'},
+        ]
+        assert_equal(sorted(node.getchaintips(), key=lambda t: (-t['height'], t['hash'])), expected)
 
 if __name__ == '__main__':
     GetChainTipsTest ().main ()
