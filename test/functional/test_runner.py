@@ -89,11 +89,11 @@ BASE_SCRIPTS = [
     'wallet_dump.py',
     'wallet_hd.py',
     'feature_reindex.py',
+    'feature_hardfork_1_0.py',  # 4
     # vv 3 s or less vv
     'feature_epoch.py',
     'feature_tx_malleability.py',
     'rpc_getchaintips.py',
-    'feature_hardfork_1_0.py',
     'feature_basic_transfer.py',
     'feature_token_overflow.py',
     'mining_basic.py',

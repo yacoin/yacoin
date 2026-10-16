@@ -489,6 +489,10 @@ def peers(node):
     """Return getpeerinfo() without the trailing {"size: ": n} element YACoin appends."""
     return [peer for peer in node.getpeerinfo() if 'id' in peer]
 
+def node_peers(node):
+    """The node's peers that are test nodes (peers() also lists mininodes)."""
+    return [peer for peer in peers(node) if 'testnode' in peer.get('subver', '')]
+
 def connect_nodes(from_connection, node_num):
     ip_port = "127.0.0.1:" + str(p2p_port(node_num))
     from_connection.addnode(ip_port, "onetry")

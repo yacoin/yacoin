@@ -42,6 +42,7 @@ from .messages import (
     BLOCK_VERSION,
     CBlock,
     CBlockHeader,
+    COIN,
     COutPoint,
     CTransaction,
     CTxIn,
@@ -66,6 +67,9 @@ MAX_BLOCK_SIGOPS = 20000
 
 # Genesis block time (nChainStartTime)
 TIME_GENESIS_BLOCK = 1367991200
+
+# nNumberOfBlocksPerYear (validation.h), for the post-fork reward
+BLOCKS_PER_YEAR = 365 * 24 * 60 + 6 * 60
 
 # Makes every default coinbase unique, so two blocks built on the same parent
 # with the same transactions differ.
@@ -106,6 +110,18 @@ def create_coinbase_yac(height, ntime, value, script_pubkey=CScript([OP_TRUE]), 
     coinbase.vout = [CTxOut(value, script_pubkey)]
     coinbase.rehash()
     return coinbase
+
+
+def epoch_reward(node, height, fork_height):
+    """The proof-of-work reward of block height (at or after the 1.0 fork at
+    fork_height), in base units: 2% a year of the money supply at the end of
+    the previous epoch, or before the fork while in the first epoch. Computed
+    in the node's order and float arithmetic (GetProofOfWorkReward), from the
+    node's active chain."""
+    interval = node.getmininginfo()['Epoch Interval']
+    start = (height // interval) * interval or fork_height
+    supply = int(node.getblock(node.getblockhash(start - 1))['money supply'] * COIN)
+    return int(supply * 0.02 / BLOCKS_PER_YEAR)
 
 
 def get_template(node):
