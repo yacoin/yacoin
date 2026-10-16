@@ -246,6 +246,11 @@ class TestNode():
                 self.rpc_connected = True
                 self.url = self.rpc.url
                 return
+            except ConnectionResetError:
+                # This might happen when the RPC server is in warmup, but shut down before the call to getblockcount
+                # succeeds. Try again to properly raise the FailedToStartError. (Before IOError, which it is a
+                # subclass of.)
+                pass
             except IOError as e:
                 if e.errno != errno.ECONNREFUSED:  # Port not yet open?
                     raise  # unknown IO error
@@ -254,10 +259,6 @@ class TestNode():
                 # -342 Service unavailable, RPC server started but is shutting down due to error
                 if e.error['code'] != -28 and e.error['code'] != -342:
                     raise  # unknown JSON RPC exception
-            except ConnectionResetError:
-                # This might happen when the RPC server is in warmup, but shut down before the call to getblockcount
-                # succeeds. Try again to properly raise the FailedToStartError
-                pass
             except ValueError as e:  # cookie file not found and no rpcuser or rpcassword. bitcoind still starting
                 if "No RPC credentials" not in str(e):
                     raise
