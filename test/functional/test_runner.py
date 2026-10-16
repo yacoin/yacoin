@@ -76,6 +76,7 @@ BASE_SCRIPTS = [
     'rpc_rawtransaction.py',  # 15
     'feature_tokens.py',  # 11
     'feature_defaultport.py',  # 11
+    'feature_token_reorg.py',  # 10
     'mempool_reorg.py',  # 5-18
     'wallet_encryption.py',  # 8
     'feature_op_cltv.py',
