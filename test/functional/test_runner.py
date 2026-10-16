@@ -93,6 +93,7 @@ BASE_SCRIPTS = [
     'feature_hardfork_1_0.py',  # 4
     'feature_block_limits.py',  # 4
     'rpc_invalidateblock.py',  # 3
+    'p2p_invalid_block.py',  # 3
     # vv 3 s or less vv
     'feature_epoch.py',
     'feature_tx_malleability.py',
