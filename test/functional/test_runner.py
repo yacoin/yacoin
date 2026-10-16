@@ -78,6 +78,7 @@ BASE_SCRIPTS = [
     'feature_defaultport.py',  # 11
     'mempool_reorg.py',  # 5-18
     'wallet_encryption.py',  # 8
+    'feature_crash_recovery.py',  # 5
     'feature_op_cltv.py',
     'feature_op_csv.py',
     'p2p_invalid_messages.py',
