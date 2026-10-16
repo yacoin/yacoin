@@ -123,7 +123,9 @@ BASE_SCRIPTS = [
     'mempool_spend_coinbase.py',
 ]
 
-EXTENDED_SCRIPTS = []
+EXTENDED_SCRIPTS = [
+    'mining_getblocktemplate_longpoll_slow.py',  # 125: two one-minute longpoll waits
+]
 
 # Place EXTENDED_SCRIPTS first since it has the 3 longest running tests
 ALL_SCRIPTS = EXTENDED_SCRIPTS + BASE_SCRIPTS
