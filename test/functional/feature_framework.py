@@ -16,6 +16,7 @@ Later tests rely on these helpers, so check them against a real node:
 - set_mocktime / mine_with_mocktime keep one forward-only clock on all
   nodes, also across restarts.
 - raw_rpc, rpcauth_value, the wallet fee rule and single_utxo_wallet.
+- known_failure passes while its check fails and fails once it passes.
 """
 
 from decimal import Decimal
@@ -54,6 +55,7 @@ class FrameworkTest(BitcoinTestFramework):
         self.test_mocktime()
         self.test_raw_rpc()
         self.test_wallet_helpers()
+        self.test_known_failure()
 
     def test_exit_codes(self):
         node = self.nodes[1]
@@ -218,6 +220,19 @@ class FrameworkTest(BitcoinTestFramework):
         self.log.info("single_utxo_wallet leaves exactly one UTXO")
         utxo = self.single_utxo_wallet(self.nodes[0], self.nodes[1], Decimal('2.5'))
         assert_equal(utxo['confirmations'], 1)
+
+    def test_known_failure(self):
+        self.log.info("known_failure passes while the check fails (assertion or RPC error)")
+        self.known_failure("example bug", lambda: assert_equal(1, 2))
+        self.known_failure("example bug", lambda: self.nodes[0].getblockhash(100000))
+
+        self.log.info("known_failure fails once the check passes")
+        try:
+            self.known_failure("example bug", lambda: assert_equal(1, 1))
+        except AssertionError as e:
+            assert_equal(str(e), "example bug no longer fails; remove the known-failure marker")
+        else:
+            raise AssertionError("known_failure did not fail on a passing check")
 
 
 if __name__ == '__main__':

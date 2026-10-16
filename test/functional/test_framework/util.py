@@ -150,6 +150,21 @@ def try_rpc(code, message, fun, *args, **kwds):
     else:
         return False
 
+def known_failure(log, bug, check):
+    """Run an assertion that a known bug breaks today.
+
+    Passes (and logs) while the bug is present, i.e. while check() raises an
+    AssertionError or a JSONRPCException (some bugs show up as an RPC error);
+    raises as soon as the check passes, so the marker is removed together
+    with the fix. `bug` names the bug and its Trello card, e.g.
+    "W-B5 (XbGM5oTW)"."""
+    try:
+        check()
+    except (AssertionError, JSONRPCException) as e:
+        log.info("Known failure %s: %s" % (bug, e))
+        return
+    raise AssertionError("%s no longer fails; remove the known-failure marker" % bug)
+
 def assert_is_hex_string(string):
     try:
         int(string, 16)
