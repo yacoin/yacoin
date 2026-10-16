@@ -123,7 +123,9 @@ BASE_SCRIPTS = [
     'mempool_spend_coinbase.py',
 ]
 
-EXTENDED_SCRIPTS = []
+EXTENDED_SCRIPTS = [
+    'feature_dbcrash.py',  # 100-170
+]
 
 # Place EXTENDED_SCRIPTS first since it has the 3 longest running tests
 ALL_SCRIPTS = EXTENDED_SCRIPTS + BASE_SCRIPTS
