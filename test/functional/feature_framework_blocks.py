@@ -9,10 +9,13 @@ real node:
 - CBlock reads and writes the node's block serialization (vchBlockSig
   included), and msg_headers its headers message.
 - reject messages are parsed and wait_for_reject matches each one once.
+- CBlockHeader.hash is the node's block hash (scrypt-jane in Python), for
+  version 7 and for older headers across their N-factor steps.
 """
 
 from test_framework.messages import (
     CBlock,
+    CBlockHeader,
     COIN,
     COutPoint,
     CTransaction,
@@ -26,11 +29,13 @@ from test_framework.messages import (
     msg_tx,
     msg_version,
 )
+from test_framework.blocktools import block_hash_rpc
+from test_framework.scrypt_jane import keccak512, scrypt_jane
 from test_framework.mininode import P2PInterface, mininode_lock
 from test_framework.script import CScript, OP_CHECKSIG, OP_DUP, OP_EQUALVERIFY, OP_HASH160
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.test_node import TestNode
-from test_framework.util import assert_equal, wait_until
+from test_framework.util import NFACTOR_AT_HARDFORK, assert_equal, wait_until
 
 
 class FrameworkBlocksTest(BitcoinTestFramework):
@@ -56,6 +61,7 @@ class FrameworkBlocksTest(BitcoinTestFramework):
         self.test_block_serialization()
         self.test_headers_message()
         self.test_reject()
+        self.test_block_hash()
 
     def test_block_serialization(self):
         node = self.nodes[0]
@@ -113,6 +119,44 @@ class FrameworkBlocksTest(BitcoinTestFramework):
         assert_equal(peer.rejects, [])
         node.disconnect_p2ps()
         wait_until(lambda: node.getconnectioncount() == 0)
+
+    def test_block_hash(self):
+        node = self.nodes[0]
+        self.log.info("scrypt-jane's own self-test vectors (Keccak-512, ChaCha20/8)")
+        # scrypt-jane-hash.h scrypt_test_hash and scrypt-jane-test-vectors.h
+        msg = bytes(range(256)) + b"\x00"
+        chained = b"".join(keccak512(msg[:i]) for i in range(len(msg) + 1))
+        assert_equal(keccak512(chained)[:8].hex(), "17c78ca0d9081dba")
+        assert_equal(scrypt_jane(b"", b"", 3, 64)[:16].hex(), "77cb70bfaed44c5bbcd3ec8a82438db3")
+
+        self.log.info("CBlockHeader.hash is the node's block hash, for genesis (version 1) and version 7 blocks")
+        assert_equal(node.getmininginfo()['Nfactor'], NFACTOR_AT_HARDFORK)
+        for height in range(node.getblockcount() + 1):
+            block_hash = node.getblockhash(height)
+            block = FromHex(CBlock(), node.getblock(block_hash, False))
+            block.calc_sha256()
+            assert_equal(block.hash, block_hash)
+            assert_equal(block_hash_rpc(node, block), block_hash)
+        assert_equal(block.sha256d, int(node.getbestblockhashsha256(), 16))
+
+        self.log.info("Copying a header doesn't hash it")
+        unhashed = FromHex(CBlock(), node.getblock(block_hash, False))
+        assert_equal(CBlockHeader(unhashed).sha256, None)
+        assert_equal(CBlockHeader(block).hash, block_hash)
+
+        self.log.info("Older headers use the time-based N-factor; check both sides of its first steps")
+        header = CBlockHeader(block)
+        header.nVersion = 6
+        for step in (1368515488, 1368777632, 1369039776, 1369826208):
+            for ntime in (step - 1, step):
+                header.nTime = ntime
+                header.rehash()
+                assert_equal(header.hash, block_hash_rpc(node, header))
+        self.log.info("A version 7 header with a time beyond 32 bits")
+        header.nVersion = 7
+        header.nTime = 2**32 + 5
+        header.rehash()
+        assert_equal(header.hash, block_hash_rpc(node, header))
 
 
 if __name__ == '__main__':

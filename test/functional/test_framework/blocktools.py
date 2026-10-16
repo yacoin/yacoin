@@ -12,6 +12,7 @@ from .address import (
 )
 from .messages import (
     CBlock,
+    CBlockHeader,
     COIN,
     COutPoint,
     CTransaction,
@@ -47,6 +48,13 @@ TIME_GENESIS_BLOCK = 1367991200 # Bitcoin 1296688602
 
 # From BIP141
 WITNESS_COMMITMENT_HEADER = b"\xaa\x21\xa9\xed"
+
+
+def block_hash_rpc(node, header):
+    """The node's block hash (hex) of a CBlockHeader or CBlock, computed by
+    the node through calculatescrypthash. That RPC checks the length and the
+    decoding of its input; calculateblockhash doesn't."""
+    return node.calculatescrypthash(CBlockHeader.serialize(header).hex())['hash_BE']
 
 
 def create_block(hashprev, coinbase, ntime=None, *, version=1):

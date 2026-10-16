@@ -18,7 +18,6 @@ ser_*, deser_*: functions that handle serialization/deserialization.
 Classes use __slots__ to ensure extraneous attributes aren't accidentally added
 by tests, compromising their intended effect.
 """
-from codecs import encode
 import copy
 import hashlib
 from io import BytesIO
@@ -27,6 +26,7 @@ import socket
 import struct
 import time
 
+from test_framework.scrypt_jane import yac_block_hash
 from test_framework.util import hex_str_to_bytes, assert_equal
 
 MIN_VERSION_SUPPORTED = 60001
@@ -457,9 +457,10 @@ class CBlockHeader:
             self.nTime = header.nTime
             self.nBits = header.nBits
             self.nNonce = header.nNonce
+            # Copies the cached hash as it is: hashing costs 10 ms
+            # (scrypt), and many headers are copied but never hashed.
             self.sha256 = header.sha256
             self.hash = header.hash
-            self.calc_sha256()
 
     def set_null(self):
         self.nVersion = BLOCK_VERSION
@@ -498,19 +499,19 @@ class CBlockHeader:
         return r
 
     def calc_sha256(self):
+        """Compute the block hash as the node does (scrypt-jane, see
+        scrypt_jane.py), the hash of getblockhash, inv, getdata and block
+        locators. Cached in self.sha256 (int) and self.hash (hex); about
+        10 ms when not cached. rehash() recomputes it after a change."""
         if self.sha256 is None:
-            r = b""
-            r += struct.pack("<i", self.nVersion)
-            r += ser_uint256(self.hashPrevBlock)
-            r += ser_uint256(self.hashMerkleRoot)
-            if (self.nVersion >= 7):
-                r += struct.pack("<q", self.nTime)
-            else:
-                r += struct.pack("<I", self.nTime)
-            r += struct.pack("<I", self.nBits)
-            r += struct.pack("<I", self.nNonce)
-            self.sha256 = uint256_from_str(hash256(r))
-            self.hash = encode(hash256(r)[::-1], 'hex_codec').decode('ascii')
+            h = yac_block_hash(CBlockHeader.serialize(self))
+            self.sha256 = uint256_from_str(h)
+            self.hash = h[::-1].hex()
+
+    @property
+    def sha256d(self):
+        """SHA-256d of the header (getbestblockhashsha256), as an int."""
+        return uint256_from_str(hash256(CBlockHeader.serialize(self)))
 
     def rehash(self):
         self.sha256 = None
@@ -567,6 +568,8 @@ class CBlock(CBlockHeader):
         return self.get_merkle_root(hashes)
 
     def is_valid(self):
+        """Proof of work, transaction amounts and merkle root.
+        (blocktools.solve_block solves a block.)"""
         self.calc_sha256()
         target = uint256_from_compact(self.nBits)
         if self.sha256 > target:
@@ -577,13 +580,6 @@ class CBlock(CBlockHeader):
         if self.calc_merkle_root() != self.hashMerkleRoot:
             return False
         return True
-
-    def solve(self):
-        self.rehash()
-        target = uint256_from_compact(self.nBits)
-        while self.sha256 > target:
-            self.nNonce += 1
-            self.rehash()
 
     def __repr__(self):
         return "CBlock(nVersion=%i hashPrevBlock=%064x hashMerkleRoot=%064x nTime=%s nBits=%08x nNonce=%08x vtx=%s)" \

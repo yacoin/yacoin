@@ -371,9 +371,15 @@ class P2PInterface(P2PConnection):
         wait_until(test_function, timeout=timeout, lock=mininode_lock)
 
     def wait_for_block(self, blockhash, timeout=60):
+        """Wait until the last block received has blockhash (an int)."""
         def test_function():
             assert self.is_connected
-            return self.last_message.get("block") and self.last_message["block"].block.rehash() == blockhash
+            if not self.last_message.get("block"):
+                return False
+            # calc_sha256 caches: the block hash costs 10 ms, the poll runs often.
+            block = self.last_message["block"].block
+            block.calc_sha256()
+            return block.sha256 == blockhash
 
         wait_until(test_function, timeout=timeout, lock=mininode_lock)
 
@@ -383,7 +389,9 @@ class P2PInterface(P2PConnection):
             last_headers = self.last_message.get('headers')
             if not last_headers:
                 return False
-            return last_headers.headers[0].rehash() == blockhash
+            header = last_headers.headers[0]
+            header.calc_sha256()
+            return header.sha256 == blockhash
 
         wait_until(test_function, timeout=timeout, lock=mininode_lock)
 
@@ -513,7 +521,8 @@ class NetworkThread(threading.Thread):
 class P2PDataStore(P2PInterface):
     """A P2P data store class.
 
-    Keeps a block and transaction store and responds correctly to getdata and getheaders requests."""
+    Keeps a block and transaction store and responds correctly to getdata and getheaders requests.
+    Blocks are keyed by their block hash (CBlockHeader.sha256, the scrypt hash the node uses)."""
 
     def __init__(self):
         super().__init__()
@@ -581,6 +590,7 @@ class P2PDataStore(P2PInterface):
 
         with mininode_lock:
             for block in blocks:
+                block.calc_sha256()
                 self.block_store[block.sha256] = block
                 self.last_block_hash = block.sha256
 
@@ -614,6 +624,7 @@ class P2PDataStore(P2PInterface):
 
         with mininode_lock:
             for tx in txs:
+                tx.calc_sha256()
                 self.tx_store[tx.sha256] = tx
 
         reject_reason = [reject_reason] if reject_reason else []
