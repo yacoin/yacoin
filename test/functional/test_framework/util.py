@@ -415,15 +415,25 @@ def disconnect_nodes(from_connection, node_num):
     # wait to disconnect
     wait_until(lambda: [peer['id'] for peer in from_connection.getpeerinfo() if peer.get('subver') and "testnode%d" % node_num in peer.get('subver')] == [], timeout=5)
 
+def peers(node):
+    """Return getpeerinfo() without the trailing {"size: ": n} element YACoin appends."""
+    return [peer for peer in node.getpeerinfo() if 'id' in peer]
+
 def connect_nodes(from_connection, node_num):
     ip_port = "127.0.0.1:" + str(p2p_port(node_num))
     from_connection.addnode(ip_port, "onetry")
-    time.sleep(10)
-    # poll until version handshake complete to avoid race conditions
-    # with transaction relaying
-    wait_until(lambda:  all(peer['version'] != 0 for peer in from_connection.getpeerinfo()[:-1]))
+    # Wait until both sides have finished the version handshake, so that
+    # transactions created next are relayed. A node sends its first ping only
+    # after it got the peer's verack, and its own verack went out before that
+    # on the same connection; the peer answers the ping only after processing
+    # that verack. So a pong on our outbound connection means both sides are
+    # done.
+    def handshake_done():
+        return any(peer['addr'] == ip_port and not peer['inbound'] and peer['version'] != 0
+                   and 'pong' in peer['bytesrecv_per_msg'] for peer in peers(from_connection))
+    wait_until(handshake_done)
 
-def sync_blocks(rpc_connections, *, wait=1, timeout=60):
+def sync_blocks(rpc_connections, *, wait=0.1, timeout=60):
     """
     Wait until everybody has the same tip.
 
@@ -436,17 +446,19 @@ def sync_blocks(rpc_connections, *, wait=1, timeout=60):
         best_hash = [x.getbestblockhash() for x in rpc_connections]
         if best_hash.count(best_hash[0]) == len(rpc_connections):
             return
-        # Check that each peer has at least one connection
-        assert (all([len(x.getpeerinfo()) for x in rpc_connections]))
         time.sleep(wait)
-    raise AssertionError("Block sync timed out:{}".format("".join("\n  {!r}".format(b) for b in best_hash)))
+    # A node without peers is the usual cause; say so in the message.
+    peer_counts = [len(peers(x)) for x in rpc_connections]
+    raise AssertionError("Block sync timed out (peer count of each node: {}):{}".format(
+        peer_counts, "".join("\n  {!r}".format(b) for b in best_hash)))
 
-def sync_mempools(rpc_connections, *, wait=1, timeout=60):
+def sync_mempools(rpc_connections, *, wait=0.1, timeout=60):
     """
     Wait until everybody has the same transactions in their memory
     pools
     """
-    while timeout > 0:
+    stop_time = time.time() + timeout
+    while time.time() <= stop_time:
         pool = set(rpc_connections[0].getrawmempool())
         num_match = 1
         for i in range(1, len(rpc_connections)):
@@ -455,7 +467,6 @@ def sync_mempools(rpc_connections, *, wait=1, timeout=60):
         if num_match == len(rpc_connections):
             return
         time.sleep(wait)
-        timeout -= wait
     raise AssertionError("Mempool sync failed")
 
 # Transaction/Block functions

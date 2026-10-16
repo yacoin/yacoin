@@ -7,12 +7,19 @@
 Later tests rely on these helpers, so check them against a real node:
 - node exit codes and the signal helpers (TestNode.wait_until_stopped,
   send_signal, wait_for_exit).
+- connect_nodes returns only when both sides finished the handshake, and
+  peers() drops YACoin's extra getpeerinfo element.
 """
 
 import signal
 
 from test_framework.test_framework import BitcoinTestFramework
-from test_framework.util import assert_equal
+from test_framework.util import (
+    assert_equal,
+    connect_nodes,
+    p2p_port,
+    peers,
+)
 
 
 class FrameworkTest(BitcoinTestFramework):
@@ -26,6 +33,7 @@ class FrameworkTest(BitcoinTestFramework):
 
     def run_test(self):
         self.test_exit_codes()
+        self.test_connect_nodes()
 
     def test_exit_codes(self):
         node = self.nodes[1]
@@ -53,6 +61,25 @@ class FrameworkTest(BitcoinTestFramework):
         assert not node.running
         self.start_node(1)
         assert_equal(node.getblockcount(), 0)
+
+    def test_connect_nodes(self):
+        self.log.info("peers() drops the extra getpeerinfo element")
+        assert_equal(len(self.nodes[0].getpeerinfo()), 1)
+        assert_equal(peers(self.nodes[0]), [])
+
+        self.log.info("connect_nodes returns when both sides finished the handshake")
+        connect_nodes(self.nodes[0], 1)
+        # No waiting here: both sides must already agree.
+        outbound = peers(self.nodes[0])
+        inbound = peers(self.nodes[1])
+        assert_equal(len(outbound), 1)
+        assert_equal(len(inbound), 1)
+        assert_equal(outbound[0]['addr'], "127.0.0.1:%d" % p2p_port(1))
+        assert not outbound[0]['inbound']
+        assert inbound[0]['inbound']
+        assert outbound[0]['version'] != 0 and inbound[0]['version'] != 0
+        assert 'verack' in inbound[0]['bytesrecv_per_msg']
+        assert 'pong' in outbound[0]['bytesrecv_per_msg']
 
 
 if __name__ == '__main__':

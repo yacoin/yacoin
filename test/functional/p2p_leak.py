@@ -15,7 +15,7 @@ import time
 from test_framework.messages import msg_getaddr, msg_ping, msg_verack
 from test_framework.mininode import mininode_lock, P2PInterface
 from test_framework.test_framework import BitcoinTestFramework
-from test_framework.util import wait_until
+from test_framework.util import peers, wait_until
 
 banscore = 10
 
@@ -120,7 +120,7 @@ class P2PLeakTest(BitcoinTestFramework):
         self.nodes[0].disconnect_p2ps()
 
         # Wait until all connections are closed
-        wait_until(lambda: len(self.nodes[0].getpeerinfo()) - 1 == 0)
+        wait_until(lambda: len(peers(self.nodes[0])) == 0)
 
         # Make sure no unexpected messages came in
         assert no_version_bannode.unexpected_msg == False
