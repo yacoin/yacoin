@@ -80,6 +80,7 @@ BASE_SCRIPTS = [
     'feature_signals.py',  # 10
     'mempool_reorg.py',  # 5-18
     'wallet_encryption.py',  # 8
+    'feature_abortnode.py',  # 8
     'feature_verifydb.py',  # 6
     'feature_loadblock.py',  # 6
     'feature_shutdown.py',  # 6
