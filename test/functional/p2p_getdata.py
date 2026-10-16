@@ -14,17 +14,19 @@ from test_framework.mininode import (
     P2PInterface,
 )
 from test_framework.test_framework import BitcoinTestFramework
-from test_framework.util import wait_until
+from test_framework.util import assert_equal, wait_until
 
 class P2PStoreBlock(P2PInterface):
 
     def __init__(self):
         super().__init__()
         self.blocks = defaultdict(int)
+        self.last_sha256d = None
 
     def on_block(self, message):
         message.block.calc_sha256()
         self.blocks[message.block.sha256] += 1
+        self.last_sha256d = message.block.sha256d
 
 class GetdataTest(BitcoinTestFramework):
     def set_test_params(self):
@@ -42,11 +44,11 @@ class GetdataTest(BitcoinTestFramework):
 
         # Check getdata still works by fetching tip block
         best_block = int(self.nodes[0].getbestblockhash(), 16)
-        best_block_sha256 = int(self.nodes[0].getbestblockhashsha256(), 16)
         good_getdata = msg_getdata()
         good_getdata.inv.append(CInv(t=2, h=best_block))
         self.nodes[0].p2ps[0].send_and_ping(good_getdata)
-        wait_until(lambda: self.nodes[0].p2ps[0].blocks[best_block_sha256] == 1, timeout=30, lock=mininode_lock)
+        wait_until(lambda: self.nodes[0].p2ps[0].blocks[best_block] == 1, timeout=30, lock=mininode_lock)
+        assert_equal(self.nodes[0].p2ps[0].last_sha256d, int(self.nodes[0].getbestblockhashsha256(), 16))
 
 if __name__ == '__main__':
     GetdataTest().main()
