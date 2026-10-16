@@ -19,9 +19,15 @@ import time
 import urllib.parse
 import collections
 import shlex
+import signal
 import sys
+try:
+    import resource
+except ImportError:  # not POSIX
+    resource = None
 
 from .authproxy import JSONRPCException
+from .mininode import P2PInterface
 from .util import (
     MAX_NODES,
     append_config,
@@ -34,6 +40,16 @@ from .util import (
 )
 
 BITCOIND_PROC_WAIT_TIMEOUT = 60
+
+
+def describe_exit_code(return_code):
+    """Format a Popen return code, naming the signal for negative codes."""
+    if return_code < 0:
+        try:
+            return "{} ({})".format(return_code, signal.Signals(-return_code).name)
+        except ValueError:
+            pass
+    return str(return_code)
 
 
 class FailedToStartError(Exception):
@@ -88,7 +104,6 @@ class TestNode():
         # Configuration for logging is set as command-line args rather than in the bitcoin.conf file.
         # This means that starting a bitcoind using the temp dir to debug a failed test won't
         # spam debug.log.
-        print("Block fork "+str(block_fork_1_0))
         self.args = [
             self.binary,
             "-datadir=" + self.datadir,
@@ -127,6 +142,9 @@ class TestNode():
         self.perf_subprocesses = {}
 
         self.p2ps = []
+        # The test's mocktime (BitcoinTestFramework.set_mocktime). Set here so
+        # that reading it doesn't go to __getattr__ and the RPC.
+        self.mocktime = None
 
     AddressKeyPair = collections.namedtuple('AddressKeyPair', ['address', 'key'])
     PRIV_KEYS = [
@@ -177,8 +195,11 @@ class TestNode():
             assert self.rpc_connected and self.rpc is not None, self._node_msg("Error: no RPC connection")
             return getattr(self.rpc, name)
 
-    def start(self, extra_args=None, *, cwd=None, stdout=None, stderr=None, **kwargs):
-        """Start the node."""
+    def start(self, extra_args=None, *, cwd=None, stdout=None, stderr=None, no_core_dump=False, **kwargs):
+        """Start the node.
+
+        no_core_dump: start it with RLIMIT_CORE 0, for a start where the test
+        expects the node to crash (no-op where the resource module is missing)."""
         if extra_args is None:
             extra_args = self.extra_args
 
@@ -201,7 +222,13 @@ class TestNode():
         # add environment variable LIBC_FATAL_STDERR_=1 so that libc errors are written to stderr and not the terminal
         subp_env = dict(os.environ, LIBC_FATAL_STDERR_="1")
 
-        self.process = subprocess.Popen(self.args + extra_args, env=subp_env, stdout=stdout, stderr=stderr, cwd=cwd, **kwargs)
+        args = self.args + extra_args
+        if self.mocktime is not None and not any(arg.startswith("-mocktime=") for arg in args):
+            # A restarted node keeps the test's clock.
+            args.append("-mocktime=%d" % self.mocktime)
+        if no_core_dump and resource is not None:
+            kwargs['preexec_fn'] = lambda: resource.setrlimit(resource.RLIMIT_CORE, (0, 0))
+        self.process = subprocess.Popen(args, env=subp_env, stdout=stdout, stderr=stderr, cwd=cwd, **kwargs)
 
         self.running = True
         self.log.debug("bitcoind started, waiting for RPC to come up")
@@ -228,6 +255,11 @@ class TestNode():
                 self.rpc_connected = True
                 self.url = self.rpc.url
                 return
+            except ConnectionResetError:
+                # This might happen when the RPC server is in warmup, but shut down before the call to getblockcount
+                # succeeds. Try again to properly raise the FailedToStartError. (Before IOError, which it is a
+                # subclass of.)
+                pass
             except IOError as e:
                 if e.errno != errno.ECONNREFUSED:  # Port not yet open?
                     raise  # unknown IO error
@@ -236,10 +268,6 @@ class TestNode():
                 # -342 Service unavailable, RPC server started but is shutting down due to error
                 if e.error['code'] != -28 and e.error['code'] != -342:
                     raise  # unknown JSON RPC exception
-            except ConnectionResetError:
-                # This might happen when the RPC server is in warmup, but shut down before the call to getblockcount
-                # succeeds. Try again to properly raise the FailedToStartError
-                pass
             except ValueError as e:  # cookie file not found and no rpcuser or rpcassword. bitcoind still starting
                 if "No RPC credentials" not in str(e):
                     raise
@@ -267,7 +295,10 @@ class TestNode():
             # Do not use wait argument when testing older nodes, e.g. in feature_backwards_compatibility.py
             if self.version is None or self.version >= 180000:
                 self.stop(wait=wait)
-                self.close()
+                # Close the RPC connection. With --usecli there is none, and
+                # self.close() would be sent to yacoin-cli as a command.
+                if self.rpc is not None:
+                    self.rpc.close()
             else:
                 self.stop()
         except http.client.CannotSendRequest:
@@ -288,30 +319,58 @@ class TestNode():
 
         del self.p2ps[:]
 
-    def is_node_stopped(self):
+    def _mark_stopped(self):
+        """Reset the state of a node whose process has exited."""
+        self.running = False
+        self.process = None
+        self.rpc_connected = False
+        self.rpc = None
+        # The mininode connections died with the process.
+        del self.p2ps[:]
+        # read_stderr() reopens the file by name.
+        self.stdout.close()
+        self.stderr.close()
+        self.log.debug("Node stopped")
+
+    def is_node_stopped(self, *, expected_ret_code=0):
         """Checks whether the node has stopped.
 
-        Returns True if the node has stopped. False otherwise.
+        Returns True if the node has stopped. False otherwise. Raises an
+        AssertionError if the node exited with a code other than
+        expected_ret_code (the node is marked stopped first, so it can be
+        restarted).
         This method is responsible for freeing resources (self.process)."""
         if not self.running:
             return True
         return_code = self.process.poll()
         if return_code is None:
             return False
-
-        # process has stopped. Assert that it didn't return an error code.
-        # assert return_code == 0, self._node_msg("Node returned non-zero exit code (%d) when stopping" % return_code) # TODO put this back in
-        if return_code != 0:
-            print("WARNING: Node returned non-zero exit code (%d) when stopping" % return_code)
-        self.running = False
-        self.process = None
-        self.rpc_connected = False
-        self.rpc = None
-        self.log.debug("Node stopped")
+        self._mark_stopped()
+        if return_code != expected_ret_code:
+            self._raise_assertion_error("Node returned exit code {}, expected {}, when stopping; stderr: {}".format(
+                describe_exit_code(return_code), expected_ret_code, self.stderr.name))
         return True
 
-    def wait_until_stopped(self, timeout=BITCOIND_PROC_WAIT_TIMEOUT):
-        wait_until(self.is_node_stopped, timeout=timeout)
+    def wait_until_stopped(self, timeout=BITCOIND_PROC_WAIT_TIMEOUT, *, expected_ret_code=0):
+        wait_until(lambda: self.is_node_stopped(expected_ret_code=expected_ret_code), timeout=timeout)
+
+    def send_signal(self, sig):
+        """Send a signal (e.g. signal.SIGTERM) to the node process."""
+        self.process.send_signal(sig)
+
+    def wait_for_exit(self, timeout=BITCOIND_PROC_WAIT_TIMEOUT):
+        """Wait for the node process to exit and return its exit code.
+
+        The code is not checked here (negative means killed by that signal).
+        The node is marked stopped, so it can be started again."""
+        return_code = self.process.wait(timeout)
+        self._mark_stopped()
+        return return_code
+
+    def read_stderr(self):
+        """Return what the node wrote to stderr since it was last started."""
+        with open(self.stderr.name, 'rb') as f:
+            return f.read().decode('utf-8')
 
     @contextlib.contextmanager
     def assert_debug_log(self, expected_msgs, unexpected_msgs=None, timeout=2):
@@ -474,6 +533,9 @@ class TestNode():
             kwargs['dstport'] = p2p_port(self.index)
         if 'dstaddr' not in kwargs:
             kwargs['dstaddr'] = '127.0.0.1'
+        if isinstance(p2p_conn, P2PInterface) and kwargs.get('send_version', True) and 'starting_height' not in kwargs:
+            # Announce the node's own height, like a real peer.
+            kwargs['starting_height'] = self.getblockcount()
 
         p2p_conn.peer_connect(**kwargs, net=self.chain)()
         self.p2ps.append(p2p_conn)
