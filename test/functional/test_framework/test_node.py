@@ -23,6 +23,7 @@ import signal
 import sys
 
 from .authproxy import JSONRPCException
+from .mininode import P2PInterface
 from .util import (
     MAX_NODES,
     append_config,
@@ -515,6 +516,9 @@ class TestNode():
             kwargs['dstport'] = p2p_port(self.index)
         if 'dstaddr' not in kwargs:
             kwargs['dstaddr'] = '127.0.0.1'
+        if isinstance(p2p_conn, P2PInterface) and kwargs.get('send_version', True) and 'starting_height' not in kwargs:
+            # Announce the node's own height, like a real peer.
+            kwargs['starting_height'] = self.getblockcount()
 
         p2p_conn.peer_connect(**kwargs, net=self.chain)()
         self.p2ps.append(p2p_conn)

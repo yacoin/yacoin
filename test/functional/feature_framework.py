@@ -11,12 +11,15 @@ Later tests rely on these helpers, so check them against a real node:
   peers() drops YACoin's extra getpeerinfo element.
 - CTransaction computes the node's txids (scriptSigs ignored from version 2
   on, except for coinbases) and CBlock the merkle root.
+- mininode connections announce the node's height and can use another
+  loopback source address.
 """
 
 from decimal import Decimal
 import signal
 
 from test_framework.messages import COIN, CBlock, CTransaction, FromHex, TX_VERSION
+from test_framework.mininode import P2PInterface
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import (
     assert_equal,
@@ -39,6 +42,7 @@ class FrameworkTest(BitcoinTestFramework):
         self.test_exit_codes()
         self.test_connect_nodes()
         self.test_txid()
+        self.test_mininode_options()
 
     def test_exit_codes(self):
         node = self.nodes[1]
@@ -132,6 +136,19 @@ class FrameworkTest(BitcoinTestFramework):
         signed = node.signrawtransaction(unsigned)['hex']
         assert_equal(FromHex(CTransaction(), unsigned).rehash(), FromHex(CTransaction(), signed).rehash())
         assert_equal(FromHex(CTransaction(), signed).rehash(), node.decoderawtransaction(signed)['txid'])
+
+    def test_mininode_options(self):
+        node = self.nodes[0]
+        self.log.info("A mininode announces the node's height")
+        node.add_p2p_connection(P2PInterface())
+        info = peers(node)[-1]
+        assert_equal(info['subver'], "/python-mininode-tester:0.0.3/")
+        assert_equal(info['startingheight'], node.getblockcount())
+
+        self.log.info("local_addr gives a mininode its own source address")
+        node.add_p2p_connection(P2PInterface(), local_addr=("127.0.0.2", 0))
+        assert peers(node)[-1]['addr'].startswith("127.0.0.2:")
+        node.disconnect_p2ps()
 
 
 if __name__ == '__main__':
