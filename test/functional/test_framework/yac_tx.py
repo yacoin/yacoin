@@ -49,6 +49,7 @@ from .script import (
     OP_EQUALVERIFY,
     OP_HASH160,
     OP_NOP4,
+    OP_TRUE,
     SIGHASH_ALL,
     hash160,
 )
@@ -89,6 +90,16 @@ def cltv_p2sh_redeem_script(locktime, pubkey):
 def csv_p2sh_redeem_script(sequence, pubkey):
     """The wallet's CSV redeem script (createcsvaddress, GetScriptForCsvP2SH)."""
     return CScript([CScriptNum(sequence), OP_CHECKSEQUENCEVERIFY, OP_DROP, pubkey, OP_CHECKSIG])
+
+
+# Anyone-can-spend P2SH outputs: spending one needs no signature, so the size
+# of a spend is fixed (one P2SH_TRUE input to one P2SH_TRUE output is 93
+# bytes). Both sides are standard: P2SH_TRUE_SCRIPT is P2SH, and a redeem
+# script that is no template is standard with up to 21 sigops
+# (AreInputsStandard).
+TRUE_REDEEM_SCRIPT = CScript([OP_TRUE])
+P2SH_TRUE_SCRIPT = p2sh_script(TRUE_REDEEM_SCRIPT)
+P2SH_TRUE_SCRIPT_SIG = CScript([bytes(TRUE_REDEEM_SCRIPT)])
 
 
 def sign_input(tx, i, key, script_code, hashtype=SIGHASH_ALL):
