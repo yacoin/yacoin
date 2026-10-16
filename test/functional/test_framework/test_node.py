@@ -138,6 +138,9 @@ class TestNode():
         self.perf_subprocesses = {}
 
         self.p2ps = []
+        # The test's mocktime (BitcoinTestFramework.set_mocktime). Set here so
+        # that reading it doesn't go to __getattr__ and the RPC.
+        self.mocktime = None
 
     AddressKeyPair = collections.namedtuple('AddressKeyPair', ['address', 'key'])
     PRIV_KEYS = [
@@ -212,7 +215,11 @@ class TestNode():
         # add environment variable LIBC_FATAL_STDERR_=1 so that libc errors are written to stderr and not the terminal
         subp_env = dict(os.environ, LIBC_FATAL_STDERR_="1")
 
-        self.process = subprocess.Popen(self.args + extra_args, env=subp_env, stdout=stdout, stderr=stderr, cwd=cwd, **kwargs)
+        args = self.args + extra_args
+        if self.mocktime is not None and not any(arg.startswith("-mocktime=") for arg in args):
+            # A restarted node keeps the test's clock.
+            args.append("-mocktime=%d" % self.mocktime)
+        self.process = subprocess.Popen(args, env=subp_env, stdout=stdout, stderr=stderr, cwd=cwd, **kwargs)
 
         self.running = True
         self.log.debug("bitcoind started, waiting for RPC to come up")

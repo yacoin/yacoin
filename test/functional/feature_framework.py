@@ -13,6 +13,9 @@ Later tests rely on these helpers, so check them against a real node:
   on, except for coinbases) and CBlock the merkle root.
 - mininode connections announce the node's height and can use another
   loopback source address.
+- set_mocktime / mine_with_mocktime keep one forward-only clock on all
+  nodes, also across restarts.
+- raw_rpc, rpcauth_value, the wallet fee rule and single_utxo_wallet.
 """
 
 from decimal import Decimal
@@ -23,10 +26,15 @@ from test_framework.mininode import P2PInterface
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import (
     assert_equal,
+    assert_raises,
     connect_nodes,
+    non_loopback_ipv4,
     p2p_port,
     peers,
+    raw_rpc,
+    rpcauth_value,
 )
+from test_framework.wallet_util import assert_yac_fee, expected_fee
 
 
 class FrameworkTest(BitcoinTestFramework):
@@ -43,6 +51,9 @@ class FrameworkTest(BitcoinTestFramework):
         self.test_connect_nodes()
         self.test_txid()
         self.test_mininode_options()
+        self.test_mocktime()
+        self.test_raw_rpc()
+        self.test_wallet_helpers()
 
     def test_exit_codes(self):
         node = self.nodes[1]
@@ -113,9 +124,11 @@ class FrameworkTest(BitcoinTestFramework):
         # COIN matches the node's unit.
         for n, txout in enumerate(node.getrawtransaction(one_input.hash, 1)['vout']):
             assert_equal(Decimal(one_input.vout[n].nValue) / COIN, txout['value'])
+        self.fee_txids = [one_input.hash]
         many_inputs = self.check_txid(node.sendtoaddress(address=node.getnewaddress(), amount=node.getbalance() - 1))
         assert len(many_inputs.vin) > 1
         assert not many_inputs.is_coinbase()
+        self.fee_txids.append(many_inputs.hash)
 
         self.log.info("Merkle root of a block with these transactions")
         block_hash = node.generate(1)[0]
@@ -149,6 +162,62 @@ class FrameworkTest(BitcoinTestFramework):
         node.add_p2p_connection(P2PInterface(), local_addr=("127.0.0.2", 0))
         assert peers(node)[-1]['addr'].startswith("127.0.0.2:")
         node.disconnect_p2ps()
+
+    def test_mocktime(self):
+        node = self.nodes[0]
+        self.log.info("mine_with_mocktime spaces blocks by the given time")
+        height = node.getblockcount()
+        hashes = self.mine_with_mocktime(node, 3, spacing=90)
+        assert_equal(node.getblockcount(), height + 3)
+        times = [node.getblockheader(h)['time'] for h in hashes]
+        assert_equal([times[1] - times[0], times[2] - times[1]], [90, 90])
+        assert_equal(times[2], self.mocktime)
+        assert_equal(self.nodes[1].getbestblockhash(), hashes[-1])
+
+        self.log.info("set_mocktime refuses to move the clock back")
+        assert_raises(AssertionError, self.set_mocktime, self.mocktime - 1)
+
+        self.log.info("A node stopped while the clock moves comes back with the current mocktime")
+        self.stop_node(1)
+        self.mine_with_mocktime(node, 2)
+        self.start_node(1)
+        connect_nodes(self.nodes[1], 0)
+        self.sync_blocks()
+        block = self.nodes[1].getblockheader(self.nodes[1].generate(1)[0])
+        assert_equal(block['time'], self.mocktime)
+        self.sync_blocks()
+
+    def test_raw_rpc(self):
+        node = self.nodes[0]
+        self.log.info("raw_rpc returns status and body as sent by the node")
+        status, headers, body = raw_rpc(node, {"method": "getblockcount", "params": [], "id": 1})
+        assert_equal(status, 200)
+        assert_equal(headers['Content-Type'], 'application/json')
+        assert body.startswith(b'{"result":%d,' % node.getblockcount())
+        assert_equal(raw_rpc(node, {"method": "getblockcount"}, auth=False)[0], 401)
+
+        self.log.info("rpcauth_value gives a working -rpcauth entry")
+        self.restart_node(1, extra_args=["-rpcauth=" + rpcauth_value("alice", "secret")])
+        connect_nodes(self.nodes[1], 0)
+        assert_equal(raw_rpc(self.nodes[1], {"method": "getblockcount"}, auth=("alice", "secret"))[0], 200)
+        assert_equal(raw_rpc(self.nodes[1], {"method": "getblockcount"}, auth=("alice", "wrong"))[0], 401)
+
+        address = non_loopback_ipv4()
+        self.log.info("non_loopback_ipv4: %s", address)
+        assert address is None or not address.startswith("127.")
+
+    def test_wallet_helpers(self):
+        self.log.info("expected_fee matches the wallet's fees, for a small and a large transaction")
+        for txid in self.fee_txids:
+            assert_yac_fee(self.nodes[0], txid)
+        assert_equal(-self.nodes[0].gettransaction(self.fee_txids[0])['fee'], Decimal('0.01'))
+        large_size = len(self.nodes[0].getrawtransaction(self.fee_txids[1])) // 2
+        assert large_size > 1000
+        assert expected_fee(large_size) > Decimal('0.01')
+
+        self.log.info("single_utxo_wallet leaves exactly one UTXO")
+        utxo = self.single_utxo_wallet(self.nodes[0], self.nodes[1], Decimal('2.5'))
+        assert_equal(utxo['confirmations'], 1)
 
 
 if __name__ == '__main__':

@@ -19,6 +19,7 @@ import time
 
 from .authproxy import JSONRPCException
 from . import coverage
+from .blocktools import TIME_GENESIS_BLOCK
 from .test_node import TestNode
 from .mininode import NetworkThread
 from .util import (
@@ -100,6 +101,8 @@ class BitcoinTestFramework(metaclass=BitcoinTestMetaClass):
         self.supports_cli = True
         self.bind_to_localhost_only = True
         self.block_fork_1_0=0
+        # Set by set_mocktime() and mine_with_mocktime(); see there.
+        self.mocktime = None
         self.set_test_params()
         self.parse_args()        
 
@@ -505,6 +508,64 @@ class BitcoinTestFramework(metaclass=BitcoinTestMetaClass):
         """
         connect_nodes(self.nodes[1], 2)
         self.sync_all()
+
+    def set_mocktime(self, t):
+        """Set the mocktime of all nodes to t; it may only move forward.
+
+        Running nodes get it through setmocktime. Every node, running or not,
+        remembers it, and TestNode.start passes it as -mocktime, so a node
+        (re)started later gets the same clock as the others."""
+        t = int(t)
+        if self.mocktime is not None and t < self.mocktime:
+            raise AssertionError("mocktime must only move forward: {} < {}".format(t, self.mocktime))
+        self.mocktime = t
+        for node in self.nodes:
+            node.mocktime = t
+            if node.running:
+                node.setmocktime(t)
+
+    def mine_with_mocktime(self, node, n, *, spacing=60, sync=True):
+        """Mine n blocks on node, one at a time, moving the mocktime of all
+        nodes forward by spacing seconds before each block.
+
+        Starts from the tip's time if no mocktime was set yet. sync: True
+        syncs all running nodes afterwards, a list syncs those nodes, False
+        doesn't sync. Returns the block hashes.
+
+        (Many older scripts define their own mine_blocks(nodeId, n); this is
+        the shared version for new tests.)"""
+        if self.mocktime is None:
+            tip_time = node.getblockheader(node.getbestblockhash())['time']
+            self.set_mocktime(max(tip_time, TIME_GENESIS_BLOCK))
+        hashes = []
+        for _ in range(n):
+            self.set_mocktime(self.mocktime + spacing)
+            hashes += node.generate(1)
+        if sync is True:
+            self.sync_all([x for x in self.nodes if x.running])
+        elif sync:
+            self.sync_all(sync)
+        return hashes
+
+    def single_utxo_wallet(self, funder, node, amount):
+        """Give node's wallet exactly one confirmed UTXO of amount, and return it.
+
+        node's wallet must be empty (on the cached chain nodes 0-3 already
+        hold coinbases). funder sends the coins and mines the block (with
+        mine_with_mocktime if the test uses mocktime); all running nodes are
+        synced."""
+        assert_equal(node.listunspent(0), [])
+        address = node.getnewaddress()
+        txid = funder.sendtoaddress(address=address, amount=amount)
+        if self.mocktime is not None:
+            self.mine_with_mocktime(funder, 1)
+        else:
+            funder.generate(1)
+            self.sync_all([x for x in self.nodes if x.running])
+        utxos = node.listunspent()
+        assert_equal(len(utxos), 1)
+        assert_equal((utxos[0]['txid'], utxos[0]['address'], utxos[0]['amount']), (txid, address, amount))
+        return utxos[0]
 
     def sync_blocks(self, nodes=None, **kwargs):
         sync_blocks(nodes or self.nodes, **kwargs)
