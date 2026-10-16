@@ -150,6 +150,22 @@ def try_rpc(code, message, fun, *args, **kwds):
     else:
         return False
 
+def read_block_file(path, magic, checksum_size=0):
+    """Read a blk*.dat or rev*.dat file.
+
+    Returns its content and the (offset, size) of each record: the network
+    magic, a 4-byte little-endian size, size bytes of data, then
+    checksum_size bytes (32 in rev*.dat). Stops at the zero padding."""
+    with open(path, 'rb') as f:
+        data = f.read()
+    records = []
+    pos = 0
+    while pos + 8 <= len(data) and data[pos:pos + 4] == magic:
+        size = int.from_bytes(data[pos + 4:pos + 8], 'little')
+        records.append((pos, size))
+        pos += 8 + size + checksum_size
+    return data, records
+
 def known_failure(log, bug, check, expected):
     """Run an assertion that a known bug breaks today.
 
