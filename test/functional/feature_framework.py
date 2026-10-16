@@ -20,8 +20,10 @@ Later tests rely on these helpers, so check them against a real node:
 """
 
 from decimal import Decimal
+import re
 import signal
 
+from test_framework.authproxy import JSONRPCException
 from test_framework.messages import COIN, CBlock, CTransaction, FromHex, TX_VERSION
 from test_framework.mininode import P2PInterface
 from test_framework.test_framework import BitcoinTestFramework
@@ -222,17 +224,43 @@ class FrameworkTest(BitcoinTestFramework):
         assert_equal(utxo['confirmations'], 1)
 
     def test_known_failure(self):
-        self.log.info("known_failure passes while the check fails (assertion or RPC error)")
-        self.known_failure("example bug", lambda: assert_equal(1, 2))
-        self.known_failure("example bug", lambda: self.nodes[0].getblockhash(100000))
+        node = self.nodes[0]
+        out_of_range = lambda: node.getblockhash(100000)
+
+        self.log.info("known_failure passes while the check fails with the expected symptom")
+        self.known_failure("example bug", lambda: assert_equal(1, 2), "not(1 == 2)")
+        self.known_failure("example bug", lambda: assert_equal(1, 2), re.compile(r"not\(1 == \d\)"))
+        self.known_failure("example bug", out_of_range, "Block height out of range")
+        self.known_failure("example bug", out_of_range, -8)
 
         self.log.info("known_failure fails once the check passes")
         try:
-            self.known_failure("example bug", lambda: assert_equal(1, 1))
+            self.known_failure("example bug", lambda: assert_equal(1, 1), "not(1 == 2)")
         except AssertionError as e:
             assert_equal(str(e), "example bug no longer fails; remove the known-failure marker")
         else:
             raise AssertionError("known_failure did not fail on a passing check")
+
+        self.log.info("known_failure raises an unexpected failure unchanged")
+        try:
+            self.known_failure("example bug", lambda: assert_equal(1, 2), "not(1 == 3)")
+        except AssertionError as e:
+            assert_equal(str(e), "not(1 == 2)")
+        else:
+            raise AssertionError("known_failure accepted the wrong assertion")
+        for expected in ("Method not found", -5):
+            try:
+                self.known_failure("example bug", out_of_range, expected)
+            except JSONRPCException as e:
+                assert_equal(e.error['code'], -8)
+            else:
+                raise AssertionError("known_failure accepted the wrong RPC error")
+        try:
+            self.known_failure("example bug", lambda: assert_equal(1, 2), -8)
+        except AssertionError as e:
+            assert_equal(str(e), "not(1 == 2)")
+        else:
+            raise AssertionError("known_failure matched an error code against an assertion")
 
 
 if __name__ == '__main__':

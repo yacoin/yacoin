@@ -150,17 +150,33 @@ def try_rpc(code, message, fun, *args, **kwds):
     else:
         return False
 
-def known_failure(log, bug, check):
+def known_failure(log, bug, check, expected):
     """Run an assertion that a known bug breaks today.
 
-    Passes (and logs) while the bug is present, i.e. while check() raises an
-    AssertionError or a JSONRPCException (some bugs show up as an RPC error);
-    raises as soon as the check passes, so the marker is removed together
-    with the fix. `bug` names the bug and its Trello card, e.g.
-    "W-B5 (XbGM5oTW)"."""
+    Passes (and logs) while check() fails the way the bug makes it fail, and
+    raises as soon as the check passes, so the marker is removed together with
+    the fix. `bug` names the bug and its Trello card, e.g. "W-B5 (XbGM5oTW)".
+
+    `expected` is the bug's symptom and is required, so that an unrelated
+    failure (a typo in an RPC name, a stopped node, a timeout) isn't taken for
+    the bug: a substring or a compiled regex that must be found in the
+    AssertionError's text or the JSONRPCException's message, or an int that
+    must equal the JSONRPCException's error code. Any other failure is raised
+    unchanged, after logging that it isn't the expected known failure."""
     try:
         check()
     except (AssertionError, JSONRPCException) as e:
+        rpc_error = isinstance(e, JSONRPCException)
+        text = e.error.get('message', '') if rpc_error else str(e)
+        if isinstance(expected, int):
+            matched = rpc_error and e.error.get('code') == expected
+        elif hasattr(expected, 'search'):
+            matched = expected.search(text) is not None
+        else:
+            matched = expected in text
+        if not matched:
+            log.error("%s: this failure is not the expected known failure (expected %r)" % (bug, getattr(expected, 'pattern', expected)))
+            raise
         log.info("Known failure %s: %s" % (bug, e))
         return
     raise AssertionError("%s no longer fails; remove the known-failure marker" % bug)

@@ -568,9 +568,9 @@ class BitcoinTestFramework(metaclass=BitcoinTestMetaClass):
         assert_equal((utxos[0]['txid'], utxos[0]['address'], utxos[0]['amount']), (txid, address, amount))
         return utxos[0]
 
-    def known_failure(self, bug, check):
+    def known_failure(self, bug, check, expected):
         """util.known_failure with this test's log."""
-        known_failure(self.log, bug, check)
+        known_failure(self.log, bug, check, expected)
 
     def sync_blocks(self, nodes=None, **kwargs):
         sync_blocks(nodes or self.nodes, **kwargs)
