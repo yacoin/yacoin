@@ -16,6 +16,9 @@ real node:
   another parent; assert_block_accepted / assert_block_rejected.
 - blocks_from_node takes blocks from an unconnected donor node; the two
   merkle mutations keep the header and are rejected with their reasons.
+- yac_tx signs P2PKH, P2SH CLTV and P2SH CSV spends the node accepts, builds
+  the wallet's timelock redeem scripts and the node's token scripts, and
+  makes version 1 copies; address.py encodes YACoin addresses.
 """
 
 from test_framework.messages import (
@@ -34,6 +37,7 @@ from test_framework.messages import (
     msg_tx,
     msg_version,
 )
+from test_framework.address import key_to_p2pkh, script_to_p2sh
 from test_framework.blocktools import (
     assert_block_accepted,
     assert_block_rejected,
@@ -47,7 +51,21 @@ from test_framework.blocktools import (
 )
 from test_framework.scrypt_jane import keccak512, scrypt_jane
 from test_framework.mininode import P2PDataStore, P2PInterface, mininode_lock
-from test_framework.script import CScript, OP_CHECKSIG, OP_DUP, OP_EQUALVERIFY, OP_HASH160
+from test_framework.script import CScript, OP_CHECKSIG, OP_DUP, OP_EQUALVERIFY, OP_HASH160, OP_NOP4
+from test_framework.yac_tx import (
+    cltv_p2sh_redeem_script,
+    csv_p2sh_redeem_script,
+    key_from_wif,
+    p2pkh_script,
+    p2sh_script,
+    sign_p2pkh_input,
+    sign_p2sh_input,
+    to_v1,
+    token_issue_script,
+    token_owner_script,
+    token_reissue_script,
+    token_transfer_script,
+)
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.test_node import TestNode
 from test_framework.util import (
@@ -65,6 +83,8 @@ class FrameworkBlocksTest(BitcoinTestFramework):
     def set_test_params(self):
         self.num_nodes = 2
         self.setup_clean_chain = True
+        # Tokens for the token script checks.
+        self.extra_args = [["-tokenSupportBlockNumber=5"], []]
 
     def setup_network(self):
         # Node 1 is a donor that only connects when a check needs it.
@@ -87,6 +107,8 @@ class FrameworkBlocksTest(BitcoinTestFramework):
         self.test_block_hash()
         self.test_build_blocks()
         self.test_donor_blocks()
+        self.test_signing()
+        self.test_token_scripts()
 
     def test_block_serialization(self):
         node = self.nodes[0]
@@ -292,6 +314,109 @@ class FrameworkBlocksTest(BitcoinTestFramework):
         hashes = self.mine_with_mocktime(donor, 3, sync=False)
         self.store.send_blocks_and_test(blocks_from_node(donor, hashes), node)
         assert_equal(node.getbestblockhash(), hashes[-1])
+
+    def unspent_coinbases(self, count):
+        """(txid, value) of mature, unspent coinbases paying PRIV_KEYS[0]."""
+        node = self.nodes[0]
+        script = p2pkh_script(self.key.get_pubkey().get_bytes()).hex()
+        found = []
+        for height in range(1, node.getblockcount() - 6):
+            txid = node.getblock(node.getblockhash(height))['tx'][0]
+            out = node.gettxout(txid, 0)
+            if out is not None and out['scriptPubKey']['hex'] == script:
+                found.append((txid, int(out['value'] * COIN)))
+        assert len(found) >= count
+        return found[:count]
+
+    def test_signing(self):
+        node = self.nodes[0]
+        self.log.info("key_from_wif and key_to_p2pkh give TestNode.PRIV_KEYS[0] and its address")
+        self.key = key_from_wif(TestNode.PRIV_KEYS[0].key)
+        pubkey = self.key.get_pubkey().get_bytes()
+        assert_equal(key_to_p2pkh(pubkey), TestNode.PRIV_KEYS[0].address)
+        assert_equal(node.validateaddress(TestNode.PRIV_KEYS[0].address)['scriptPubKey'], p2pkh_script(pubkey).hex())
+
+        self.log.info("A P2PKH spend signed in Python (legacy sighash with nTime) is accepted")
+        (spend_txid, spend_value), (fund_txid, fund_value) = self.unspent_coinbases(2)
+        tx = CTransaction()
+        tx.nTime = self.mocktime
+        tx.vin = [CTxIn(COutPoint(int(spend_txid, 16), 0))]
+        tx.vout = [CTxOut(spend_value - COIN // 100, p2pkh_script(pubkey))]
+        sign_p2pkh_input(tx, 0, self.key)
+        assert_equal(node.sendrawtransaction(tx.serialize().hex()), tx.hash)
+
+        self.log.info("to_v1: a version 1 copy with a 32-bit nTime, signed after converting")
+        v1 = to_v1(tx)
+        assert_equal(len(v1.serialize()), len(tx.serialize()) - 4)
+        sign_p2pkh_input(v1, 0, self.key)
+        decoded = node.decoderawtransaction(v1.serialize().hex())
+        assert_equal((decoded['version'], decoded['txid']), (1, v1.hash))
+
+        self.log.info("The timelock redeem scripts and P2SH addresses match the wallet's")
+        for locktime in (5, 100, 1700000000):
+            created = node.createcltvaddress(locktime)
+            redeem = bytes.fromhex(created['redeemScript'])
+            assert_equal(cltv_p2sh_redeem_script(locktime, list(CScript(redeem))[3]), redeem)
+            assert_equal(script_to_p2sh(redeem), created['cltv address'])
+        created = node.createcsvaddress(5, True)
+        redeem = bytes.fromhex(created['redeemScript'])
+        assert_equal(csv_p2sh_redeem_script(5, list(CScript(redeem))[3]), redeem)
+        assert_equal(script_to_p2sh(redeem), created['csv address'])
+
+        self.log.info("P2SH CLTV and CSV outputs, spent with Python signatures")
+        height = node.getblockcount()
+        cltv = cltv_p2sh_redeem_script(height, pubkey)
+        csv = csv_p2sh_redeem_script(2, pubkey)
+        fund = CTransaction()
+        fund.nTime = self.mocktime
+        fund.vin = [CTxIn(COutPoint(int(fund_txid, 16), 0))]
+        half = (fund_value - COIN // 100) // 2
+        fund.vout = [CTxOut(half, p2sh_script(cltv)), CTxOut(half, p2sh_script(csv))]
+        sign_p2pkh_input(fund, 0, self.key)
+        assert_equal(node.sendrawtransaction(fund.serialize().hex()), fund.hash)
+        self.generate_to(node, 1)
+
+        cltv_spend = CTransaction()
+        cltv_spend.nTime = self.mocktime
+        cltv_spend.nLockTime = height
+        cltv_spend.vin = [CTxIn(COutPoint(fund.sha256, 0), nSequence=0xfffffffe)]
+        cltv_spend.vout = [CTxOut(half - COIN // 100, p2pkh_script(pubkey))]
+        sign_p2sh_input(cltv_spend, 0, cltv, [self.key])
+        assert_equal(node.sendrawtransaction(cltv_spend.serialize().hex()), cltv_spend.hash)
+
+        csv_spend = CTransaction()
+        csv_spend.nTime = self.mocktime
+        csv_spend.vin = [CTxIn(COutPoint(fund.sha256, 1), nSequence=2)]
+        csv_spend.vout = [CTxOut(half - COIN // 100, p2pkh_script(pubkey))]
+        sign_p2sh_input(csv_spend, 0, csv, [self.key])
+        assert_raises_rpc_error(-26, "64: non-BIP68-final", node.sendrawtransaction, csv_spend.serialize().hex())
+        self.generate_to(node, 1)
+        assert_equal(node.sendrawtransaction(csv_spend.serialize().hex()), csv_spend.hash)
+        self.generate_to(node, 1)
+        assert_equal(node.getrawmempool(), [])
+
+    def token_outputs(self, txid):
+        tx = FromHex(CTransaction(), self.nodes[0].getrawtransaction(txid))
+        return [bytes(out.scriptPubKey) for out in tx.vout if bytes([OP_NOP4]) in bytes(out.scriptPubKey)]
+
+    def test_token_scripts(self):
+        node = self.nodes[0]
+        self.log.info("Token issue, owner, reissue and owner transfer scripts match the node's")
+        node.importprivkey(TestNode.PRIV_KEYS[0].key)
+        address = node.getnewaddress()
+        prefix = bytes.fromhex(node.validateaddress(address)['scriptPubKey'])
+        issue_txid = node.issue("PYTOKEN", 1000, 2, True, False, "", address, "")
+        self.generate_to(node, 1)
+        assert_equal(sorted(self.token_outputs(issue_txid)),
+                     sorted([bytes(token_issue_script(prefix, "PYTOKEN", 1000 * COIN, 2, True)),
+                             bytes(token_owner_script(prefix, "PYTOKEN"))]))
+        reissue_txid = node.reissue("PYTOKEN", 5, True, address)
+        outputs = self.token_outputs(reissue_txid)
+        assert bytes(token_reissue_script(prefix, "PYTOKEN", 5 * COIN)) in outputs
+        # The owner token goes back to a change address of the wallet.
+        owner_back = [o for o in outputs if b"yact" in o]
+        assert_equal(len(owner_back), 1)
+        assert_equal(owner_back[0], bytes(token_transfer_script(owner_back[0][:25], "PYTOKEN!", COIN)))
 
 
 if __name__ == '__main__':

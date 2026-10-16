@@ -13,10 +13,7 @@ from .messages import (
     CTransaction,
     CTxOut,
     hash256,
-    ser_string,
-    ser_uint256,
     sha256,
-    uint256_from_str,
 )
 from .ripemd160 import ripemd160
 
@@ -627,7 +624,10 @@ def FindAndDelete(script, sig):
 
 
 def LegacySignatureHash(script, txTo, inIdx, hashtype):
-    """Consensus-correct SignatureHash
+    """Consensus-correct SignatureHash (script/interpreter.cpp SignatureHash)
+
+    YACoin's transaction serialization includes nTime (64-bit from version 2
+    on, 32-bit before), so it is part of the signed data.
 
     Returns (hash, err) to precisely match the consensus-critical behavior of
     the SIGHASH_SINGLE bug. (inIdx is *not* checked for validity)
@@ -669,54 +669,9 @@ def LegacySignatureHash(script, txTo, inIdx, hashtype):
         txtmp.vin = []
         txtmp.vin.append(tmp)
 
-    s = txtmp.serialize_without_witness()
+    s = txtmp.serialize()
     s += struct.pack(b"<I", hashtype)
 
     hash = hash256(s)
 
     return (hash, None)
-
-# TODO: Allow cached hashPrevouts/hashSequence/hashOutputs to be provided.
-# Performance optimization probably not necessary for python tests, however.
-# Note that this corresponds to sigversion == 1 in EvalScript, which is used
-# for version 0 witnesses.
-def SegwitV0SignatureHash(script, txTo, inIdx, hashtype, amount):
-
-    hashPrevouts = 0
-    hashSequence = 0
-    hashOutputs = 0
-
-    if not (hashtype & SIGHASH_ANYONECANPAY):
-        serialize_prevouts = bytes()
-        for i in txTo.vin:
-            serialize_prevouts += i.prevout.serialize()
-        hashPrevouts = uint256_from_str(hash256(serialize_prevouts))
-
-    if (not (hashtype & SIGHASH_ANYONECANPAY) and (hashtype & 0x1f) != SIGHASH_SINGLE and (hashtype & 0x1f) != SIGHASH_NONE):
-        serialize_sequence = bytes()
-        for i in txTo.vin:
-            serialize_sequence += struct.pack("<I", i.nSequence)
-        hashSequence = uint256_from_str(hash256(serialize_sequence))
-
-    if ((hashtype & 0x1f) != SIGHASH_SINGLE and (hashtype & 0x1f) != SIGHASH_NONE):
-        serialize_outputs = bytes()
-        for o in txTo.vout:
-            serialize_outputs += o.serialize()
-        hashOutputs = uint256_from_str(hash256(serialize_outputs))
-    elif ((hashtype & 0x1f) == SIGHASH_SINGLE and inIdx < len(txTo.vout)):
-        serialize_outputs = txTo.vout[inIdx].serialize()
-        hashOutputs = uint256_from_str(hash256(serialize_outputs))
-
-    ss = bytes()
-    ss += struct.pack("<i", txTo.nVersion)
-    ss += ser_uint256(hashPrevouts)
-    ss += ser_uint256(hashSequence)
-    ss += txTo.vin[inIdx].prevout.serialize()
-    ss += ser_string(script)
-    ss += struct.pack("<q", amount)
-    ss += struct.pack("<I", txTo.vin[inIdx].nSequence)
-    ss += ser_uint256(hashOutputs)
-    ss += struct.pack("<i", txTo.nLockTime)
-    ss += struct.pack("<I", hashtype)
-
-    return hash256(ss)
