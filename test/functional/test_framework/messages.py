@@ -528,8 +528,9 @@ assert_equal(BLOCK_HEADER_SIZE, 84)
 
 class CBlock(CBlockHeader):
     """A block as the node serializes it: header, transactions, then
-    vchBlockSig. Only proof-of-stake blocks (none after the 1.0 fork) carry a
-    signature; proof-of-work blocks leave it empty, a single 00 byte."""
+    vchBlockSig. Blocks built here leave it empty (a single 00 byte); blocks
+    from getwork and the internal miner carry one, which proof-of-work
+    validation doesn't check."""
     __slots__ = ("vtx", "vchBlockSig")
 
     def __init__(self, header=None):
