@@ -96,6 +96,7 @@ BASE_SCRIPTS = [
     'p2p_invalid_block.py',  # 3
     # vv 3 s or less vv
     'feature_epoch.py',
+    'feature_cltv_csv_enforcement.py',
     'feature_tx_malleability.py',
     'rpc_getchaintips.py',
     'feature_basic_transfer.py',
