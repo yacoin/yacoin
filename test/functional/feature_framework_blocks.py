@@ -11,6 +11,9 @@ real node:
 - reject messages are parsed and wait_for_reject matches each one once.
 - CBlockHeader.hash is the node's block hash (scrypt-jane in Python), for
   version 7 and for older headers across their N-factor steps.
+- create_block_yac / solve_block build blocks the node accepts, through
+  submitblock and P2P, on the tip (also at a retarget height) and on
+  another parent; assert_block_accepted / assert_block_rejected.
 """
 
 from test_framework.messages import (
@@ -29,13 +32,20 @@ from test_framework.messages import (
     msg_tx,
     msg_version,
 )
-from test_framework.blocktools import block_hash_rpc
+from test_framework.blocktools import (
+    assert_block_accepted,
+    assert_block_rejected,
+    block_hash_rpc,
+    create_block_yac,
+    get_template,
+    solve_block,
+)
 from test_framework.scrypt_jane import keccak512, scrypt_jane
-from test_framework.mininode import P2PInterface, mininode_lock
+from test_framework.mininode import P2PDataStore, P2PInterface, mininode_lock
 from test_framework.script import CScript, OP_CHECKSIG, OP_DUP, OP_EQUALVERIFY, OP_HASH160
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.test_node import TestNode
-from test_framework.util import NFACTOR_AT_HARDFORK, assert_equal, wait_until
+from test_framework.util import NFACTOR_AT_HARDFORK, assert_equal, assert_raises_rpc_error, wait_until
 
 
 class FrameworkBlocksTest(BitcoinTestFramework):
@@ -62,6 +72,7 @@ class FrameworkBlocksTest(BitcoinTestFramework):
         self.test_headers_message()
         self.test_reject()
         self.test_block_hash()
+        self.test_build_blocks()
 
     def test_block_serialization(self):
         node = self.nodes[0]
@@ -157,6 +168,78 @@ class FrameworkBlocksTest(BitcoinTestFramework):
         header.nTime = 2**32 + 5
         header.rehash()
         assert_equal(header.hash, block_hash_rpc(node, header))
+
+    def test_build_blocks(self):
+        node = self.nodes[0]
+        self.log.info("getblocktemplate needs a peer; get_template says so")
+        assert_raises_rpc_error(-9, "Yacoin is not connected!", node.getblocktemplate)
+        try:
+            get_template(node)
+        except AssertionError as e:
+            assert "needs a connected peer" in str(e), str(e)
+        else:
+            raise AssertionError("get_template did not fail without a peer")
+        self.store = node.add_p2p_connection(P2PDataStore())
+
+        self.log.info("A template block, solved through the node, is accepted by submitblock")
+        block = solve_block(node, create_block_yac(node))
+        assert_block_accepted(node, block)
+        assert_equal(node.submitblock(block.serialize().hex()), "duplicate")
+
+        self.log.info("The coinbase has the node's shape: version 2, block time, height first")
+        own = FromHex(CTransaction(), node.getrawtransaction(node.getblock(node.getblockhash(12))['tx'][0]))
+        assert_equal((own.nVersion, own.nTime), (2, node.getblockheader(node.getblockhash(12))['time']))
+        # The height check compares this prefix (CScript() << nHeight).
+        assert own.vin[0].scriptSig.startswith(bytes(CScript([12])))
+        assert block.vtx[0].vin[0].scriptSig.startswith(bytes(CScript([13])))
+        assert_equal((block.vtx[0].nVersion, block.vtx[0].nTime), (2, block.nTime))
+
+        self.log.info("Two default blocks on the same parent differ")
+        tmpl = get_template(node)
+        first, second = create_block_yac(node, tmpl=tmpl), create_block_yac(node, tmpl=tmpl)
+        assert first.calc_merkle_root() != second.calc_merkle_root()
+        try:
+            create_block_yac(node, height=5)
+        except ValueError as e:
+            assert "pass coinbase=" in str(e), str(e)
+        else:
+            raise AssertionError("create_block_yac ignored height= on the tip")
+
+        self.log.info("assert_block_rejected: coinbase above the template's value")
+        assert_block_rejected(node, solve_block(node, create_block_yac(node, coinbase_value=tmpl['coinbasevalue'] + 1)), "bad-cb-amount")
+
+        self.log.info("A block through P2P: headers, getdata by block hash, block")
+        block = solve_block(node, create_block_yac(node))
+        self.store.send_blocks_and_test([block], node)
+
+        self.log.info("At a retarget height the template's nBits differ from the tip's")
+        interval = node.getmininginfo()['Difficulty Interval']
+        while (node.getblockcount() + 1) % interval:
+            # Faster than the 60 s spacing, so the target changes.
+            self.generate_to(node, 1, spacing=20)
+        self.set_mocktime(self.mocktime + 20)
+        tmpl = get_template(node)
+        tip = node.getbestblockhash()
+        assert int(tmpl['bits'], 16) != int(node.getblockheader(tip)['bits'], 16)
+        try:
+            create_block_yac(node, prev=tip)
+        except ValueError as e:
+            assert "pass nbits" in str(e), str(e)
+        else:
+            raise AssertionError("create_block_yac took the parent's nBits at a retarget height")
+        assert_block_accepted(node, solve_block(node, create_block_yac(node, tmpl=tmpl)))
+
+        self.log.info("Blocks on another parent: a side block, then a longer branch")
+        parent = node.getbestblockhash()
+        assert_block_accepted(node, solve_block(node, create_block_yac(node)))
+        side = solve_block(node, create_block_yac(node, prev=parent))
+        assert_equal(node.submitblock(side.serialize().hex()), "inconclusive")
+        assert node.getbestblockhash() != side.hash
+        child = solve_block(node, create_block_yac(node, prev=side, height=node.getblockcount() + 1))
+        assert_block_accepted(node, child)
+
+        self.log.info("solve_block(invalid=True): proof-of-work failures have no reason string (C-S12)")
+        assert_block_rejected(node, solve_block(node, create_block_yac(node), invalid=True), "rejected")
 
 
 if __name__ == '__main__':
