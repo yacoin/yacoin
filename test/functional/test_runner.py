@@ -105,6 +105,7 @@ BASE_SCRIPTS = [
     'feature_set_min_fee.py',
     'feature_uptime.py',
     'interface_rpc.py',
+    'interface_http.py',
     'rpc_decodescript.py',
     'rpc_signmessage.py',
     'rpc_signrawtransaction.py',
