@@ -79,6 +79,7 @@ BASE_SCRIPTS = [
     'feature_reindex.py',  # 10
     'mempool_reorg.py',  # 5-18
     'wallet_encryption.py',  # 8
+    'feature_verifydb.py',  # 6
     'feature_crash_recovery.py',  # 5
     'feature_op_cltv.py',
     'feature_op_csv.py',
