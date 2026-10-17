@@ -228,9 +228,10 @@ class NetTest(BitcoinTestFramework):
     def _test_ping(self):
         node = self.nodes[0]
         self.log.info('ping')
-        before = [p['bytessent_per_msg'].get('ping', 0) for p in peers(node)]
+        # Every peer answers the RPC's ping with a 32-byte pong.
+        before = [p['bytesrecv_per_msg'].get('pong', 0) for p in peers(node)]
         assert_equal(node.ping(), None)
-        wait_until(lambda: [p['bytessent_per_msg'].get('ping', 0) for p in peers(node)] != before)
+        wait_until(lambda: all(a >= b + 32 for a, b in zip([p['bytesrecv_per_msg'].get('pong', 0) for p in peers(node)], before)))
         for peer in peers(node):
             assert_greater_than(peer['pingtime'], 0)
 

@@ -4,9 +4,9 @@
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
 """Test connection limits, -addnode, -connect and the addnode RPC.
 
-- Inbound slots are -maxconnections minus 16 outbound slots minus 1 feeler
-  slot: -maxconnections 17, 8 and 0 accept no inbound peer at all, 18
-  accepts one and 19 two. With fewer than 21 inbound peers every peer is
+- Inbound slots are -maxconnections minus min(16, -maxconnections)
+  outbound slots minus 1 feeler slot: -maxconnections 17, 8 and 0 accept
+  no inbound peer at all, 18 accepts one and 19 two. With fewer than 21 inbound peers every peer is
   protected from eviction, so the new connection is dropped, whitelisted
   or not. Manual outbound connections still work.
 - -addnode connects at startup and is listed by getaddednodeinfo; the
@@ -118,7 +118,7 @@ class ConnectionsTest(BitcoinTestFramework):
         assert_equal(len(peers(node)), 1)
         assert_raises_rpc_error(-24, "Error: Node has not been added.", node.addnode, self.addr1, "remove")
 
-        self.log.info("An added name is matched by name")
+        self.log.info("An added name that isn't connected")
         # Nothing listens on this port, so the name stays unconnected.
         name = "localhost:%d" % p2p_port(2)
         node.addnode(name, "add")
@@ -139,9 +139,11 @@ class ConnectionsTest(BitcoinTestFramework):
         wait_until(lambda: [p['id'] for p in peers(node)] not in ([], [peer['id']]), timeout=10)
         assert_equal([(p['addr'], p['inbound']) for p in peers(node)], [(self.addr1, False)])
 
+        self.log.info("-connect still listens (bind=127.0.0.1 in yacoin.conf)")
         # The framework's yacoin.conf has bind=127.0.0.1, which sets
         # -listen=1 before -connect could turn it off.
         node.add_p2p_connection(P2PInterface())
+        assert_equal(peers(node)[-1]['inbound'], True)
         node.disconnect_p2ps()
 
         self.log.info("-connect=0 starts no automatic connections, so -seednode is unused")
