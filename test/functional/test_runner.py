@@ -116,6 +116,7 @@ BASE_SCRIPTS = [
     'p2p_addr_relay.py',
     'p2p_getdata.py',
     'p2p_disabled_features.py',
+    'p2p_timedata.py',
     'p2p_leak_tx.py',
     'p2p_mempool.py',
     'mempool_resurrect.py',
