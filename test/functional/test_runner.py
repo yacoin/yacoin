@@ -95,6 +95,7 @@ BASE_SCRIPTS = [
     'wallet_listtransactions.py',
     # vv 3 s or less vv
     'wallet_accounts.py',
+    'wallet_listreceivedby.py',
     'feature_epoch.py',
     'feature_tx_malleability.py',
     'rpc_getchaintips.py',
