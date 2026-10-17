@@ -4,18 +4,18 @@
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
 """Test the block download timeout (-initSyncDownloadTimeout).
 
-The only peer announces one block and never delivers it. The help text says
-the option is a timeout in seconds, so with -initSyncDownloadTimeout=1 the
-block should no longer be in flight after 10 s.
+The only peer announces one block and never delivers it. The node runs with
+-initSyncDownloadTimeout=2.
 
 Known bug: the node multiplies the option by the block spacing (60 s) for
-block downloads, so the default 900 means 15 hours, and 1 means 60 s.
-The marker checks the help's promise; a second step measures today's 60 s.
-A fix must update both: if it makes the option seconds, the marker reports
-itself and the 60 s step fails; if it keeps the block-interval scale and
-corrects the help instead, the marker's check and the help text change.
+block downloads, so the default 900 means 15 hours, and 2 means 120 s. The
+help says the option is in seconds (2 s); Bitcoin Core's block timeout is
+one block interval (60 s here). The marker checks that nothing is in flight
+75 s after the getdata. Either fix (the option in seconds, or Core's one
+block interval) makes the marker report itself; the 120 s step then fails
+and must be replaced by the fixed timing.
 
-Slow (about 65 s): in the extended list.
+Slow (about 122 s): in the extended list.
 """
 import time
 
@@ -43,7 +43,7 @@ class BlockDownloadTimeoutTest(BitcoinTestFramework):
     def set_test_params(self):
         self.num_nodes = 2
         self.setup_clean_chain = True
-        self.extra_args = [["-initSyncDownloadTimeout=1"], []]
+        self.extra_args = [["-initSyncDownloadTimeout=2"], []]
 
     def setup_network(self):
         # Node 1 is a donor that mines unconnected.
@@ -68,19 +68,19 @@ class BlockDownloadTimeoutTest(BitcoinTestFramework):
             start = peer.getdata_time
         assert_equal([p['inflight'] for p in peers(node)], [[4]])
 
-        self.log.info("-initSyncDownloadTimeout=1: nothing in flight 10 s later")
+        self.log.info("-initSyncDownloadTimeout=2: nothing in flight 75 s after the getdata")
 
         def check():
-            wait_until(lambda: not peer.is_connected or time.time() > start + 10, timeout=20)
+            wait_until(lambda: not peer.is_connected or time.time() > start + 75, timeout=90)
             assert_equal([p['inflight'] for p in peers(node)], [])
         self.known_failure("download timeout ×60 (t2B49V3R item 1)", check, "not([[4]] == [])")
 
-        self.log.info("Today the peer is disconnected after 60 s (the block spacing times the option)")
+        self.log.info("Today the peer is disconnected after 120 s (the block spacing times the option)")
         with node.assert_debug_log(["Timeout downloading block %s from peer=" % block.hash], timeout=10):
             peer.wait_for_disconnect(timeout=90)
         elapsed = time.time() - start
-        assert_greater_than(elapsed, 55)
-        assert_greater_than(75, elapsed)
+        assert_greater_than(elapsed, 110)
+        assert_greater_than(135, elapsed)
         assert_equal(node.getblockcount(), 3)
 
 

@@ -32,13 +32,27 @@ class HeadersTest(BitcoinTestFramework):
         self.extra_args = [[], ["-hashcalcthreads=1"]]
 
     def setup_network(self):
-        # Node 1 syncs from a mininode only.
-        self.setup_nodes()
+        # Node 1 starts only for the sync, from a mininode.
+        self.add_nodes(self.num_nodes, self.extra_args)
+        self.start_node(0)
+
+    def mine_batch(self, node, n):
+        """mine_with_mocktime(node, n, sync=False) in one RPC batch; only for
+        a test whose other nodes aren't running."""
+        address = node.get_deterministic_priv_key().address
+        t, requests = self.mocktime, []
+        for _ in range(n):
+            t += 60
+            requests += [node.setmocktime.get_request(t), node.generatetoaddress.get_request(1, address)]
+        results = node.batch(requests)
+        assert all(r['error'] is None for r in results)
+        self.set_mocktime(t)
+        return [r['result'][0] for r in results[1::2]]
 
     def run_test(self):
         node = self.nodes[0]
         self.set_mocktime(1600000000)
-        hashes = [node.getblockhash(0)] + self.mine_with_mocktime(node, 2010, sync=False)
+        hashes = [node.getblockhash(0)] + self.mine_batch(node, 2010)
         self.h = [int(h, 16) for h in hashes]
         # Header hashes aren't computed in Python (10 ms each): a header's
         # height follows from its parent, and the last one is checked by RPC.
@@ -126,9 +140,11 @@ class HeadersTest(BitcoinTestFramework):
     def test_sync(self):
         node, fresh = self.nodes
         self.log.info("Node 1 syncs 2013 blocks from a mininode with -hashcalcthreads=1")
+        self.start_node(1)
         count = node.getblockcount()
         assert_equal(count, 2013)
-        blocks = blocks_from_node(node, [node.getblockhash(i) for i in range(1, count + 1)])
+        hashes = ["%064x" % x for x in self.h[1:2011]] + [node.getblockhash(i) for i in range(2011, count + 1)]
+        blocks = blocks_from_node(node, hashes)
         store = P2PDataStore()
         for block in blocks:
             store.block_store[block.sha256] = block

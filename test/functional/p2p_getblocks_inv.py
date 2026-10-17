@@ -179,6 +179,7 @@ class GetBlocksInvTest(BitcoinTestFramework):
         assert_equal([node.submitblock(b.serialize().hex()) for b in branch], ["inconclusive", None])
         assert_equal([t['status'] for t in node.getchaintips() if t['hash'] == stale], ['valid-fork'])
         assert_equal(node.getrawmempool(), [])
+        self.wait_announced(branch[-1].hash)
         self.peer.take()
         self.peer.send_message(msg_getdata([CInv(MSG_BLOCK, int(stale, 16))]))
         assert_equal(self.peer.take(), [('block', int(stale, 16))])

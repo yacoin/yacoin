@@ -7,15 +7,14 @@
 
 - -blocksonly: localrelay false, the version message asks peers not to relay
   transactions; a tx or tx inv from a peer is ignored ("sent in violation of
-  protocol") without a penalty; the node's own sendrawtransaction still
-  relays.
+  protocol") without a penalty.
 - -blocksonly -whitelist: a whitelisted peer's tx is accepted and relayed;
   sent again, a tx that is in the mempool is relayed again ("Force relaying
   tx"); a tx below the minimum relay fee (fee 0) is refused and not
-  announced; an invalid tx is
-  not relayed ("Not relaying invalid transaction") and the peer stays
-  connected.
-- -whitelistrelay=0: a whitelisted peer's tx is ignored again.
+  announced; an invalid tx is not relayed ("Not relaying invalid
+  transaction") and the peer stays connected.
+- -whitelistrelay=0: a whitelisted peer's tx is ignored again; the node's
+  own sendrawtransaction still relays.
 """
 from decimal import Decimal
 
@@ -70,7 +69,8 @@ class BlocksOnlyTest(BitcoinTestFramework):
     def restart(self, extra_args):
         self.nodes[0].disconnect_p2ps()
         self.restart_node(0, extra_args)
-        connect_nodes(self.nodes[0], 1)
+        # Node 1 connects to node 0, so it is a whitelisted inbound peer there.
+        connect_nodes(self.nodes[1], 0)
 
     def test_blocksonly(self):
         node, other = self.nodes
@@ -95,10 +95,6 @@ class BlocksOnlyTest(BitcoinTestFramework):
         peer.sync_with_ping()
         with mininode_lock:
             assert_equal(peer.requests, [])
-
-        self.log.info("The node's own sendrawtransaction still relays")
-        txid = node.sendrawtransaction(tx.serialize().hex())
-        wait_until(lambda: txid in other.getrawmempool(), timeout=60)
 
     def test_whitelisted(self):
         node, other = self.nodes
@@ -125,8 +121,8 @@ class BlocksOnlyTest(BitcoinTestFramework):
         assert refused.hash not in node.getrawmempool()
         accepted = self.signed_tx("0.01")
         sender.send_and_ping(msg_tx(accepted))
-        # Only transactions in the mempool are announced; the refused one was
-        # queued before the accepted one.
+        # Only transactions in the mempool are announced; if the refused one
+        # is queued at all, it is queued before the accepted one.
         wait_until(lambda: accepted.sha256 in listener.tx_invs, timeout=30, lock=mininode_lock)
         with mininode_lock:
             assert refused.sha256 not in listener.tx_invs
@@ -148,6 +144,10 @@ class BlocksOnlyTest(BitcoinTestFramework):
         with node.assert_debug_log(["transaction sent in violation of protocol peer="]):
             peer.send_and_ping(msg_tx(tx))
         assert tx.hash not in node.getrawmempool()
+
+        self.log.info("The node's own sendrawtransaction still relays")
+        txid = node.sendrawtransaction(tx.serialize().hex())
+        wait_until(lambda: txid in self.nodes[1].getrawmempool(), timeout=60)
 
 
 if __name__ == '__main__':

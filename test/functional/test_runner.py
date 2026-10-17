@@ -71,20 +71,20 @@ BASE_SCRIPTS = [
     # script. Durations in seconds after the connect_nodes change.
     'feature_help.py', # at the beginning to quickly check that it can be started
     'p2p_timeouts.py',  # 63: the node's fixed 60 s inactivity check
-    'p2p_headers.py',  # 35: mines 2010 blocks
     'wallet_backup.py',  # 25
     'feature_timelock.py',  # 17
+    'p2p_headers.py',  # 15: mines 2010 blocks
     'rpc_rawtransaction.py',  # 15
-    'p2p_blocksonly.py',  # 7-18: two restarts
-    'p2p_getblocks_inv.py',  # 11
     'feature_tokens.py',  # 11
     'feature_defaultport.py',  # 11
     'mempool_reorg.py',  # 5-18
+    'p2p_getblocks_inv.py',  # 9
     'p2p_sendheaders.py',  # 9
     'wallet_encryption.py',  # 8
     'p2p_unrequested_blocks.py',  # 7
     'p2p_block_sync.py',  # 5
     'p2p_feefilter.py',  # 5
+    'p2p_blocksonly.py',  # 4: two restarts
     'feature_op_cltv.py',
     'feature_op_csv.py',
     'p2p_invalid_messages.py',
@@ -126,7 +126,7 @@ BASE_SCRIPTS = [
 ]
 
 EXTENDED_SCRIPTS = [
-    'p2p_block_download_timeout.py',  # 62: waits for a 60 s block download timeout
+    'p2p_block_download_timeout.py',  # 122: waits for a 120 s block download timeout
 ]
 
 # Place EXTENDED_SCRIPTS first since it has the 3 longest running tests

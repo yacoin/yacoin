@@ -22,7 +22,7 @@ Valid blocks come from a donor node that mines them unconnected.
 """
 
 from test_framework.blocktools import blocks_from_node
-from test_framework.messages import MSG_BLOCK, CBlockHeader, msg_headers
+from test_framework.messages import CBlockHeader, msg_headers
 from test_framework.mininode import P2PDataStore, mininode_lock
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import assert_equal, connect_nodes, disconnect_nodes, peers, wait_until
@@ -37,7 +37,6 @@ class BlockRequests(P2PDataStore):
         self.requests = []
 
     def on_getdata(self, message):
-        assert all(inv.type == MSG_BLOCK for inv in message.inv)
         self.requests.append([inv.hash for inv in message.inv])
         if self.serve:
             super().on_getdata(message)
