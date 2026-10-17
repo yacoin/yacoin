@@ -80,6 +80,7 @@ BASE_SCRIPTS = [
     'feature_tokens.py',  # 11
     'feature_defaultport.py',  # 11
     'mempool_reorg.py',  # 5-18
+    'p2p_sendheaders.py',  # 9
     'wallet_encryption.py',  # 8
     'p2p_block_sync.py',  # 5
     'p2p_feefilter.py',  # 5
