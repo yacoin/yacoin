@@ -82,6 +82,7 @@ BASE_SCRIPTS = [
     'mempool_reorg.py',  # 5-18
     'wallet_encryption.py',  # 8
     'wallet_timelock_rpc.py',  # 8
+    'wallet_multiwallet.py',  # 9
     'feature_op_cltv.py',
     'feature_op_csv.py',
     'p2p_invalid_messages.py',
