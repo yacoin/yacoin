@@ -71,6 +71,7 @@ BASE_SCRIPTS = [
     # script. Durations in seconds after the connect_nodes change.
     'feature_help.py', # at the beginning to quickly check that it can be started
     'p2p_timeouts.py',  # 63: the node's fixed 60 s inactivity check
+    'p2p_addr_relay.py',  # ~45 mean: the node's random addr timer, up to 300
     'wallet_backup.py',  # 25
     'feature_timelock.py',  # 17
     'rpc_rawtransaction.py',  # 15
@@ -115,7 +116,6 @@ BASE_SCRIPTS = [
     'rpc_signrawtransaction.py',
     'rpc_uptime.py',
     'wallet_disable.py',
-    'p2p_addr_relay.py',
     'p2p_getdata.py',
     'p2p_disabled_features.py',
     'p2p_timedata.py',
