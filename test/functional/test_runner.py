@@ -90,6 +90,7 @@ BASE_SCRIPTS = [
     'feature_reindex.py',
     'p2p_connections.py',  # 7
     'p2p_eviction.py',  # 5
+    'feature_net_args.py',  # 6
     'feature_maxuploadtarget.py',  # 5
     # vv 3 s or less vv
     'feature_epoch.py',
