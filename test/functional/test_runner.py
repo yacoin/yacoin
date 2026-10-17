@@ -89,6 +89,7 @@ BASE_SCRIPTS = [
     'wallet_dump.py',
     'wallet_hd.py',
     'feature_reindex.py',
+    'feature_uacomment.py',
     'interface_yacoin_cli.py',
     'rpc_users.py',
     'interface_rpc.py',
