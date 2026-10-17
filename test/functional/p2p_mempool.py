@@ -72,11 +72,17 @@ class InvPeer(P2PInterface):
         with mininode_lock:
             return self.txs[n_tx:], sum(self.notfound[n_notfound:], [])
 
-    def mempool_inv(self):
-        """Send mempool; return the txids of the invs received until the pong."""
+    def mempool_inv(self, expect_inv=True):
+        """Send mempool; return the txids of the invs received until the pong.
+
+        The answer goes out with the node's next send, which is skipped
+        while another thread holds cs_main, so the pong can overtake it:
+        with expect_inv, wait for the inv first."""
         with mininode_lock:
             n_inv = len(self.invs)
         self.send_message(msg_mempool())
+        if expect_inv:
+            wait_until(lambda: len(self.invs) > n_inv, timeout=10, lock=mininode_lock)
         self.sync_with_ping()
         with mininode_lock:
             invs = sum(self.invs[n_inv:], [])
@@ -196,7 +202,7 @@ class P2PMempoolTests(BitcoinTestFramework):
         self.mine_with_mocktime(node, 1, sync=False)
         assert_equal(node.getrawmempool(), [])
         peer = node.add_p2p_connection(InvPeer())
-        assert_equal(peer.mempool_inv(), [])
+        assert_equal(peer.mempool_inv(expect_inv=False), [])
         with mininode_lock:
             assert_equal(peer.invs, [])
 

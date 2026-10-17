@@ -9,8 +9,9 @@ Port of Bitcoin Core 0.15's mempool_packages.py. YACoin's limits are fixed:
 25 ancestors, 25 descendants and 101,000 bytes each way (txmempool.h); the
 -limitancestorcount/-limitdescendantcount/... options don't exist (they are
 ignored like any unknown option), so Core's second node with lower limits
-and the prioritisetransaction parts are left out. Fees are 0.01 YAC per
-transaction.
+and the prioritisetransaction parts are left out. Fees are 0.01 YAC for the
+small transactions and the minimum (10 base units per byte) for the large
+ones.
 
 Checks:
 - a chain of 25: every getmempoolentry field, getmempoolancestors,
@@ -51,7 +52,7 @@ class MempoolPackagesTest(BitcoinTestFramework):
         self.num_nodes = 1
         self.setup_clean_chain = True
 
-    # Build/send a transaction with the wallet (Core's helper, one output).
+    # Build/send a transaction with the wallet (Core's helper; the chain uses one output).
     def chain_transaction(self, node, parent_txid, vout, value, fee, num_outputs, *, send=True):
         send_value = satoshi_round((value - fee) / num_outputs)
         inputs = [{'txid': parent_txid, 'vout': vout}]

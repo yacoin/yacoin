@@ -227,7 +227,7 @@ class MempoolAcceptTest(BitcoinTestFramework):
         coinbase.vin[0].scriptSig = b"\x01"
         coinbase.vout[0].nValue += 1
         coinbase.rehash()
-        self.check_reject(coinbase, 16, "bad-cb-length", p2p=False)
+        self.check_reject(coinbase, 16, "bad-cb-length")
         self.log.info("A real coinbase is already in the chain (its outputs are unspent)")
         real = node.getblock(node.getblockhash(3))['tx'][0]
         assert_raises_rpc_error(-27, "transaction already in block chain",
@@ -415,7 +415,7 @@ class MempoolAcceptTest(BitcoinTestFramework):
         self.log.info("Larger than the maximum block size (about 380 kB here): bad-txns-oversize")
         tx = self.spend_coinbase(lambda v: [CTxOut(1, P2SH_TRUE_SCRIPT)] * 12500)
         assert len(tx.serialize()) > 400000
-        self.check_reject(tx, 16, "bad-txns-oversize", p2p=False)
+        self.check_reject(tx, 16, "bad-txns-oversize")
 
         self.log.info("Undecodable hex: TX decode failed")
         for bad_hex in ("", "00", "zz"):
@@ -428,8 +428,8 @@ class MempoolAcceptTest(BitcoinTestFramework):
                            "No exception raised")
         tx = self.spend_true(lambda v: [CTxOut(v - FEE, P2SH_TRUE_SCRIPT), CTxOut(1, CScript(b"\xff\xff"))])
         self.known_failure("DecodeHexTx (QDofTzi1)",
-                           lambda: assert_raises_rpc_error(-22, "TX decode failed", node.sendrawtransaction, tx.serialize().hex()),
-                           "Unexpected JSONRPC error code -26")
+                           lambda: self.assert_rpc_reject(tx, "TX decode failed", code=-22),
+                           "(-26, '64: scriptpubkey')")
 
     def test_version_1(self):
         self.log.info("A version 1 transaction after the fork (known failure: no reason, no P2P reject)")
