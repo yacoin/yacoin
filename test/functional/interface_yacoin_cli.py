@@ -34,6 +34,8 @@ from test_framework.util import (
 class TestBitcoinCli(BitcoinTestFramework):
     def set_test_params(self):
         self.num_nodes = 1
+        # It compares yacoin-cli with the RPC interface itself.
+        self.supports_cli = False
         # Tokens active from the start, for the reissue argument check.
         self.extra_args = [['-tokenSupportBlockNumber=0']]
 
