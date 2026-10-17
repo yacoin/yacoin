@@ -12,14 +12,17 @@ database environment.
   the keys and rescans: keys, balance and transactions survive, labels and
   key metadata don't.
 - A wallet.dat that fails the database check is salvaged automatically at
-  startup (warning), or the start fails ("salvage failed").
-- A damaged database environment is moved aside.
+  startup (warning), or the start fails ("salvage failed"); a non-database
+  file stays in place.
+- Known failures: a silent -salvagewallet failure, a wallet.dat restored
+  after a failed salvage is moved aside again, -salvagewallet drops the HD
+  chain split, a raw exception for a file named "database", and a segfault
+  on a damaged database log (the environment is moved aside first).
 - -blocksonly turns wallet broadcasting off unless -walletbroadcast=1.
 """
 import os
 import re
 import resource
-import shutil
 import struct
 import time
 
@@ -182,12 +185,24 @@ class WalletStartupOptionsTest(BitcoinTestFramework):
 
         self.log.info("A regular file in place of the database directory")
         self.write_wallet(healthy)
-        if os.path.isdir(self.wallet_path('database')):
-            shutil.rmtree(self.wallet_path('database'))
+        # A clean shutdown removes the database directory.
+        assert not os.path.exists(self.wallet_path('database'))
         with open(self.wallet_path('database'), 'wb') as f:
             f.write(junk)
-        self.known_failure("raw exception for a database file (YslI5Qz7 item 5)",
-                           lambda: n0.assert_start_raises_init_error([], "Error initializing wallet database environment", match=ErrorMatch.PARTIAL_REGEX),
+
+        def no_raw_exception():
+            # Fixed, the start either fails with an init error or moves the
+            # file aside and starts.
+            n0.start([])
+            try:
+                n0.wait_for_rpc_connection()
+            except FailedToStartError:
+                n0.wait_for_exit()
+                stderr = n0.read_stderr()
+                assert 'EXCEPTION' not in stderr and stderr.startswith('Error: '), stderr
+            else:
+                self.stop_node(0)
+        self.known_failure("raw exception for a database file (YslI5Qz7 item 5)", no_raw_exception,
                            expected='EXCEPTION: N5boost10filesystem16filesystem_errorE')
         os.remove(self.wallet_path('database'))
 
@@ -218,6 +233,7 @@ class WalletStartupOptionsTest(BitcoinTestFramework):
         assert_equal(n0.gettransaction(txid)['confirmations'], 0)
         assert_raises_rpc_error(-4, "Error: Wallet transaction broadcasting is disabled with -walletbroadcast", n0.resendwallettransactions)
         self.stop_node(0)
+        # txid2 is received later, so it is listed second.
         self.tick()
         self.start_node(0, ['-blocksonly', '-walletbroadcast=1'])
         assert_equal(n0.getrawmempool(), [txid])

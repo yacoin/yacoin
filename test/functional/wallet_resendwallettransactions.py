@@ -6,8 +6,8 @@
 
 - resendwallettransactions returns the unconfirmed transactions in the
   order they were received, and [] once they are confirmed.
-- The periodic rebroadcast (ResendWalletTransactions) runs at most every
-  30 minutes, only after a new block, and only for transactions received
+- The periodic rebroadcast (ResendWalletTransactions) runs at a random time
+  up to 30 minutes after the previous round, only after a new block, and only for transactions received
   at least 5 minutes before that block arrived. A peer that was already
   sent a transaction doesn't get it again.
 """

@@ -122,11 +122,14 @@ class DescribeRedeemScriptTest(BitcoinTestFramework):
         self.test_full_output()
         self.test_errors()
 
-    def check(self, script, address, kind, fmt_lock, pubkey, lock_type, condition):
+    def pubkey_of(self, script):
+        return self.nodes[0].decodescript(script)['asm'].split()[3]
+
+    def check_described(self, script, address, kind, lock, pubkey, lock_type, condition):
         assert_equal(self.nodes[0].describeredeemscript(script), {
             'RedeemScriptHex': script,
             'RedeemScriptFormat': '%s OP_%s OP_DROP %s OP_CHECKSIG' % (
-                fmt_lock, 'CHECKLOCKTIMEVERIFY' if kind == 'Cltv' else 'CHECKSEQUENCEVERIFY', pubkey),
+                lock, 'CHECKLOCKTIMEVERIFY' if kind == 'Cltv' else 'CHECKSEQUENCEVERIFY', pubkey),
             'PublicKey': pubkey,
             'LockType': lock_type,
             kind + 'Address': address,
@@ -137,13 +140,12 @@ class DescribeRedeemScriptTest(BitcoinTestFramework):
     def test_full_output(self):
         self.log.info("describeredeemscript: complete output")
         node = self.nodes[0]
-        pubkey_of = lambda script: node.decodescript(script)['asm'].split()[3]
         for lock in (17, 1000):
             info = node.createcltvaddress(lock)
-            self.check(info['redeemScript'], info['cltv address'], 'Cltv', lock, pubkey_of(info['redeemScript']),
+            self.check_described(info['redeemScript'], info['cltv address'], 'Cltv', lock, self.pubkey_of(info['redeemScript']),
                        'Block-based lock', 'locked until block height %d' % lock)
         info = node.createcsvaddress(100, True)
-        self.check(info['redeemScript'], info['csv address'], 'Csv', 100, pubkey_of(info['redeemScript']),
+        self.check_described(info['redeemScript'], info['csv address'], 'Csv', 100, self.pubkey_of(info['redeemScript']),
                    'Block-based lock', 'locked within 100 blocks')
 
         # Scripts made outside this wallet, with a foreign key; lock time 5
@@ -152,7 +154,7 @@ class DescribeRedeemScriptTest(BitcoinTestFramework):
         for op, kind, condition in ((OP_CHECKLOCKTIMEVERIFY, 'Cltv', 'locked until block height 5'),
                                     (OP_CHECKSEQUENCEVERIFY, 'Csv', 'locked within 5 blocks')):
             script = CScript([5, op, OP_DROP, bytes.fromhex(pubkey), OP_CHECKSIG]).hex()
-            self.check(script, node.decodescript(script)['p2sh'], kind, 5, pubkey, 'Block-based lock', condition)
+            self.check_described(script, node.decodescript(script)['p2sh'], kind, 5, pubkey, 'Block-based lock', condition)
 
     def test_errors(self):
         self.log.info("describeredeemscript: errors")
