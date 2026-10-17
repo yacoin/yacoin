@@ -12,6 +12,7 @@
 #include "test/test_bitcoin.h"
 
 #include <stdint.h>
+#include <algorithm>
 #include <cstdio>
 #include <vector>
 
@@ -660,8 +661,8 @@ struct UtilDataDirSetup : public BasicTestingSetup {
 
     ~UtilDataDirSetup()
     {
-        // Leave both datadir caches filled, as TestingSetup does: an empty cache would make
-        // the next GetDataDir() recompute from whatever args are restored (possibly $HOME).
+        // Leave both datadir caches filled: an empty cache would make the next GetDataDir()
+        // recompute from whatever args are restored (possibly $HOME).
         gArgs.ForceSetArg("-datadir", pathTemp.string());
         GetDataDir(false);
         GetDataDir(true);
@@ -711,19 +712,20 @@ BOOST_FIXTURE_TEST_CASE(util_ReadConfigFile_syntax, UtilDataDirSetup)
     TestArgsManager testArgs;
     testArgs.ReadConfigFile(conf.string());
 
-    // In the file the first value wins; every value (also from -nofoo) is kept in order
+    // Current behaviour: in the file the first value wins (on the command line the last one
+    // does); every value (also from -nofoo) is kept in order
     BOOST_CHECK_EQUAL(testArgs.GetArg("-foo", ""), "1");
     BOOST_CHECK(testArgs.GetArgs("-foo") == std::vector<std::string>({"1", "2", "0"}));
     // Whitespace around names and values is trimmed (also tabs and a CR), not inside values
     BOOST_CHECK_EQUAL(testArgs.GetArg("-spaced", ""), "value with spaces");
     BOOST_CHECK_EQUAL(testArgs.GetArg("-tabbed", ""), "x");
     BOOST_CHECK_EQUAL(testArgs.GetArg("-crlf", ""), "yes");
-    // An empty value is set and counts as true
+    // An empty value is set and counts as true (current behaviour)
     BOOST_CHECK(testArgs.IsArgSet("-empty"));
     BOOST_CHECK_EQUAL(testArgs.GetArg("-empty", "default"), "");
     BOOST_CHECK(testArgs.GetBoolArg("-empty", false));
     BOOST_CHECK_EQUAL(testArgs.GetArg("-blank", "default"), "");
-    // Split at the first '=', and '#' starts a comment even inside a value
+    // Split at the first '=', and '#' starts a comment even inside a value (current behaviour)
     BOOST_CHECK_EQUAL(testArgs.GetArg("-eq", ""), "a=b=c");
     BOOST_CHECK_EQUAL(testArgs.GetArg("-hash", ""), "abc");
     // Names are case sensitive
@@ -867,9 +869,11 @@ BOOST_FIXTURE_TEST_CASE(util_ReadConfigFile_datadir, UtilDataDirSetup)
     BOOST_CHECK(GetDataDir(false) == pathTemp);
 
     // Without it, the file's datadir takes effect at once: reading the file clears the
-    // cached datadir (read by absolute path, so the old datadir isn't consulted)
+    // cached datadir (read by absolute path, so the old datadir isn't consulted). Without
+    // -datadir only the cache keeps GetDataDir() away from the real default datadir, so it
+    // is checked right before each read.
     TestArgsManager::EraseArg(gArgs, "-datadir");
-    BOOST_CHECK(GetDataDir(false) == pathTemp); // still cached
+    BOOST_REQUIRE(GetDataDir(false) == pathTemp); // still cached
     gArgs.ReadConfigFile(conf.string());
     BOOST_CHECK(GetDataDir(false) == dir2);
     BOOST_CHECK(GetDataDir(true) == dir2);
@@ -877,6 +881,7 @@ BOOST_FIXTURE_TEST_CASE(util_ReadConfigFile_datadir, UtilDataDirSetup)
     // A datadir that doesn't exist gives an empty path
     WriteFile(conf, "datadir=" + (pathTemp / "missing").string() + "\n");
     TestArgsManager::EraseArg(gArgs, "-datadir");
+    BOOST_REQUIRE(GetDataDir(false) == dir2);
     gArgs.ReadConfigFile(conf.string());
     BOOST_CHECK(GetDataDir(false).empty());
     BOOST_CHECK(!fs::exists(pathTemp / "missing"));
@@ -942,13 +947,16 @@ BOOST_FIXTURE_TEST_CASE(util_LogCategories, LogStateSetup)
     BOOST_CHECK_EQUAL(all, (1U << 21) - 1);
 
     // Active flags follow logCategories, in the same order as the list
+    const size_t netPos = std::find(names.begin(), names.end(), "net") - names.begin();
+    const size_t leveldbPos = std::find(names.begin(), names.end(), "leveldb") - names.begin();
+    BOOST_REQUIRE(netPos < names.size() && leveldbPos < names.size());
     for (uint32_t cats : {(uint32_t)BCLog::NONE, (uint32_t)(BCLog::NET | BCLog::LEVELDB), (uint32_t)BCLog::ALL}) {
         logCategories = cats;
         const std::vector<CLogCategoryActive> active = ListActiveLogCategories();
         BOOST_REQUIRE_EQUAL(active.size(), names.size());
         for (size_t i = 0; i < active.size(); ++i) {
             BOOST_CHECK_EQUAL(active[i].category, names[i]);
-            const bool expected = cats == BCLog::ALL || (cats != BCLog::NONE && (i == 0 || i == 20));
+            const bool expected = cats == BCLog::ALL || (cats != BCLog::NONE && (i == netPos || i == leveldbPos));
             BOOST_CHECK_EQUAL(active[i].active, expected);
         }
     }
@@ -992,8 +1000,8 @@ BOOST_FIXTURE_TEST_CASE(util_ShrinkDebugFile, UtilDataDirSetup)
     ShrinkDebugFile();
     BOOST_CHECK(!fs::exists(log));
 
-    // Position-dependent text without CR/LF (the file is opened in text mode), so a tail
-    // taken at the wrong offset doesn't compare equal
+    // Position-dependent text without CR/LF (the file is opened in text mode). The pattern
+    // repeats every 676 bytes, so the exact size check below matters as much as the content
     std::string content(11000001, ' ');
     for (size_t i = 0; i < content.size(); ++i)
         content[i] = 'a' + (i * 7 + i / 26) % 26;
