@@ -2,46 +2,24 @@
 # Copyright (c) 2014-2019 The Bitcoin Core developers
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
-"""Test mining RPCs
+"""Test createcsvaddress, createcltvaddress and describeredeemscript.
 
-- getmininginfo
-- getblocktemplate proposal mode
-- submitblock"""
+For time-based and block-based CSV and CLTV locks: the new address is in
+the given account, has received nothing, and describeredeemscript returns
+the script, the address, the lock type and the encoded lock value.
+"""
 
-import copy
-import time
 import re
 from decimal import Decimal
 
 from test_framework.blocktools import (
     TIME_GENESIS_BLOCK,
 )
-from test_framework.messages import (
-    CBlock,
-    CBlockHeader,
-    BLOCK_HEADER_SIZE
-)
-from test_framework.mininode import (
-    P2PDataStore,
-)
 from test_framework.test_framework import BitcoinTestFramework
-from test_framework.util import (
-    assert_equal,
-    assert_approx,
-    assert_raises_rpc_error,
-    connect_nodes,
-)
-from test_framework.script import CScriptNum
+from test_framework.util import assert_equal
 
 
-def assert_template(node, block, expect, rehash=True):
-    if rehash:
-        block.hashMerkleRoot = block.calc_merkle_root()
-    rsp = node.getblocktemplate(template_request={'data': block.serialize().hex(), 'mode': 'proposal', 'rules': ['segwit']})
-    assert_equal(rsp, expect)
-
-
-class OP_CSV_Test(BitcoinTestFramework):
+class DescribeRedeemScriptTest(BitcoinTestFramework):
     def set_test_params(self):
         self.num_nodes = 2
         self.setup_clean_chain = True
@@ -134,4 +112,4 @@ class OP_CSV_Test(BitcoinTestFramework):
         assert_equal(nlocktime, 1000)
 
 if __name__ == '__main__':
-    OP_CSV_Test().main()
+    DescribeRedeemScriptTest().main()
