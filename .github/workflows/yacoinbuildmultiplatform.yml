@@ -15,33 +15,77 @@ jobs:
   build-ubuntu-1604:
     runs-on: ubuntu-latest  
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v6
       - name: build
         run: |
-          docker run -v /home/runner/work/yacoin/yacoin:/src -e BUILDVERSION=$GITHUB_RUN_NUMBER dev34253/yacoin-build:ubuntu.16.04-1
-      - uses: actions/upload-artifact@v4
+          docker run -v /home/runner/work/yacoin/yacoin:/src -e BUILDVERSION=$GITHUB_RUN_NUMBER dev34253/yacoin-build:ubuntu.16.04-2
+      - uses: actions/upload-artifact@v6
         with:
           name: yacoind-ubuntu-16.04
           path: /home/runner/work/yacoin/yacoin/release-root/bin/yacoind
           if-no-files-found: error
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: yacoin-qt-ubuntu-16.04
           path: /home/runner/work/yacoin/yacoin/release-root/bin/yacoin-qt
           if-no-files-found: error
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: yacoin-cli-ubuntu-16.04
           path: /home/runner/work/yacoin/yacoin/release-root/bin/yacoin-cli
           if-no-files-found: error
-  build-ubuntu-1604-functional-test:
+  functional-tests:
+    # Low-difficulty build of yacoind and yacoin-cli, then the functional
+    # tests serially (functional-tests mode of the yacoin-build image, Python
+    # 3.10). Cached and saved like the unit-tests job, in its own namespace.
     runs-on: ubuntu-latest
+    timeout-minutes: 55
+    env:
+      IMAGE: ubuntu.22.04-2
     steps:
-      - uses: actions/checkout@v3
-      - name: build
+      - uses: actions/checkout@v6
+      - name: cache dir and key
         run: |
-          docker run -v /home/runner/work/yacoin/yacoin:/src --entrypoint /bin/bash dev34253/yacoin-build:ubuntu.16.04 -c "cd /src && ./autogen.sh && ./configure --with-gui=no --enable-low-difficulty-for-development && make -j 2"
-          docker run -v /home/runner/work/yacoin/yacoin:/src --entrypoint /src/test/functional/test_runner.py dev34253/yacoin-build:ubuntu.16.04 -j 1
+          echo "FUNC_CACHE=$RUNNER_TEMP/yacoin-cache" >> "$GITHUB_ENV"
+          echo "CACHE_KEY=functional-tests-$IMAGE-${{ hashFiles('depends/packages/*.mk', 'depends/patches/**', 'depends/Makefile', 'depends/funcs.mk', 'depends/hosts/*.mk', 'depends/builders/*.mk') }}" >> "$GITHUB_ENV"
+      - uses: actions/cache/restore@v5
+        with:
+          path: ${{ env.FUNC_CACHE }}
+          key: ${{ env.CACHE_KEY }}-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: |
+            ${{ env.CACHE_KEY }}-
+            functional-tests-${{ env.IMAGE }}-
+      - name: build and run the functional tests
+        # Below the job timeout, so a hang fails this step and the logs are
+        # still uploaded.
+        timeout-minutes: 45
+        run: |
+          mkdir -p "$FUNC_CACHE"
+          docker run --rm --init --name functional-tests -v "$GITHUB_WORKSPACE":/src -v "$FUNC_CACHE":/cache \
+            -e CCACHE_COMPRESS=1 -e CCACHE_MAXSIZE=2G \
+            "dev34253/yacoin-build:$IMAGE" functional-tests
+      - name: stop the container and make the cache and logs readable
+        if: always()
+        run: |
+          # A step timeout may kill docker run without stopping the container.
+          docker rm -f functional-tests 2>/dev/null || true
+          # The nodes write their datadirs with umask 077 as root.
+          sudo chown -R "$(id -u):$(id -g)" "$FUNC_CACHE"
+          if [ -d build ]; then sudo chown -R "$(id -u):$(id -g)" build; fi
+      - uses: actions/cache/save@v5
+        if: ${{ !cancelled() && github.event_name == 'push' && github.ref == 'refs/heads/master' }}
+        with:
+          path: ${{ env.FUNC_CACHE }}
+          key: ${{ env.CACHE_KEY }}-${{ github.run_id }}-${{ github.run_attempt }}
+      - uses: actions/upload-artifact@v6
+        if: failure()
+        with:
+          name: functional-test-logs
+          path: |
+            build/docker-*/functional-tests/test/tmp/test_runner_*/**/*.log
+            build/docker-*/functional-tests/test/tmp/test_runner_*/**/std*/*
+            build/docker-*/functional-tests/config.log
+          retention-days: 14
   unit-tests:
     # Mainnet consensus build of test_bitcoin, every unit test suite in
     # parallel (unit-tests mode of the yacoin-build image). Depends packages,
@@ -76,7 +120,7 @@ jobs:
       - name: stop the container and make the cache readable for saving
         if: always()
         run: |
-          # A step timeout stops docker run, but not always the container.
+          # A step timeout may kill docker run without stopping the container.
           docker rm -f unit-tests 2>/dev/null || true
           sudo chown -R "$(id -u):$(id -g)" "$UNIT_CACHE"
       - uses: actions/cache/save@v5
@@ -95,7 +139,7 @@ jobs:
   build-ubuntu-1604-low-difficulty:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v6
       - name: build
         # Build a low-difficulty yacoind using the depends system, mirroring
         # build-ubuntu-1604 (depends, glibc-back-compat, static-libstdc++) so
@@ -105,8 +149,8 @@ jobs:
         # See doc/cross-compilation-with-depends-system.md for the source of
         # the depends + configure commands chained here.
         run: |
-          docker run -v /home/runner/work/yacoin/yacoin:/src -e BUILDVERSION=$GITHUB_RUN_NUMBER --entrypoint /bin/bash dev34253/yacoin-build:ubuntu.16.04-1 -c "cd /src/depends && make -j 4 HOST=x86_64-pc-linux-gnu && cd /src && ./autogen.sh && CONFIG_SITE=/src/depends/x86_64-pc-linux-gnu/share/config.site ./configure --enable-glibc-back-compat --enable-reduce-exports --enable-low-difficulty-for-development LDFLAGS=-static-libstdc++ --prefix=/ && make -j 4 && make install DESTDIR=/src/release-root"
-      - uses: actions/upload-artifact@v4
+          docker run -v /home/runner/work/yacoin/yacoin:/src -e BUILDVERSION=$GITHUB_RUN_NUMBER --entrypoint /bin/bash dev34253/yacoin-build:ubuntu.16.04-2 -c "cd /src/depends && make -j 4 HOST=x86_64-pc-linux-gnu && cd /src && ./autogen.sh && CONFIG_SITE=/src/depends/x86_64-pc-linux-gnu/share/config.site ./configure --enable-glibc-back-compat --enable-reduce-exports --enable-low-difficulty-for-development LDFLAGS=-static-libstdc++ --prefix=/ && make -j 4 && make install DESTDIR=/src/release-root"
+      - uses: actions/upload-artifact@v6
         with:
           name: yacoind-low-difficulty-16.04
           path: /home/runner/work/yacoin/yacoin/release-root/bin/yacoind
@@ -114,21 +158,21 @@ jobs:
   build-ubuntu-1804:
     runs-on: ubuntu-latest  
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v6
       - name: build
         run: |
-          docker run -v /home/runner/work/yacoin/yacoin:/src -e BUILDVERSION=$GITHUB_RUN_NUMBER dev34253/yacoin-build:ubuntu.18.04-1
-      - uses: actions/upload-artifact@v4
+          docker run -v /home/runner/work/yacoin/yacoin:/src -e BUILDVERSION=$GITHUB_RUN_NUMBER dev34253/yacoin-build:ubuntu.18.04-2
+      - uses: actions/upload-artifact@v6
         with:
           name: yacoind-ubuntu-18.04
           path: /home/runner/work/yacoin/yacoin/release-root/bin/yacoind
           if-no-files-found: error
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: yacoin-qt-ubuntu-18.04-qt4
           path: /home/runner/work/yacoin/yacoin/release-root/bin/yacoin-qt
           if-no-files-found: error
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: yacoin-cli-ubuntu-18.04
           path: /home/runner/work/yacoin/yacoin/release-root/bin/yacoin-cli
@@ -136,21 +180,21 @@ jobs:
   build-ubuntu-2004:
     runs-on: ubuntu-latest  
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v6
       - name: build
         run: |
-          docker run -v /home/runner/work/yacoin/yacoin:/src -e BUILDVERSION=$GITHUB_RUN_NUMBER dev34253/yacoin-build:ubuntu.20.04-1
-      - uses: actions/upload-artifact@v4
+          docker run -v /home/runner/work/yacoin/yacoin:/src -e BUILDVERSION=$GITHUB_RUN_NUMBER dev34253/yacoin-build:ubuntu.20.04-2
+      - uses: actions/upload-artifact@v6
         with:
           name: yacoind-ubuntu-20.04
           path: /home/runner/work/yacoin/yacoin/release-root/bin/yacoind
           if-no-files-found: error
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: yacoin-qt-ubuntu-20.04-qt4
           path: /home/runner/work/yacoin/yacoin/release-root/bin/yacoin-qt
           if-no-files-found: error
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: yacoin-cli-ubuntu-20.04
           path: /home/runner/work/yacoin/yacoin/release-root/bin/yacoin-cli
@@ -158,21 +202,21 @@ jobs:
   build-ubuntu-2204:
     runs-on: ubuntu-latest  
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v6
       - name: build
         run: |
-          docker run -v /home/runner/work/yacoin/yacoin:/src -e BUILDVERSION=$GITHUB_RUN_NUMBER dev34253/yacoin-build:ubuntu.22.04-1
-      - uses: actions/upload-artifact@v4
+          docker run -v /home/runner/work/yacoin/yacoin:/src -e BUILDVERSION=$GITHUB_RUN_NUMBER dev34253/yacoin-build:ubuntu.22.04-2
+      - uses: actions/upload-artifact@v6
         with:
           name: yacoind-ubuntu-22.04
           path: /home/runner/work/yacoin/yacoin/release-root/bin/yacoind
           if-no-files-found: error
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: yacoin-qt-ubuntu-22.04-qt4
           path: /home/runner/work/yacoin/yacoin/release-root/bin/yacoin-qt
           if-no-files-found: error
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: yacoin-cli-ubuntu-22.04
           path: /home/runner/work/yacoin/yacoin/release-root/bin/yacoin-cli
@@ -180,21 +224,21 @@ jobs:
   build-windows:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v6
       - name: build
         run: |
           docker run -v /home/runner/work/yacoin/yacoin:/src -e BUILDVERSION=$GITHUB_RUN_NUMBER dev34253/yacoin-build:windows-1
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: yacoin-qt-windows
           path: /home/runner/work/yacoin/yacoin/release-root/bin/yacoin-qt.exe
           if-no-files-found: error
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: yacoind-windows
           path: /home/runner/work/yacoin/yacoin/release-root/bin/yacoind.exe
           if-no-files-found: error
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: yacoin-cli-windows
           path: /home/runner/work/yacoin/yacoin/release-root/bin/yacoin-cli.exe
@@ -202,21 +246,21 @@ jobs:
   build-macos:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v6
       - name: build
         run: |
           docker run -v /home/runner/work/yacoin/yacoin:/src -e BUILDVERSION=$GITHUB_RUN_NUMBER dev34253/yacoin-build:macos-1
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: yacoin-qt-macos
           path: /home/runner/work/yacoin/yacoin/release-root/bin/yacoin-qt
           if-no-files-found: error
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: yacoind-macos
           path: /home/runner/work/yacoin/yacoin/release-root/bin/yacoind
           if-no-files-found: error
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: yacoin-cli-macos
           path: /home/runner/work/yacoin/yacoin/release-root/bin/yacoin-cli
