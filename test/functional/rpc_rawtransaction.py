@@ -272,7 +272,8 @@ class RawTransactionsTest(BitcoinTestFramework):
     def test_invalid_signature(self):
         self.log.info("sendrawtransaction of a transaction signed with the wrong key")
         node = self.nodes[0]
-        utxo = node.listunspent()[-1]
+        # The largest coin: change below the output's 1 YAC would fail first.
+        utxo = max(node.listunspent(), key=lambda u: u['amount'])
         raw = node.createrawtransaction([{'txid': utxo['txid'], 'vout': utxo['vout']}], {node.getnewaddress(): 1})
         tx = FromHex(CTransaction(), raw)
         # A key of another node's wallet: it doesn't own the coin.

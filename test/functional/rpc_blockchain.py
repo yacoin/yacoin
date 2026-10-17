@@ -263,10 +263,10 @@ class BlockchainTest(BitcoinTestFramework):
 
         header = CBlockHeader(FromHex(CBlock(), node.getblock(tip, 0)))
         header.nNonce = 0x80000001
-        self.known_failure("uxP8YzbJ item 6 (nonce)",
+        self.known_failure("uxP8YzbJ item 6, negative nonce",
                            lambda: assert_equal(node.calculatescrypthash(header.serialize().hex())['nonce'], 0x80000001),
                            expected="not(-2147483647 == 2147483649)")
-        self.known_failure("uxP8YzbJ item 6 (extra parameter)",
+        self.known_failure("uxP8YzbJ item 6, extra parameter",
                            lambda: assert_raises_rpc_error(-1, "calculatescrypthash", node.calculatescrypthash, header_hex, 1),
                            expected="No exception raised")
 

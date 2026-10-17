@@ -11,6 +11,7 @@
 - Authorization: missing, other schemes and wrong credentials get 401
   with WWW-Authenticate; a 401 leaves a keep-alive connection usable.
 - Bodies that aren't a JSON object or array get 500 "Parse error".
+- A chunked request body is read.
 - Paths: only "/" and "/wallet/<name>"; the reply echoes the request id.
 """
 
@@ -50,12 +51,10 @@ class HTTPBasicsTest(BitcoinTestFramework):
         self.log.info("HTTP/1.1 keeps the connection open")
         conn = self.connection()
         conn.request('POST', '/', '{"method": "getbestblockhash"}', AUTH)
-        out1 = conn.getresponse().read()
-        assert b'"error":null' in out1
+        assert b'"error":null' in conn.getresponse().read()
         assert conn.sock is not None
         conn.request('POST', '/', '{"method": "getchaintips"}', AUTH)
-        out1 = conn.getresponse().read()
-        assert b'"error":null' in out1
+        assert b'"error":null' in conn.getresponse().read()
         assert conn.sock is not None
         conn.close()
 

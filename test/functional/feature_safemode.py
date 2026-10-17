@@ -50,12 +50,12 @@ class SafeModeTest(BitcoinTestFramework):
         assert_equal(node.getblock(node.getbestblockhash())['height'], height)
         assert_is_hash_string(node.generatetoaddress(1, address)[0])
         assert_equal(node.getblockcount(), height + 1)
-        node.getnewaddress()
+        assert node.getnewaddress() != address
 
         self.log.info("-disablesafemode: everything works, the warning stays")
         self.restart_node(0, ['-testsafemode=1', '-disablesafemode=1'])
         assert_equal(node.getinfo()['errors'], WARNING)
-        node.getbalance()
+        assert node.getbalance() > 0
         assert len(node.listunspent()) > 0
         assert_equal(node.gettransaction(txid)['txid'], txid)
         assert_is_hash_string(node.sendtoaddress(address=address, amount=1))

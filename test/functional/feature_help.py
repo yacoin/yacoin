@@ -12,8 +12,9 @@ from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import assert_equal
 
 # Options yacoind has, and removed ones (-rpcssl only makes startup fail).
-SHOULD_BE_LISTED = ['-rpcauth=', '-rpcbind=', '-rpcthreads=', '-rpcworkqueue=', '-rpcservertimeout=',
-                    '-alertnotify=', '-testsafemode', '-disablesafemode']
+SHOULD_BE_LISTED = ['-rpcauth=', '-rpcbind=', '-rpcthreads=', '-alertnotify=']
+# Core lists these only with -help-debug.
+SHOULD_BE_LISTED_DEBUG = ['-rpcworkqueue=', '-rpcservertimeout=', '-testsafemode', '-disablesafemode']
 SHOULD_NOT_BE_LISTED = ['-rpcssl\n', '-rpcsslcertificatechainfile=', '-rpcsslprivatekeyfile=', '-rpcsslciphers=']
 
 class HelpTest(BitcoinTestFramework):
@@ -51,9 +52,12 @@ class HelpTest(BitcoinTestFramework):
         assert b'Options' in output
         self.log.info("Help text received: {} (...)".format(output[0:60]))
         text = output.decode('utf-8')
+        self.nodes[0].start(extra_args=['-h', '-help-debug'])
+        debug_text = self.get_node_output(ret_code_expected=0)[0].decode('utf-8')
 
         def check():
             missing = [o for o in SHOULD_BE_LISTED if o not in text]
+            missing += [o for o in SHOULD_BE_LISTED_DEBUG if o not in debug_text]
             removed = [o for o in SHOULD_NOT_BE_LISTED if o in text]
             assert_equal((missing, removed), ([], []))
         self.known_failure("uxP8YzbJ item 7", check, expected="'-rpcauth=', '-rpcbind='")

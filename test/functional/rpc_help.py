@@ -54,8 +54,8 @@ class HelpRpcTest(BitcoinTestFramework):
             if command == 'calculateblockchash':
                 continue
             assert indexed.help(command).split('\n')[0].startswith(command), command
-        self.known_failure("uxP8YzbJ item 6",
-                           lambda: assert_equal(node.help('calculateblockhash').split(' ')[0], 'calculateblockhash'),
+        self.known_failure("uxP8YzbJ item 6, help typo",
+                           lambda: assert_equal(node.help('calculateblockhash').split()[0], 'calculateblockhash'),
                            expected="not(calculateblockchash == calculateblockhash)")
 
         self.log.info("Hidden commands have help but are not listed")

@@ -24,7 +24,7 @@ class UacommentTest(BitcoinTestFramework):
 
     def run_test(self):
         node = self.nodes[0]
-        self.log.info("test multiple -uacomment")
+        self.log.info("The framework's comment is in the subversion")
         subversion = node.getnetworkinfo()["subversion"]
         assert subversion.endswith("(testnode0)/"), subversion
 

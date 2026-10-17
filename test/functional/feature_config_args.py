@@ -135,9 +135,12 @@ class ConfArgsTest(BitcoinTestFramework):
 
         self.log.info("Two values in a file: the first wins; options in a section are ignored")
         self.write_conf('dup.conf', drop=['epochinterval='],
-                        extra=['epochinterval=15', 'epochinterval=16', '[test]', 'epochinterval=99'])
+                        extra=['epochinterval=15', 'epochinterval=16', '[test]', 'nowalletbroadcast=1'])
         self.start_node(0, ['-conf=dup.conf'])
         assert_equal(node.getmininginfo()['Epoch Interval'], 15)
+        # In the section it is test.nowalletbroadcast: no effect (outside
+        # a section, as in alt.conf, it disables broadcasting).
+        assert_equal(node.resendwallettransactions(), [])
         self.stop_node(0)
 
         self.log.info("A negated option on the command line")

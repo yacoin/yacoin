@@ -72,9 +72,9 @@ BASE_SCRIPTS = [
     'feature_help.py', # at the beginning to quickly check that it can be started
     'p2p_timeouts.py',  # 63: the node's fixed 60 s inactivity check
     'wallet_backup.py',  # 25
-    'feature_notifications.py',  # 12-24
     'feature_timelock.py',  # 17
-    'rpc_rawtransaction.py',  # 15
+    'rpc_rawtransaction.py',  # 16-27
+    'feature_notifications.py',  # 12
     'feature_tokens.py',  # 11
     'feature_defaultport.py',  # 11
     'mempool_reorg.py',  # 5-18

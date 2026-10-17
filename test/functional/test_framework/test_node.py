@@ -616,22 +616,22 @@ class TestNodeCLI():
 
         The parameter isn't called "command": RPCs have named arguments of
         that name (help command=...)."""
-        command = clicommand
         pos_args = [arg_to_cli(arg) for arg in args]
         named_args = [str(key) + "=" + arg_to_cli(value) for (key, value) in kwargs.items()]
         assert not (pos_args and named_args), "Cannot use positional arguments and named arguments in the same bitcoin-cli call"
         p_args = [self.binary, "-datadir=" + self.datadir] + self.options
         if named_args:
             p_args += ["-named"]
-        if command is not None:
-            p_args += [command]
+        if clicommand is not None:
+            p_args += [clicommand]
         p_args += pos_args + named_args
-        self.log.debug("Running bitcoin-cli command: %s" % command)
+        self.log.debug("Running bitcoin-cli command: %s" % clicommand)
         process = subprocess.Popen(p_args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
         cli_stdout, cli_stderr = process.communicate(input=self.input)
         returncode = process.poll()
         if returncode:
-            # The whole message, as over RPC: some have several lines.
+            # The whole message, as over RPC (some have several lines; for -19
+            # the CLI adds a -rpcwallet hint).
             match = re.match(r'error code: ([-0-9]+)\nerror message:\n(.*)\n\Z', cli_stderr, re.DOTALL)
             if match:
                 code, message = match.groups()

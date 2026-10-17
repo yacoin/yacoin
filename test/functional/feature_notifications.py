@@ -64,6 +64,9 @@ class NotificationsTest(BitcoinTestFramework):
         self.log.info("-walletnotify: each transaction when it arrives and when it confirms")
         self.mine_with_mocktime(node0, 20)
         txids = [node0.sendtoaddress(address=node1.getnewaddress(), amount=1) for _ in range(3)]
+        # Hand them to node1 directly: relay waits for a random inv timer.
+        for txid in txids:
+            node1.sendrawtransaction(node0.gettransaction(txid)['hex'])
         self.sync_mempools()
         self.mine_with_mocktime(node0, 1)
         wait_until(lambda: len(read_lines(self.wallet_file)) >= 6)
@@ -78,14 +81,15 @@ class NotificationsTest(BitcoinTestFramework):
         self.log.info("-blocknotify: each new tip")
 
         def check():
-            # The block notifications would have been started before the
-            # wallet ones waited for above; allow a little more time.
-            wait_until(lambda: os.path.isfile(self.block_file), timeout=2)
-            lines = read_lines(self.block_file)
-            for block_hash in lines:
-                assert_equal(node0.getblockheader(block_hash)['confirmations'] > 0, True)
-            assert_equal(lines[-1], node0.getbestblockhash())
-        self.known_failure("uxP8YzbJ item 1", check, expected="not true after 2 seconds")
+            # The notifications for these blocks were started before the
+            # wallet ones waited for above, so the file is there by now. They
+            # run in parallel, so their order isn't fixed.
+            assert os.path.isfile(self.block_file), "no -blocknotify output"
+            tip = node0.getbestblockhash()
+            wait_until(lambda: tip in read_lines(self.block_file))
+            for block_hash in read_lines(self.block_file):
+                assert node0.getblockheader(block_hash)['confirmations'] > 0, block_hash
+        self.known_failure("uxP8YzbJ item 1", check, expected="no -blocknotify output")
 
     def mine_version_8(self, n):
         node0 = self.nodes[0]
@@ -115,7 +119,6 @@ class NotificationsTest(BitcoinTestFramework):
 
         self.log.info("The command runs only once per process")
         self.mine_version_8(4)
-        self.sync_all()
 
         self.log.info("After a restart the warning is gone until the next block")
         self.restart_node(0, self.node0_args)

@@ -153,7 +153,7 @@ class RPCInterfaceTest(BitcoinTestFramework):
     def test_uptime_params(self):
         self.log.info("uptime takes no parameter")
         node = self.nodes[0]
-        self.known_failure("uxP8YzbJ item 6",
+        self.known_failure("uxP8YzbJ item 6, uptime arg",
                            lambda: assert_raises_rpc_error(-1, "uptime", node.uptime, 1),
                            expected="No exception raised")
 
