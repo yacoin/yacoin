@@ -94,6 +94,7 @@ BASE_SCRIPTS = [
     'wallet_listsinceblock.py',
     'wallet_listtransactions.py',
     'wallet_keypool.py',
+    'wallet_zapwallettxes.py',
     'wallet_abandonconflict.py',
     # vv 3 s or less vv
     'wallet_accounts.py',
