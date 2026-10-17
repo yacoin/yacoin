@@ -101,6 +101,7 @@ BASE_SCRIPTS = [
     'rpc_invalidateblock.py',
     'p2p_disconnect_ban.py',
     'rpc_net.py',
+    'feature_proxy.py',
     'feature_describe_redeemscript.py',
     'feature_getrpcinfo.py',
     'feature_set_min_fee.py',
