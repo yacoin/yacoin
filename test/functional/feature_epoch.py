@@ -2,44 +2,21 @@
 # Copyright (c) 2014-2019 The Bitcoin Core developers
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
-"""
-Test sending and receiving coins 
+"""Test the epoch block reward.
+
+Mine 39 blocks with epochinterval=10 and check the block value and
+difficulty after every block and the money supply after each epoch.
 """
 
-import copy
-import time
-from decimal import Decimal
-
-from test_framework.blocktools import (
-    create_coinbase,
-    TIME_GENESIS_BLOCK,
-)
-from test_framework.messages import (
-    CBlock,
-    CBlockHeader,
-    BLOCK_HEADER_SIZE
-)
-from test_framework.mininode import (
-    P2PDataStore,
-)
+from test_framework.blocktools import TIME_GENESIS_BLOCK
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import (
     assert_equal,
     assert_approx,
-    assert_raises_rpc_error,
-    connect_nodes,
 )
-from test_framework.script import CScriptNum
 
 
-def assert_template(node, block, expect, rehash=True):
-    if rehash:
-        block.hashMerkleRoot = block.calc_merkle_root()
-    rsp = node.getblocktemplate(template_request={'data': block.serialize().hex(), 'mode': 'proposal', 'rules': ['segwit']})
-    assert_equal(rsp, expect)
-
-
-class BasicTransfer_Test(BitcoinTestFramework):
+class EpochTest(BitcoinTestFramework):
     def set_test_params(self):
         self.num_nodes = 2
         self.setup_clean_chain = True
@@ -77,4 +54,4 @@ class BasicTransfer_Test(BitcoinTestFramework):
         self.mine_blocks(0, 10, 3802574, 100000148300310, 1.98682149E-8)        
 
 if __name__ == '__main__':
-    BasicTransfer_Test().main()
+    EpochTest().main()
