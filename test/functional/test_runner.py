@@ -91,6 +91,7 @@ BASE_SCRIPTS = [
     'wallet_dump.py',
     'wallet_hd.py',
     'feature_reindex.py',
+    'wallet_listtransactions.py',
     # vv 3 s or less vv
     'wallet_accounts.py',
     'feature_epoch.py',
