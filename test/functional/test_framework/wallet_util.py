@@ -52,7 +52,7 @@ from test_framework.script import (
     hash160,
     sha256,
 )
-from test_framework.messages import COIN, MIN_TX_FEE
+from test_framework.messages import COIN, COINBASE_MATURITY, MIN_TX_FEE
 from test_framework.util import assert_greater_than_or_equal, hex_str_to_bytes
 
 Key = namedtuple('Key', ['privkey',
@@ -158,6 +158,18 @@ def coinbase_value(node, block_hash):
     """Return the total value of the coinbase outputs of a block, in YAC."""
     coinbase = node.getrawtransaction(node.getblock(block_hash)['tx'][0], 1)
     return sum(out['value'] for out in coinbase['vout'])
+
+def mature_coinbase_total(node, address):
+    """Return the value of the coinbases in the active chain that pay address
+    and are mature (depth >= COINBASE_MATURITY, after the fork), in YAC."""
+    tip = node.getblockcount()
+    total = Decimal(0)
+    for height in range(1, tip - COINBASE_MATURITY + 2):
+        block_hash = node.getblockhash(height)
+        coinbase = node.getrawtransaction(node.getblock(block_hash)['tx'][0], 1)
+        total += sum(out['value'] for out in coinbase['vout']
+                     if out['scriptPubKey'].get('addresses') == [address])
+    return total
 
 def wipe_chain(node, *, wallet=False):
     """Delete a stopped node's chain data, so it starts like a new node.
