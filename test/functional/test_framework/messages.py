@@ -38,8 +38,13 @@ MY_RELAY = 1 # from version 70001 onwards, fRelay should be appended to version 
 MAX_LOCATOR_SZ = 101
 MAX_BLOCK_BASE_SIZE = 1000000
 
-COIN = 100000000  # 1 btc in satoshis
-MAX_MONEY = 21000000 * COIN
+COIN = 1000000  # 1 YAC in base units (amount.h)
+MAX_MONEY = 2000000000 * COIN  # amount.h
+MIN_TX_FEE = COIN // 100  # policy/fees.h: relay fee per kB, and the wallet's default -paytxfee
+COINBASE_MATURITY = 6  # consensus.h COINBASE_MATURITY_AFTER_HARDFORK
+COINBASE_MATURITY_BEFORE_HARDFORK = 500
+BLOCK_VERSION = 7  # block version from the 1.0 fork on
+TX_VERSION = 2  # transaction version from the 1.0 fork on; its txid ignores scriptSigs
 
 BIP125_SEQUENCE_NUMBER = 0xfffffffd  # Sequence number that is BIP 125 opt-in and BIP 68-opt-out
 
@@ -338,17 +343,16 @@ class CTxOut:
         return r
 
     def __repr__(self):
-        return "CTxOut(nValue=%i.%08i scriptPubKey=%s)" \
+        return "CTxOut(nValue=%i.%06i scriptPubKey=%s)" \
             % (self.nValue // COIN, self.nValue % COIN,
                self.scriptPubKey.hex())
 
 class CTransaction:
-    __slots__ = ("hash", "nTime", "nLockTime", "nVersion", "sha256", "vin", "vout",
-                 "wit")
+    __slots__ = ("hash", "nTime", "nLockTime", "nVersion", "sha256", "vin", "vout")
 
     def __init__(self, tx=None):
         if tx is None:
-            self.nVersion = 2
+            self.nVersion = TX_VERSION
             self.vin = []
             self.vout = []
             self.nLockTime = 0
@@ -388,23 +392,41 @@ class CTransaction:
         r += struct.pack("<I", self.nLockTime)
         return r
 
-    # Recalculate the txid (transaction hash without witness)
+    def is_coinbase(self):
+        """Same rule as CTransaction::IsCoinBase."""
+        return (len(self.vin) == 1 and self.vin[0].prevout.hash == 0
+                and self.vin[0].prevout.n == 0xffffffff and len(self.vout) >= 1)
+
+    # Recalculate the txid
     def rehash(self):
         self.sha256 = None
         self.calc_sha256()
         return self.hash
 
-    # We will only cache the serialization without witness in
-    # self.sha256 and self.hash -- those are expected to be the txid.
     def calc_sha256(self):
+        """Compute the txid as the node does (CTransaction::GetHash).
+
+        From version 2 on, the txid of a non-coinbase transaction is the
+        hash of the transaction with every scriptSig emptied, so signatures
+        can't change it. Coinbases and version 1 transactions hash the full
+        serialization. The result is cached in self.sha256 (int) and
+        self.hash (hex)."""
         if self.sha256 is None:
-            self.sha256 = uint256_from_str(hash256(self.serialize()))
-        self.hash = encode(hash256(self.serialize())[::-1], 'hex_codec').decode('ascii')
+            if self.nVersion >= TX_VERSION and not self.is_coinbase():
+                tx = CTransaction(self)
+                for txin in tx.vin:
+                    txin.scriptSig = b""
+                data = tx.serialize()
+            else:
+                data = self.serialize()
+            h = hash256(data)
+            self.sha256 = uint256_from_str(h)
+            self.hash = h[::-1].hex()
 
     def is_valid(self):
         self.calc_sha256()
         for tout in self.vout:
-            if tout.nValue < 0 or tout.nValue > 21000000 * COIN:
+            if tout.nValue < 0 or tout.nValue > MAX_MONEY:
                 return False
         return True
 
@@ -433,7 +455,7 @@ class CBlockHeader:
             self.calc_sha256()
 
     def set_null(self):
-        self.nVersion = 7
+        self.nVersion = BLOCK_VERSION
         self.hashPrevBlock = 0
         self.hashMerkleRoot = 0
         self.nTime = 0
@@ -548,17 +570,6 @@ class CBlock(CBlockHeader):
         for tx in self.vtx:
             tx.calc_sha256()
             hashes.append(ser_uint256(tx.sha256))
-        return self.get_merkle_root(hashes)
-
-    def calc_witness_merkle_root(self):
-        # For witness root purposes, the hash of the
-        # coinbase, with witness, is defined to be 0...0
-        hashes = [ser_uint256(0)]
-
-        for tx in self.vtx[1:]:
-            # Calculate the hashes with witness data
-            hashes.append(ser_uint256(tx.calc_sha256(True)))
-
         return self.get_merkle_root(hashes)
 
     def is_valid(self):
@@ -857,8 +868,8 @@ class msg_tx:
     __slots__ = ("tx",)
     command = b"tx"
 
-    def __init__(self, tx=CTransaction()):
-        self.tx = tx
+    def __init__(self, tx=None):
+        self.tx = tx if tx is not None else CTransaction()
 
     def deserialize(self, f):
         self.tx.deserialize(f)
