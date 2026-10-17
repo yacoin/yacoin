@@ -23,8 +23,8 @@ On node0 and node1 at the same time:
 
 The node sends addr messages to a peer at random intervals (30 s on
 average, not affected by mocktime), so the waits for them allow 300 s.
-The nodes run with -discover=0 (no machine-dependent local addresses to
-advertise) and never dial the addresses they learn: node1 and node2 with
+The nodes run with -discover=0 and -listenonion=0 (no machine-dependent
+local addresses or onion service to advertise) and never dial the addresses they learn: node1 and node2 with
 -connect=0, node0 with a -connect to a closed local port (the one-shot
 -seednode connection is still made).
 """
@@ -92,9 +92,9 @@ class AddrTest(BitcoinTestFramework):
     def setup_network(self):
         # The ports are known only now.
         self.extra_args = [
-            ["-discover=0", "-connect=127.0.0.1:%d" % p2p_port(3)],
-            ["-discover=0", "-connect=0"],
-            ["-discover=0", "-connect=0"],
+            ["-discover=0", "-listenonion=0", "-connect=127.0.0.1:%d" % p2p_port(3)],
+            ["-discover=0", "-listenonion=0", "-connect=0"],
+            ["-discover=0", "-listenonion=0", "-connect=0"],
         ]
         self.setup_nodes()
 

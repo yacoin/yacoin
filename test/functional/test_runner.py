@@ -90,9 +90,10 @@ BASE_SCRIPTS = [
     'wallet_hd.py',
     'feature_reindex.py',
     'p2p_connections.py',  # 7
-    'p2p_eviction.py',  # 5
     'feature_net_args.py',  # 6
+    'p2p_eviction.py',  # 5
     'feature_maxuploadtarget.py',  # 5
+    'p2p_timedata.py',  # 3
     # vv 3 s or less vv
     'feature_epoch.py',
     'feature_tx_malleability.py',
@@ -118,7 +119,6 @@ BASE_SCRIPTS = [
     'wallet_disable.py',
     'p2p_getdata.py',
     'p2p_disabled_features.py',
-    'p2p_timedata.py',
     'p2p_leak_tx.py',
     'p2p_mempool.py',
     'mempool_resurrect.py',

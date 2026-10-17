@@ -129,6 +129,7 @@ class DisabledFeaturesTest(BitcoinTestFramework):
         peer_id = peers(node)[-1]['id']
         peer.send_and_ping(sendcmpct(1))
         peer.add_block(block)
+        height = node.getblockcount() + 1
         # The node answers the inv with getheaders, the peer with the
         # header, and the node then requests the block.
         peer.send_message(msg_inv([CInv(MSG_BLOCK, block.sha256)]))
@@ -139,9 +140,9 @@ class DisabledFeaturesTest(BitcoinTestFramework):
                 assert_equal(peer.getdata_types[0], MSG_BLOCK)
         self.known_failure("compact-block getdata (iQg6oeoK item 1)", check, expected="not(4 == 2)")
 
-        # The rest of this test shows what the type 4 request leads to
-        # today; it changes together with the fix.
-        height = node.getblockcount() + 1
+        # Today the type-4 request keeps the block in flight, so another
+        # peer's announcement isn't followed up and the tip doesn't move
+        # until the peer sends the block; these asserts change with the fix.
         assert_equal([p['inflight'] for p in peers(node) if p['id'] == peer_id], [[height]])
 
         self.log.info("A second peer announcing the block gets no request while it is in flight")
@@ -158,7 +159,8 @@ class DisabledFeaturesTest(BitcoinTestFramework):
         self.log.info("The full block from the first peer is accepted")
         peer.send_and_ping(msg_block(block))
         assert_equal(node.getbestblockhash(), block.hash)
-        # BlockChecked asks the peer to announce new blocks with cmpctblock.
+        # Independent of the request type: the peer's sendcmpct makes
+        # BlockChecked ask it to announce with cmpctblock.
         wait_until(lambda: peer.sendcmpcts == [(True, 1)], timeout=10, lock=mininode_lock)
         assert_equal([p['inflight'] for p in peers(node)], [[], []])
         node.disconnect_p2ps()

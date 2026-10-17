@@ -55,7 +55,7 @@ class EvictionTest(BitcoinTestFramework):
         self.sync_blocks()
         disconnect_nodes(donor, 0)
         wait_until(lambda: node.getconnectioncount() == 0)
-        blocks = blocks_from_node(donor, donor.generate(4))
+        blocks = blocks_from_node(donor, self.mine_with_mocktime(donor, 4, sync=False))
 
         # Transactions from node0's wallet, signed but not broadcast.
         txs = []
@@ -92,6 +92,9 @@ class EvictionTest(BitcoinTestFramework):
         self.log.info("Fill the remaining inbound slots with slow peers")
         while len(node.p2ps) < INBOUND_SLOTS:
             node.add_p2p_connection(SlowP2PInterface())
+        # Every fast peer has answered a ping (minping), and so have the
+        # block and transaction peers.
+        wait_until(lambda: sum('minping' in p for p in peers(node)) >= 8 + 4 + 4, timeout=10)
         peer_info = peers(node)
         assert_equal(len(peer_info), INBOUND_SLOTS)
 
