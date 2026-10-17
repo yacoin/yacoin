@@ -19,7 +19,6 @@ Not ported: the RBF / bip125-replaceable part (YACoin has no RBF).
 Mining uses mine_with_mocktime: after invalidateblock a block mined in the
 same second as the invalidated one would be the same, invalid block.
 """
-import time
 from decimal import Decimal
 
 from test_framework.test_framework import BitcoinTestFramework
@@ -146,6 +145,7 @@ class ListTransactionsTest(BitcoinTestFramework):
         b = node0.getnewaddress()
         txid = node0.sendfrom('coinbase', b, 1)
         assert txid in [e.get('txid') for e in node0.listtransactions('coinbase', 1000)]
+        # b is in '', so only the send entry must be missing
         assert txid not in [e.get('txid') for e in node0.listtransactions('', 1000) if e['category'] == 'send']
         self.mine()
 

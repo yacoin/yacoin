@@ -149,7 +149,7 @@ class WalletAccountsTest(BitcoinTestFramework):
         entries = self.moves('a')
         assert_equal(len(entries), 2)
         for e in entries:
-            assert abs(e['time'] - time.time()) < 300, e
+            assert abs(e['time'] - time.time()) < 30, e
         assert_equal(entries, [
             {'account': 'a', 'category': 'move', 'time': entries[0]['time'], 'amount': Decimal('2'),
              'otheraccount': 'coinbase', 'comment': 'm1'},
@@ -196,10 +196,11 @@ class WalletAccountsTest(BitcoinTestFramework):
         # sendfrom compares with <= where the others use <
         self.known_failure("sendfrom minimum (DCjqQX73 item 5)", check_sendfrom_minimum,
                            expected="Send amount too small")
-        node.generate(1)
 
         self.log.info("Balances by account")
+        # With the sends still unconfirmed
         assert_equal(node.getbalance('', 0), node.listaccounts(0)[''])
+        node.generate(1)
         assert_equal(node.getbalance('*'), node.getbalance())
         assert_equal(node.getbalance('*', 1, True), node.getbalance())
         received = node.listreceivedbyaccount()
