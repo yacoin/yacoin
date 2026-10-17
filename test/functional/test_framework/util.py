@@ -538,12 +538,15 @@ def sync_mempools(rpc_connections, *, wait=0.1, timeout=60):
 # Transaction/Block functions
 #############################
 
-def find_output(node, txid, amount, *, blockhash=None):
+def find_output(node, txid, amount):
     """
     Return index to output of txid with value amount
     Raises exception if there is none.
+
+    YACoin's getrawtransaction has no blockhash argument; the txindex
+    finds confirmed and mempool transactions.
     """
-    txdata = node.getrawtransaction(txid, 1, blockhash)
+    txdata = node.getrawtransaction(txid, 1)
     for i in range(len(txdata["vout"])):
         if txdata["vout"][i]["value"] == amount:
             return i
