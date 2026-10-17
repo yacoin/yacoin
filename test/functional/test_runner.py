@@ -88,6 +88,7 @@ BASE_SCRIPTS = [
     'wallet_dump.py',
     'wallet_hd.py',
     'feature_reindex.py',
+    'p2p_invalid_tx.py',
     # vv 3 s or less vv
     'feature_epoch.py',
     'feature_tx_malleability.py',
