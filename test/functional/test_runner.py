@@ -91,6 +91,7 @@ BASE_SCRIPTS = [
     'p2p_leak.py',
     'wallet_dump.py',
     'wallet_hd.py',
+    'wallet_watchonly.py',
     'feature_reindex.py',
     'wallet_listsinceblock.py',
     'wallet_listtransactions.py',
