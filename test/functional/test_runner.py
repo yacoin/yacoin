@@ -94,6 +94,7 @@ BASE_SCRIPTS = [
     'interface_yacoin_cli.py',
     'rpc_users.py',
     'interface_rpc.py',
+    'rpc_blockchain.py',
     # vv 3 s or less vv
     'feature_epoch.py',
     'feature_tx_malleability.py',
@@ -102,7 +103,6 @@ BASE_SCRIPTS = [
     'feature_basic_transfer.py',
     'feature_token_overflow.py',
     'mining_basic.py',
-    'rpc_blockchain.py',
     'rpc_invalidateblock.py',
     'p2p_disconnect_ban.py',
     'rpc_net.py',
