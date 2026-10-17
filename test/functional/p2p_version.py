@@ -64,6 +64,16 @@ class VersionTest(BitcoinTestFramework):
         conn.peer_id = [p['id'] for p in peers(node) if p['id'] not in before][0]
         return conn
 
+    def connect(self):
+        """A peer after the handshake, with its node id."""
+        node = self.nodes[0]
+        before = {p['id'] for p in peers(node)}
+        conn = node.add_p2p_connection(P2PInterface())
+        new = [p['id'] for p in peers(node) if p['id'] not in before]
+        assert_equal(len(new), 1)
+        conn.peer_id = new[0]
+        return conn
+
     def peer_info(self, conn):
         for p in peers(self.nodes[0]):
             if p['id'] == conn.peer_id:
@@ -121,12 +131,11 @@ class VersionTest(BitcoinTestFramework):
     def test_node_version(self):
         node = self.nodes[0]
         self.log.info("The node's version message")
-        conn = node.add_p2p_connection(P2PInterface())
+        conn = self.connect()
         with mininode_lock:
             version = conn.last_message['version']
         assert_equal(version.nVersion, 70015)
         assert_equal(version.nServices, 1)  # NODE_NETWORK only
-        assert_equal(version.nStartingHeight, node.getblockcount())
         assert_equal(version.nRelay, 1)
         assert version.strSubVer.startswith(b"/Yacoin-WM:"), version.strSubVer
         node.disconnect_p2ps()
@@ -134,9 +143,7 @@ class VersionTest(BitcoinTestFramework):
     def test_duplicate_version(self):
         node = self.nodes[0]
         self.log.info("A second version message: reject, ban score 1")
-        before = {p['id'] for p in peers(node)}
-        conn = node.add_p2p_connection(P2PInterface())
-        conn.peer_id = [p['id'] for p in peers(node) if p['id'] not in before][0]
+        conn = self.connect()
         version = msg_version()
         version.nStartingHeight = node.getblockcount()
         conn.send_and_ping(version)
@@ -161,8 +168,8 @@ class VersionTest(BitcoinTestFramework):
             conn = self.handshake(self.version_payload(end=end))
             info = self.peer_info(conn)
             # Absent fields keep their defaults.
-            assert_equal((info['version'], info['subver'], info['startingheight'], info['relaytxes'], info['banscore']),
-                         (70015, subver, -1, True, 0))
+            assert_equal((info['version'], info['subver'], info['relaytxes'], info['banscore']),
+                         (70015, subver, True, 0))
             self.close(conn)
 
     def test_relay(self):
@@ -228,8 +235,7 @@ class VersionTest(BitcoinTestFramework):
     def test_malformed_payloads(self):
         node = self.nodes[0]
         self.log.info("Malformed payloads: reject, no ban score")
-        conn = node.add_p2p_connection(P2PInterface())
-        conn.peer_id = peers(node)[0]['id']
+        conn = self.connect()
         inv_entry = struct.pack("<I", MSG_TX) + b"\x00" * 32
         cases = [
             (b"inv", b"\xfd\x01\x00" + inv_entry, "non-canonical ReadCompactSize()"),

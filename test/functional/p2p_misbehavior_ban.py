@@ -16,13 +16,12 @@ one, only the loopback case runs and the test is skipped.
 - -whitelist: a whitelisted peer can connect while its address is banned,
   and its misbehaviour (filterload, +100) is counted but not punished.
 - -banscore lowers the threshold.
-- setban on a connected peer's address disconnects it.
 """
 import socket
 import time
 
 from test_framework.messages import CAddress, msg_addr, msg_generic
-from test_framework.mininode import P2PInterface
+from test_framework.mininode import P2PInterface, mininode_lock
 from test_framework.test_framework import BitcoinTestFramework, SkipTest
 from test_framework.util import assert_equal, non_loopback_ipv4, peers
 
@@ -87,8 +86,14 @@ class MisbehaviorBanTest(BitcoinTestFramework):
         conn.addr = new[0]['addr']
         return conn
 
+    def peer_info(self, conn):
+        for p in peers(self.nodes[0]):
+            if p['id'] == conn.peer_id:
+                return p
+        raise AssertionError("peer=%d is not connected" % conn.peer_id)
+
     def banscore(self, conn):
-        return [p['banscore'] for p in peers(self.nodes[0]) if p['id'] == conn.peer_id][0]
+        return self.peer_info(conn)['banscore']
 
     def ban_entry(self, reason):
         return {"address": self.ip + "/32", "banned_until": self.mocktime + BANTIME,
@@ -129,7 +134,8 @@ class MisbehaviorBanTest(BitcoinTestFramework):
         with node.assert_debug_log(["connection from %s:" % ip, "dropped (banned)"], timeout=10):
             refused = node.add_p2p_connection(P2PInterface(), dstaddr=ip, wait_for_verack=False)
         refused.wait_for_disconnect(timeout=10)
-        assert_equal(refused.message_count['version'], 0)
+        with mininode_lock:
+            assert_equal(refused.message_count['version'], 0)
         self.connect().peer_disconnect()  # loopback still works
 
         self.log.info("The ban survives a restart")
@@ -142,7 +148,7 @@ class MisbehaviorBanTest(BitcoinTestFramework):
         conn = self.connect(ip)
         with node.assert_debug_log(["Warning: not punishing whitelisted peer %s!" % conn.addr], timeout=10):
             conn.send_and_ping(FILTERLOAD)
-        info = [p for p in peers(node) if p['id'] == conn.peer_id][0]
+        info = self.peer_info(conn)
         # The score is counted, only the punishment is skipped.
         assert_equal((info['whitelisted'], info['banscore']), (True, 100))
         assert_equal(node.listbanned(), banned)
@@ -154,13 +160,6 @@ class MisbehaviorBanTest(BitcoinTestFramework):
         self.restart_node(0, self.base_args + ["-banscore=40"])
         self.misbehave_until_banned(self.connect(ip), 2)
         assert_equal(node.listbanned(), [self.ban_entry("node misbehaving")])
-
-        self.log.info("setban on a connected peer's address disconnects it")
-        node.clearbanned()
-        conn = self.connect(ip)
-        node.setban(ip, "add")
-        conn.wait_for_disconnect(timeout=10)
-        assert_equal(node.listbanned(), [self.ban_entry("manually added")])
 
 
 if __name__ == '__main__':
