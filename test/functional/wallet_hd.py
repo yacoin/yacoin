@@ -2,7 +2,17 @@
 # Copyright (c) 2016-2019 The Bitcoin Core developers
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
-"""Test Hierarchical Deterministic wallet function."""
+"""Test Hierarchical Deterministic wallet function.
+
+- -usehd can't be switched off on an HD wallet, nor on for a non-HD one;
+  the wallet versions and keypool fields of both kinds;
+- the internal (change) and external key paths; a non-HD key imported into
+  an HD wallet; dumpwallet;
+- a restored backup derives the same keys and finds the funds with -rescan;
+- keypool top-up: restoring a backup over a wallet whose later keys were
+  used marks the keypool keys up to the used one as used and refills the
+  keypool.
+"""
 
 import os
 import shutil
@@ -12,7 +22,6 @@ from test_framework.test_node import ErrorMatch
 from test_framework.util import (
     assert_equal,
     connect_nodes,
-    assert_raises_rpc_error,
 )
 
 
@@ -32,6 +41,20 @@ class WalletHDTest(BitcoinTestFramework):
         self.nodes[1].assert_start_raises_init_error(['-usehd=0'], 'already existing HD wallet', match=ErrorMatch.PARTIAL_REGEX)
         self.start_node(1)
 
+        # Versions and keypool fields: HD with chain split, and non-HD
+        info0 = self.nodes[0].getwalletinfo()
+        assert_equal(info0['walletversion'], 60000)
+        assert 'keypoolsize_hd_internal' not in info0 and 'hdmasterkeyid' not in info0
+        info1 = self.nodes[1].getwalletinfo()
+        assert_equal(info1['walletversion'], 139900)
+        # -keypool=0 still keeps one key of each kind
+        assert_equal((info1['keypoolsize'], info1['keypoolsize_hd_internal']), (1, 1))
+
+        # Make sure can't switch on usehd on a non-HD wallet
+        self.stop_node(0)
+        self.nodes[0].assert_start_raises_init_error(['-usehd=1'], "Error: Error loading wallet.dat: You can't enable HD on an already existing non-HD wallet")
+        self.start_node(0)
+
         # Make sure we use hd, keep masterkeyid
         masterkeyid = self.nodes[1].getwalletinfo()['hdmasterkeyid']
         assert_equal(len(masterkeyid), 40)
@@ -47,7 +70,8 @@ class WalletHDTest(BitcoinTestFramework):
 
         # This should be enough to keep the master key and the non-HD key
         self.nodes[1].backupwallet(os.path.join(self.nodes[1].datadir, "hd.bak"))
-        #self.nodes[1].dumpwallet(os.path.join(self.nodes[1].datadir, "hd.dump"))
+        dump = os.path.join(self.nodes[1].datadir, "hd.dump")
+        assert_equal(self.nodes[1].dumpwallet(dump)['filename'], dump)
 
         # Derive some HD addresses and remember the last
         # Also send funds to each add
@@ -107,6 +131,41 @@ class WalletHDTest(BitcoinTestFramework):
                 keypath = self.nodes[1].validateaddress(out['scriptPubKey']['addresses'][0])['hdkeypath']
 
         assert_equal(keypath[0:7], "m/0'/1'")
+
+        self.test_keypool_topup()
+
+    def test_keypool_topup(self):
+        self.log.info("Keypool top-up after restoring a backup")
+        args = ['-usehd=1', '-keypool=20']
+        self.restart_node(1, args)
+        connect_nodes(self.nodes[0], 1)
+        self.sync_blocks()
+        node0, node1 = self.nodes
+        info = node1.getwalletinfo()
+        assert_equal((info['keypoolsize'], info['keypoolsize_hd_internal']), (20, 20))
+        backup = os.path.join(node1.datadir, "topup.bak")
+        node1.backupwallet(backup)
+
+        addresses = [node1.getnewaddress() for _ in range(15)]
+        first = int(node1.validateaddress(addresses[0])['hdkeypath'].split('/')[-1][:-1])
+        node0.sendtoaddress(addresses[11], 1)
+        node0.generate(1)
+        self.sync_blocks()
+
+        self.stop_node(1)
+        shutil.copyfile(backup, os.path.join(node1.datadir, "wallet.dat"))
+        self.start_node(1, args)
+        connect_nodes(self.nodes[0], 1)
+        self.sync_blocks()
+        node1 = self.nodes[1]
+        # (Not the balance: node 0 may spend the non-HD key's coin, which
+        # both wallets own.)
+        assert_equal([u['amount'] for u in node1.listunspent() if u['address'] == addresses[11]], [1])
+        assert_equal(node1.getreceivedbyaddress(addresses[11]), 1)
+        # The keys up to the used one were taken out, and the pool refilled
+        info = node1.getwalletinfo()
+        assert_equal((info['keypoolsize'], info['keypoolsize_hd_internal']), (20, 20))
+        assert_equal(node1.validateaddress(node1.getnewaddress())['hdkeypath'], "m/0'/0'/%d'" % (first + 12))
 
 if __name__ == '__main__':
     WalletHDTest().main ()
