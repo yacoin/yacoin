@@ -52,12 +52,12 @@ jobs:
     env:
       IMAGE: ubuntu.16.04-2
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: cache dir and key
         run: |
           echo "UNIT_CACHE=$RUNNER_TEMP/yacoin-cache" >> "$GITHUB_ENV"
           echo "CACHE_KEY=unit-tests-$IMAGE-${{ hashFiles('depends/packages/*.mk', 'depends/patches/**', 'depends/Makefile', 'depends/funcs.mk', 'depends/hosts/*.mk', 'depends/builders/*.mk') }}" >> "$GITHUB_ENV"
-      - uses: actions/cache/restore@v4
+      - uses: actions/cache/restore@v5
         with:
           path: ${{ env.UNIT_CACHE }}
           key: ${{ env.CACHE_KEY }}-${{ github.run_id }}-${{ github.run_attempt }}
@@ -70,18 +70,21 @@ jobs:
         timeout-minutes: 50
         run: |
           mkdir -p "$UNIT_CACHE"
-          docker run --rm -v "$GITHUB_WORKSPACE":/src -v "$UNIT_CACHE":/cache \
+          docker run --rm --init --name unit-tests -v "$GITHUB_WORKSPACE":/src -v "$UNIT_CACHE":/cache \
             -e CCACHE_COMPRESS=1 -e CCACHE_MAXSIZE=2G \
             "dev34253/yacoin-build:$IMAGE" unit-tests
-      - name: make the cache readable for saving
+      - name: stop the container and make the cache readable for saving
         if: always()
-        run: sudo chown -R "$(id -u):$(id -g)" "$UNIT_CACHE"
-      - uses: actions/cache/save@v4
+        run: |
+          # A step timeout stops docker run, but not always the container.
+          docker rm -f unit-tests 2>/dev/null || true
+          sudo chown -R "$(id -u):$(id -g)" "$UNIT_CACHE"
+      - uses: actions/cache/save@v5
         if: ${{ !cancelled() && github.event_name == 'push' && github.ref == 'refs/heads/master' }}
         with:
           path: ${{ env.UNIT_CACHE }}
           key: ${{ env.CACHE_KEY }}-${{ github.run_id }}-${{ github.run_attempt }}
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         if: failure()
         with:
           name: unit-test-logs
