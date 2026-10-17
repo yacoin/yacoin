@@ -118,7 +118,7 @@ class WalletTimelockRPCTest(BitcoinTestFramework):
         vin = self.decode(node1, tx_csv)['vin']
         assert_equal(len(vin), 1)
         assert_equal((vin[0]['txid'], vin[0]['vout'], vin[0]['sequence']), fund[cs_addr] + (3,))
-        self.sync_mempools()
+        self.relay()
 
         self.log.info("CLTV: can't spend before the lock expires, can spend from the expiry block on")
         self.mine_to(h + 4)
@@ -131,7 +131,7 @@ class WalletTimelockRPCTest(BitcoinTestFramework):
         assert_equal((decoded['vin'][0]['txid'], decoded['vin'][0]['vout'], decoded['vin'][0]['sequence']),
                      fund[cl_addr] + (0,))
 
-        self.sync_mempools()
+        self.relay()
         self.mine_to(h + 6)
         assert_equal(node0.getreceivedbyaddress(dest), 8)
         assert_equal(node1.gettransaction(tx_cltv)['confirmations'], 1)
@@ -158,7 +158,7 @@ class WalletTimelockRPCTest(BitcoinTestFramework):
         self.mine_to(h + 8)
         tx_cltv2 = node1.spendcltv(cl2_addr, dest, 4)
         assert_equal(self.decode(node1, tx_cltv2)['vin'][0]['txid'], fund[cl2_addr][0])
-        self.sync_mempools()
+        self.relay()
         self.mine_to(h + 9)
         assert_equal(node0.getreceivedbyaddress(dest), 12)
 

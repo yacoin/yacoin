@@ -35,8 +35,6 @@ class WatchOnlyTest(BitcoinTestFramework):
     def set_test_params(self):
         self.num_nodes = 2
         self.setup_clean_chain = True
-        # Relay transactions to peers without the inventory trickle delay
-        self.extra_args = [['-whitelist=127.0.0.1']] * 2
 
     def skip_test_if_missing_module(self):
         self.skip_if_no_wallet()
@@ -110,7 +108,7 @@ class WatchOnlyTest(BitcoinTestFramework):
 
     def test_errors(self):
         self.log.info("Import errors")
-        node0, node1 = self.nodes
+        node1 = self.nodes[1]
         own = node1.getnewaddress()
         assert_raises_rpc_error(-5, "Cannot use the p2sh flag with an address - use a script instead",
                                 node1.importaddress, self.a0, '', False, True)
