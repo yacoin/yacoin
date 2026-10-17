@@ -190,7 +190,8 @@ class WalletDumpTest(BitcoinTestFramework):
             assert_equal(node1.dumpprivkey(key_address), node0.dumpprivkey(key_address))
 
         def check_labels_and_scripts():
-            for label, address in labelled.items():
+            # Sorted, so the first failing label (the marker's symptom) is the same on Python 3.5
+            for label, address in sorted(labelled.items()):
                 assert_equal(node1.getaccount(address), label)
             for address, (_, label, redeem_script) in scripts.items():
                 info = node1.validateaddress(address)
