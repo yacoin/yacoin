@@ -184,9 +184,10 @@ class AbandonConflictTest(BitcoinTestFramework):
         assert v_txid not in [u['txid'] for u in node1.listunspent(0)]
         # Abandoning a conflicted transaction changes nothing
         assert_equal(node1.abandontransaction(d), None)
+        assert_equal((self.send_entry(d)['abandoned'], node1.gettransaction(d)['confirmations']), (False, -2))
 
         self.log.info("Invalidating the conflicting block clears the conflict")
-        # Last step: nothing is mined after the invalidation
+        # Last step
         node1.invalidateblock(block)
         assert_equal([node1.gettransaction(t)['confirmations'] for t in (d, e)], [0, 0])
         assert signed_txid(node0, signed['hex']) in node1.getrawmempool()

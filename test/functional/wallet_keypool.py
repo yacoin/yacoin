@@ -122,11 +122,9 @@ class KeyPoolTest(BitcoinTestFramework):
         info = node.getwalletinfo()
         assert_equal((info['keypoolsize'], info['keypoolsize_hd_internal']), (6, 6))
         node.walletlock()
-        for _ in range(6):
-            node.getnewaddress()
+        assert_equal(len({node.getnewaddress() for _ in range(6)}), 6)
         assert_raises_rpc_error(-12, KEYPOOL_RAN_OUT, node.getnewaddress)
-        for _ in range(6):
-            node.getrawchangeaddress()
+        assert_equal(len({node.getrawchangeaddress() for _ in range(6)}), 6)
         assert_raises_rpc_error(-12, KEYPOOL_RAN_OUT, node.getrawchangeaddress)
 
         # Unlocking tops the pool up again (to -keypool=3)

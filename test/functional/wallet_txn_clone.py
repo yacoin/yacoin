@@ -13,14 +13,14 @@ tx2. After the networks join, tx1 is conflicted, the clone and tx2 are
 confirmed, and the balances of the wallet and of each account follow. With
 --mineblock, node 0 mines tx1 and tx2 first.
 
-Porting notes: createrawtransaction gives the clone a new nTime and the
-output order differs, so the wallet doesn't treat the clone as an
-equivalent of tx1: the clone is debited from '' rather than from foo (Core
-signs with ALL|ANYONECANPAY to get an equivalent clone). Mined coins belong
+Porting notes: the clone has tx1's outputs in a different order, so it is a
+different transaction and the wallet never treats it as tx1; the '' account
+pays for it. Mined coins belong
 to the 'coinbase' account; node 0's mature coinbases don't change during
 the test, so Core's subsidy terms are dropped; tx1 and tx2 each spend one
 known funding output (the other coins are locked).
 """
+from collections import OrderedDict
 from decimal import Decimal
 
 from test_framework.test_framework import BitcoinTestFramework
@@ -88,7 +88,7 @@ class TxnMallTest(BitcoinTestFramework):
         rawtx1 = node0.getrawtransaction(txid1, 1)
         clone_inputs = [{'txid': i['txid'], 'vout': i['vout']} for i in rawtx1['vin']]
         # The outputs in the other order
-        clone_outputs = {o['scriptPubKey']['addresses'][0]: o['value'] for o in reversed(rawtx1['vout'])}
+        clone_outputs = OrderedDict((o['scriptPubKey']['addresses'][0], o['value']) for o in reversed(rawtx1['vout']))
         clone_raw = node0.createrawtransaction(clone_inputs, clone_outputs, rawtx1['locktime'])
         assert_equal([o['value'] for o in node0.decoderawtransaction(clone_raw)['vout']],
                      [o['value'] for o in reversed(rawtx1['vout'])])

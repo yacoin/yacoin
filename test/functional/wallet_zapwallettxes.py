@@ -18,7 +18,6 @@ wallet_basic.py covers =1 / =2 on a wallet with only confirmed
 transactions.
 """
 import os
-from decimal import Decimal
 
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.test_node import TestNode
@@ -84,15 +83,15 @@ class ZapWalletTXesTest(BitcoinTestFramework):
                                                 "Error: -zapwallettxes is only allowed with a single wallet file")
 
         self.log.info("-zapwallettxes without a value")
+        # The mempool saved earlier would bring old transactions back
+        mempool = os.path.join(node.datadir, 'mempool.dat')
+        if os.path.exists(mempool):
+            os.remove(mempool)
         self.start_node(0)
         node = self.nodes[0]
         info = node.getwalletinfo()
         snapshot = (info['txcount'], node.getbalance())
         self.stop_node(0)
-        # The mempool saved earlier would bring old transactions back
-        mempool = os.path.join(node.datadir, 'mempool.dat')
-        if os.path.exists(mempool):
-            os.remove(mempool)
         self.start_node(0, ['-zapwallettxes'])
         node = self.nodes[0]
 
