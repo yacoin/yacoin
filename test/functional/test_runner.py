@@ -108,6 +108,7 @@ BASE_SCRIPTS = [
     'feature_set_min_fee.py',
     'feature_uptime.py',
     'interface_http.py',
+    'rpc_misc.py',
     'rpc_named_arguments.py',
     'rpc_named_arguments.py --usecli',
     'rpc_help.py',
