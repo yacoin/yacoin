@@ -45,15 +45,6 @@ static std::vector<std::string> Dir(const std::string& filter, size_t count, lon
     return names;
 }
 
-static std::vector<std::string> Holders(const std::string& name, size_t count, long start, bool fExpectOk = true)
-{
-    std::vector<std::pair<std::string, CAmount> > vec;
-    int nTotal = -1;
-    BOOST_CHECK_EQUAL(ptokensdb->TokenAddressDir(vec, nTotal, false, name, count, start), fExpectOk);
-    BOOST_CHECK_EQUAL(nTotal, -1); // only written when asking for the total
-    return Entries(vec);
-}
-
 static int HolderTotal(const std::string& name)
 {
     std::vector<std::pair<std::string, CAmount> > vec;
@@ -61,15 +52,6 @@ static int HolderTotal(const std::string& name)
     BOOST_CHECK(ptokensdb->TokenAddressDir(vec, nTotal, true, name, 10, 0));
     BOOST_CHECK(vec.empty());
     return nTotal;
-}
-
-static std::vector<std::string> Holdings(const std::string& address, size_t count, long start, bool fExpectOk = true)
-{
-    std::vector<std::pair<std::string, CAmount> > vec;
-    int nTotal = -1;
-    BOOST_CHECK_EQUAL(ptokensdb->AddressDir(vec, nTotal, false, address, count, start), fExpectOk);
-    BOOST_CHECK_EQUAL(nTotal, -1);
-    return Entries(vec);
 }
 
 static int HoldingTotal(const std::string& address)
@@ -114,46 +96,46 @@ BOOST_AUTO_TEST_CASE(token_dir_filters_and_paging)
     }
 
     // Filters: everything, a prefix, an exact name, no match
-    CHECK_LIST(Dir("*", 100, 0), all);
-    CHECK_LIST(Dir("ABC*", 100, 0), {"ABC", "ABCD", "ABC#T", "ABC/X"});
-    CHECK_LIST(Dir("ABC/*", 100, 0), {"ABC/X"});
-    CHECK_LIST(Dir("ABC", 100, 0), {"ABC"});
-    CHECK_LIST(Dir("ZZZ", 100, 0), {});
-    CHECK_LIST(Dir("ZZZ*", 100, 0), {});
+    TOKEN_CHECK_LIST(Dir("*", 100, 0), all);
+    TOKEN_CHECK_LIST(Dir("ABC*", 100, 0), {"ABC", "ABCD", "ABC#T", "ABC/X"});
+    TOKEN_CHECK_LIST(Dir("ABC/*", 100, 0), {"ABC/X"});
+    TOKEN_CHECK_LIST(Dir("ABC", 100, 0), {"ABC"});
+    TOKEN_CHECK_LIST(Dir("ZZZ", 100, 0), {});
+    TOKEN_CHECK_LIST(Dir("ZZZ*", 100, 0), {});
 
     // Paging from the front
-    CHECK_LIST(Dir("*", 2, 0), {"AAA", "ABC"});
-    CHECK_LIST(Dir("*", 2, 2), {"BBB", "CCC"});
-    CHECK_LIST(Dir("*", 10, 6), {"ABC/X"});
-    CHECK_LIST(Dir("*", 10, 7), {});
-    CHECK_LIST(Dir("*", 10, 100), {});
-    CHECK_LIST(Dir("*", 0, 0), {});
+    TOKEN_CHECK_LIST(Dir("*", 2, 0), {"AAA", "ABC"});
+    TOKEN_CHECK_LIST(Dir("*", 2, 2), {"BBB", "CCC"});
+    TOKEN_CHECK_LIST(Dir("*", 10, 6), {"ABC/X"});
+    TOKEN_CHECK_LIST(Dir("*", 10, 7), {});
+    TOKEN_CHECK_LIST(Dir("*", 10, 100), {});
+    TOKEN_CHECK_LIST(Dir("*", 0, 0), {});
     // Only matching entries count toward the offset
-    CHECK_LIST(Dir("ABC*", 2, 1), {"ABCD", "ABC#T"});
+    TOKEN_CHECK_LIST(Dir("ABC*", 2, 1), {"ABCD", "ABC#T"});
 
     // A negative start counts back from the end of the filtered list
-    CHECK_LIST(Dir("*", 1, -1), {"ABC/X"});
-    CHECK_LIST(Dir("*", 2, -3), {"ABCD", "ABC#T"});
-    CHECK_LIST(Dir("*", 100, -7), all);
-    CHECK_LIST(Dir("*", 100, -8), {});
-    CHECK_LIST(Dir("ABC*", 10, -1), {"ABC/X"});
-    CHECK_LIST(Dir("ABC*", 10, -4), {"ABC", "ABCD", "ABC#T", "ABC/X"});
-    CHECK_LIST(Dir("ABC", 10, -1), {"ABC"});
-    CHECK_LIST(Dir("ZZZ", 10, -1), {});
+    TOKEN_CHECK_LIST(Dir("*", 1, -1), {"ABC/X"});
+    TOKEN_CHECK_LIST(Dir("*", 2, -3), {"ABCD", "ABC#T"});
+    TOKEN_CHECK_LIST(Dir("*", 100, -7), all);
+    TOKEN_CHECK_LIST(Dir("*", 100, -8), {});
+    TOKEN_CHECK_LIST(Dir("ABC*", 10, -1), {"ABC/X"});
+    TOKEN_CHECK_LIST(Dir("ABC*", 10, -4), {"ABC", "ABCD", "ABC#T", "ABC/X"});
+    TOKEN_CHECK_LIST(Dir("ABC", 10, -1), {"ABC"});
+    TOKEN_CHECK_LIST(Dir("ZZZ", 10, -1), {});
 }
 
 BOOST_AUTO_TEST_CASE(token_dir_empty_and_unreadable)
 {
-    CHECK_LIST(Dir("*", 10, 0), {});
-    CHECK_LIST(Dir("*", 10, -1), {});
+    TOKEN_CHECK_LIST(Dir("*", 10, 0), {});
+    TOKEN_CHECK_LIST(Dir("*", 10, -1), {});
 
     // An unreadable entry fails the listing only when it would be returned
     BOOST_REQUIRE(ptokensdb->WriteTokenData(DbToken("AAA", 1), 1, DbBlockHash(1)));
     BOOST_REQUIRE(ptokensdb->Write(std::make_pair(TOKEN_FLAG, std::string("BAD")), uint8_t(1)));
-    CHECK_LIST(Dir("*", 10, 0, false), {"AAA"});
-    CHECK_LIST(Dir("*", 10, 1, false), {});
-    CHECK_LIST(Dir("*", 1, 0), {"AAA"});
-    CHECK_LIST(Dir("AAA", 10, 0), {"AAA"});
+    TOKEN_CHECK_LIST(Dir("*", 10, 0, false), {"AAA"});
+    TOKEN_CHECK_LIST(Dir("*", 10, 1, false), {});
+    TOKEN_CHECK_LIST(Dir("*", 1, 0), {"AAA"});
+    TOKEN_CHECK_LIST(Dir("AAA", 10, 0), {"AAA"});
 }
 
 BOOST_AUTO_TEST_CASE(token_address_dir_totals_and_paging)
@@ -167,30 +149,26 @@ BOOST_AUTO_TEST_CASE(token_address_dir_totals_and_paging)
     BOOST_REQUIRE(ptokensdb->WriteTokenData(DbToken("ABC", 1), 1, DbBlockHash(1)));
     BOOST_REQUIRE(ptokensdb->WriteAddressTokenQuantity(a1, "ABC", 1 * COIN));
 
-    std::vector<std::pair<std::string, CAmount> > abc = {{a1, 1 * COIN}, {a2, 2 * COIN}, {a3, 3 * COIN}};
-    std::sort(abc.begin(), abc.end(), [](const std::pair<std::string, CAmount>& x, const std::pair<std::string, CAmount>& y) {
-        return DbKeyLess(x.first, y.first);
-    });
-    const std::vector<std::string> all = Entries(abc);
+    const std::vector<std::string> all = TokenEntriesInDbOrder({{a1, 1 * COIN}, {a2, 2 * COIN}, {a3, 3 * COIN}});
 
     // Totals count the exact name only; the passed-in total is reset
     BOOST_CHECK_EQUAL(HolderTotal("ABC"), 3);
     BOOST_CHECK_EQUAL(HolderTotal("ABCD"), 1);
     BOOST_CHECK_EQUAL(HolderTotal("NONE"), 0);
 
-    CHECK_LIST(Holders("ABC", 100, 0), all);
-    CHECK_LIST(Holders("ABC", 2, 0), {all[0], all[1]});
-    CHECK_LIST(Holders("ABC", 2, 2), {all[2]});
-    CHECK_LIST(Holders("ABC", 10, 3), {});
-    CHECK_LIST(Holders("ABC", 0, 0), {});
-    CHECK_LIST(Holders("ABCD", 100, 0), {Entry(a1, 4 * COIN)});
-    CHECK_LIST(Holders("NONE", 100, 0), {});
+    TOKEN_CHECK_LIST(TokenHolders("ABC", 100, 0), all);
+    TOKEN_CHECK_LIST(TokenHolders("ABC", 2, 0), {all[0], all[1]});
+    TOKEN_CHECK_LIST(TokenHolders("ABC", 2, 2), {all[2]});
+    TOKEN_CHECK_LIST(TokenHolders("ABC", 10, 3), {});
+    TOKEN_CHECK_LIST(TokenHolders("ABC", 0, 0), {});
+    TOKEN_CHECK_LIST(TokenHolders("ABCD", 100, 0), {Entry(a1, 4 * COIN)});
+    TOKEN_CHECK_LIST(TokenHolders("NONE", 100, 0), {});
 
     // An unreadable quantity fails the listing, not the total or a page that skips it
     BOOST_REQUIRE(ptokensdb->Write(std::make_pair(TOKEN_ADDRESS_QUANTITY_FLAG, std::make_pair(std::string("BAD"), a1)), uint8_t(1)));
-    CHECK_LIST(Holders("BAD", 10, 0, false), {});
+    TOKEN_CHECK_LIST(TokenHolders("BAD", 10, 0, false), {});
     BOOST_CHECK_EQUAL(HolderTotal("BAD"), 1);
-    CHECK_LIST(Holders("BAD", 10, 1), {});
+    TOKEN_CHECK_LIST(TokenHolders("BAD", 10, 1), {});
 }
 
 BOOST_AUTO_TEST_CASE(address_dir_totals_and_paging)
@@ -207,17 +185,17 @@ BOOST_AUTO_TEST_CASE(address_dir_totals_and_paging)
     BOOST_CHECK_EQUAL(HoldingTotal(a2), 1);
     BOOST_CHECK_EQUAL(HoldingTotal(TestTokenAddress(9)), 0);
 
-    CHECK_LIST(Holdings(a1, 100, 0), {"ABC=1000000", "XYZ=3000000", "ABCD=2000000"});
-    CHECK_LIST(Holdings(a1, 1, 1), {"XYZ=3000000"});
-    CHECK_LIST(Holdings(a1, 10, 3), {});
-    CHECK_LIST(Holdings(a1, 0, 0), {});
-    CHECK_LIST(Holdings(a2, 100, 0), {"ABC=5000000"});
-    CHECK_LIST(Holdings(TestTokenAddress(9), 100, 0), {});
+    TOKEN_CHECK_LIST(TokenHoldings(a1, 100, 0), {"ABC=1000000", "XYZ=3000000", "ABCD=2000000"});
+    TOKEN_CHECK_LIST(TokenHoldings(a1, 1, 1), {"XYZ=3000000"});
+    TOKEN_CHECK_LIST(TokenHoldings(a1, 10, 3), {});
+    TOKEN_CHECK_LIST(TokenHoldings(a1, 0, 0), {});
+    TOKEN_CHECK_LIST(TokenHoldings(a2, 100, 0), {"ABC=5000000"});
+    TOKEN_CHECK_LIST(TokenHoldings(TestTokenAddress(9), 100, 0), {});
 
     BOOST_REQUIRE(ptokensdb->Write(std::make_pair(ADDRESS_TOKEN_QUANTITY_FLAG, std::make_pair(a3, std::string("BAD"))), uint8_t(1)));
-    CHECK_LIST(Holdings(a3, 10, 0, false), {});
+    TOKEN_CHECK_LIST(TokenHoldings(a3, 10, 0, false), {});
     BOOST_CHECK_EQUAL(HoldingTotal(a3), 1);
-    CHECK_LIST(Holdings(a3, 10, 1), {});
+    TOKEN_CHECK_LIST(TokenHoldings(a3, 10, 1), {});
 }
 
 BOOST_AUTO_TEST_SUITE_END()

@@ -15,41 +15,49 @@
 
 #include "test/test_bitcoin.h"
 
+#include <algorithm>
+#include <memory>
 #include <string>
+#include <utility>
+#include <vector>
+
+#include <boost/test/unit_test.hpp>
 
 /**
- * TestingSetup plus what init.cpp creates for tokens: an in-memory token
- * database and the LRU metadata cache, with the token index enabled.
- * TestingSetup itself creates ptokens and activates genesis, so
- * AreTokensDeployed() is true (nTokenSupportBlockNumber is 0 in unit tests).
- * Everything is restored or cleared on teardown so no token state leaks into
- * other suites.
+ * What init.cpp creates for tokens, for the guard's lifetime: an in-memory
+ * token database and the LRU metadata cache, with the token index enabled.
+ * The previous globals are restored, and the token maps cleared, when the
+ * guard is destroyed, so no token state leaks into other suites. As a base or
+ * member of a fixture this also holds when the fixture's constructor throws.
  */
-struct TokenTestingSetup : public TestingSetup {
-    CTokensDB* prevTokensDb;
-    CLRUCache<std::string, CDatabasedTokenData>* prevTokensCache;
-    bool prevTokenIndex;
+struct TokenGlobalsGuard {
+    CTokensDB* const prevTokensDb;
+    CLRUCache<std::string, CDatabasedTokenData>* const prevTokensCache;
+    const bool prevTokenIndex;
+    std::unique_ptr<CTokensDB> tokensDb;
+    std::unique_ptr<CLRUCache<std::string, CDatabasedTokenData> > tokensCache;
 
-    TokenTestingSetup()
+    TokenGlobalsGuard()
+        : prevTokensDb(ptokensdb), prevTokensCache(ptokensCache), prevTokenIndex(fTokenIndex),
+          tokensDb(new CTokensDB(1 << 20, true, true)),
+          tokensCache(new CLRUCache<std::string, CDatabasedTokenData>(MAX_CACHE_TOKENS_SIZE))
     {
-        prevTokensDb = ptokensdb;
-        prevTokensCache = ptokensCache;
-        prevTokenIndex = fTokenIndex;
-        ptokensdb = new CTokensDB(1 << 20, true, true);
-        ptokensCache = new CLRUCache<std::string, CDatabasedTokenData>(MAX_CACHE_TOKENS_SIZE);
+        ptokensdb = tokensDb.get();
+        ptokensCache = tokensCache.get();
         fTokenIndex = true;
         ClearTokenGlobals();
     }
 
-    ~TokenTestingSetup()
+    ~TokenGlobalsGuard()
     {
         ClearTokenGlobals();
-        delete ptokensdb;
-        delete ptokensCache;
         ptokensdb = prevTokensDb;
         ptokensCache = prevTokensCache;
         fTokenIndex = prevTokenIndex;
     }
+
+    TokenGlobalsGuard(const TokenGlobalsGuard&) = delete;
+    TokenGlobalsGuard& operator=(const TokenGlobalsGuard&) = delete;
 
     static void ClearTokenGlobals()
     {
@@ -59,6 +67,15 @@ struct TokenTestingSetup : public TestingSetup {
         mempool.mapHashToToken.clear();
         if (ptokens) ptokens->ClearDirtyCache();
     }
+};
+
+/**
+ * TestingSetup plus the token globals of TokenGlobalsGuard. TestingSetup
+ * itself creates ptokens and activates genesis, so AreTokensDeployed() is true
+ * (nTokenSupportBlockNumber is 0 in unit tests). The guard is destroyed before
+ * TestingSetup.
+ */
+struct TokenTestingSetup : public TestingSetup, public TokenGlobalsGuard {
 };
 
 /** P2PKH script and mainnet address for a fixed test key id */
@@ -174,7 +191,7 @@ inline bool DbKeyLess(const std::string& a, const std::string& b)
 }
 
 /** "name=amount" for each entry of a token DB listing, for readable collection checks */
-inline std::vector<std::string> Entries(const std::vector<std::pair<std::string, CAmount> >& vec)
+inline std::vector<std::string> TokenEntries(const std::vector<std::pair<std::string, CAmount> >& vec)
 {
     std::vector<std::string> result;
     for (const auto& entry : vec)
@@ -182,8 +199,37 @@ inline std::vector<std::string> Entries(const std::vector<std::pair<std::string,
     return result;
 }
 
+/** TokenEntries in the order the token DB lists them (DbKeyLess on the key) */
+inline std::vector<std::string> TokenEntriesInDbOrder(std::vector<std::pair<std::string, CAmount> > vec)
+{
+    std::sort(vec.begin(), vec.end(), [](const std::pair<std::string, CAmount>& x, const std::pair<std::string, CAmount>& y) {
+        return DbKeyLess(x.first, y.first);
+    });
+    return TokenEntries(vec);
+}
+
+/** TokenAddressDir without the total: "address=amount" of the holders of a token */
+inline std::vector<std::string> TokenHolders(const std::string& name, size_t count, long start, bool fExpectOk = true)
+{
+    std::vector<std::pair<std::string, CAmount> > vec;
+    int nTotal = -1;
+    BOOST_CHECK_EQUAL(ptokensdb->TokenAddressDir(vec, nTotal, false, name, count, start), fExpectOk);
+    BOOST_CHECK_EQUAL(nTotal, -1); // only written when asking for the total
+    return TokenEntries(vec);
+}
+
+/** AddressDir without the total: "name=amount" of the tokens an address holds */
+inline std::vector<std::string> TokenHoldings(const std::string& address, size_t count, long start, bool fExpectOk = true)
+{
+    std::vector<std::pair<std::string, CAmount> > vec;
+    int nTotal = -1;
+    BOOST_CHECK_EQUAL(ptokensdb->AddressDir(vec, nTotal, false, address, count, start), fExpectOk);
+    BOOST_CHECK_EQUAL(nTotal, -1);
+    return TokenEntries(vec);
+}
+
 /** Compare a vector<string> with a braced list, printing both on mismatch */
-#define CHECK_LIST(got, ...) do { \
+#define TOKEN_CHECK_LIST(got, ...) do { \
     const std::vector<std::string> want_ = __VA_ARGS__; \
     const std::vector<std::string> got_ = (got); \
     BOOST_CHECK_EQUAL_COLLECTIONS(got_.begin(), got_.end(), want_.begin(), want_.end()); \

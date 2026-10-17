@@ -16,6 +16,7 @@
 #include "tinyformat.h"
 #include "tokens/tokendb.h"
 #include "tokens/tokens.h"
+#include "utilmoneystr.h"
 #include "validation.h"
 #include "wallet/coincontrol.h"
 #include "wallet/db.h"
@@ -46,7 +47,7 @@ struct CreateResult {
     BOOST_CHECK_EQUAL(r_.error.second, (message)); \
 } while (0)
 
-static const std::string FEE_ERROR = "Error: This transaction requires a transaction fee of at least 0.01";
+static const std::string FEE_ERROR = "Error: This transaction requires a transaction fee of at least " + FormatMoney(MIN_TX_FEE);
 
 static CNewToken TokenA() { return CNewToken("TOKENA", 1000 * COIN, 2, 1, 0, ""); }
 static CNewToken TokenB() { return CNewToken("TOKENB", 10 * COIN, 0, 1, 0, ""); }
@@ -119,17 +120,29 @@ struct NullGuard {
     ~NullGuard() { ref = saved; }
 };
 
+/** Mock wallet database environment for the object's lifetime */
+struct MockWalletDb {
+    MockWalletDb() { bitdb.MakeMock(); }
+    ~MockWalletDb()
+    {
+        bitdb.Flush(true);
+        bitdb.Reset();
+    }
+    MockWalletDb(const MockWalletDb&) = delete;
+    MockWalletDb& operator=(const MockWalletDb&) = delete;
+};
+
 /**
- * Regtest chain with token globals (as in TokenTestingSetup) and a wallet at
- * vpwallets[0]. Wallets are funded by a mined tx that spends a coin added to
- * the UTXO set directly, which is much cheaper than mining enough coinbases
- * for the token locks. Wallets aren't registered for validation callbacks
- * (no scheduler runs in unit tests); Mine() rescans the new block instead.
+ * Regtest chain with token globals (TokenGlobalsGuard, as in TokenTestingSetup)
+ * and a wallet at vpwallets[0]. Wallets are funded by a mined tx that spends a
+ * coin added to the UTXO set directly, which is much cheaper than mining enough
+ * coinbases for the token locks. Wallets aren't registered for validation
+ * callbacks (no scheduler runs in unit tests); Mine() rescans the new block
+ * instead. If the constructor fails, the members and bases undo what was set
+ * up, and vpwallets, changed last, is untouched.
  */
-struct TokenWalletSetup : public TestChain100Setup {
-    CTokensDB* prevTokensDb;
-    CLRUCache<std::string, CDatabasedTokenData>* prevTokensCache;
-    bool prevTokenIndex;
+struct TokenWalletSetup : public TestChain100Setup, public TokenGlobalsGuard {
+    MockWalletDb mockWalletDb; // declared before the wallets, so it outlives them
     std::vector<CWallet*> prevWallets;
     std::unique_ptr<CWallet> wallet;
     std::unique_ptr<CWallet> walletB;
@@ -142,23 +155,14 @@ struct TokenWalletSetup : public TestChain100Setup {
 
     TokenWalletSetup()
     {
-        prevTokensDb = ptokensdb;
-        prevTokensCache = ptokensCache;
-        prevTokenIndex = fTokenIndex;
-        ptokensdb = new CTokensDB(1 << 20, true, true);
-        ptokensCache = new CLRUCache<std::string, CDatabasedTokenData>(MAX_CACHE_TOKENS_SIZE);
-        fTokenIndex = true;
-        TokenTestingSetup::ClearTokenGlobals();
-
-        bitdb.MakeMock();
         wallet = NewWallet("wallet_token_a.dat");
-        prevWallets = vpwallets;
-        vpwallets.insert(vpwallets.begin(), wallet.get());
         tokenDest = NewDest(*wallet);
         changeDest = NewDest(*wallet);
         fundDest = NewDest(*wallet);
         tokenAddress = EncodeDestination(tokenDest);
         changeAddress = EncodeDestination(changeDest);
+        prevWallets = vpwallets;
+        vpwallets.insert(vpwallets.begin(), wallet.get());
     }
 
     ~TokenWalletSetup()
@@ -166,16 +170,8 @@ struct TokenWalletSetup : public TestChain100Setup {
         vpwallets = prevWallets;
         walletB.reset();
         wallet.reset();
-        bitdb.Flush(true);
-        bitdb.Reset();
         SetMockTime(0);
         mempool.clear();
-        TokenTestingSetup::ClearTokenGlobals();
-        delete ptokensdb;
-        delete ptokensCache;
-        ptokensdb = prevTokensDb;
-        ptokensCache = prevTokensCache;
-        fTokenIndex = prevTokenIndex;
     }
 
     static std::unique_ptr<CWallet> NewWallet(const std::string& file)
@@ -374,7 +370,7 @@ struct TokenWalletSetup : public TestChain100Setup {
             for (const auto& entry : outputs)
                 pOutputNames->push_back(entry.first);
         }
-        return Entries(std::vector<std::pair<std::string, CAmount> >(amounts.begin(), amounts.end()));
+        return TokenEntries(std::vector<std::pair<std::string, CAmount> >(amounts.begin(), amounts.end()));
     }
 };
 
@@ -382,6 +378,10 @@ BOOST_FIXTURE_TEST_SUITE(token_wallet_tests, TokenWalletSetup)
 
 BOOST_AUTO_TEST_CASE(issue_reissue_and_balances)
 {
+    // Every kind of issue, and a reissue, locks the same amount: L (per unique token)
+    for (ETokenType type : {ETokenType::YATOKEN, ETokenType::SUB, ETokenType::UNIQUE, ETokenType::REISSUE})
+        BOOST_CHECK_EQUAL(GetLockAmount(type), L);
+
     Fund({{fundDest, 2 * L + COIN}});
 
     // Without a wallet the lookups fail
@@ -401,8 +401,8 @@ BOOST_AUTO_TEST_CASE(issue_reissue_and_balances)
     }
 
     // A wallet without tokens
-    CHECK_LIST(MyTokens(wallet.get(), 1, true, false), {});
-    CHECK_LIST(MyBalances("", 0), {});
+    TOKEN_CHECK_LIST(MyTokens(wallet.get(), 1, true, false), {});
+    TOKEN_CHECK_LIST(MyBalances("", 0), {});
     BOOST_CHECK_EQUAL(Balance("TOKENA"), 0);
     RpcError error(0, "");
     BOOST_CHECK(!VerifyWalletHasToken("TOKENA", error));
@@ -426,7 +426,7 @@ BOOST_AUTO_TEST_CASE(issue_reissue_and_balances)
     BOOST_REQUIRE(OwnerFromTransaction(issue, ownerName, ownerAddress));
     BOOST_CHECK_EQUAL(ownerName, "TOKENA!");
     BOOST_CHECK_EQUAL(ownerAddress, tokenAddress);
-    BOOST_CHECK_EQUAL(CountValue(issue, GetLockAmount(ETokenType::YATOKEN)), 1);
+    BOOST_CHECK_EQUAL(CountValue(issue, L), 1);
     BOOST_CHECK(TransfersOf(issue).empty());
     // Exactly one YAC change output, paying the new change key
     int nChange = 0;
@@ -465,9 +465,9 @@ BOOST_AUTO_TEST_CASE(issue_reissue_and_balances)
     BOOST_CHECK_EQUAL((int)parsed.nReissuable, 1);
     BOOST_CHECK_EQUAL(parsed.strIPFSHash, "");
     BOOST_CHECK_EQUAL(reissueAddress, tokenAddress);
-    CHECK_LIST(TransfersOf(*reissueTx), {TransferOut("TOKENA!", OWNER_TOKEN_AMOUNT, changeAddress)});
+    TOKEN_CHECK_LIST(TransfersOf(*reissueTx), {TransferOut("TOKENA!", OWNER_TOKEN_AMOUNT, changeAddress)});
     BOOST_CHECK(Spends(*reissueTx, COutPoint(issue.GetHash(), ownerIndex)));
-    BOOST_CHECK_EQUAL(CountValue(*reissueTx, GetReissueTokenLockAmount()), 1);
+    BOOST_CHECK_EQUAL(CountValue(*reissueTx, L), 1);
 
     BOOST_REQUIRE(ptokens->GetTokenMetaDataIfExists("TOKENA", meta));
     BOOST_CHECK_EQUAL(meta.nAmount, 1500 * COIN);
@@ -480,8 +480,8 @@ BOOST_AUTO_TEST_CASE(issue_reissue_and_balances)
     BOOST_CHECK_EQUAL(Balance("TOKENA", 3), 1000 * COIN);
     BOOST_CHECK_EQUAL(Balance("TOKENA", 4), 0);
     std::vector<std::string> outputNames;
-    CHECK_LIST(MyBalances("", 0, &outputNames), {"TOKENA=1500000000", "TOKENA!=1000000"});
-    CHECK_LIST(outputNames, {"TOKENA", "TOKENA!"});
+    TOKEN_CHECK_LIST(MyBalances("", 0, &outputNames), {"TOKENA=1500000000", "TOKENA!=1000000"});
+    TOKEN_CHECK_LIST(outputNames, {"TOKENA", "TOKENA!"});
     std::map<std::string, std::vector<COutput> > outputs;
     std::map<std::string, CAmount> amounts;
     BOOST_CHECK(GetAllMyTokenBalances(outputs, amounts));
@@ -503,9 +503,9 @@ BOOST_AUTO_TEST_CASE(sub_and_unique_issue_and_listing)
     BOOST_REQUIRE(OwnerFromTransaction(*subTx, ownerName, ownerAddress));
     BOOST_CHECK_EQUAL(ownerName, "TOKENA/SUB!");
     BOOST_CHECK_EQUAL(ownerAddress, tokenAddress);
-    CHECK_LIST(TransfersOf(*subTx), {TransferOut("TOKENA!", OWNER_TOKEN_AMOUNT, changeAddress)});
+    TOKEN_CHECK_LIST(TransfersOf(*subTx), {TransferOut("TOKENA!", OWNER_TOKEN_AMOUNT, changeAddress)});
     BOOST_CHECK(Spends(*subTx, COutPoint(issue->GetHash(), issueOwner)));
-    BOOST_CHECK_EQUAL(CountValue(*subTx, GetLockAmount(ETokenType::SUB)), 1);
+    BOOST_CHECK_EQUAL(CountValue(*subTx, L), 1);
     BOOST_CHECK_EQUAL(Balance("TOKENA/SUB"), 50 * COIN);
     BOOST_CHECK_EQUAL(Balance("TOKENA/SUB!"), OWNER_TOKEN_AMOUNT);
     BOOST_CHECK_EQUAL(Balance("TOKENA!"), OWNER_TOKEN_AMOUNT);
@@ -519,44 +519,45 @@ BOOST_AUTO_TEST_CASE(sub_and_unique_issue_and_listing)
     CheckNewToken(uniqueTx->vout[n - 1].scriptPubKey, Unique("TOKENA#TAG2"), tokenAddress);
     for (const CTxOut& out : uniqueTx->vout)
         BOOST_CHECK(!IsScriptOwnerToken(out.scriptPubKey));
-    BOOST_CHECK_EQUAL(CountValue(*uniqueTx, 2 * GetLockAmount(ETokenType::UNIQUE)), 1);
-    CHECK_LIST(TransfersOf(*uniqueTx), {TransferOut("TOKENA!", OWNER_TOKEN_AMOUNT, changeAddress)});
+    BOOST_CHECK_EQUAL(CountValue(*uniqueTx, 2 * L), 1);
+    BOOST_CHECK_EQUAL(CountValue(*uniqueTx, L), 0);
+    TOKEN_CHECK_LIST(TransfersOf(*uniqueTx), {TransferOut("TOKENA!", OWNER_TOKEN_AMOUNT, changeAddress)});
     BOOST_CHECK(Spends(*uniqueTx, COutPoint(subTx->GetHash(), subOwnerChange)));
     BOOST_CHECK_EQUAL(Balance("TOKENA#TAG1"), UNIQUE_TOKEN_AMOUNT);
     BOOST_CHECK_EQUAL(Balance("TOKENA#TAG2"), UNIQUE_TOKEN_AMOUNT);
 
     // Name listings. Depths now: TOKENA 3, TOKENA/SUB and TOKENA/SUB! 2,
     // TOKENA! (moved by the unique tx) and the tags 1.
-    CHECK_LIST(MyTokens(wallet.get(), 1, false, false), {"TOKENA", "TOKENA#TAG1", "TOKENA#TAG2", "TOKENA/SUB"});
-    CHECK_LIST(MyTokens(wallet.get(), 1, true, false), {"TOKENA", "TOKENA!", "TOKENA#TAG1", "TOKENA#TAG2", "TOKENA/SUB", "TOKENA/SUB!"});
-    CHECK_LIST(MyTokens(wallet.get(), 1, false, true), {"TOKENA!", "TOKENA/SUB!"});
-    CHECK_LIST(MyTokens(wallet.get(), 1, true, true), {"TOKENA!", "TOKENA/SUB!"});
-    CHECK_LIST(MyTokens(wallet.get(), 2, false, false), {"TOKENA", "TOKENA/SUB"});
-    CHECK_LIST(MyTokens(wallet.get(), 2, true, false), {"TOKENA", "TOKENA/SUB", "TOKENA/SUB!"});
+    TOKEN_CHECK_LIST(MyTokens(wallet.get(), 1, false, false), {"TOKENA", "TOKENA#TAG1", "TOKENA#TAG2", "TOKENA/SUB"});
+    TOKEN_CHECK_LIST(MyTokens(wallet.get(), 1, true, false), {"TOKENA", "TOKENA!", "TOKENA#TAG1", "TOKENA#TAG2", "TOKENA/SUB", "TOKENA/SUB!"});
+    TOKEN_CHECK_LIST(MyTokens(wallet.get(), 1, false, true), {"TOKENA!", "TOKENA/SUB!"});
+    TOKEN_CHECK_LIST(MyTokens(wallet.get(), 1, true, true), {"TOKENA!", "TOKENA/SUB!"});
+    TOKEN_CHECK_LIST(MyTokens(wallet.get(), 2, false, false), {"TOKENA", "TOKENA/SUB"});
+    TOKEN_CHECK_LIST(MyTokens(wallet.get(), 2, true, false), {"TOKENA", "TOKENA/SUB", "TOKENA/SUB!"});
     std::vector<std::string> names;
     GetAllAdministrativeTokens(wallet.get(), names, 1);
-    CHECK_LIST(names, {"TOKENA!", "TOKENA/SUB!"});
+    TOKEN_CHECK_LIST(names, {"TOKENA!", "TOKENA/SUB!"});
     names = {"X"};
     GetAllAdministrativeTokens(nullptr, names, 1);
     GetAllMyTokens(nullptr, names, 1, true, false);
-    CHECK_LIST(names, {"X"});
+    TOKEN_CHECK_LIST(names, {"X"});
 
     // Balances by prefix; the outputs map is never filtered
     const std::vector<std::string> allNames = {"TOKENA", "TOKENA!", "TOKENA#TAG1", "TOKENA#TAG2", "TOKENA/SUB", "TOKENA/SUB!"};
     std::vector<std::string> outputNames;
-    CHECK_LIST(MyBalances("", 0, &outputNames), {"TOKENA=1000000000", "TOKENA!=1000000", "TOKENA#TAG1=1000000",
+    TOKEN_CHECK_LIST(MyBalances("", 0, &outputNames), {"TOKENA=1000000000", "TOKENA!=1000000", "TOKENA#TAG1=1000000",
                                                  "TOKENA#TAG2=1000000", "TOKENA/SUB=50000000", "TOKENA/SUB!=1000000"});
-    CHECK_LIST(outputNames, allNames);
-    CHECK_LIST(MyBalances("TOKENA", 0, &outputNames), {"TOKENA=1000000000", "TOKENA!=1000000", "TOKENA#TAG1=1000000",
+    TOKEN_CHECK_LIST(outputNames, allNames);
+    TOKEN_CHECK_LIST(MyBalances("TOKENA", 0, &outputNames), {"TOKENA=1000000000", "TOKENA!=1000000", "TOKENA#TAG1=1000000",
                                                        "TOKENA#TAG2=1000000", "TOKENA/SUB=50000000", "TOKENA/SUB!=1000000"});
-    CHECK_LIST(MyBalances("TOKENA/", 0, &outputNames), {"TOKENA/SUB=50000000", "TOKENA/SUB!=1000000"});
-    CHECK_LIST(outputNames, allNames);
-    CHECK_LIST(MyBalances("TOKENA#", 0), {"TOKENA#TAG1=1000000", "TOKENA#TAG2=1000000"});
-    CHECK_LIST(MyBalances("SUB", 0, &outputNames), {}); // must be a prefix, not anywhere in the name
-    CHECK_LIST(outputNames, allNames);
-    CHECK_LIST(MyBalances("NOPE", 0), {});
-    CHECK_LIST(MyBalances("", 2, &outputNames), {"TOKENA=1000000000", "TOKENA/SUB=50000000", "TOKENA/SUB!=1000000"});
-    CHECK_LIST(outputNames, {"TOKENA", "TOKENA/SUB", "TOKENA/SUB!"});
+    TOKEN_CHECK_LIST(MyBalances("TOKENA/", 0, &outputNames), {"TOKENA/SUB=50000000", "TOKENA/SUB!=1000000"});
+    TOKEN_CHECK_LIST(outputNames, allNames);
+    TOKEN_CHECK_LIST(MyBalances("TOKENA#", 0), {"TOKENA#TAG1=1000000", "TOKENA#TAG2=1000000"});
+    TOKEN_CHECK_LIST(MyBalances("SUB", 0, &outputNames), {}); // must be a prefix, not anywhere in the name
+    TOKEN_CHECK_LIST(outputNames, allNames);
+    TOKEN_CHECK_LIST(MyBalances("NOPE", 0), {});
+    TOKEN_CHECK_LIST(MyBalances("", 2, &outputNames), {"TOKENA=1000000000", "TOKENA/SUB=50000000", "TOKENA/SUB!=1000000"});
+    TOKEN_CHECK_LIST(outputNames, {"TOKENA", "TOKENA/SUB", "TOKENA/SUB!"});
 }
 
 BOOST_AUTO_TEST_CASE(transfer_tokens)
@@ -567,7 +568,7 @@ BOOST_AUTO_TEST_CASE(transfer_tokens)
 
     // One transfer: the rest comes back to the change address, no lock
     CTransactionRef t1 = Transfer({{CTokenTransfer("TOKENA", 300 * COIN), addrX}});
-    CHECK_LIST(TransfersOf(*t1), {TransferOut("TOKENA", 300 * COIN, addrX), TransferOut("TOKENA", 700 * COIN, changeAddress)});
+    TOKEN_CHECK_LIST(TransfersOf(*t1), {TransferOut("TOKENA", 300 * COIN, addrX), TransferOut("TOKENA", 700 * COIN, changeAddress)});
     BOOST_CHECK_EQUAL(CountValue(*t1, L), 0);
     BOOST_CHECK(Spends(*t1, COutPoint(issue->GetHash(), issue->vout.size() - 1)));
     BOOST_CHECK_EQUAL(Balance("TOKENA"), 700 * COIN);
@@ -576,7 +577,7 @@ BOOST_AUTO_TEST_CASE(transfer_tokens)
     CTransactionRef t2 = Transfer({{CTokenTransfer("TOKENA", 100 * COIN), addrX},
                                    {CTokenTransfer("TOKENA/SUB", 10 * COIN), addrY},
                                    {CTokenTransfer("TOKENA/SUB!", OWNER_TOKEN_AMOUNT), addrY}});
-    CHECK_LIST(TransfersOf(*t2), {TransferOut("TOKENA", 100 * COIN, addrX), TransferOut("TOKENA", 600 * COIN, changeAddress),
+    TOKEN_CHECK_LIST(TransfersOf(*t2), {TransferOut("TOKENA", 100 * COIN, addrX), TransferOut("TOKENA", 600 * COIN, changeAddress),
                                   TransferOut("TOKENA/SUB", 10 * COIN, addrY), TransferOut("TOKENA/SUB", 40 * COIN, changeAddress),
                                   TransferOut("TOKENA/SUB!", OWNER_TOKEN_AMOUNT, addrY)});
     BOOST_CHECK_EQUAL(Balance("TOKENA"), 600 * COIN);
@@ -615,7 +616,7 @@ BOOST_AUTO_TEST_CASE(transfer_tokens)
 
     // Sending everything leaves no token change
     CTransactionRef t3 = Transfer({{CTokenTransfer("TOKENA", 600 * COIN), addrX}});
-    CHECK_LIST(TransfersOf(*t3), {TransferOut("TOKENA", 600 * COIN, addrX)});
+    TOKEN_CHECK_LIST(TransfersOf(*t3), {TransferOut("TOKENA", 600 * COIN, addrX)});
     BOOST_CHECK_EQUAL(Balance("TOKENA"), 0);
 }
 
@@ -635,7 +636,7 @@ BOOST_AUTO_TEST_CASE(second_wallet_funds_and_ownership)
 
     {
         // The balance and has-token lookups (also inside the Create* functions) read
-        // vpwallets[0], so the second wallet has to be first there while it acts
+        // vpwallets[0], so the second wallet is made the only one there while it acts
         VpWalletsGuard onlyB({&b});
         BOOST_CHECK_EQUAL(Balance("TOKENA"), 5 * COIN);
         BOOST_CHECK_EQUAL(Balance("TOKENA!"), OWNER_TOKEN_AMOUNT);
@@ -706,8 +707,9 @@ BOOST_AUTO_TEST_CASE(issue_and_reissue_errors)
     CHECK_FAIL(TryIssue(wallet.get(), {TokenB()}, tokenAddress, ccSmall), RPC_WALLET_ERROR, "Insufficient funds");
     CHECK_FAIL(TryIssue(&locked, {TokenB()}, tokenAddress, CCoinControl()),
                RPC_WALLET_KEYPOOL_RAN_OUT, "Keypool ran out, please call keypoolrefill first");
-    // The destination isn't checked up front; the wallet refuses it. The error currently
-    // carries no message. (TryIssue starts the fee at 0, so no fee message is added.)
+    // The destination isn't checked up front; the wallet refuses it. This pins a known
+    // bug: the error carries no message, so a fix is expected to change this check.
+    // (TryIssue starts the fee at 0, so no fee message is added.)
     CHECK_FAIL(TryIssue(wallet.get(), {TokenB()}, "", cc), RPC_WALLET_ERROR, "");
 
     const CReissueToken reissue("TOKENA", COIN, -1, 1, "");
@@ -799,41 +801,24 @@ BOOST_AUTO_TEST_CASE(token_db_listings_after_issue_and_transfer)
     BOOST_REQUIRE_EQUAL(tokens.size(), 1U);
     BOOST_CHECK_EQUAL(tokens[0].token.strName, "TOKENB");
 
-    // Holders: the fully spent outputs at the token address are gone, the change is at C
-    auto holders = [](const std::string& name) {
-        std::vector<std::pair<std::string, CAmount> > vec;
-        int nTotal = 0;
-        BOOST_CHECK(ptokensdb->TokenAddressDir(vec, nTotal, false, name, 100, 0));
-        return vec;
-    };
-    auto sorted = [](std::vector<std::pair<std::string, CAmount> > vec) {
-        std::sort(vec.begin(), vec.end(), [](const std::pair<std::string, CAmount>& x, const std::pair<std::string, CAmount>& y) {
-            return DbKeyLess(x.first, y.first);
-        });
-        return Entries(vec);
-    };
+    // Holders: the fully spent outputs at the token address are gone, the change is at changeAddress
     std::vector<std::pair<std::string, CAmount> > vec;
     int nTotal = 0;
     BOOST_CHECK(ptokensdb->TokenAddressDir(vec, nTotal, true, "TOKENA", 100, 0));
     BOOST_CHECK_EQUAL(nTotal, 3);
-    CHECK_LIST(Entries(holders("TOKENA")), sorted({{changeAddress, 500 * COIN}, {addrX, 300 * COIN}, {addrY, 200 * COIN}}));
-    CHECK_LIST(Entries(holders("TOKENB")), sorted({{changeAddress, 9 * COIN}, {addrX, 1 * COIN}}));
-    CHECK_LIST(Entries(holders("TOKENA!")), {tokenAddress + "=1000000"});
+    TOKEN_CHECK_LIST(TokenHolders("TOKENA", 100, 0),
+                     TokenEntriesInDbOrder({{changeAddress, 500 * COIN}, {addrX, 300 * COIN}, {addrY, 200 * COIN}}));
+    TOKEN_CHECK_LIST(TokenHolders("TOKENB", 100, 0), TokenEntriesInDbOrder({{changeAddress, 9 * COIN}, {addrX, 1 * COIN}}));
+    TOKEN_CHECK_LIST(TokenHolders("TOKENA!", 100, 0), {tokenAddress + "=1000000"});
 
     // Holdings per address
-    auto holdings = [](const std::string& address, size_t count, long start) {
-        std::vector<std::pair<std::string, CAmount> > v;
-        int n = 0;
-        BOOST_CHECK(ptokensdb->AddressDir(v, n, false, address, count, start));
-        return Entries(v);
-    };
     BOOST_CHECK(ptokensdb->AddressDir(vec, nTotal, true, addrX, 100, 0));
     BOOST_CHECK_EQUAL(nTotal, 2);
-    CHECK_LIST(holdings(addrX, 100, 0), {"TOKENA=300000000", "TOKENB=1000000"});
-    CHECK_LIST(holdings(addrY, 100, 0), {"TOKENA=200000000"});
-    CHECK_LIST(holdings(changeAddress, 100, 0), {"TOKENA=500000000", "TOKENB=9000000"});
-    CHECK_LIST(holdings(changeAddress, 1, 1), {"TOKENB=9000000"});
-    CHECK_LIST(holdings(tokenAddress, 100, 0), {"TOKENA!=1000000", "TOKENB!=1000000"});
+    TOKEN_CHECK_LIST(TokenHoldings(addrX, 100, 0), {"TOKENA=300000000", "TOKENB=1000000"});
+    TOKEN_CHECK_LIST(TokenHoldings(addrY, 100, 0), {"TOKENA=200000000"});
+    TOKEN_CHECK_LIST(TokenHoldings(changeAddress, 100, 0), {"TOKENA=500000000", "TOKENB=9000000"});
+    TOKEN_CHECK_LIST(TokenHoldings(changeAddress, 1, 1), {"TOKENB=9000000"});
+    TOKEN_CHECK_LIST(TokenHoldings(tokenAddress, 100, 0), {"TOKENA!=1000000", "TOKENB!=1000000"});
 
     // The index agrees with what the wallet holds at its own addresses
     std::map<std::string, std::map<std::string, CAmount> > walletHoldings;
@@ -849,7 +834,7 @@ BOOST_AUTO_TEST_CASE(token_db_listings_after_issue_and_transfer)
     BOOST_CHECK_EQUAL(walletHoldings.size(), 2U);
     for (const auto& entry : walletHoldings) {
         std::vector<std::pair<std::string, CAmount> > held(entry.second.begin(), entry.second.end());
-        CHECK_LIST(holdings(entry.first, 100, 0), sorted(held));
+        TOKEN_CHECK_LIST(TokenHoldings(entry.first, 100, 0), TokenEntriesInDbOrder(held));
     }
 }
 
