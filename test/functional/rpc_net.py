@@ -17,6 +17,7 @@ from test_framework.util import (
     assert_raises_rpc_error,
     connect_nodes,
     p2p_port,
+    peers,
     wait_until,
 )
 from test_framework.mininode import P2PInterface
@@ -67,11 +68,11 @@ class NetTest(BitcoinTestFramework):
         # getnettotals before and after and verify that the returned values
         # from getpeerinfo are bounded by those values.
         net_totals_before = self.nodes[0].getnettotals()
-        peer_info = self.nodes[0].getpeerinfo()
+        peer_info = peers(self.nodes[0])
         net_totals_after = self.nodes[0].getnettotals()
-        assert_equal(len(peer_info) - 1, 2)
-        peers_recv = sum([peer['bytesrecv'] for peer in peer_info if peer.get('bytesrecv') is not None])
-        peers_sent = sum([peer['bytessent'] for peer in peer_info if peer.get('bytesrecv') is not None])
+        assert_equal(len(peer_info), 2)
+        peers_recv = sum([peer['bytesrecv'] for peer in peer_info])
+        peers_sent = sum([peer['bytessent'] for peer in peer_info])
 
         assert_greater_than_or_equal(peers_recv, net_totals_before['totalbytesrecv'])
         assert_greater_than_or_equal(net_totals_after['totalbytesrecv'], peers_recv)
@@ -85,12 +86,10 @@ class NetTest(BitcoinTestFramework):
         wait_until(lambda: (self.nodes[0].getnettotals()['totalbytessent'] >= net_totals_after['totalbytessent'] + 32 * 2), timeout=1)
         wait_until(lambda: (self.nodes[0].getnettotals()['totalbytesrecv'] >= net_totals_after['totalbytesrecv'] + 32 * 2), timeout=1)
 
-        peer_info_after_ping = self.nodes[0].getpeerinfo()
+        peer_info_after_ping = peers(self.nodes[0])
         for before, after in zip(peer_info, peer_info_after_ping):
-            if before.get('bytesrecv_per_msg') is not None and after.get('bytesrecv_per_msg') is not None:
-                assert_greater_than_or_equal(after['bytesrecv_per_msg'].get('pong', 0), before['bytesrecv_per_msg'].get('pong', 0) + 32)
-            if before.get('bytessent_per_msg') is not None and after.get('bytessent_per_msg') is not None:
-                assert_greater_than_or_equal(after['bytessent_per_msg'].get('ping', 0), before['bytessent_per_msg'].get('ping', 0) + 32)
+            assert_greater_than_or_equal(after['bytesrecv_per_msg'].get('pong', 0), before['bytesrecv_per_msg'].get('pong', 0) + 32)
+            assert_greater_than_or_equal(after['bytessent_per_msg'].get('ping', 0), before['bytessent_per_msg'].get('ping', 0) + 32)
 
     def _test_getnetworkinfo(self):
         assert_equal(self.nodes[0].getnetworkinfo()['networkactive'], True)
