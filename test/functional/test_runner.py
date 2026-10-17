@@ -71,6 +71,7 @@ BASE_SCRIPTS = [
     # script. Durations in seconds after the connect_nodes change.
     'feature_help.py', # at the beginning to quickly check that it can be started
     'p2p_timeouts.py',  # 63: the node's fixed 60 s inactivity check
+    'p2p_headers.py',  # 35: mines 2010 blocks
     'wallet_backup.py',  # 25
     'feature_timelock.py',  # 17
     'rpc_rawtransaction.py',  # 15
