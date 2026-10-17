@@ -99,6 +99,7 @@ BASE_SCRIPTS = [
     'wallet_zapwallettxes.py',
     'wallet_abandonconflict.py',
     # vv 3 s or less vv
+    'wallet_import_rescan.py',
     'wallet_txn_doublespend.py',
     'wallet_txn_doublespend.py --mineblock',
     'wallet_txn_clone.py',
