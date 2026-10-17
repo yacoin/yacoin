@@ -82,6 +82,7 @@ BASE_SCRIPTS = [
     'mempool_reorg.py',  # 5-18
     'p2p_sendheaders.py',  # 9
     'wallet_encryption.py',  # 8
+    'p2p_unrequested_blocks.py',  # 7
     'p2p_block_sync.py',  # 5
     'p2p_feefilter.py',  # 5
     'feature_op_cltv.py',
