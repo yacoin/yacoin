@@ -15,7 +15,7 @@ import time
 from test_framework.messages import msg_getaddr, msg_ping, msg_verack
 from test_framework.mininode import mininode_lock, P2PInterface
 from test_framework.test_framework import BitcoinTestFramework
-from test_framework.util import wait_until
+from test_framework.util import peers, wait_until
 
 banscore = 10
 
@@ -51,9 +51,6 @@ class CLazyNode(P2PInterface):
     def on_feefilter(self, message): self.bad_message(message)
     def on_sendheaders(self, message): self.bad_message(message)
     def on_sendcmpct(self, message): self.bad_message(message)
-    def on_cmpctblock(self, message): self.bad_message(message)
-    def on_getblocktxn(self, message): self.bad_message(message)
-    def on_blocktxn(self, message): self.bad_message(message)
 
 # Node that never sends a version. We'll use this to send a bunch of messages
 # anyway, and eventually get disconnected.
@@ -114,13 +111,13 @@ class P2PLeakTest(BitcoinTestFramework):
         #Give the node enough time to possibly leak out a message
         time.sleep(5)
 
-        #This node should have been banned
+        # This node should have been disconnected (loopback peers are never banned)
         assert not no_version_bannode.is_connected
 
         self.nodes[0].disconnect_p2ps()
 
         # Wait until all connections are closed
-        wait_until(lambda: len(self.nodes[0].getpeerinfo()) - 1 == 0)
+        wait_until(lambda: len(peers(self.nodes[0])) == 0)
 
         # Make sure no unexpected messages came in
         assert no_version_bannode.unexpected_msg == False
