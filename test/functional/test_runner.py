@@ -77,6 +77,7 @@ BASE_SCRIPTS = [
     'feature_tokens.py',  # 11
     'feature_defaultport.py',  # 11
     'mempool_reorg.py',  # 5-18
+    'wallet_startup_options.py',  # 10
     'wallet_encryption.py',  # 8
     'feature_op_cltv.py',
     'feature_op_csv.py',
