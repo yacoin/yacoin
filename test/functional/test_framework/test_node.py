@@ -611,8 +611,12 @@ class TestNodeCLI():
                 results.append(dict(result=None, error=e.error))
         return results
 
-    def send_cli(self, command=None, *args, **kwargs):
-        """Run bitcoin-cli command. Deserializes returned string as python object."""
+    def send_cli(self, clicommand=None, *args, **kwargs):
+        """Run bitcoin-cli command. Deserializes returned string as python object.
+
+        The parameter isn't called "command": RPCs have named arguments of
+        that name (help command=...)."""
+        command = clicommand
         pos_args = [arg_to_cli(arg) for arg in args]
         named_args = [str(key) + "=" + arg_to_cli(value) for (key, value) in kwargs.items()]
         assert not (pos_args and named_args), "Cannot use positional arguments and named arguments in the same bitcoin-cli call"
