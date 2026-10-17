@@ -112,7 +112,7 @@ std::vector<std::string> Sorted(std::vector<std::string> v)
     return v;
 }
 
-uint160 Hash(unsigned char n) { return uint160(std::vector<unsigned char>(20, n)); }
+uint160 FilledHash(unsigned char n) { return uint160(std::vector<unsigned char>(20, n)); }
 
 #define CHECK_SAME(a, b)                                                     \
     do {                                                                     \
@@ -130,9 +130,10 @@ std::vector<int> Heights(CBlockTreeDB& db, const uint160& hash, const std::strin
     return heights;
 }
 
+/** Compare heights with a braced list, e.g. CHECK_HEIGHTS(h, {1, 2}) or CHECK_HEIGHTS(h, {}) */
 #define CHECK_HEIGHTS(actual, ...)                                             \
     do {                                                                       \
-        const std::vector<int> _act = (actual), _exp = {__VA_ARGS__};          \
+        const std::vector<int> _act = (actual), _exp = __VA_ARGS__;            \
         BOOST_CHECK_EQUAL_COLLECTIONS(_act.begin(), _act.end(), _exp.begin(), _exp.end()); \
     } while (0)
 
@@ -152,7 +153,7 @@ struct AddressIndexSetup : public AddressIndexOn, public TestChain100Setup {
     bool prevTokenIndex;
     CKey keyB, keyC, keyU, keyF;
     uint160 idA, idB, idC, idU, idF, idS;
-    CScript redeem, scriptS, opTrue;
+    CScript scriptS, opTrue;
 
     // Material built by BuildP / BuildX
     CTransaction tx0, tx1, tx2;
@@ -183,10 +184,9 @@ struct AddressIndexSetup : public AddressIndexOn, public TestChain100Setup {
         idC = keyC.GetPubKey().GetID();
         idU = keyU.GetPubKey().GetID();
         idF = keyF.GetPubKey().GetID();
-        redeem = CScript() << OP_TRUE;
-        idS = CScriptID(redeem);
-        scriptS = GetScriptForDestination(CScriptID(redeem));
-        opTrue = CScript() << OP_TRUE;
+        opTrue = CScript() << OP_TRUE; // a bare output, and the redeem script of scriptS
+        idS = CScriptID(opTrue);
+        scriptS = GetScriptForDestination(CScriptID(opTrue));
     }
 
     ~AddressIndexSetup()
@@ -209,7 +209,7 @@ struct AddressIndexSetup : public AddressIndexOn, public TestChain100Setup {
         for (size_t i = 0; i < mtx.vin.size(); i++) {
             const CScript& prev = prevScripts[i];
             if (prev == scriptS) {
-                mtx.vin[i].scriptSig = CScript() << ToByteVector(redeem);
+                mtx.vin[i].scriptSig = CScript() << ToByteVector(opTrue);
                 continue;
             }
             if (prev == opTrue) continue;
@@ -392,7 +392,15 @@ struct AddressIndexSetup : public AddressIndexOn, public TestChain100Setup {
     }
 
     /** X (height 14): tx1 spends tx0's P2PK, P2SH, P2PKH and OP_TRUE outputs (input index
-     *  differs from the output index for P2SH and P2PKH); tx2 spends tx1's P2SH output */
+     *  differs from the output index for P2SH and P2PKH); tx2 spends tx1's P2SH output.
+     *
+     *  The disconnect tests rely on two properties of how their blocks spend coins, chosen
+     *  so that a known issue in the address index undo (DisconnectBlock) doesn't affect
+     *  their results:
+     *  - every coin a disconnected block spends was created in the block just before it
+     *    (here: tx0, at height 13), or in the same block;
+     *  - every P2PK input's index equals the prevout.n it spends (input 0 spends output 0).
+     *  Keep both when extending these tests, or expect different results until it's fixed. */
     void BuildX()
     {
         CMutableTransaction m1;
@@ -517,7 +525,7 @@ BOOST_FIXTURE_TEST_SUITE(addressindex_tests, AddressIndexSetup)
 
 BOOST_FIXTURE_TEST_CASE(key_serialization, BasicTestingSetup)
 {
-    const uint160 h = Hash(0x5a);
+    const uint160 h = FilledHash(0x5a);
     const uint256 txid = uint256S("0x0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20");
 
     // Index key: heights and tx positions are big-endian so LevelDB sorts them numerically
@@ -639,7 +647,7 @@ BOOST_FIXTURE_TEST_CASE(key_serialization, BasicTestingSetup)
 BOOST_FIXTURE_TEST_CASE(address_index_write_read_erase, TestingSetup)
 {
     CBlockTreeDB db(1 << 20, true, true);
-    const uint160 h1 = Hash(0x11), h2 = Hash(0x22), h3 = Hash(0x33);
+    const uint160 h1 = FilledHash(0x11), h2 = FilledHash(0x22), h3 = FilledHash(0x33);
     const uint256 txA = uint256S("0xaa"), txB = uint256S("0xbb");
 
     // Empty batches are no-ops
@@ -682,8 +690,8 @@ BOOST_FIXTURE_TEST_CASE(address_index_write_read_erase, TestingSetup)
     CHECK_SAME(read(h2, 1, ""), (Strs<CAddressIndexKey, CAmount>({other})));
     CHECK_SAME(read(h3, 2, ""), (Strs<CAddressIndexKey, CAmount>({p2sh})));
     BOOST_CHECK(read(h1, 2, "").empty());
-    BOOST_CHECK(read(Hash(0x15), 1, "").empty());
-    BOOST_CHECK(read(Hash(0x44), 2, "").empty());
+    BOOST_CHECK(read(FilledHash(0x15), 1, "").empty());
+    BOOST_CHECK(read(FilledHash(0x44), 2, "").empty());
 
     // Results are appended to what the caller passes in
     out = {other};
@@ -704,7 +712,7 @@ BOOST_FIXTURE_TEST_CASE(address_index_write_read_erase, TestingSetup)
 BOOST_FIXTURE_TEST_CASE(address_index_height_range, TestingSetup)
 {
     CBlockTreeDB db(1 << 20, true, true);
-    const uint160 h1 = Hash(0x11), h2 = Hash(0x22);
+    const uint160 h1 = FilledHash(0x11), h2 = FilledHash(0x22);
     const uint256 tx = uint256S("0xaa");
     BOOST_CHECK(db.WriteAddressIndex({
         IndexEntry(CAddressIndexKey(1, h1, 65536, 0, tx, 0, false), 1),
@@ -716,33 +724,33 @@ BOOST_FIXTURE_TEST_CASE(address_index_height_range, TestingSetup)
     }));
 
     // Both ends are inclusive; 255 < 256 < 65536 in key order (big-endian)
-    CHECK_HEIGHTS(Heights(db, h1, "YAC", 256, 256), 256);
-    CHECK_HEIGHTS(Heights(db, h1, "YAC", 255, 256), 255, 256);
-    CHECK_HEIGHTS(Heights(db, h1, "YAC", 256, 65536), 256, 65536);
-    CHECK_HEIGHTS(Heights(db, h1, "YAC", 257, 65535));
-    CHECK_HEIGHTS(Heights(db, h1, "YAC", 65536, 70000), 65536);
-    CHECK_HEIGHTS(Heights(db, h1, "YAC", 70000, 80000));
-    CHECK_HEIGHTS(Heights(db, h1, "YAC", 1, 254));
-    CHECK_HEIGHTS(Heights(db, h1, "YAC", 1, 255), 255);
-    CHECK_HEIGHTS(Heights(db, h1, "YAC", 300, 200));
+    CHECK_HEIGHTS(Heights(db, h1, "YAC", 256, 256), {256});
+    CHECK_HEIGHTS(Heights(db, h1, "YAC", 255, 256), {255, 256});
+    CHECK_HEIGHTS(Heights(db, h1, "YAC", 256, 65536), {256, 65536});
+    CHECK_HEIGHTS(Heights(db, h1, "YAC", 257, 65535), {});
+    CHECK_HEIGHTS(Heights(db, h1, "YAC", 65536, 70000), {65536});
+    CHECK_HEIGHTS(Heights(db, h1, "YAC", 70000, 80000), {});
+    CHECK_HEIGHTS(Heights(db, h1, "YAC", 1, 254), {});
+    CHECK_HEIGHTS(Heights(db, h1, "YAC", 1, 255), {255});
+    CHECK_HEIGHTS(Heights(db, h1, "YAC", 300, 200), {});
     // start 0: from the first entry, end still applies
-    CHECK_HEIGHTS(Heights(db, h1, "YAC", 0, 256), 255, 256);
-    CHECK_HEIGHTS(Heights(db, h1, "YAC", -1, 256), 255, 256);
-    CHECK_HEIGHTS(Heights(db, h1, "YAC", 256, -1), 255, 256, 65536);
+    CHECK_HEIGHTS(Heights(db, h1, "YAC", 0, 256), {255, 256});
+    CHECK_HEIGHTS(Heights(db, h1, "YAC", -1, 256), {255, 256});
+    CHECK_HEIGHTS(Heights(db, h1, "YAC", 256, -1), {255, 256, 65536});
     // start is only used together with end (the RPC always passes both)
-    CHECK_HEIGHTS(Heights(db, h1, "YAC", 256, 0), 255, 256, 65536);
-    CHECK_HEIGHTS(Heights(db, h1, "YAC", 0, 0), 255, 256, 65536);
+    CHECK_HEIGHTS(Heights(db, h1, "YAC", 256, 0), {255, 256, 65536});
+    CHECK_HEIGHTS(Heights(db, h1, "YAC", 0, 0), {255, 256, 65536});
     // The range stays within one token and one address
-    CHECK_HEIGHTS(Heights(db, h1, "TOK", 256, 256), 256);
-    CHECK_HEIGHTS(Heights(db, h1, "TOKEN", 1, 255));
-    CHECK_HEIGHTS(Heights(db, h1, "TOKEN", 1, 300), 256);
-    CHECK_HEIGHTS(Heights(db, h2, "YAC", 1, 1000), 256);
+    CHECK_HEIGHTS(Heights(db, h1, "TOK", 256, 256), {256});
+    CHECK_HEIGHTS(Heights(db, h1, "TOKEN", 1, 255), {});
+    CHECK_HEIGHTS(Heights(db, h1, "TOKEN", 1, 300), {256});
+    CHECK_HEIGHTS(Heights(db, h2, "YAC", 1, 1000), {256});
 }
 
 BOOST_FIXTURE_TEST_CASE(address_index_corrupt_records, TestingSetup)
 {
     CBlockTreeDB db(1 << 20, true, true);
-    const uint160 h1 = Hash(0x11), h2 = Hash(0x22), hLast = Hash(0xee);
+    const uint160 h1 = FilledHash(0x11), h2 = FilledHash(0x22), hLast = FilledHash(0xee);
     const uint256 tx = uint256S("0xaa");
     const IndexEntry e1(CAddressIndexKey(1, h1, 10, 0, tx, 0, false), 5);
     const IndexEntry e2(CAddressIndexKey(1, h2, 10, 0, tx, 0, false), 6);
@@ -775,7 +783,7 @@ BOOST_FIXTURE_TEST_CASE(address_index_corrupt_records, TestingSetup)
 BOOST_FIXTURE_TEST_CASE(unspent_index_update_and_read, TestingSetup)
 {
     CBlockTreeDB db(1 << 20, true, true);
-    const uint160 h1 = Hash(0x11), h2 = Hash(0x22);
+    const uint160 h1 = FilledHash(0x11), h2 = FilledHash(0x22);
     const uint256 txA = uint256S("0xaa"), txB = uint256S("0xbb"), txC = uint256S("0xcc");
     const CScript s1 = CScript() << OP_TRUE, s2 = CScript() << OP_2 << OP_DROP;
 
@@ -806,12 +814,12 @@ BOOST_FIXTURE_TEST_CASE(unspent_index_update_and_read, TestingSetup)
     CHECK_SAME(read(h1, ""), (Strs<K, V>({tok, yA, yB, token})));
     BOOST_CHECK(read(h1, "NOPE").empty());
     CHECK_SAME(read(h2, "YAC"), (Strs<K, V>({other})));
-    BOOST_CHECK(read(Hash(0x99), "").empty());
+    BOOST_CHECK(read(FilledHash(0x99), "").empty());
 
     // Without a token name: every token but YAC (the scan goes on past the YAC records)
     CHECK_SAME(readTokens(h1), (Strs<K, V>({tok, token})));
     BOOST_CHECK(readTokens(h2).empty());
-    BOOST_CHECK(readTokens(Hash(0x99)).empty());
+    BOOST_CHECK(readTokens(FilledHash(0x99)).empty());
 
     // Appends to the caller's vector
     std::vector<UnspentEntry> out{other};
@@ -837,7 +845,7 @@ BOOST_FIXTURE_TEST_CASE(unspent_index_update_and_read, TestingSetup)
 BOOST_FIXTURE_TEST_CASE(unspent_index_corrupt_records, TestingSetup)
 {
     CBlockTreeDB db(1 << 20, true, true);
-    const uint160 h1 = Hash(0x11), h2 = Hash(0x22), hLast = Hash(0xee);
+    const uint160 h1 = FilledHash(0x11), h2 = FilledHash(0x22), hLast = FilledHash(0xee);
     const uint256 txA = uint256S("0xaa"), txB = uint256S("0xbb");
     const CScript s = CScript() << OP_TRUE;
     typedef CAddressUnspentKey K;
@@ -929,9 +937,10 @@ BOOST_AUTO_TEST_CASE(disconnect_and_reconnect)
     const std::vector<std::string> indexX = DumpIndex(*pblocktree), unspentX = DumpUnspent(*pblocktree);
     CBlock blockZ = BuildBlock({});
     BOOST_REQUIRE(Submit(blockZ));
-    BOOST_CHECK(DumpIndex(*pblocktree).size() == indexX.size() + 1);
+    BOOST_CHECK_EQUAL(DumpIndex(*pblocktree).size(), indexX.size() + 1);
 
-    // Both X and its child are disconnected
+    // Both X and its child are disconnected. X spends only coins from P, the block just
+    // before it, and its P2PK input spends the same index (see BuildX)
     Invalidate(blockX);
     BOOST_REQUIRE(Tip()->GetBlockHash() == blockP.GetHash());
     CHECK_SAME(DumpIndex(*pblocktree), indexP);
@@ -962,12 +971,16 @@ BOOST_AUTO_TEST_CASE(reorg_replaces_entries)
     CBlockIndex* pindexX = Tip();
     const std::vector<std::string> indexX = DumpIndex(*pblocktree), unspentX = DumpUnspent(*pblocktree);
 
-    // Y1 spends tx0's keyB output (also spent by X) to keyC; Y2 makes that branch longer
+    // Y1 spends tx0's keyB output (also spent by X) to keyC; Y2 makes that branch longer.
+    // Both X and Y1 only spend coins from P, the block just before them (see BuildX)
     CMutableTransaction m;
     m.vin.emplace_back(COutPoint(tx0.GetHash(), 1));
     m.vout.emplace_back(2 * u - u / 10, P2PKH(idC));
     CTransaction ytx = Sign(m, {tx0.vout[1].scriptPubKey});
     CBlock y1 = BuildOn(pindexP, CScript() << OP_TRUE << std::vector<unsigned char>(1, 2), {ytx});
+    // Y1 has the same work as X: with the hard fork at height 0 in unit tests the target only
+    // changes every 21000 blocks, so siblings get the same nBits. On equal work the block
+    // seen first stays the tip.
     BOOST_CHECK(!Submit(y1));
     CBlockIndex* pindexY1;
     {
@@ -986,7 +999,8 @@ BOOST_AUTO_TEST_CASE(reorg_replaces_entries)
     CHECK_SAME(Sorted(DumpIndex(*pblocktree)), Sorted(expIndex));
     CHECK_SAME(Sorted(DumpUnspent(*pblocktree)), Sorted(expUnspent));
 
-    // Two more blocks on X (coinbases not indexed): back to exactly X's entries
+    // Two more blocks on X (coinbases not indexed): back to exactly X's entries. X2 has the
+    // same work as Y2 (as above), so only the second block takes over.
     CBlock x2 = BuildOn(pindexX, CScript() << OP_TRUE << std::vector<unsigned char>(1, 4), {});
     BOOST_CHECK(!Submit(x2));
     CBlockIndex* pindexX2;
@@ -1004,7 +1018,9 @@ BOOST_AUTO_TEST_CASE(uncompressed_p2pk_spend)
 {
     BuildP();
     BOOST_REQUIRE(Submit(blockP));
-    // A keyU output at index 0, spent by input 0 of the next block
+    // A keyU output at index 0, spent by input 0 of the next block. Spending from the block
+    // just before, with the input index equal to prevout.n, is what the disconnect below
+    // needs (see BuildX)
     CMutableTransaction m1;
     m1.vin.emplace_back(COutPoint(tx0.GetHash(), 12));
     m1.vout.emplace_back(tx0.vout[12].nValue - u / 10, CScript() << ToByteVector(keyU.GetPubKey()) << OP_CHECKSIG);
@@ -1031,8 +1047,10 @@ BOOST_AUTO_TEST_CASE(uncompressed_p2pk_spend)
 /* Token outputs are indexed per token name (owner tokens included), and undone on disconnect */
 BOOST_AUTO_TEST_CASE(token_entries)
 {
-    // A mature coin large enough for the issue lock, instead of mining enough coinbases.
+    // A coin large enough for the issue lock, instead of mining enough coinbases.
     // It wasn't created by an indexed block, so its address only shows the spend.
+    // It's added at the tip height so that, like every coin the disconnects below
+    // restore, it comes from the block just before the one that spends it (see BuildX).
     const CAmount nLock = GetLockAmount(ETokenType::YATOKEN);
     const CAmount nFund = nLock + 10 * COIN;
     const COutPoint fund(uint256S("0xf0f0f0f0"), 0);
@@ -1142,15 +1160,15 @@ BOOST_AUTO_TEST_CASE(chain_height_ranges)
         for (const IndexEntry& e : out) h.push_back(e.first.blockHeight);
         return h;
     };
-    CHECK_HEIGHTS(heights(3, 5), 3, 4, 5);
-    CHECK_HEIGHTS(heights(7, 7), 7);
-    CHECK_HEIGHTS(heights(1, 1), 1);
-    CHECK_HEIGHTS(heights(12, 12), 12);
-    CHECK_HEIGHTS(heights(12, 100), 12);
-    CHECK_HEIGHTS(heights(13, 20));
-    CHECK_HEIGHTS(heights(6, 5));
-    CHECK_HEIGHTS(heights(0, 5), 1, 2, 3, 4, 5);
-    CHECK_HEIGHTS(heights(5, 0), 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12);
+    CHECK_HEIGHTS(heights(3, 5), {3, 4, 5});
+    CHECK_HEIGHTS(heights(7, 7), {7});
+    CHECK_HEIGHTS(heights(1, 1), {1});
+    CHECK_HEIGHTS(heights(12, 12), {12});
+    CHECK_HEIGHTS(heights(12, 100), {12});
+    CHECK_HEIGHTS(heights(13, 20), {});
+    CHECK_HEIGHTS(heights(6, 5), {});
+    CHECK_HEIGHTS(heights(0, 5), {1, 2, 3, 4, 5});
+    CHECK_HEIGHTS(heights(5, 0), {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12});
 }
 
 /* Block checks (TestBlockValidity) and VerifyDB connect and disconnect without touching the index */
@@ -1222,7 +1240,7 @@ BOOST_AUTO_TEST_CASE(index_switched_off)
     BOOST_CHECK(uout.empty());
 
     // Undecodable records make every getter fail
-    const uint160 idZ = Hash(0x7f);
+    const uint160 idZ = FilledHash(0x7f);
     BOOST_CHECK(pblocktree->Write(std::make_pair(DB_ADDRESSINDEX, CAddressIndexKey(1, idZ, 5, 0, uint256S("0x01"), 0, false)), (unsigned char)1));
     BOOST_CHECK(pblocktree->Write(std::make_pair(DB_ADDRESSUNSPENTINDEX, CAddressUnspentKey(1, idZ, uint256S("0x01"), 0)), (unsigned char)1));
     BOOST_CHECK(!GetAddressIndex(idZ, 1, out));
