@@ -102,6 +102,7 @@ BASE_SCRIPTS = [
     'rpc_blockchain.py',
     'rpc_invalidateblock.py',
     'p2p_disconnect_ban.py',
+    'rpc_setban.py',
     'rpc_net.py',
     'feature_describe_redeemscript.py',
     'feature_getrpcinfo.py',
