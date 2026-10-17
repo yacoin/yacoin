@@ -25,6 +25,11 @@ from test_framework.util import assert_equal, raw_rpc, rpc_port, str_to_b64str
 AUTH = {'Authorization': 'Basic ' + str_to_b64str('yacoinuser:yacoinpwd')}
 
 
+def json_body(body):
+    """Parse an HTTP response body (json.loads only takes bytes from Python 3.6 on)."""
+    return json.loads(body.decode('utf-8'))
+
+
 class HTTPBasicsTest(BitcoinTestFramework):
     def set_test_params(self):
         self.num_nodes = 1
@@ -125,7 +130,7 @@ class HTTPBasicsTest(BitcoinTestFramework):
 
         self.log.info("Spaces around the base64 credentials are trimmed")
         status, _, reply = raw_rpc(node, body, auth=False, headers={'Authorization': 'Basic   ' + str_to_b64str('yacoinuser:yacoinpwd') + '  '})
-        assert_equal((status, json.loads(reply)['result']), (200, 0))
+        assert_equal((status, json_body(reply)['result']), (200, 0))
 
         self.log.info("A 401 leaves a keep-alive connection usable")
         conn = self.connection()
@@ -135,7 +140,7 @@ class HTTPBasicsTest(BitcoinTestFramework):
         assert conn.sock is not None
         conn.request('POST', '/', body, AUTH)
         response = conn.getresponse()
-        assert_equal((response.status, json.loads(response.read())['result']), (200, 0))
+        assert_equal((response.status, json_body(response.read())['result']), (200, 0))
         conn.close()
 
     def test_bodies(self):
@@ -146,7 +151,7 @@ class HTTPBasicsTest(BitcoinTestFramework):
         # so it gets "Parse error" too.
         for body in ['{', '"x"', '1', 'null', '']:
             status, headers, reply = raw_rpc(node, body)
-            assert_equal((status, json.loads(reply)), (500, parse_error))
+            assert_equal((status, json_body(reply)), (500, parse_error))
             assert_equal(headers['Content-Type'], 'application/json')
 
         self.log.info("A chunked request body is read")
@@ -158,7 +163,7 @@ class HTTPBasicsTest(BitcoinTestFramework):
                      b'%x\r\n' % len(payload) + payload + b'\r\n0\r\n\r\n')
         response = http.client.HTTPResponse(sock)
         response.begin()
-        assert_equal((response.status, json.loads(response.read())), (200, {"result": 0, "error": None, "id": 7}))
+        assert_equal((response.status, json_body(response.read())), (200, {"result": 0, "error": None, "id": 7}))
         sock.close()
 
     def test_paths_and_ids(self):
@@ -169,20 +174,20 @@ class HTTPBasicsTest(BitcoinTestFramework):
         assert_equal(raw_rpc(node, '{"method": "getblockcount"}', path='/?x=1')[::2], (404, b""))
 
         status, _, reply = raw_rpc(node, '{"method": "getwalletinfo"}', path='/wallet/wallet.dat')
-        assert_equal((status, json.loads(reply)['result']['walletname']), (200, 'wallet.dat'))
+        assert_equal((status, json_body(reply)['result']['walletname']), (200, 'wallet.dat'))
         for path in ['/wallet/nope', '/wallet/']:
             status, _, reply = raw_rpc(node, '{"method": "getwalletinfo"}', path=path)
-            assert_equal((status, json.loads(reply)['error']),
+            assert_equal((status, json_body(reply)['error']),
                          (500, {'code': -18, 'message': "Requested wallet does not exist or is not loaded"}))
         # Non-wallet methods don't look at the wallet path.
         status, _, reply = raw_rpc(node, '{"method": "getblockcount"}', path='/wallet/nope')
-        assert_equal((status, json.loads(reply)['result']), (200, 0))
+        assert_equal((status, json_body(reply)['result']), (200, 0))
 
         self.log.info("The reply echoes the request id")
         for id_ in ['"s"', '5', 'null']:
-            reply = json.loads(raw_rpc(node, '{"method": "getblockcount", "id": %s}' % id_)[2])
+            reply = json_body(raw_rpc(node, '{"method": "getblockcount", "id": %s}' % id_)[2])
             assert_equal(reply['id'], json.loads(id_))
-        assert_equal(json.loads(raw_rpc(node, '{"method": "getblockcount"}')[2])['id'], None)
+        assert_equal(json_body(raw_rpc(node, '{"method": "getblockcount"}')[2])['id'], None)
 
 
 if __name__ == '__main__':
