@@ -177,10 +177,10 @@ class WalletFeeTest(BitcoinTestFramework):
         values = {}
         for out in node0.getrawtransaction(txid, 1)['vout']:
             values[out['scriptPubKey']['addresses'][0]] = out['value']
-        # Equal shares; the first recipient (in object order) also pays the remainder
-        assert_equal(values[x], 1 - Decimal(share + remainder) / COIN)
-        assert_equal(values[y], 1 - Decimal(share) / COIN)
-        assert_equal(values[z], 1 - Decimal(share) / COIN)
+        # Equal shares; the first recipient in the JSON object also pays the remainder. Which one
+        # that is depends on dict order (not kept before Python 3.7), so compare sorted values
+        assert_equal(sorted(values[a] for a in (x, y, z)),
+                     sorted([1 - Decimal(share + remainder) / COIN] + [1 - Decimal(share) / COIN] * 2))
         self.mine(relay=False)
         assert_equal(node1.getreceivedbyaddress(b), Decimal('0.99'))
 
