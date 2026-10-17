@@ -18,9 +18,7 @@ wallet_util.expected_fee). Covered:
 - subtracting the fee from the amount: sendtoaddress, sendmany split between
   three recipients (the first pays the remainder), sweeping a wallet;
 - sending the whole balance without subtracting the fee;
-- known failure W-B6: subtracting a fee larger than the amount;
-- a new address in a new account has received nothing (moved here from
-  feature_set_min_fee.py).
+- known failure W-B6: subtracting a fee larger than the amount.
 """
 from decimal import Decimal
 
@@ -70,13 +68,6 @@ class WalletFeeTest(BitcoinTestFramework):
         node0, node1 = self.nodes
         node0.generate(30)
         self.sync_blocks()
-
-        self.log.info("A new address in a new account has received nothing")
-        address = node1.getnewaddress('test-node2')
-        assert_equal(node1.getaccount(address), 'test-node2')
-        assert_equal(node1.getreceivedbyaddress(address), 0)
-        assert_equal(node1.getreceivedbyaccount('test-node2'), 0)
-        assert_equal(node1.listaccounts()['test-node2'], 0)
 
         # Pins today's fee semantics: paytxfee is a fee for the whole
         # transaction and a per-kB rate above 1 kB; settxfee rounds down to

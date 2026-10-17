@@ -92,6 +92,7 @@ BASE_SCRIPTS = [
     'wallet_hd.py',
     'feature_reindex.py',
     # vv 3 s or less vv
+    'wallet_accounts.py',
     'feature_epoch.py',
     'feature_tx_malleability.py',
     'rpc_getchaintips.py',
