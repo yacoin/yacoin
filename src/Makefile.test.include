@@ -78,6 +78,7 @@ BITCOIN_TESTS =\
   test/test_bitcoin_main.cpp \
   test/timedata_tests.cpp \
   test/token_cache_tests.cpp \
+  test/token_db_tests.cpp \
   test/token_test_util.h \
   test/token_tests.cpp \
   test/token_tx_tests.cpp \
@@ -94,6 +95,7 @@ BITCOIN_TESTS += \
   wallet/test/wallet_test_fixture.cpp \
   wallet/test/wallet_test_fixture.h \
   wallet/test/accounting_tests.cpp \
+  wallet/test/token_wallet_tests.cpp \
   wallet/test/wallet_tests.cpp \
   wallet/test/crypto_tests.cpp
 endif
