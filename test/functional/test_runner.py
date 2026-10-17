@@ -93,6 +93,7 @@ BASE_SCRIPTS = [
     'feature_reindex.py',
     'wallet_listsinceblock.py',
     'wallet_listtransactions.py',
+    'wallet_abandonconflict.py',
     # vv 3 s or less vv
     'wallet_accounts.py',
     'wallet_listreceivedby.py',
