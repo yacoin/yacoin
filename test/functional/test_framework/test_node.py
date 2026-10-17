@@ -631,7 +631,8 @@ class TestNodeCLI():
         cli_stdout, cli_stderr = process.communicate(input=self.input)
         returncode = process.poll()
         if returncode:
-            match = re.match(r'error code: ([-0-9]+)\nerror message:\n(.*)', cli_stderr)
+            # The whole message, as over RPC: some have several lines.
+            match = re.match(r'error code: ([-0-9]+)\nerror message:\n(.*)\n\Z', cli_stderr, re.DOTALL)
             if match:
                 code, message = match.groups()
                 raise JSONRPCException(dict(code=int(code), message=message))
