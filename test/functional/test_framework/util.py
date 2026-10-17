@@ -8,17 +8,19 @@ from base64 import b64encode
 from binascii import unhexlify
 from decimal import Decimal, ROUND_DOWN
 from subprocess import CalledProcessError
+import hashlib
+import hmac
+import http.client
 import inspect
 import json
 import logging
 import os
-import random
 import re
 import time
 
 from . import coverage
 from .authproxy import AuthServiceProxy, JSONRPCException
-from io import BytesIO
+from .netutil import all_interfaces
 
 logger = logging.getLogger("TestFramework.utils")
 
@@ -54,15 +56,6 @@ def assert_contains_key(key, dict_data):
 def assert_does_not_contain_key(key, dict_data):
     if key in dict_data:
         raise AssertionError("key %s is in dict" % key)
-
-def assert_fee_amount(fee, tx_size, fee_per_kB):
-    """Assert the fee was in range"""
-    target_fee = round(tx_size * fee_per_kB / 1000, 8)
-    if fee < target_fee:
-        raise AssertionError("Fee of %s BTC too low! (Should be %s BTC)" % (str(fee), str(target_fee)))
-    # allow the wallet's estimation to be at most 2 bytes off
-    if fee > (tx_size + 2) * fee_per_kB / 1000:
-        raise AssertionError("Fee of %s BTC too high! (Should be %s BTC)" % (str(fee), str(target_fee)))
 
 def assert_equal(thing1, thing2, *args):
     if thing1 != thing2 or any(thing1 != arg for arg in args):
@@ -157,6 +150,37 @@ def try_rpc(code, message, fun, *args, **kwds):
     else:
         return False
 
+def known_failure(log, bug, check, expected):
+    """Run an assertion that a known bug breaks today.
+
+    Passes (and logs) while check() fails the way the bug makes it fail, and
+    raises as soon as the check passes, so the marker is removed together with
+    the fix. `bug` names the bug and its Trello card, e.g. "W-B5 (XbGM5oTW)".
+
+    `expected` is the bug's symptom and is required, so that an unrelated
+    failure (a typo in an RPC name, a stopped node, a timeout) isn't taken for
+    the bug: a substring or a compiled regex that must be found in the
+    AssertionError's text or the JSONRPCException's message, or an int that
+    must equal the JSONRPCException's error code. Any other failure is raised
+    unchanged, after logging that it isn't the expected known failure."""
+    try:
+        check()
+    except (AssertionError, JSONRPCException) as e:
+        rpc_error = isinstance(e, JSONRPCException)
+        text = e.error.get('message', '') if rpc_error else str(e)
+        if isinstance(expected, int):
+            matched = rpc_error and e.error.get('code') == expected
+        elif hasattr(expected, 'search'):
+            matched = expected.search(text) is not None
+        else:
+            matched = expected in text
+        if not matched:
+            log.error("%s: this failure is not the expected known failure (expected %r)" % (bug, getattr(expected, 'pattern', expected)))
+            raise
+        log.info("Known failure %s: %s" % (bug, e))
+        return
+    raise AssertionError("%s no longer fails; remove the known-failure marker" % bug)
+
 def assert_is_hex_string(string):
     try:
         int(string, 16)
@@ -229,7 +253,8 @@ def str_to_b64str(string):
     return b64encode(string.encode('utf-8')).decode('ascii')
 
 def satoshi_round(amount):
-    return Decimal(amount).quantize(Decimal('0.00000001'), rounding=ROUND_DOWN)
+    """Round down to YACoin's smallest unit (6 decimals)."""
+    return Decimal(amount).quantize(Decimal('0.000001'), rounding=ROUND_DOWN)
 
 def wait_until(predicate, *, attempts=float('inf'), timeout=float('inf'), lock=None):
     if attempts == float('inf') and timeout == float('inf'):
@@ -338,7 +363,6 @@ def initialize_datadir(dirname, n, chain, epochinterval=10):
         f.write("rpcpassword=yacoinpwd\n")
         f.write("port=" + str(p2p_port(n)) + "\n")
         f.write("rpcport=" + str(rpc_port(n)) + "\n")
-        f.write("rpcpallowip=127.0.0.1\n")
         f.write("checkblocks=8\n")
         f.write("server=1\n")
         f.write("daemon=0\n")
@@ -394,6 +418,47 @@ def delete_cookie_file(datadir, chain):
         logger.debug("Deleting leftover cookie file")
         os.remove(os.path.join(datadir, chain, ".cookie"))
 
+def rpcauth_value(user, password, salt=None):
+    """Return the value of an -rpcauth option for user and password:
+    "user:salt$hash", hash = HMAC-SHA256(key=salt as text, msg=password),
+    as httprpc.cpp checks it. Use as "-rpcauth=" + rpcauth_value(...)."""
+    if salt is None:
+        salt = os.urandom(16).hex()
+    digest = hmac.new(salt.encode('utf-8'), password.encode('utf-8'), hashlib.sha256).hexdigest()
+    return "{}:{}${}".format(user, salt, digest)
+
+def raw_rpc(node, body, *, method='POST', path='/', headers=None, auth=True):
+    """Send one HTTP request to node's RPC server and return
+    (status, headers, body bytes), without interpreting the response.
+
+    body: bytes or str as is; anything else is sent as JSON. auth: True uses
+    the node's configured credentials, a (user, password) pair those, and
+    False sends no Authorization header. For checking HTTP status codes,
+    non-JSON bodies and raw JSON (e.g. duplicate keys)."""
+    if isinstance(body, str):
+        body = body.encode('utf-8')
+    elif not isinstance(body, bytes):
+        body = json.dumps(body, default=EncodeDecimal).encode('utf-8')
+    all_headers = {'Content-Type': 'application/json'}
+    if auth:
+        user, password = get_auth_cookie(node.datadir, node.chain) if auth is True else auth
+        all_headers['Authorization'] = 'Basic ' + str_to_b64str('{}:{}'.format(user, password))
+    all_headers.update(headers or {})
+    conn = http.client.HTTPConnection('127.0.0.1', rpc_port(node.index), timeout=60)
+    try:
+        conn.request(method, path, body, all_headers)
+        response = conn.getresponse()
+        return response.status, dict(response.getheaders()), response.read()
+    finally:
+        conn.close()
+
+def non_loopback_ipv4():
+    """Return the first IPv4 address of a non-loopback interface, or None."""
+    for _, addr in all_interfaces():
+        if not addr.startswith('127.'):
+            return addr
+    return None
+
 def softfork_active(node, key):
     """Return whether a softfork is active."""
     return node.getblockchaininfo()['softforks'][key]['active']
@@ -416,15 +481,25 @@ def disconnect_nodes(from_connection, node_num):
     # wait to disconnect
     wait_until(lambda: [peer['id'] for peer in from_connection.getpeerinfo() if peer.get('subver') and "testnode%d" % node_num in peer.get('subver')] == [], timeout=5)
 
+def peers(node):
+    """Return getpeerinfo() without the trailing {"size: ": n} element YACoin appends."""
+    return [peer for peer in node.getpeerinfo() if 'id' in peer]
+
 def connect_nodes(from_connection, node_num):
     ip_port = "127.0.0.1:" + str(p2p_port(node_num))
     from_connection.addnode(ip_port, "onetry")
-    time.sleep(10)
-    # poll until version handshake complete to avoid race conditions
-    # with transaction relaying
-    wait_until(lambda:  all(peer['version'] != 0 for peer in from_connection.getpeerinfo()[:-1]))
+    # Wait until both sides have finished the version handshake, so that
+    # transactions created next are relayed. A node sends its first ping only
+    # after it got the peer's verack, and its own verack went out before that
+    # on the same connection; the peer answers the ping only after processing
+    # that verack. So a pong on our outbound connection means both sides are
+    # done.
+    def handshake_done():
+        return any(peer['addr'] == ip_port and not peer['inbound'] and peer['version'] != 0
+                   and 'pong' in peer['bytesrecv_per_msg'] for peer in peers(from_connection))
+    wait_until(handshake_done)
 
-def sync_blocks(rpc_connections, *, wait=1, timeout=60):
+def sync_blocks(rpc_connections, *, wait=0.1, timeout=60):
     """
     Wait until everybody has the same tip.
 
@@ -437,17 +512,19 @@ def sync_blocks(rpc_connections, *, wait=1, timeout=60):
         best_hash = [x.getbestblockhash() for x in rpc_connections]
         if best_hash.count(best_hash[0]) == len(rpc_connections):
             return
-        # Check that each peer has at least one connection
-        assert (all([len(x.getpeerinfo()) for x in rpc_connections]))
         time.sleep(wait)
-    raise AssertionError("Block sync timed out:{}".format("".join("\n  {!r}".format(b) for b in best_hash)))
+    # A node without peers is the usual cause; say so in the message.
+    peer_counts = [len(peers(x)) for x in rpc_connections]
+    raise AssertionError("Block sync timed out (peer count of each node: {}):{}".format(
+        peer_counts, "".join("\n  {!r}".format(b) for b in best_hash)))
 
-def sync_mempools(rpc_connections, *, wait=1, timeout=60):
+def sync_mempools(rpc_connections, *, wait=0.1, timeout=60):
     """
     Wait until everybody has the same transactions in their memory
     pools
     """
-    while timeout > 0:
+    stop_time = time.time() + timeout
+    while time.time() <= stop_time:
         pool = set(rpc_connections[0].getrawmempool())
         num_match = 1
         for i in range(1, len(rpc_connections)):
@@ -456,162 +533,24 @@ def sync_mempools(rpc_connections, *, wait=1, timeout=60):
         if num_match == len(rpc_connections):
             return
         time.sleep(wait)
-        timeout -= wait
     raise AssertionError("Mempool sync failed")
 
 # Transaction/Block functions
 #############################
 
-def find_output(node, txid, amount, *, blockhash=None):
+def find_output(node, txid, amount):
     """
     Return index to output of txid with value amount
     Raises exception if there is none.
+
+    YACoin's getrawtransaction has no blockhash argument; the txindex
+    finds confirmed and mempool transactions.
     """
-    txdata = node.getrawtransaction(txid, 1, blockhash)
+    txdata = node.getrawtransaction(txid, 1)
     for i in range(len(txdata["vout"])):
         if txdata["vout"][i]["value"] == amount:
             return i
     raise RuntimeError("find_output txid %s : %s not found" % (txid, str(amount)))
-
-def gather_inputs(from_node, amount_needed, confirmations_required=1):
-    """
-    Return a random set of unspent txouts that are enough to pay amount_needed
-    """
-    assert confirmations_required >= 0
-    utxo = from_node.listunspent(confirmations_required)
-    random.shuffle(utxo)
-    inputs = []
-    total_in = Decimal("0.00000000")
-    while total_in < amount_needed and len(utxo) > 0:
-        t = utxo.pop()
-        total_in += t["amount"]
-        inputs.append({"txid": t["txid"], "vout": t["vout"], "address": t["address"]})
-    if total_in < amount_needed:
-        raise RuntimeError("Insufficient funds: need %d, have %d" % (amount_needed, total_in))
-    return (total_in, inputs)
-
-def make_change(from_node, amount_in, amount_out, fee):
-    """
-    Create change output(s), return them
-    """
-    outputs = {}
-    amount = amount_out + fee
-    change = amount_in - amount
-    if change > amount * 2:
-        # Create an extra change output to break up big inputs
-        change_address = from_node.getnewaddress()
-        # Split change in two, being careful of rounding:
-        outputs[change_address] = Decimal(change / 2).quantize(Decimal('0.00000001'), rounding=ROUND_DOWN)
-        change = amount_in - amount - outputs[change_address]
-    if change > 0:
-        outputs[from_node.getnewaddress()] = change
-    return outputs
-
-def random_transaction(nodes, amount, min_fee, fee_increment, fee_variants):
-    """
-    Create a random transaction.
-    Returns (txid, hex-encoded-transaction-data, fee)
-    """
-    from_node = random.choice(nodes)
-    to_node = random.choice(nodes)
-    fee = min_fee + fee_increment * random.randint(0, fee_variants)
-
-    (total_in, inputs) = gather_inputs(from_node, amount + fee)
-    outputs = make_change(from_node, total_in, amount, fee)
-    outputs[to_node.getnewaddress()] = float(amount)
-
-    rawtx = from_node.createrawtransaction(inputs, outputs)
-    signresult = from_node.signrawtransactionwithwallet(rawtx)
-    txid = from_node.sendrawtransaction(signresult["hex"], 0)
-
-    return (txid, signresult["hex"], fee)
-
-# Helper to create at least "count" utxos
-# Pass in a fee that is sufficient for relay and mining new transactions.
-def create_confirmed_utxos(fee, node, count):
-    to_generate = int(0.5 * count) + 101
-    while to_generate > 0:
-        node.generate(min(25, to_generate))
-        to_generate -= 25
-    utxos = node.listunspent()
-    iterations = count - len(utxos)
-    addr1 = node.getnewaddress()
-    addr2 = node.getnewaddress()
-    if iterations <= 0:
-        return utxos
-    for i in range(iterations):
-        t = utxos.pop()
-        inputs = []
-        inputs.append({"txid": t["txid"], "vout": t["vout"]})
-        outputs = {}
-        send_value = t['amount'] - fee
-        outputs[addr1] = satoshi_round(send_value / 2)
-        outputs[addr2] = satoshi_round(send_value / 2)
-        raw_tx = node.createrawtransaction(inputs, outputs)
-        signed_tx = node.signrawtransactionwithwallet(raw_tx)["hex"]
-        node.sendrawtransaction(signed_tx)
-
-    while (node.getmempoolinfo()['size'] > 0):
-        node.generate(1)
-
-    utxos = node.listunspent()
-    assert len(utxos) >= count
-    return utxos
-
-# Create large OP_RETURN txouts that can be appended to a transaction
-# to make it large (helper for constructing large transactions).
-def gen_return_txouts():
-    # Some pre-processing to create a bunch of OP_RETURN txouts to insert into transactions we create
-    # So we have big transactions (and therefore can't fit very many into each block)
-    # create one script_pubkey
-    script_pubkey = "6a4d0200"  # OP_RETURN OP_PUSH2 512 bytes
-    for i in range(512):
-        script_pubkey = script_pubkey + "01"
-    # concatenate 128 txouts of above script_pubkey which we'll insert before the txout for change
-    txouts = []
-    from .messages import CTxOut
-    txout = CTxOut()
-    txout.nValue = 0
-    txout.scriptPubKey = hex_str_to_bytes(script_pubkey)
-    for k in range(128):
-        txouts.append(txout)
-    return txouts
-
-# Create a spend of each passed-in utxo, splicing in "txouts" to each raw
-# transaction to make it large.  See gen_return_txouts() above.
-def create_lots_of_big_transactions(node, txouts, utxos, num, fee):
-    addr = node.getnewaddress()
-    txids = []
-    from .messages import CTransaction
-    for _ in range(num):
-        t = utxos.pop()
-        inputs = [{"txid": t["txid"], "vout": t["vout"]}]
-        outputs = {}
-        change = t['amount'] - fee
-        outputs[addr] = satoshi_round(change)
-        rawtx = node.createrawtransaction(inputs, outputs)
-        tx = CTransaction()
-        tx.deserialize(BytesIO(hex_str_to_bytes(rawtx)))
-        for txout in txouts:
-            tx.vout.append(txout)
-        newtx = tx.serialize().hex()
-        signresult = node.signrawtransactionwithwallet(newtx, None, "NONE")
-        txid = node.sendrawtransaction(signresult["hex"], 0)
-        txids.append(txid)
-    return txids
-
-def mine_large_block(node, utxos=None):
-    # generate a 66k transaction,
-    # and 14 of them is close to the 1MB block limit
-    num = 14
-    txouts = gen_return_txouts()
-    utxos = utxos if utxos is not None else []
-    if len(utxos) < num:
-        utxos.clear()
-        utxos.extend(node.listunspent())
-    fee = 100 * node.getnetworkinfo()["relayfee"]
-    create_lots_of_big_transactions(node, txouts, utxos, num, fee=fee)
-    node.generate(1)
 
 def find_vout_for_address(node, txid, addr):
     """
