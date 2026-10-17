@@ -56,13 +56,6 @@ struct MinerTestingSetup : public TestChain100Setup {
         return vHashes;
     }
 
-    CAmount StoredDelta(const uint256& hash)
-    {
-        CAmount nDelta = 0;
-        mempool.ApplyDelta(hash, nDelta);
-        return nDelta;
-    }
-
     /** Signed spend of a mature coinbase back to the coinbase key, paying nFee */
     CTransaction Spend(const CTransaction& prev, CAmount nFee, unsigned int n = 0)
     {
@@ -318,7 +311,7 @@ BOOST_AUTO_TEST_CASE(prioritised_template_order)
     CTransaction medium = Spend(matureCoinbases[1], 20 * k);
     CTransaction high = Spend(matureCoinbases[2], 50 * k);
     mempool.PrioritiseTransaction(low.GetHash(), 100 * k);
-    BOOST_CHECK(!mempool.exists(low.GetHash()));
+    BOOST_CHECK_EQUAL(StoredDelta(mempool, low.GetHash()), 100 * k);
     for (const CTransaction& tx : {low, medium, high})
         BOOST_CHECK(ToMemPool(tx));
     BOOST_CHECK_EQUAL(mempool.info(low.GetHash()).nFeeDelta, 100 * k);
@@ -344,9 +337,9 @@ BOOST_AUTO_TEST_CASE(prioritised_template_order)
     BOOST_CHECK(MineTemplate(pblocktemplate->block));
     BOOST_CHECK_EQUAL(mempool.size(), 1U);
     BOOST_CHECK(mempool.exists(medium.GetHash()));
-    BOOST_CHECK_EQUAL(StoredDelta(low.GetHash()), 0);
-    BOOST_CHECK_EQUAL(StoredDelta(high.GetHash()), 0);
-    BOOST_CHECK_EQUAL(StoredDelta(medium.GetHash()), -20 * k);
+    BOOST_CHECK_EQUAL(StoredDelta(mempool, low.GetHash()), 0);
+    BOOST_CHECK_EQUAL(StoredDelta(mempool, high.GetHash()), 0);
+    BOOST_CHECK_EQUAL(StoredDelta(mempool, medium.GetHash()), -20 * k);
 }
 
 /* Deltas on a parent and on its child move them between packages */
@@ -385,8 +378,8 @@ BOOST_AUTO_TEST_CASE(prioritised_parent_and_child)
 
     BOOST_CHECK(MineTemplate(pblocktemplate->block));
     BOOST_CHECK_EQUAL(mempool.size(), 0U);
-    BOOST_CHECK_EQUAL(StoredDelta(hashP), 0);
-    BOOST_CHECK_EQUAL(StoredDelta(hashC), 0);
+    BOOST_CHECK_EQUAL(StoredDelta(mempool, hashP), 0);
+    BOOST_CHECK_EQUAL(StoredDelta(mempool, hashC), 0);
 }
 
 /* A child whose two parents enter the block in separate packages: its package is reduced

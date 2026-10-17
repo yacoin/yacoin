@@ -456,14 +456,6 @@ static const CTxMemPoolEntry& Entry(const CTxMemPool& pool, const uint256& hash)
     return *it;
 }
 
-/** The delta stored for hash, as AcceptToMemoryPool would apply it */
-static CAmount StoredDelta(const CTxMemPool& pool, const uint256& hash)
-{
-    CAmount nDelta = 0;
-    pool.ApplyDelta(hash, nDelta);
-    return nDelta;
-}
-
 /** Everything a fee delta or a re-link can change in an entry */
 struct EntryState {
     CAmount nModFee, nModFeesWithAncestors, nModFeesWithDescendants;
@@ -642,7 +634,7 @@ BOOST_AUTO_TEST_CASE(MempoolPrioritiseRemovalTest)
     BOOST_CHECK_EQUAL(pool.size(), 1U);
     BOOST_CHECK_EQUAL(Entry(pool, hashA).GetModFeesWithDescendants(), 1000);
     BOOST_CHECK_EQUAL(StoredDelta(pool, hashB), 300);
-    pool.addUnchecked(hashB, CTxMemPoolEntry(refB, 2000, 0, 1, false, 4, LockPoints()));
+    pool.addUnchecked(hashB, entry.Fee(2000).FromTx(*refB));
     BOOST_CHECK_EQUAL(Entry(pool, hashB).GetModifiedFee(), 2300);
     BOOST_CHECK_EQUAL(Entry(pool, hashA).GetModFeesWithDescendants(), 1000 + 2300);
 
@@ -820,7 +812,8 @@ BOOST_AUTO_TEST_CASE(MempoolAncestorLimitsTest)
     BOOST_CHECK(!Calc(entryD, 3, nMax, nMax, nMax));
     BOOST_CHECK_EQUAL(err, "too many unconfirmed ancestors [limit: 3]");
     BOOST_CHECK(Calc(entryD, 4, nMax, nMax, nMax));
-    // The limits are checked for every ancestor; here A, the furthest, is the first to fail
+    // The limits are checked for every ancestor; at nSum - 1 only A, whose descendants
+    // are B, C and D, is over the limit
     BOOST_CHECK(!Calc(entryD, nMax, nMax, nMax, nSum - 1));
     BOOST_CHECK_EQUAL(err, strprintf("exceeds descendant size limit for tx %s [limit: %u]", strA, nSum - 1));
     BOOST_CHECK(Calc(entryD, nMax, nMax, nMax, nSum));
@@ -854,15 +847,27 @@ BOOST_AUTO_TEST_CASE(MempoolQueryHelpersTest)
     CMutableTransaction txB = MakeTx({COutPoint(txA.GetHash(), 0)}, 9 * COIN);
     pool.addUnchecked(txA.GetHash(), entry.FromTx(txA));
     pool.addUnchecked(txB.GetHash(), entry.FromTx(txB));
-    CTxMemPool::txiter itA = pool.mapTx.find(txA.GetHash()), itB = pool.mapTx.find(txB.GetHash());
+    CTxMemPool::txiter itA = pool.mapTx.find(txA.GetHash());
 
     // CalculateDescendants doesn't walk what the set already holds
     CTxMemPool::setEntries descendants = {itA};
     pool.CalculateDescendants(itA, descendants);
     BOOST_CHECK(descendants == CTxMemPool::setEntries({itA}));
-    descendants = {itB};
-    pool.CalculateDescendants(itA, descendants);
-    BOOST_CHECK(descendants == CTxMemPool::setEntries({itA, itB}));
+    {
+        // A -> B -> C: with B already in the set, B's child C isn't reached from A
+        CTxMemPool chain;
+        CMutableTransaction txC = MakeTx({COutPoint(txB.GetHash(), 0)}, 8 * COIN);
+        for (const CMutableTransaction& tx : {txA, txB, txC})
+            chain.addUnchecked(tx.GetHash(), entry.FromTx(tx));
+        CTxMemPool::txiter cA = chain.mapTx.find(txA.GetHash()), cB = chain.mapTx.find(txB.GetHash());
+        CTxMemPool::txiter cC = chain.mapTx.find(txC.GetHash());
+        CTxMemPool::setEntries set = {cB};
+        chain.CalculateDescendants(cA, set);
+        BOOST_CHECK(set == CTxMemPool::setEntries({cA, cB}));
+        set.clear();
+        chain.CalculateDescendants(cA, set);
+        BOOST_CHECK(set == CTxMemPool::setEntries({cA, cB, cC}));
+    }
 
     BOOST_CHECK(pool.HasNoInputsOf(CMutableTransaction()));
     BOOST_CHECK(pool.HasNoInputsOf(MakeTx({}, COIN)));
