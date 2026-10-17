@@ -109,7 +109,9 @@ class P2PConnection(asyncio.Protocol):
     def is_connected(self):
         return self._transport is not None
 
-    def peer_connect(self, dstaddr, dstport, *, net):
+    def peer_connect(self, dstaddr, dstport, *, net, local_addr=None):
+        """local_addr: optional (ip, port) to connect from, e.g. ("127.0.0.2", 0)
+        for a distinct peer address on the loopback interface."""
         assert not self.is_connected
         self.dstaddr = dstaddr
         self.dstport = dstport
@@ -120,7 +122,7 @@ class P2PConnection(asyncio.Protocol):
         logger.debug('Connecting to Bitcoin Node: %s:%d' % (self.dstaddr, self.dstport))
 
         loop = NetworkThread.network_event_loop
-        conn_gen_unsafe = loop.create_connection(lambda: self, host=self.dstaddr, port=self.dstport)
+        conn_gen_unsafe = loop.create_connection(lambda: self, host=self.dstaddr, port=self.dstport, local_addr=local_addr)
         conn_gen = lambda: loop.call_soon_threadsafe(loop.create_task, conn_gen_unsafe)
         return conn_gen
 
@@ -272,13 +274,14 @@ class P2PInterface(P2PConnection):
         # The network services received from the peer
         self.nServices = 0
 
-    def peer_connect(self, *args, services=NODE_NETWORK|NODE_WITNESS, send_version=True, **kwargs):
+    def peer_connect(self, *args, services=NODE_NETWORK|NODE_WITNESS, send_version=True, starting_height=-1, **kwargs):
         create_conn = super().peer_connect(*args, **kwargs)
 
         if send_version:
             # Send a version msg
             vt = msg_version()
             vt.nServices = services
+            vt.nStartingHeight = starting_height
             vt.addrTo.ip = self.dstaddr
             vt.addrTo.port = self.dstport
             vt.addrFrom.ip = "0.0.0.0"

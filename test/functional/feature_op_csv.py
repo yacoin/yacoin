@@ -2,45 +2,25 @@
 # Copyright (c) 2014-2019 The Bitcoin Core developers
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
-"""Test mining RPCs
+"""Test spending from a CSV address with spendcsv.
 
-- getmininginfo
-- getblocktemplate proposal mode
-- submitblock"""
+Fund a time-locked CSV address; spendcsv fails while the relative lock
+hasn't passed and succeeds after it, and the coins arrive.
+"""
 
-import copy
-import time
 from decimal import Decimal
 
 from test_framework.blocktools import (
     TIME_GENESIS_BLOCK,
 )
-from test_framework.messages import (
-    CBlock,
-    CBlockHeader,
-    BLOCK_HEADER_SIZE
-)
-from test_framework.mininode import (
-    P2PDataStore,
-)
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import (
     assert_equal,
-    assert_approx,
     assert_raises_rpc_error,
-    connect_nodes,
 )
-from test_framework.script import CScriptNum
 
 
-def assert_template(node, block, expect, rehash=True):
-    if rehash:
-        block.hashMerkleRoot = block.calc_merkle_root()
-    rsp = node.getblocktemplate(template_request={'data': block.serialize().hex(), 'mode': 'proposal', 'rules': ['segwit']})
-    assert_equal(rsp, expect)
-
-
-class OP_CSV_Test(BitcoinTestFramework):
+class OpCsvTest(BitcoinTestFramework):
     def set_test_params(self):
         self.num_nodes = 2
         self.setup_clean_chain = True
@@ -138,4 +118,4 @@ class OP_CSV_Test(BitcoinTestFramework):
         assert_equal(receiver_balance, Decimal('2.0'))
 
 if __name__ == '__main__':
-    OP_CSV_Test().main()
+    OpCsvTest().main()

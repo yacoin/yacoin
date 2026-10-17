@@ -2,7 +2,12 @@
 # Copyright (c) 2023 The Yacoin Core developers
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
-"""Testing token use cases"""
+"""Test the timelockcoins RPC.
+
+Lock coins with CSV and CLTV, by time and by block height, check the
+returned address and message, and spend the coins after the lock expires,
+following the balances through the address index.
+"""
 
 from datetime import datetime
 from decimal import Decimal
@@ -23,7 +28,7 @@ from test_framework.util import (
 )
 
 
-class TokenTest(BitcoinTestFramework):
+class TimelockTest(BitcoinTestFramework):
     def set_test_params(self):
         self.num_nodes = 2
         self.setup_clean_chain = True
@@ -377,4 +382,4 @@ class TokenTest(BitcoinTestFramework):
 
 
 if __name__ == "__main__":
-    TokenTest().main()
+    TimelockTest().main()

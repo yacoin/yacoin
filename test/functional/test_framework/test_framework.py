@@ -19,6 +19,7 @@ import time
 
 from .authproxy import JSONRPCException
 from . import coverage
+from .blocktools import TIME_GENESIS_BLOCK
 from .test_node import TestNode
 from .mininode import NetworkThread
 from .util import (
@@ -27,6 +28,7 @@ from .util import (
     assert_equal,
     check_json_precision,
     connect_nodes,
+    known_failure,
     disconnect_nodes,
     get_datadir_path,
     initialize_datadir,
@@ -100,6 +102,12 @@ class BitcoinTestFramework(metaclass=BitcoinTestMetaClass):
         self.supports_cli = True
         self.bind_to_localhost_only = True
         self.block_fork_1_0=0
+        # Set by set_mocktime() and mine_with_mocktime(); see there.
+        self.mocktime = None
+        # True once set_mocktime() was used. Only then do nodes get the
+        # mocktime at startup: older scripts assign self.mocktime themselves
+        # and expect their nodes to start on real time.
+        self._mocktime_managed = False
         self.set_test_params()
         self.parse_args()        
 
@@ -242,7 +250,14 @@ class BitcoinTestFramework(metaclass=BitcoinTestMetaClass):
         if not self.options.noshutdown:
             self.log.info("Stopping nodes")
             if self.nodes:
-                self.stop_nodes()
+                try:
+                    self.stop_nodes()
+                except Exception:
+                    # E.g. a node that crashed at shutdown. Fail the test and
+                    # keep the directory rather than escaping main() with a
+                    # bare traceback.
+                    self.log.exception("Stopping nodes failed")
+                    self.success = TestStatus.FAILED
         else:
             for node in self.nodes:
                 node.cleanup_on_exit = False
@@ -413,6 +428,9 @@ class BitcoinTestFramework(metaclass=BitcoinTestMetaClass):
                 use_valgrind=self.options.valgrind,
                 block_fork_1_0=self.block_fork_1_0
             ))
+            if self._mocktime_managed:
+                # Nodes added later start on the test's clock too.
+                self.nodes[-1].mocktime = self.mocktime
 
     def start_node(self, i, *args, **kwargs):
         """Start a bitcoind"""
@@ -445,20 +463,34 @@ class BitcoinTestFramework(metaclass=BitcoinTestMetaClass):
             for node in self.nodes:
                 coverage.write_all_rpc_commands(self.options.coveragedir, node.rpc)
 
-    def stop_node(self, i, expected_stderr='', wait=0):
+    def stop_node(self, i, expected_stderr='', wait=0, *, expected_ret_code=0):
         """Stop a bitcoind test node"""
         self.nodes[i].stop_node(expected_stderr, wait=wait)
-        self.nodes[i].wait_until_stopped()
+        self.nodes[i].wait_until_stopped(expected_ret_code=expected_ret_code)
 
     def stop_nodes(self, wait=0):
-        """Stop multiple bitcoind test nodes"""
+        """Stop multiple bitcoind test nodes.
+
+        Every node is stopped and waited for even if one fails its checks
+        (stderr, exit code); then the first error is raised."""
+        errors = []
         for node in self.nodes:
             # Issue RPC to stop nodes
-            node.stop_node(wait=wait)
+            try:
+                node.stop_node(wait=wait)
+            except Exception as e:
+                errors.append(e)
 
         for node in self.nodes:
             # Wait for nodes to stop
-            node.wait_until_stopped()
+            try:
+                node.wait_until_stopped()
+            except Exception as e:
+                errors.append(e)
+        for e in errors[1:]:
+            self.log.error("Also failed while stopping nodes: %r", e)
+        if errors:
+            raise errors[0]
 
     def restart_node(self, i, extra_args=None):
         """Stop and start a test node"""
@@ -466,7 +498,8 @@ class BitcoinTestFramework(metaclass=BitcoinTestMetaClass):
         self.start_node(i, extra_args)
 
     def wait_for_node_exit(self, i, timeout):
-        self.nodes[i].process.wait(timeout)
+        """Wait for node i to exit; return its exit code (see TestNode.wait_for_exit)."""
+        return self.nodes[i].wait_for_exit(timeout)
 
     def split_network(self):
         """
@@ -483,6 +516,69 @@ class BitcoinTestFramework(metaclass=BitcoinTestMetaClass):
         """
         connect_nodes(self.nodes[1], 2)
         self.sync_all()
+
+    def set_mocktime(self, t):
+        """Set the mocktime of all nodes to t; it may only move forward.
+
+        Running nodes get it through setmocktime. Every node, running or not,
+        remembers it, and TestNode.start passes it as -mocktime, so a node
+        (re)started later gets the same clock as the others."""
+        t = int(t)
+        if self.mocktime is not None and t < self.mocktime:
+            raise AssertionError("mocktime must only move forward: {} < {}".format(t, self.mocktime))
+        self.mocktime = t
+        self._mocktime_managed = True
+        for node in self.nodes:
+            node.mocktime = t
+            if node.running:
+                node.setmocktime(t)
+
+    def mine_with_mocktime(self, node, n, *, spacing=60, sync=True):
+        """Mine n blocks on node, one at a time, moving the mocktime of all
+        nodes forward by spacing seconds before each block.
+
+        Starts from the tip's time if no mocktime was set yet. sync: True
+        syncs all running nodes afterwards, a list syncs those nodes, False
+        doesn't sync. Returns the block hashes.
+
+        (Many older scripts define their own mine_blocks(nodeId, n); this is
+        the shared version for new tests.)"""
+        if self.mocktime is None:
+            tip_time = node.getblockheader(node.getbestblockhash())['time']
+            self.set_mocktime(max(tip_time, TIME_GENESIS_BLOCK))
+        hashes = []
+        for _ in range(n):
+            self.set_mocktime(self.mocktime + spacing)
+            hashes += node.generate(1)
+        if sync is True:
+            self.sync_all([x for x in self.nodes if x.running])
+        elif sync:
+            self.sync_all(sync)
+        return hashes
+
+    def single_utxo_wallet(self, funder, node, amount):
+        """Give node's wallet exactly one confirmed UTXO of amount, and return it.
+
+        node's wallet must be empty (on the cached chain nodes 0-3 already
+        hold coinbases). funder sends the coins and mines the block (with
+        mine_with_mocktime if the test uses mocktime); all running nodes are
+        synced."""
+        assert_equal(node.listunspent(0), [])
+        address = node.getnewaddress()
+        txid = funder.sendtoaddress(address=address, amount=amount)
+        if self.mocktime is not None:
+            self.mine_with_mocktime(funder, 1)
+        else:
+            funder.generate(1)
+            self.sync_all([x for x in self.nodes if x.running])
+        utxos = node.listunspent()
+        assert_equal(len(utxos), 1)
+        assert_equal((utxos[0]['txid'], utxos[0]['address'], utxos[0]['amount']), (txid, address, amount))
+        return utxos[0]
+
+    def known_failure(self, bug, check, expected):
+        """util.known_failure with this test's log."""
+        known_failure(self.log, bug, check, expected)
 
     def sync_blocks(self, nodes=None, **kwargs):
         sync_blocks(nodes or self.nodes, **kwargs)
