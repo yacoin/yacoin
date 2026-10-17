@@ -36,96 +36,23 @@ out-of-range amounts) and submits it:
     test PASSES.
 """
 
-import struct
 from decimal import Decimal
 
 from test_framework.blocktools import TIME_GENESIS_BLOCK
-from test_framework.key import ECKey
-from test_framework.messages import CTransaction, CTxIn, CTxOut, COutPoint, hash256, ser_string
-from test_framework.script import CScript, OP_DROP, OP_NOP4  # OP_NOP4 == OP_YAC_TOKEN
+from test_framework.messages import COIN, MAX_MONEY, CTransaction, CTxIn, CTxOut, COutPoint
+from test_framework.script import CScript
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import assert_equal, JSONRPCException
+from test_framework.yac_tx import key_from_wif, sign_p2pkh_input, token_transfer_script
 
-SIGHASH_ALL = 1
 SEQUENCE_FINAL = 0xffffffff
-_B58 = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
-
-
-def decode_wif(wif):
-    """Decode a base58check WIF string to (32-byte secret, compressed flag)."""
-    n = 0
-    for ch in wif:
-        n = n * 58 + _B58.index(ch)
-    raw = n.to_bytes((n.bit_length() + 7) // 8, "big")
-    raw = b"\x00" * (len(wif) - len(wif.lstrip("1"))) + raw
-    payload = raw[1:-4]  # drop 1 version byte and the 4-byte checksum
-    if len(payload) == 33 and payload[-1] == 1:
-        return payload[:32], True
-    return payload, False
-
-
-def sighash_all(tx, in_idx, script_code):
-    """Legacy SIGHASH_ALL digest, matching yacoin's nTime-extended serialization.
-
-    yacoin serializes nVersion, nTime (64-bit for tx version >= 2), vin, vout,
-    nLockTime, then appends the 4-byte hash type before double-SHA256 - exactly
-    what CTransaction.serialize() produces here.
-    """
-    txtmp = CTransaction()
-    txtmp.nVersion = tx.nVersion
-    txtmp.nTime = tx.nTime
-    txtmp.nLockTime = tx.nLockTime
-    txtmp.vin = [
-        CTxIn(vi.prevout, script_code if i == in_idx else b"", vi.nSequence)
-        for i, vi in enumerate(tx.vin)
-    ]
-    txtmp.vout = tx.vout
-    return hash256(txtmp.serialize() + struct.pack("<I", SIGHASH_ALL))
-
-
-def sign_input(tx, in_idx, script_code_hex, wif):
-    """Sign one P2PKH-style input (plain or token) with an explicit key.
-
-    The wallet's signrawtransaction cannot sign token inputs (CombineSignatures
-    has no token case and discards the signature), so inputs are signed here.
-    """
-    secret, compressed = decode_wif(wif)
-    key = ECKey()
-    key.set(secret, compressed)
-    digest = sighash_all(tx, in_idx, CScript(bytes.fromhex(script_code_hex)))
-    sig = key.sign_ecdsa(digest) + bytes([SIGHASH_ALL])
-    tx.vin[in_idx].scriptSig = CScript([sig, key.get_pubkey().get_bytes()])
-
-# Consensus constants, mirrored from the C++ source.
-COIN = 1000000                       # src/amount.h
-MAX_MONEY = 2000000000 * COIN        # src/amount.h
 INT64_MAX = 2**63 - 1                # 9223372036854775807
 TOKEN = "OVERFLOW"
-OP_YAC_TOKEN = OP_NOP4               # src/script/script.h: OP_YAC_TOKEN = OP_NOP4
 P2PKH_LEN = 25                       # OP_DUP OP_HASH160 <20> OP_EQUALVERIFY OP_CHECKSIG
 
 # Fee (in satoshis) taken from a separate YAC input. Token transfer outputs must
 # carry 0 YAC, so fees cannot come from the token UTXO.
 FEE = 100000  # 0.1 YAC
-
-
-def token_transfer_script(p2pkh_prefix, name, amount):
-    """Build a token transfer output script for `amount` base units of `name`.
-
-    Layout matches CTokenTransfer::ConstructTransaction:
-        <25-byte P2PKH> OP_YAC_TOKEN <push "yact" || name || int64(amount)> OP_DROP
-    The P2PKH prefix is reused from an existing UTXO so no address decoding is
-    needed. `amount` is written as a raw signed 64-bit little-endian integer,
-    exactly how CTokenTransfer serializes nAmount.
-    """
-    payload = b"yact" + ser_string(name.encode()) + struct.pack("<q", amount)
-    assert len(payload) < 76, "payload must use a single-byte direct push"
-    return CScript(
-        bytes(p2pkh_prefix)
-        + bytes([OP_YAC_TOKEN, len(payload)])
-        + payload
-        + bytes([OP_DROP])
-    )
 
 
 class TokenOverflowTest(BitcoinTestFramework):
@@ -201,9 +128,12 @@ class TokenOverflowTest(BitcoinTestFramework):
         self.log.info("  Sum of outputs mod 2^64 = %d (input total = 1 base unit)", wrapped)
         assert_equal(wrapped, 1)
 
-        # Sign the token input and the YAC fee input with their own keys.
-        sign_input(tx, 0, tok["script"], n0.dumpprivkey(victim_addr)["private_key"])
-        sign_input(tx, 1, yac["scriptPubKey"], n0.dumpprivkey(yac["address"])["private_key"])
+        # Sign the token input and the YAC fee input with their own keys
+        # (the wallet can't sign token inputs).
+        sign_p2pkh_input(tx, 0, key_from_wif(n0.dumpprivkey(victim_addr)["private_key"]),
+                         CScript(bytes.fromhex(tok["script"])))
+        sign_p2pkh_input(tx, 1, key_from_wif(n0.dumpprivkey(yac["address"])["private_key"]),
+                         CScript(bytes.fromhex(yac["scriptPubKey"])))
         signed_hex = tx.serialize().hex()
 
         self.log.info("Submitting the overflow transaction")
