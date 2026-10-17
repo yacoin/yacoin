@@ -2,10 +2,19 @@
 # Copyright (c) 2018 The Bitcoin Core developers
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
-"""Verify that starting bitcoin with -h works as expected."""
+"""Verify that starting yacoind with -h and --version works as expected.
+
+The help text misses RPC server options and still lists the removed
+-rpcssl ones (known failure).
+"""
 
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import assert_equal
+
+# Options yacoind has, and removed ones (-rpcssl only makes startup fail).
+SHOULD_BE_LISTED = ['-rpcauth=', '-rpcbind=', '-rpcthreads=', '-rpcworkqueue=', '-rpcservertimeout=',
+                    '-alertnotify=', '-testsafemode', '-disablesafemode']
+SHOULD_NOT_BE_LISTED = ['-rpcssl\n', '-rpcsslcertificatechainfile=', '-rpcsslprivatekeyfile=', '-rpcsslciphers=']
 
 class HelpTest(BitcoinTestFramework):
     def set_test_params(self):
@@ -41,6 +50,13 @@ class HelpTest(BitcoinTestFramework):
         output, _ = self.get_node_output(ret_code_expected=0)
         assert b'Options' in output
         self.log.info("Help text received: {} (...)".format(output[0:60]))
+        text = output.decode('utf-8')
+
+        def check():
+            missing = [o for o in SHOULD_BE_LISTED if o not in text]
+            removed = [o for o in SHOULD_NOT_BE_LISTED if o in text]
+            assert_equal((missing, removed), ([], []))
+        self.known_failure("uxP8YzbJ item 7", check, expected="'-rpcauth=', '-rpcbind='")
 
         self.log.info("Start bitcoin with -version for version information")
         self.nodes[0].start(extra_args=['--version'])
