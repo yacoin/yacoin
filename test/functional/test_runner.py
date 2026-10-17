@@ -120,7 +120,9 @@ BASE_SCRIPTS = [
     'mempool_spend_coinbase.py',
 ]
 
-EXTENDED_SCRIPTS = []
+EXTENDED_SCRIPTS = [
+    'p2p_block_download_timeout.py',  # 62: waits for a 60 s block download timeout
+]
 
 # Place EXTENDED_SCRIPTS first since it has the 3 longest running tests
 ALL_SCRIPTS = EXTENDED_SCRIPTS + BASE_SCRIPTS
