@@ -89,6 +89,7 @@ BASE_SCRIPTS = [
     'p2p_invalid_messages.py',
     'mempool_persist.py',
     'feature_framework.py',
+    'feature_framework_blocks.py',
     'p2p_leak.py',
     'wallet_dump.py',
     'wallet_hd.py',

@@ -573,7 +573,9 @@ class TestNodeCLIAttr:
         return lambda: self(*args, **kwargs)
 
 def arg_to_cli(arg):
-    if isinstance(arg, bool):
+    if arg is None:
+        return 'null'
+    elif isinstance(arg, bool):
         return str(arg).lower()
     elif isinstance(arg, dict) or isinstance(arg, list):
         return json.dumps(arg, default=EncodeDecimal)
@@ -604,9 +606,9 @@ class TestNodeCLI():
         results = []
         for request in requests:
             try:
-                results.append(dict(result=request()))
+                results.append(dict(result=request(), error=None))
             except JSONRPCException as e:
-                results.append(dict(error=e))
+                results.append(dict(result=None, error=e.error))
         return results
 
     def send_cli(self, command=None, *args, **kwargs):
@@ -631,6 +633,9 @@ class TestNodeCLI():
                 raise JSONRPCException(dict(code=int(code), message=message))
             # Ignore cli_stdout, raise with cli_stderr
             raise subprocess.CalledProcessError(returncode, self.binary, output=cli_stderr)
+        # The CLI prints nothing for a null result.
+        if cli_stdout == "":
+            return None
         try:
             return json.loads(cli_stdout, parse_float=decimal.Decimal)
         except json.JSONDecodeError:
