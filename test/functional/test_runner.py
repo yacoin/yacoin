@@ -75,10 +75,12 @@ BASE_SCRIPTS = [
     'wallet_basic.py',  # 35-45
     'wallet_coinbase_maturity.py',  # 17 (600 blocks)
     'feature_timelock.py',  # 17
+    'feature_tokens.py',  # 15-30
+    'wallet_tokens.py',  # 15
     'rpc_rawtransaction.py',  # 15
     'wallet_fee.py',  # 10-19
-    'feature_tokens.py',  # 11
     'feature_defaultport.py',  # 11
+    'feature_token_reorg.py',  # 10
     'mempool_reorg.py',  # 5-18
     'wallet_encryption.py',  # 8
     'wallet_timelock_rpc.py',  # 8
