@@ -397,7 +397,8 @@ class FrameworkBlocksTest(BitcoinTestFramework):
 
     def token_outputs(self, txid):
         tx = FromHex(CTransaction(), self.nodes[0].getrawtransaction(txid))
-        return [bytes(out.scriptPubKey) for out in tx.vout if bytes([OP_NOP4]) in bytes(out.scriptPubKey)]
+        # Match the OP_YAC_TOKEN opcode, not the byte: a key hash can contain 0xb3
+        return [bytes(out.scriptPubKey) for out in tx.vout if OP_NOP4 in list(out.scriptPubKey)]
 
     def test_token_scripts(self):
         node = self.nodes[0]
