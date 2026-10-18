@@ -114,4 +114,12 @@ struct TestMemPoolEntryHelper
     TestMemPoolEntryHelper &SpendsCoinbase(bool _flag) { spendsCoinbase = _flag; return *this; }
     TestMemPoolEntryHelper &SigOpsCost(unsigned int _sigopsCost) { sigOpCost = _sigopsCost; return *this; }
 };
+
+/** The fee delta stored for hash in pool, as AcceptToMemoryPool would apply it */
+inline CAmount StoredDelta(const CTxMemPool& pool, const uint256& hash)
+{
+    CAmount nDelta = 0;
+    pool.ApplyDelta(hash, nDelta);
+    return nDelta;
+}
 #endif
