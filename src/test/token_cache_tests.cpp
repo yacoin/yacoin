@@ -17,7 +17,18 @@
 
 #include <boost/test/unit_test.hpp>
 
-BOOST_FIXTURE_TEST_SUITE(token_cache_tests, TokenTestingSetup)
+struct TokenCacheSetup : public TokenTestingSetup {
+    /** Fresh token state with the token index on or off (it is off by default on nodes) */
+    void ResetTokens(bool fIndex)
+    {
+        fTokenIndex = fIndex;
+        ClearTokenGlobals();
+        ResetTokenDb();
+        ptokensCache->Clear();
+    }
+};
+
+BOOST_FIXTURE_TEST_SUITE(token_cache_tests, TokenCacheSetup)
 
 static const uint256 BLOCK_HASH = uint256S("0xb10c");
 static const int BLOCK_HEIGHT = 10;
@@ -106,16 +117,6 @@ static void CheckMetaData(CTokensCache& cache, const CNewToken& expected)
     BOOST_CHECK_EQUAL((int)token.nReissuable, (int)expected.nReissuable);
     BOOST_CHECK_EQUAL((int)token.nHasIPFS, (int)expected.nHasIPFS);
     BOOST_CHECK(token.strIPFSHash == expected.strIPFSHash);
-}
-
-/** Fresh token state with the token index on or off (it is off by default on nodes) */
-static void ResetTokens(bool fIndex)
-{
-    fTokenIndex = fIndex;
-    TokenTestingSetup::ClearTokenGlobals();
-    delete ptokensdb;
-    ptokensdb = new CTokensDB(1 << 20, true, true);
-    ptokensCache->Clear();
 }
 
 /** Write the cache to the database the way a chain state flush does, then forget the LRU copy */
