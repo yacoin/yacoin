@@ -79,6 +79,7 @@ BASE_SCRIPTS = [
     'wallet_tokens.py',  # 15
     'rpc_rawtransaction.py',  # 15
     'wallet_fee.py',  # 10-19
+    'feature_addressindex.py',  # 13
     'feature_defaultport.py',  # 11
     'feature_token_reorg.py',  # 10
     'mempool_reorg.py',  # 5-18
