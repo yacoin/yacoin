@@ -24,6 +24,10 @@ from .netutil import all_interfaces
 
 logger = logging.getLogger("TestFramework.utils")
 
+# -nFactorAtHardfork of every test node: the scrypt N-factor of the block
+# hash from block version 7 on (scrypt_jane.py hashes with the same value).
+NFACTOR_AT_HARDFORK = 4
+
 # Assert functions
 ##################
 
@@ -374,7 +378,7 @@ def initialize_datadir(dirname, n, chain, epochinterval=10):
         f.write("dnsseed=0\n")
         f.write("printtoconsole=0\n")
         f.write("upnp=0\n")
-        f.write("nFactorAtHardfork=4\n")
+        f.write("nFactorAtHardfork=%d\n" % NFACTOR_AT_HARDFORK)
         # f.write("shrinkdebugfile=0\n")
         os.makedirs(os.path.join(datadir, 'stderr'), exist_ok=True)
         os.makedirs(os.path.join(datadir, 'stdout'), exist_ok=True)

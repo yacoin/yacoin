@@ -27,12 +27,9 @@ from test_framework.messages import (
     msg_addr,
     msg_block,
     MSG_BLOCK,
-    msg_blocktxn,
-    msg_cmpctblock,
     msg_feefilter,
     msg_getaddr,
     msg_getblocks,
-    msg_getblocktxn,
     msg_getdata,
     msg_getheaders,
     msg_headers,
@@ -41,6 +38,7 @@ from test_framework.messages import (
     msg_notfound,
     msg_ping,
     msg_pong,
+    msg_reject,
     msg_sendcmpct,
     msg_sendheaders,
     msg_tx,
@@ -59,12 +57,9 @@ logger = logging.getLogger("TestFramework.mininode")
 MESSAGEMAP = {
     b"addr": msg_addr,
     b"block": msg_block,
-    b"blocktxn": msg_blocktxn,
-    b"cmpctblock": msg_cmpctblock,
     b"feefilter": msg_feefilter,
     b"getaddr": msg_getaddr,
     b"getblocks": msg_getblocks,
-    b"getblocktxn": msg_getblocktxn,
     b"getdata": msg_getdata,
     b"getheaders": msg_getheaders,
     b"headers": msg_headers,
@@ -73,6 +68,7 @@ MESSAGEMAP = {
     b"notfound": msg_notfound,
     b"ping": msg_ping,
     b"pong": msg_pong,
+    b"reject": msg_reject,
     b"sendcmpct": msg_sendcmpct,
     b"sendheaders": msg_sendheaders,
     b"tx": msg_tx,
@@ -267,6 +263,8 @@ class P2PInterface(P2PConnection):
         # message of each type
         self.message_count = defaultdict(int)
         self.last_message = {}
+        # reject messages not yet consumed by wait_for_reject, oldest first
+        self.rejects = []
 
         # A count of the number of ping messages we've sent to the node
         self.ping_counter = 1
@@ -302,6 +300,10 @@ class P2PInterface(P2PConnection):
                 command = message.command.decode('ascii')
                 self.message_count[command] += 1
                 self.last_message[command] = message
+                if command == "reject":
+                    # Kept here rather than in on_reject, so wait_for_reject
+                    # works for subclasses that override on_reject.
+                    self.rejects.append(message)
                 getattr(self, 'on_' + command)(message)
             except:
                 print("ERROR delivering %s (%s)" % (repr(message), sys.exc_info()[0]))
@@ -318,12 +320,9 @@ class P2PInterface(P2PConnection):
 
     def on_addr(self, message): pass
     def on_block(self, message): pass
-    def on_blocktxn(self, message): pass
-    def on_cmpctblock(self, message): pass
     def on_feefilter(self, message): pass
     def on_getaddr(self, message): pass
     def on_getblocks(self, message): pass
-    def on_getblocktxn(self, message): pass
     def on_getdata(self, message): pass
     def on_getheaders(self, message): pass
     def on_headers(self, message): pass
@@ -372,9 +371,15 @@ class P2PInterface(P2PConnection):
         wait_until(test_function, timeout=timeout, lock=mininode_lock)
 
     def wait_for_block(self, blockhash, timeout=60):
+        """Wait until the last block received has blockhash (an int)."""
         def test_function():
             assert self.is_connected
-            return self.last_message.get("block") and self.last_message["block"].block.rehash() == blockhash
+            if not self.last_message.get("block"):
+                return False
+            # calc_sha256 caches: the block hash costs 10 ms, the poll runs often.
+            block = self.last_message["block"].block
+            block.calc_sha256()
+            return block.sha256 == blockhash
 
         wait_until(test_function, timeout=timeout, lock=mininode_lock)
 
@@ -384,9 +389,38 @@ class P2PInterface(P2PConnection):
             last_headers = self.last_message.get('headers')
             if not last_headers:
                 return False
-            return last_headers.headers[0].rehash() == blockhash
+            header = last_headers.headers[0]
+            header.calc_sha256()
+            return header.sha256 == blockhash
 
         wait_until(test_function, timeout=timeout, lock=mininode_lock)
+
+    def wait_for_reject(self, *, message=None, code=None, reason=None, data=None, timeout=60):
+        """Wait for a reject message matching every given field and return it.
+
+        message and reason are bytes, data an int (the block hash or txid).
+        The matching reject is removed from self.rejects, so a second call
+        waits for a second reject. Doesn't require the connection to stay
+        open: the node often disconnects right after sending the reject."""
+        assert all(v is None or isinstance(v, bytes) for v in (message, reason)), "message and reason are bytes"
+        wanted = {"message": message, "code": code, "reason": reason, "data": data}
+        found = []
+
+        def test_function():
+            for i, rej in enumerate(self.rejects):
+                if all(v is None or getattr(rej, k) == v for k, v in wanted.items()):
+                    found.append(self.rejects.pop(i))
+                    return True
+            return False
+
+        try:
+            wait_until(test_function, timeout=timeout, lock=mininode_lock)
+        except AssertionError:
+            with mininode_lock:
+                received = list(self.rejects)
+            raise AssertionError("no reject matching {} after {} s; unmatched rejects: {}".format(
+                {k: v for k, v in wanted.items() if v is not None}, timeout, received))
+        return found[0]
 
     def wait_for_getdata(self, timeout=60):
         """Waits for a getdata message.
@@ -487,7 +521,8 @@ class NetworkThread(threading.Thread):
 class P2PDataStore(P2PInterface):
     """A P2P data store class.
 
-    Keeps a block and transaction store and responds correctly to getdata and getheaders requests."""
+    Keeps a block and transaction store and responds correctly to getdata and getheaders requests.
+    Blocks are keyed by their block hash (CBlockHeader.sha256, the scrypt hash the node uses)."""
 
     def __init__(self):
         super().__init__()
@@ -555,6 +590,7 @@ class P2PDataStore(P2PInterface):
 
         with mininode_lock:
             for block in blocks:
+                block.calc_sha256()
                 self.block_store[block.sha256] = block
                 self.last_block_hash = block.sha256
 
@@ -588,6 +624,7 @@ class P2PDataStore(P2PInterface):
 
         with mininode_lock:
             for tx in txs:
+                tx.calc_sha256()
                 self.tx_store[tx.sha256] = tx
 
         reject_reason = [reject_reason] if reject_reason else []
