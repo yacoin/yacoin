@@ -71,18 +71,22 @@ BASE_SCRIPTS = [
     # script. Durations in seconds after the connect_nodes change.
     'feature_help.py', # at the beginning to quickly check that it can be started
     'p2p_timeouts.py',  # 63: the node's fixed 60 s inactivity check
-    'wallet_backup.py',  # 25
+    'wallet_backup.py',  # 35-60 (transaction relay)
+    'wallet_basic.py',  # 35-45
+    'wallet_coinbase_maturity.py',  # 17 (600 blocks)
     'feature_timelock.py',  # 17
     'feature_tokens.py',  # 15-30
     'wallet_tokens.py',  # 15
     'p2p_headers.py',  # 15: mines 2010 blocks
     'rpc_rawtransaction.py',  # 15
+    'wallet_fee.py',  # 10-19
     'feature_defaultport.py',  # 11
     'feature_token_reorg.py',  # 10
     'mempool_reorg.py',  # 5-18
     'p2p_getblocks_inv.py',  # 9
     'p2p_sendheaders.py',  # 9
     'wallet_encryption.py',  # 8
+    'wallet_timelock_rpc.py',  # 8
     'p2p_unrequested_blocks.py',  # 7
     'p2p_block_sync.py',  # 5
     'p2p_feefilter.py',  # 5
@@ -111,7 +115,6 @@ BASE_SCRIPTS = [
     'rpc_net.py',
     'feature_describe_redeemscript.py',
     'feature_getrpcinfo.py',
-    'feature_set_min_fee.py',
     'feature_uptime.py',
     'interface_rpc.py',
     'rpc_decodescript.py',
