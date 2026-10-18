@@ -71,20 +71,38 @@ BASE_SCRIPTS = [
     # script. Durations in seconds after the connect_nodes change.
     'feature_help.py', # at the beginning to quickly check that it can be started
     'p2p_timeouts.py',  # 63: the node's fixed 60 s inactivity check
-    'wallet_backup.py',  # 35-60 (transaction relay)
+    'wallet_backup.py',  # 25
     'wallet_basic.py',  # 35-45
     'wallet_coinbase_maturity.py',  # 17 (600 blocks)
+    'p2p_addr_relay.py',  # ~45 mean: the node's random addr timer, up to 300
     'feature_timelock.py',  # 17
     'feature_tokens.py',  # 15-30
     'wallet_tokens.py',  # 15
-    'rpc_rawtransaction.py',  # 15
+    'rpc_rawtransaction.py',  # 16-27
     'wallet_fee.py',  # 10-19
+    'p2p_headers.py',  # 15: mines 2010 blocks
+    'feature_notifications.py',  # 12
+    'mempool_packages.py',  # 12
     'feature_addressindex.py',  # 13
     'feature_defaultport.py',  # 11
     'feature_token_reorg.py',  # 10
+    'feature_hardfork_v1_mempool.py',  # 14
+    'feature_block.py',  # 9
+    'mining_setgenerate.py',  # 14
+    'mining_getwork.py',  # 10
     'mempool_reorg.py',  # 5-18
+    'wallet_startup_options.py',  # 10
+    'p2p_getblocks_inv.py',  # 9
+    'p2p_sendheaders.py',  # 9
     'wallet_encryption.py',  # 8
     'wallet_timelock_rpc.py',  # 8
+    'wallet_multiwallet.py',  # 9
+    'p2p_unrequested_blocks.py',  # 7
+    'p2p_block_sync.py',  # 5
+    'p2p_feefilter.py',  # 5
+    'p2p_blocksonly.py',  # 4: two restarts
+    'feature_config_args.py',  # 8
+    'mempool_accept.py',  # 6
     'feature_reindex.py',  # 10
     'feature_signals.py',  # 10
     'feature_abortnode.py',  # 8
@@ -98,32 +116,71 @@ BASE_SCRIPTS = [
     'mempool_persist.py',
     'feature_framework.py',
     'feature_framework_blocks.py',
+    'p2p_invalid_tx.py',
     'p2p_leak.py',
     'wallet_dump.py',
     'wallet_hd.py',
+    'wallet_watchonly.py',
+    'p2p_connections.py',  # 7
+    'feature_net_args.py',  # 6
+    'p2p_eviction.py',  # 5
+    'feature_maxuploadtarget.py',  # 5
+    'p2p_timedata.py',  # 3
+    'wallet_reorgsrestore.py',  # 4
     # vv 3 s or less vv
+    'wallet_resendwallettransactions.py',
+    'wallet_listsinceblock.py',
+    'wallet_listtransactions.py',
+    'wallet_keypool.py',
+    'wallet_zapwallettxes.py',
+    'wallet_abandonconflict.py',
+    'p2p_version.py',
+    'p2p_misbehavior_ban.py',
+    'p2p_disconnect_ban.py',
+    'feature_uacomment.py',
+    'interface_yacoin_cli.py',
+    'rpc_users.py',
+    'interface_rpc.py',
+    'rpc_blockchain.py',
+    'feature_hardfork_1_0.py',  # 4
+    'feature_block_limits.py',  # 4
+    'rpc_invalidateblock.py',  # 3
+    'p2p_invalid_block.py',  # 3
+    'wallet_import_rescan.py',
+    'wallet_txn_doublespend.py --mineblock',
+    'wallet_txn_clone.py --mineblock',
+    'wallet_accounts.py',
+    'wallet_listreceivedby.py',
     'feature_epoch.py',
+    'feature_cltv_csv_enforcement.py',
     'feature_tx_malleability.py',
     'rpc_getchaintips.py',
-    'feature_hardfork_1_0.py',
     'feature_basic_transfer.py',
     'feature_token_overflow.py',
     'mining_basic.py',
-    'rpc_blockchain.py',
-    'rpc_invalidateblock.py',
-    'p2p_disconnect_ban.py',
+    'rpc_setban.py',
+    'mining_getblocktemplate_longpoll.py',
+    'mining_submitblock.py',
+    'mining_getblocktemplate.py',
     'rpc_net.py',
+    'feature_proxy.py',
     'feature_describe_redeemscript.py',
     'feature_getrpcinfo.py',
     'feature_uptime.py',
-    'interface_rpc.py',
+    'interface_http.py',
+    'feature_safemode.py',
+    'feature_filelock.py',
+    'rpc_misc.py',
+    'rpc_named_arguments.py',
+    'rpc_named_arguments.py --usecli',
+    'rpc_help.py',
     'rpc_decodescript.py',
     'rpc_signmessage.py',
     'rpc_signrawtransaction.py',
     'rpc_uptime.py',
     'wallet_disable.py',
-    'p2p_addr_relay.py',
     'p2p_getdata.py',
+    'p2p_disabled_features.py',
     'p2p_leak_tx.py',
     'p2p_mempool.py',
     'mempool_resurrect.py',
@@ -131,6 +188,8 @@ BASE_SCRIPTS = [
 ]
 
 EXTENDED_SCRIPTS = [
+    'p2p_block_download_timeout.py',  # 122: waits for a 120 s block download timeout
+    'mining_getblocktemplate_longpoll_slow.py',  # 125: two one-minute longpoll waits
     'feature_dbcrash.py',  # 100-170
 ]
 

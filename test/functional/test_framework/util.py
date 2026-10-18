@@ -505,6 +505,10 @@ def peers(node):
     """Return getpeerinfo() without the trailing {"size: ": n} element YACoin appends."""
     return [peer for peer in node.getpeerinfo() if 'id' in peer]
 
+def node_peers(node):
+    """The node's peers that are test nodes (peers() also lists mininodes)."""
+    return [peer for peer in peers(node) if 'testnode' in peer.get('subver', '')]
+
 def connect_nodes(from_connection, node_num):
     ip_port = "127.0.0.1:" + str(p2p_port(node_num))
     from_connection.addnode(ip_port, "onetry")
@@ -558,12 +562,15 @@ def sync_mempools(rpc_connections, *, wait=0.1, timeout=60):
 # Transaction/Block functions
 #############################
 
-def find_output(node, txid, amount, *, blockhash=None):
+def find_output(node, txid, amount):
     """
     Return index to output of txid with value amount
     Raises exception if there is none.
+
+    YACoin's getrawtransaction has no blockhash argument; the txindex
+    finds confirmed and mempool transactions.
     """
-    txdata = node.getrawtransaction(txid, 1, blockhash)
+    txdata = node.getrawtransaction(txid, 1)
     for i in range(len(txdata["vout"])):
         if txdata["vout"][i]["value"] == amount:
             return i
