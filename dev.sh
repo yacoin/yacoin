@@ -89,21 +89,22 @@ cmd_depends() {
 # new build directories use configure and the Makefile.in files directly.
 # Compares content, not timestamps, so a branch switch alone doesn't trigger it.
 # Only tracked files are hashed (including the secp256k1 and univalue
-# subprojects), so files that autogen.sh itself generates don't change it;
-# aclocal.m4 is tracked but regenerated, so it's excluded. Git pathspec
-# wildcards also match across directories. Without git (e.g. a source
-# tarball) the hash is constant, so autogen only runs when files are missing.
+# subprojects), so files that autogen.sh itself generates (aclocal.m4
+# included) don't change it. Git pathspec wildcards also match across
+# directories. Without git (e.g. a source tarball) the hash is constant, so
+# autogen only runs when files are missing.
 autotools_inputs_sum() {
     (cd "$ROOT" && git ls-files -z -- '*configure.ac' '*Makefile.am' 'src/Makefile*.include' \
-        '*.m4' ':!aclocal.m4' 2>/dev/null | xargs -0 -r cat 2>/dev/null |
+        '*.m4' 2>/dev/null | xargs -0 -r cat 2>/dev/null |
         sha256sum | cut -d' ' -f1) || true
 }
 
 ensure_autogen() {
     local sum stamp="$DEVBUILD/autogen.sum"
     sum=$(autotools_inputs_sum)
-    if [[ ! -x "$ROOT/configure" || ! -f "$ROOT/build-aux/install-sh" ||
-          ! -f "$ROOT/build-aux/ltmain.sh" || "$(cat "$stamp" 2>/dev/null)" != "$sum" ]]; then
+    if [[ ! -x "$ROOT/configure" || ! -f "$ROOT/aclocal.m4" ||
+          ! -f "$ROOT/build-aux/install-sh" || ! -f "$ROOT/build-aux/ltmain.sh" ||
+          "$(cat "$stamp" 2>/dev/null)" != "$sum" ]]; then
         (cd "$ROOT" && ./autogen.sh)
         echo "$sum" > "$stamp"
     fi
