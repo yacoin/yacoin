@@ -73,10 +73,12 @@ BASE_SCRIPTS = [
     'p2p_timeouts.py',  # 63: the node's fixed 60 s inactivity check
     'wallet_backup.py',  # 25
     'feature_timelock.py',  # 17
+    'feature_tokens.py',  # 15-30
+    'wallet_tokens.py',  # 15
     'p2p_headers.py',  # 15: mines 2010 blocks
     'rpc_rawtransaction.py',  # 15
-    'feature_tokens.py',  # 11
     'feature_defaultport.py',  # 11
+    'feature_token_reorg.py',  # 10
     'mempool_reorg.py',  # 5-18
     'p2p_getblocks_inv.py',  # 9
     'p2p_sendheaders.py',  # 9
