@@ -463,4 +463,31 @@ BOOST_AUTO_TEST_CASE(boolean_expression_resolve)
     BOOST_CHECK_EQUAL(LibBoolEE::removeCharacter("#A&#B", '#'), "A&B");
 }
 
+static std::string UserError(ErrorReport::ErrorType type)
+{
+    ErrorReport report;
+    report.type = type;
+    report.vecUserData = {"a", "b"};
+    return GetUserErrorString(report);
+}
+
+BOOST_AUTO_TEST_CASE(user_error_strings)
+{
+    BOOST_CHECK_EQUAL(GetUserErrorString(ErrorReport()), "Error not set");
+    BOOST_CHECK_EQUAL(UserError(ErrorReport::NotSetError), "Error not set");
+    BOOST_CHECK_EQUAL(UserError(ErrorReport::InvalidQualifierName), "Invalid Qualifier Name: a");
+    BOOST_CHECK_EQUAL(UserError(ErrorReport::EmptyString), "Verifier string is empty");
+    BOOST_CHECK_EQUAL(UserError(ErrorReport::LengthToLarge), "Length is to large. Please use a smaller length");
+    BOOST_CHECK_EQUAL(UserError(ErrorReport::InvalidSubExpressionFormula), "Invalid expressions in verifier string: a");
+    BOOST_CHECK_EQUAL(UserError(ErrorReport::InvalidSyntax), "Invalid syntax: a");
+    BOOST_CHECK_EQUAL(UserError(ErrorReport::TokenDoesntExist), "Token doesn't exist: a");
+    BOOST_CHECK_EQUAL(UserError(ErrorReport::FailedToVerifyAgainstAddress),
+                      "This address doesn't contain the correct tags to pass the verifier string check: a");
+    BOOST_CHECK_EQUAL(UserError(ErrorReport::EmptySubExpression), "The verifier string has two operators without a tag between them");
+    BOOST_CHECK_EQUAL(UserError(ErrorReport::UnknownOperator), "The symbol: 'a' is not a valid character in the expression: b");
+    BOOST_CHECK_EQUAL(UserError(ErrorReport::ParenthesisParity), "Every '(' must have a corresponding ')' in the expression: a");
+    BOOST_CHECK_EQUAL(UserError(ErrorReport::VariableNotFound), "Variable is not allow in the expression: 'a'");
+    BOOST_CHECK_EQUAL(UserError((ErrorReport::ErrorType)12), "Error not set");
+}
+
 BOOST_AUTO_TEST_SUITE_END()
