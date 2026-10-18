@@ -21,6 +21,10 @@ import collections
 import shlex
 import signal
 import sys
+try:
+    import resource
+except ImportError:  # not POSIX
+    resource = None
 
 from .authproxy import JSONRPCException
 from .mininode import P2PInterface
@@ -191,8 +195,11 @@ class TestNode():
             assert self.rpc_connected and self.rpc is not None, self._node_msg("Error: no RPC connection")
             return getattr(self.rpc, name)
 
-    def start(self, extra_args=None, *, cwd=None, stdout=None, stderr=None, **kwargs):
-        """Start the node."""
+    def start(self, extra_args=None, *, cwd=None, stdout=None, stderr=None, no_core_dump=False, **kwargs):
+        """Start the node.
+
+        no_core_dump: start it with RLIMIT_CORE 0, for a start where the test
+        expects the node to crash (no-op where the resource module is missing)."""
         if extra_args is None:
             extra_args = self.extra_args
 
@@ -219,6 +226,8 @@ class TestNode():
         if self.mocktime is not None and not any(arg.startswith("-mocktime=") for arg in args):
             # A restarted node keeps the test's clock.
             args.append("-mocktime=%d" % self.mocktime)
+        if no_core_dump and resource is not None:
+            kwargs['preexec_fn'] = lambda: resource.setrlimit(resource.RLIMIT_CORE, (0, 0))
         self.process = subprocess.Popen(args, env=subp_env, stdout=stdout, stderr=stderr, cwd=cwd, **kwargs)
 
         self.running = True
@@ -246,6 +255,11 @@ class TestNode():
                 self.rpc_connected = True
                 self.url = self.rpc.url
                 return
+            except ConnectionResetError:
+                # This might happen when the RPC server is in warmup, but shut down before the call to getblockcount
+                # succeeds. Try again to properly raise the FailedToStartError. (Before IOError, which it is a
+                # subclass of.)
+                pass
             except IOError as e:
                 if e.errno != errno.ECONNREFUSED:  # Port not yet open?
                     raise  # unknown IO error
@@ -254,10 +268,6 @@ class TestNode():
                 # -342 Service unavailable, RPC server started but is shutting down due to error
                 if e.error['code'] != -28 and e.error['code'] != -342:
                     raise  # unknown JSON RPC exception
-            except ConnectionResetError:
-                # This might happen when the RPC server is in warmup, but shut down before the call to getblockcount
-                # succeeds. Try again to properly raise the FailedToStartError
-                pass
             except ValueError as e:  # cookie file not found and no rpcuser or rpcassword. bitcoind still starting
                 if "No RPC credentials" not in str(e):
                     raise

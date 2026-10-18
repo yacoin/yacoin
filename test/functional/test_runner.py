@@ -84,6 +84,13 @@ BASE_SCRIPTS = [
     'mempool_reorg.py',  # 5-18
     'wallet_encryption.py',  # 8
     'wallet_timelock_rpc.py',  # 8
+    'feature_reindex.py',  # 10
+    'feature_signals.py',  # 10
+    'feature_abortnode.py',  # 8
+    'feature_verifydb.py',  # 6
+    'feature_loadblock.py',  # 6
+    'feature_shutdown.py',  # 6
+    'feature_crash_recovery.py',  # 5
     'feature_op_cltv.py',
     'feature_op_csv.py',
     'p2p_invalid_messages.py',
@@ -93,7 +100,6 @@ BASE_SCRIPTS = [
     'p2p_leak.py',
     'wallet_dump.py',
     'wallet_hd.py',
-    'feature_reindex.py',
     # vv 3 s or less vv
     'feature_epoch.py',
     'feature_tx_malleability.py',
@@ -123,7 +129,9 @@ BASE_SCRIPTS = [
     'mempool_spend_coinbase.py',
 ]
 
-EXTENDED_SCRIPTS = []
+EXTENDED_SCRIPTS = [
+    'feature_dbcrash.py',  # 100-170
+]
 
 # Place EXTENDED_SCRIPTS first since it has the 3 longest running tests
 ALL_SCRIPTS = EXTENDED_SCRIPTS + BASE_SCRIPTS
