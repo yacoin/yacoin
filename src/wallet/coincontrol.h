@@ -36,6 +36,8 @@ public:
         tokenDestChange = CNoDestination();
         fAllowOtherInputs = false;
         fAllowWatchOnly = false;
+        fOverrideFeeRate = false;
+        m_feerate.reset();
         strTokenSelected = "";
         setSelected.clear();
         setTokensSelected.clear();
