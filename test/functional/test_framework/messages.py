@@ -239,6 +239,8 @@ class CInv:
         0: "Error",
         1: "TX",
         2: "Block",
+        3: "FilteredBlock",
+        4: "CompactBlock",
     }
 
     def __init__(self, t=0, h=0):
@@ -257,7 +259,7 @@ class CInv:
 
     def __repr__(self):
         return "CInv(type=%s hash=%064x)" \
-            % (self.typemap[self.type], self.hash)
+            % (self.typemap.get(self.type, "Unknown(%d)" % self.type), self.hash)
 
 
 class CBlockLocator:

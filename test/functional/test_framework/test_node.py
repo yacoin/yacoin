@@ -372,6 +372,27 @@ class TestNode():
         with open(self.stderr.name, 'rb') as f:
             return f.read().decode('utf-8')
 
+    def crash_check(self, call):
+        """Run call(); if the node died while it ran, fail with its exit code.
+
+        For known_failure checks of crashes: any exception from call() (a
+        dropped connection, or the AssertionError assert_raises_rpc_error
+        makes of it) is followed by a wait of up to 10 s for the process to
+        exit, as a crash can close the socket before the process is gone. A
+        node that exited gives AssertionError("node crashed: exit code ...")
+        and is marked stopped; a live node gets the original exception back.
+        If call() returns, the node must still be running and answering."""
+        try:
+            call()
+        except Exception as e:
+            try:
+                code = self.wait_for_exit(timeout=10)
+            except subprocess.TimeoutExpired:
+                raise e
+            raise AssertionError("node crashed: exit code %s, stderr %r" % (describe_exit_code(code), self.read_stderr()))
+        assert self.process.poll() is None, "node exited"
+        self.getblockcount()
+
     @contextlib.contextmanager
     def assert_debug_log(self, expected_msgs, unexpected_msgs=None, timeout=2):
         if unexpected_msgs is None:
@@ -621,23 +642,28 @@ class TestNodeCLI():
                 results.append(dict(result=None, error=e.error))
         return results
 
-    def send_cli(self, command=None, *args, **kwargs):
-        """Run bitcoin-cli command. Deserializes returned string as python object."""
+    def send_cli(self, clicommand=None, *args, **kwargs):
+        """Run bitcoin-cli command. Deserializes returned string as python object.
+
+        The parameter isn't called "command": RPCs have named arguments of
+        that name (help command=...)."""
         pos_args = [arg_to_cli(arg) for arg in args]
         named_args = [str(key) + "=" + arg_to_cli(value) for (key, value) in kwargs.items()]
         assert not (pos_args and named_args), "Cannot use positional arguments and named arguments in the same bitcoin-cli call"
         p_args = [self.binary, "-datadir=" + self.datadir] + self.options
         if named_args:
             p_args += ["-named"]
-        if command is not None:
-            p_args += [command]
+        if clicommand is not None:
+            p_args += [clicommand]
         p_args += pos_args + named_args
-        self.log.debug("Running bitcoin-cli command: %s" % command)
+        self.log.debug("Running bitcoin-cli command: %s" % clicommand)
         process = subprocess.Popen(p_args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
         cli_stdout, cli_stderr = process.communicate(input=self.input)
         returncode = process.poll()
         if returncode:
-            match = re.match(r'error code: ([-0-9]+)\nerror message:\n(.*)', cli_stderr)
+            # The whole message, as over RPC (some have several lines; for -19
+            # the CLI adds a -rpcwallet hint).
+            match = re.match(r'error code: ([-0-9]+)\nerror message:\n(.*)\n\Z', cli_stderr, re.DOTALL)
             if match:
                 code, message = match.groups()
                 raise JSONRPCException(dict(code=int(code), message=message))

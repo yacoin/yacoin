@@ -397,8 +397,11 @@ class FrameworkBlocksTest(BitcoinTestFramework):
 
     def token_outputs(self, txid):
         tx = FromHex(CTransaction(), self.nodes[0].getrawtransaction(txid))
-        # Match the OP_YAC_TOKEN opcode, not the byte: a key hash can contain 0xb3
-        return [bytes(out.scriptPubKey) for out in tx.vout if OP_NOP4 in list(out.scriptPubKey)]
+        # Match the OP_YAC_TOKEN opcode, not the byte: a key hash can contain 0xb3.
+        # A deserialized scriptPubKey is bytes, whose items are ints (0xb3 ==
+        # OP_NOP4), so parse it as a CScript first; list() is needed, since
+        # "in" on a CScript would match the byte again.
+        return [bytes(out.scriptPubKey) for out in tx.vout if OP_NOP4 in list(CScript(out.scriptPubKey))]
 
     def test_token_scripts(self):
         node = self.nodes[0]
@@ -415,7 +418,7 @@ class FrameworkBlocksTest(BitcoinTestFramework):
         outputs = self.token_outputs(reissue_txid)
         assert bytes(token_reissue_script(prefix, "PYTOKEN", 5 * COIN)) in outputs
         # The owner token goes back to a change address of the wallet.
-        owner_back = [o for o in outputs if b"yact" in o]
+        owner_back = [o for o in outputs if b"yact" in o[25:]]  # after the P2PKH key hash
         assert_equal(len(owner_back), 1)
         assert_equal(owner_back[0], bytes(token_transfer_script(owner_back[0][:25], "PYTOKEN!", COIN)))
 
