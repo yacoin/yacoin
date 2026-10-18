@@ -67,7 +67,7 @@ secp256k1 without its x86_64 assembly, which doesn't compile under ASan.
 ./dev.sh unit                       # all unit test suites, in parallel
 ./dev.sh unit pow_tests coins_tests # selected suites
 ./dev.sh check                      # upstream "make check" (serial)
-./dev.sh ftest                      # all functional tests, serially
+./dev.sh ftest                      # all functional tests, 4 in parallel
 ./dev.sh ftest feature_tokens.py    # selected functional tests
 ./dev.sh asan                       # unit tests under ASan/LSan/UBSan
 ./dev.sh all                        # build dev, unit, ftest, build release
@@ -101,8 +101,20 @@ same as a serial run. Per-suite logs and `summary.txt` are written to
 
 ### Functional tests
 
-Functional tests run serially (`-j 1`) for now; running them in parallel
-hasn't been verified. Their data directories go to `.devbuild/tmp/`.
+`./dev.sh ftest` runs `FTEST_JOBS` scripts in parallel (default 4;
+`FTEST_JOBS=1` for a serial run). Each script gets its own data directory under
+`.devbuild/tmp/` and its own ports, and the runner builds the shared chain cache
+once before starting the scripts.
+
+Two runner invocations on the same build directory at the same time do
+interfere: each run without `--keepcache` deletes `build/func/test/cache`
+while the other may be copying it, and both number their scripts' port seeds
+from 0. For a second, concurrent run, set `TEST_RUNNER_PORT_MIN` to a range the
+first doesn't use (the default base is 11000 and a run uses 10000 ports, so
+e.g. `TEST_RUNNER_PORT_MIN=22000`) and pass `--keepcache`. A script run
+directly (`test/functional/<script>.py --configfile=build/func/test/config.ini`)
+keeps its cache in `test/cache` and takes its port seed from its process id,
+so it only needs `TEST_RUNNER_PORT_MIN` to stay clear of a runner's ports.
 
 ## Code coverage
 
@@ -120,7 +132,7 @@ two coverage builds (`--enable-lcov`, `-O0 -g`):
 | Build | Runs | Make target |
 |---|---|---|
 | `build/cov-unit` | `test_bitcoin` (all unit tests) | `make cov-unit` |
-| `build/cov-func` | All functional tests, serially | `make cov-functional` |
+| `build/cov-func` | All functional tests (serially unless `FTEST_JOBS` is set) | `make cov-functional` |
 
 Each target zeroes the counters, records a baseline (so files that are never
 executed still count), runs the tests, and keeps the coverage even if tests
@@ -144,7 +156,9 @@ Notes:
   filter patterns that match nothing and has renamed the branch-coverage option.
 - With both builds cached, a full run takes about 27 minutes on 8 cores:
   unit coverage about 5½ minutes, functional coverage about 21 minutes. Most
-  of that is the serial functional tests (about 20 minutes at `-O0`) and
+  of that was the functional tests run serially (about 20 minutes at `-O0`,
+  measured before they ran in parallel and lost a 10 s sleep per node
+  connection; not re-measured since) and
   `transaction_tests/test_big_transaction` (about 3 minutes). Building both
   `-O0` variants from scratch adds about 13 minutes.
 - To keep that time down, lcov captures run `geninfo` in parallel
@@ -180,7 +194,8 @@ Ubuntu 22.04, 8 cores, 15 GB RAM.
 | Rebuild `test_bitcoin` after changing one source file | 7 s |
 | All unit tests, serial | 29 s |
 | All unit tests, parallel (`./dev.sh unit`) | 15 s |
-| All functional tests, serial | 13 min 40 s |
+| All functional tests, serial (`FTEST_JOBS=1 ./dev.sh ftest`) | 4 min 20 s |
+| All functional tests, 4 in parallel (`./dev.sh ftest`) | 73 s |
 
 The parallel unit test time is bounded by `transaction_tests/test_big_transaction`
 (about 17 s at `-O1`).
@@ -212,3 +227,5 @@ The parallel unit test time is bounded by `transaction_tests/test_big_transactio
     hosts build in `build/<host>/<variant>/`.
   - `JOBS`: make jobs, default the number of cores.
   - `UNIT_JOBS`: parallel unit test suites, default `JOBS`.
+  - `FTEST_JOBS`: parallel functional test scripts, default 4 in `ftest`
+    and 1 in `cov`.

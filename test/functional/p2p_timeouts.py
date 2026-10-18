@@ -2,23 +2,21 @@
 # Copyright (c) 2016-2018 The Bitcoin Core developers
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
-"""Test various net timeouts.
+"""Test the inactivity timeouts of new connections.
 
-- Create three bitcoind nodes:
+The node checks every connection once it is more than 60 s old
+(net.cpp, "Inactivity checking"); the timeout is fixed, there is no option
+for it. Three mininode connections:
 
     no_verack_node - we never send a verack in response to their version
     no_version_node - we never send a version (only a ping)
     no_send_node - we never send any P2P message.
 
-- Start all three nodes
-- Wait 1 second
-- Assert that we're connected
-- Send a ping to no_verack_node and no_version_node
-- Wait 1 second
-- Assert that we're still connected
-- Send a ping to no_verack_node and no_version_node
-- Wait 2 seconds
-- Assert that we're no longer connected (timeout to receive version/verack is 3 seconds)
+- Assert that all three are connected, and still connected after about 30 s.
+- After 60 s the node disconnects all three, logging
+  "version handshake timeout" for no_verack_node and
+  "socket no message in first 60 seconds" for the other two (with flags for
+  whether anything was received / sent).
 """
 
 from time import sleep
@@ -38,8 +36,6 @@ class TimeoutsTest(BitcoinTestFramework):
     def set_test_params(self):
         self.setup_clean_chain = True
         self.num_nodes = 1
-        # set timeout to receive version/verack to 3 seconds
-        self.extra_args = [["-peertimeout=3"]]
 
     def run_test(self):
         # Setup the p2p connections
@@ -78,10 +74,9 @@ class TimeoutsTest(BitcoinTestFramework):
         ]
 
         with self.nodes[0].assert_debug_log(expected_msgs=expected_timeout_logs):
-            sleep(31)
-            assert not no_verack_node.is_connected
-            assert not no_version_node.is_connected
-            assert not no_send_node.is_connected
+            no_verack_node.wait_for_disconnect(timeout=45)
+            no_version_node.wait_for_disconnect(timeout=5)
+            no_send_node.wait_for_disconnect(timeout=5)
 
 
 if __name__ == '__main__':

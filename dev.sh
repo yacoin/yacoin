@@ -46,7 +46,8 @@ Usage: ./dev.sh <command> [args]
   unit [suite...]         Build test_bitcoin (dev) and run unit test suites;
                           no suites = all suites, in parallel (UNIT_JOBS)
   check                   Full "make check" on build/dev (serial, as upstream)
-  ftest [test...]         Functional tests on build/func, serially (-j 1)
+  ftest [test...]         Functional tests on build/func, FTEST_JOBS in
+                          parallel (default 4)
   asan [suite...]         Build and run unit tests with ASan + UBSan
   cov                     Unit, functional and combined coverage reports
                           (needs lcov) in .devbuild/coverage/
@@ -166,6 +167,9 @@ cmd_build() {
     local dir="$BUILD_ROOT/$variant"
     ensure_dirs
     [[ -f "$dir/Makefile" ]] || cmd_configure "$variant"
+    # Nothing in "make all" depends on test/config.ini, so changes to
+    # test/config.ini.in would otherwise only reach it on a reconfigure.
+    make -s -C "$dir" test/config.ini
     if [[ -n "${2:-}" ]]; then
         make -C "$dir/src" -j"$JOBS" "$2"
     else
@@ -193,7 +197,7 @@ cmd_check() {
 
 cmd_ftest() {
     cmd_build func
-    "$BUILD_ROOT/func/test/functional/test_runner.py" -j 1 --tmpdirprefix="$TMPDIR" "$@"
+    "$BUILD_ROOT/func/test/functional/test_runner.py" -j "${FTEST_JOBS:-4}" --tmpdirprefix="$TMPDIR" "$@"
 }
 
 cmd_asan() {
@@ -212,13 +216,15 @@ cmd_cov() {
     for v in cov-unit cov-func; do
         [[ -f "$BUILD_ROOT/$v/Makefile" ]] || cmd_configure "$v"
     done
+    make -s -C "$BUILD_ROOT/cov-func" test/config.ini
     # Delete old reports here too, not only in the make targets: if make fails
     # before a recipe runs, an old report must not be shown as this run's.
     # A report that exists after make comes from this run, even if tests failed.
     rm -rf "$BUILD_ROOT/cov-unit/test_bitcoin.coverage" "$BUILD_ROOT/cov-unit/test_bitcoin_coverage.info" \
         "$BUILD_ROOT/cov-func/functional_test.coverage" "$BUILD_ROOT/cov-func/functional_test_coverage.info"
     make -C "$BUILD_ROOT/cov-unit" -j"$JOBS" COV_JOBS="$JOBS" cov-unit || status=1
-    make -C "$BUILD_ROOT/cov-func" -j"$JOBS" COV_JOBS="$JOBS" cov-functional || status=1
+    # Functional tests run serially here unless FTEST_JOBS is set (see Makefile.am).
+    make -C "$BUILD_ROOT/cov-func" -j"$JOBS" COV_JOBS="$JOBS" ${FTEST_JOBS:+FTEST_JOBS="$FTEST_JOBS"} cov-functional || status=1
     # Use the lcov and genhtml settings configure and Makefile.am chose, so the
     # merged report matches the per-build reports. Read after make, which may
     # have regenerated the Makefile.
