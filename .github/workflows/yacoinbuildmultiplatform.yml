@@ -441,11 +441,56 @@ jobs:
           if-no-files-found: error
   build-windows:
     runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      IMAGE: windows-2
     steps:
       - uses: actions/checkout@v6
-      - name: build
+      - name: cache dir and key
         run: |
-          docker run -v /home/runner/work/yacoin/yacoin:/src -e BUILDVERSION=$GITHUB_RUN_NUMBER dev34253/yacoin-build:windows-1
+          echo "REL_CACHE=$RUNNER_TEMP/yacoin-cache" >> "$GITHUB_ENV"
+          echo "CACHE_KEY=release-$IMAGE-v1-${{ hashFiles('depends/packages/*.mk', 'depends/patches/**', 'depends/Makefile', 'depends/funcs.mk', 'depends/hosts/*.mk', 'depends/builders/*.mk') }}" >> "$GITHUB_ENV"
+          # Pushes to master and release tags build from scratch; only master
+          # saves the cache. Branches and PRs reuse it.
+          clean=false; save=false
+          if [ "$GITHUB_EVENT_NAME" = push ]; then
+            case "$GITHUB_REF" in
+              refs/heads/master) clean=true; save=true ;;
+              refs/tags/*) clean=true ;;
+            esac
+          fi
+          echo "CLEAN_BUILD=$clean" >> "$GITHUB_ENV"
+          echo "SAVE_CACHE=$save" >> "$GITHUB_ENV"
+      - uses: actions/cache/restore@v5
+        if: env.CLEAN_BUILD != 'true'
+        with:
+          path: ${{ env.REL_CACHE }}
+          key: ${{ env.CACHE_KEY }}-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: |
+            ${{ env.CACHE_KEY }}-
+            release-${{ env.IMAGE }}-v1-
+      - name: build
+        # Below the job timeout. Pushes to master and tags build from scratch
+        # (nothing restored); other runs reuse the cached depends packages and
+        # the ccache of the last master build (the entrypoint keeps both in
+        # /cache/windows).
+        timeout-minutes: 50
+        run: |
+          mkdir -p "$REL_CACHE"
+          docker run --rm --init --name windows-build -v "$GITHUB_WORKSPACE":/src -v "$REL_CACHE":/cache \
+            -e CCACHE_COMPRESS=1 -e CCACHE_MAXSIZE=1G \
+            -e BUILDVERSION=$GITHUB_RUN_NUMBER "dev34253/yacoin-build:$IMAGE"
+      - name: stop the container and make the cache readable for saving
+        if: always()
+        run: |
+          # A step timeout may kill docker run without stopping the container.
+          docker rm -f windows-build 2>/dev/null || true
+          if [ -d "$REL_CACHE" ]; then sudo chown -R "$(id -u):$(id -g)" "$REL_CACHE"; fi
+      - uses: actions/cache/save@v5
+        if: success() && env.SAVE_CACHE == 'true'
+        with:
+          path: ${{ env.REL_CACHE }}
+          key: ${{ env.CACHE_KEY }}-${{ github.run_id }}-${{ github.run_attempt }}
       - uses: actions/upload-artifact@v6
         with:
           name: yacoin-qt-windows
@@ -463,11 +508,56 @@ jobs:
           if-no-files-found: error
   build-macos:
     runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      IMAGE: macos-2
     steps:
       - uses: actions/checkout@v6
-      - name: build
+      - name: cache dir and key
         run: |
-          docker run -v /home/runner/work/yacoin/yacoin:/src -e BUILDVERSION=$GITHUB_RUN_NUMBER dev34253/yacoin-build:macos-1
+          echo "REL_CACHE=$RUNNER_TEMP/yacoin-cache" >> "$GITHUB_ENV"
+          echo "CACHE_KEY=release-$IMAGE-v1-${{ hashFiles('depends/packages/*.mk', 'depends/patches/**', 'depends/Makefile', 'depends/funcs.mk', 'depends/hosts/*.mk', 'depends/builders/*.mk') }}" >> "$GITHUB_ENV"
+          # Pushes to master and release tags build from scratch; only master
+          # saves the cache. Branches and PRs reuse it.
+          clean=false; save=false
+          if [ "$GITHUB_EVENT_NAME" = push ]; then
+            case "$GITHUB_REF" in
+              refs/heads/master) clean=true; save=true ;;
+              refs/tags/*) clean=true ;;
+            esac
+          fi
+          echo "CLEAN_BUILD=$clean" >> "$GITHUB_ENV"
+          echo "SAVE_CACHE=$save" >> "$GITHUB_ENV"
+      - uses: actions/cache/restore@v5
+        if: env.CLEAN_BUILD != 'true'
+        with:
+          path: ${{ env.REL_CACHE }}
+          key: ${{ env.CACHE_KEY }}-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: |
+            ${{ env.CACHE_KEY }}-
+            release-${{ env.IMAGE }}-v1-
+      - name: build
+        # Below the job timeout. Pushes to master and tags build from scratch
+        # (nothing restored); other runs reuse the cached depends packages and
+        # the ccache of the last master build (the entrypoint keeps both in
+        # /cache/macos).
+        timeout-minutes: 50
+        run: |
+          mkdir -p "$REL_CACHE"
+          docker run --rm --init --name macos-build -v "$GITHUB_WORKSPACE":/src -v "$REL_CACHE":/cache \
+            -e CCACHE_COMPRESS=1 -e CCACHE_MAXSIZE=1G \
+            -e BUILDVERSION=$GITHUB_RUN_NUMBER "dev34253/yacoin-build:$IMAGE"
+      - name: stop the container and make the cache readable for saving
+        if: always()
+        run: |
+          # A step timeout may kill docker run without stopping the container.
+          docker rm -f macos-build 2>/dev/null || true
+          if [ -d "$REL_CACHE" ]; then sudo chown -R "$(id -u):$(id -g)" "$REL_CACHE"; fi
+      - uses: actions/cache/save@v5
+        if: success() && env.SAVE_CACHE == 'true'
+        with:
+          path: ${{ env.REL_CACHE }}
+          key: ${{ env.CACHE_KEY }}-${{ github.run_id }}-${{ github.run_attempt }}
       - uses: actions/upload-artifact@v6
         with:
           name: yacoin-qt-macos
