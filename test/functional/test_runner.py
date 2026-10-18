@@ -74,9 +74,11 @@ BASE_SCRIPTS = [
     'p2p_addr_relay.py',  # ~45 mean: the node's random addr timer, up to 300
     'wallet_backup.py',  # 25
     'feature_timelock.py',  # 17
+    'feature_tokens.py',  # 15-30
+    'wallet_tokens.py',  # 15
     'rpc_rawtransaction.py',  # 15
-    'feature_tokens.py',  # 11
     'feature_defaultport.py',  # 11
+    'feature_token_reorg.py',  # 10
     'mempool_reorg.py',  # 5-18
     'wallet_encryption.py',  # 8
     'feature_op_cltv.py',
