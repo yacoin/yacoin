@@ -38,16 +38,20 @@ jobs:
         if: env.CLEAN_BUILD != 'true'
         with:
           path: ${{ env.REL_CACHE }}
-          key: ${{ env.CACHE_KEY }}
+          key: ${{ env.CACHE_KEY }}-${{ github.run_id }}-${{ github.run_attempt }}
           restore-keys: |
+            ${{ env.CACHE_KEY }}-
             release-${{ env.IMAGE }}-v1-
       - name: build
         # Below the job timeout. Pushes to master and tags build from scratch
-        # (nothing restored); other runs reuse the cached depends packages.
+        # (nothing restored); other runs reuse the cached depends packages and
+        # the ccache of the last master build (the entrypoint keeps both in
+        # /cache).
         timeout-minutes: 50
         run: |
           mkdir -p "$REL_CACHE"
           docker run --rm --init --name release-build -v "$GITHUB_WORKSPACE":/src -v "$REL_CACHE":/cache \
+            -e CCACHE_COMPRESS=1 -e CCACHE_MAXSIZE=1G \
             -e BUILDVERSION=$GITHUB_RUN_NUMBER "dev34253/yacoin-build:$IMAGE"
       - name: stop the container and make the cache readable for saving
         if: always()
@@ -59,7 +63,7 @@ jobs:
         if: success() && env.SAVE_CACHE == 'true'
         with:
           path: ${{ env.REL_CACHE }}
-          key: ${{ env.CACHE_KEY }}
+          key: ${{ env.CACHE_KEY }}-${{ github.run_id }}-${{ github.run_attempt }}
       - uses: actions/upload-artifact@v6
         with:
           name: yacoind-ubuntu-16.04
@@ -203,8 +207,9 @@ jobs:
         if: env.CLEAN_BUILD != 'true'
         with:
           path: ${{ env.REL_CACHE }}
-          key: ${{ env.CACHE_KEY }}
+          key: ${{ env.CACHE_KEY }}-${{ github.run_id }}-${{ github.run_attempt }}
           restore-keys: |
+            ${{ env.CACHE_KEY }}-
             release-${{ env.IMAGE }}-v1-
       - name: build
         # Build a low-difficulty yacoind using the depends system, mirroring
@@ -259,16 +264,20 @@ jobs:
         if: env.CLEAN_BUILD != 'true'
         with:
           path: ${{ env.REL_CACHE }}
-          key: ${{ env.CACHE_KEY }}
+          key: ${{ env.CACHE_KEY }}-${{ github.run_id }}-${{ github.run_attempt }}
           restore-keys: |
+            ${{ env.CACHE_KEY }}-
             release-${{ env.IMAGE }}-v1-
       - name: build
         # Below the job timeout. Pushes to master and tags build from scratch
-        # (nothing restored); other runs reuse the cached depends packages.
+        # (nothing restored); other runs reuse the cached depends packages and
+        # the ccache of the last master build (the entrypoint keeps both in
+        # /cache).
         timeout-minutes: 50
         run: |
           mkdir -p "$REL_CACHE"
           docker run --rm --init --name release-build -v "$GITHUB_WORKSPACE":/src -v "$REL_CACHE":/cache \
+            -e CCACHE_COMPRESS=1 -e CCACHE_MAXSIZE=1G \
             -e BUILDVERSION=$GITHUB_RUN_NUMBER "dev34253/yacoin-build:$IMAGE"
       - name: stop the container and make the cache readable for saving
         if: always()
@@ -280,7 +289,7 @@ jobs:
         if: success() && env.SAVE_CACHE == 'true'
         with:
           path: ${{ env.REL_CACHE }}
-          key: ${{ env.CACHE_KEY }}
+          key: ${{ env.CACHE_KEY }}-${{ github.run_id }}-${{ github.run_attempt }}
       - uses: actions/upload-artifact@v6
         with:
           name: yacoind-ubuntu-18.04
@@ -322,16 +331,20 @@ jobs:
         if: env.CLEAN_BUILD != 'true'
         with:
           path: ${{ env.REL_CACHE }}
-          key: ${{ env.CACHE_KEY }}
+          key: ${{ env.CACHE_KEY }}-${{ github.run_id }}-${{ github.run_attempt }}
           restore-keys: |
+            ${{ env.CACHE_KEY }}-
             release-${{ env.IMAGE }}-v1-
       - name: build
         # Below the job timeout. Pushes to master and tags build from scratch
-        # (nothing restored); other runs reuse the cached depends packages.
+        # (nothing restored); other runs reuse the cached depends packages and
+        # the ccache of the last master build (the entrypoint keeps both in
+        # /cache).
         timeout-minutes: 50
         run: |
           mkdir -p "$REL_CACHE"
           docker run --rm --init --name release-build -v "$GITHUB_WORKSPACE":/src -v "$REL_CACHE":/cache \
+            -e CCACHE_COMPRESS=1 -e CCACHE_MAXSIZE=1G \
             -e BUILDVERSION=$GITHUB_RUN_NUMBER "dev34253/yacoin-build:$IMAGE"
       - name: stop the container and make the cache readable for saving
         if: always()
@@ -343,7 +356,7 @@ jobs:
         if: success() && env.SAVE_CACHE == 'true'
         with:
           path: ${{ env.REL_CACHE }}
-          key: ${{ env.CACHE_KEY }}
+          key: ${{ env.CACHE_KEY }}-${{ github.run_id }}-${{ github.run_attempt }}
       - uses: actions/upload-artifact@v6
         with:
           name: yacoind-ubuntu-20.04
@@ -385,16 +398,20 @@ jobs:
         if: env.CLEAN_BUILD != 'true'
         with:
           path: ${{ env.REL_CACHE }}
-          key: ${{ env.CACHE_KEY }}
+          key: ${{ env.CACHE_KEY }}-${{ github.run_id }}-${{ github.run_attempt }}
           restore-keys: |
+            ${{ env.CACHE_KEY }}-
             release-${{ env.IMAGE }}-v1-
       - name: build
         # Below the job timeout. Pushes to master and tags build from scratch
-        # (nothing restored); other runs reuse the cached depends packages.
+        # (nothing restored); other runs reuse the cached depends packages and
+        # the ccache of the last master build (the entrypoint keeps both in
+        # /cache).
         timeout-minutes: 50
         run: |
           mkdir -p "$REL_CACHE"
           docker run --rm --init --name release-build -v "$GITHUB_WORKSPACE":/src -v "$REL_CACHE":/cache \
+            -e CCACHE_COMPRESS=1 -e CCACHE_MAXSIZE=1G \
             -e BUILDVERSION=$GITHUB_RUN_NUMBER "dev34253/yacoin-build:$IMAGE"
       - name: stop the container and make the cache readable for saving
         if: always()
@@ -406,7 +423,7 @@ jobs:
         if: success() && env.SAVE_CACHE == 'true'
         with:
           path: ${{ env.REL_CACHE }}
-          key: ${{ env.CACHE_KEY }}
+          key: ${{ env.CACHE_KEY }}-${{ github.run_id }}-${{ github.run_attempt }}
       - uses: actions/upload-artifact@v6
         with:
           name: yacoind-ubuntu-22.04
