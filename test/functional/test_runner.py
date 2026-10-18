@@ -71,16 +71,20 @@ BASE_SCRIPTS = [
     # script. Durations in seconds after the connect_nodes change.
     'feature_help.py', # at the beginning to quickly check that it can be started
     'p2p_timeouts.py',  # 63: the node's fixed 60 s inactivity check
-    'wallet_backup.py',  # 25
+    'wallet_backup.py',  # 35-60 (transaction relay)
+    'wallet_basic.py',  # 35-45
+    'wallet_coinbase_maturity.py',  # 17 (600 blocks)
     'feature_timelock.py',  # 17
     'feature_tokens.py',  # 15-30
     'wallet_tokens.py',  # 15
     'rpc_rawtransaction.py',  # 16-27
+    'wallet_fee.py',  # 10-19
     'feature_notifications.py',  # 12
     'feature_defaultport.py',  # 11
     'feature_token_reorg.py',  # 10
     'mempool_reorg.py',  # 5-18
     'wallet_encryption.py',  # 8
+    'wallet_timelock_rpc.py',  # 8
     'feature_config_args.py',  # 8
     'feature_op_cltv.py',
     'feature_op_csv.py',
@@ -110,7 +114,6 @@ BASE_SCRIPTS = [
     'rpc_net.py',
     'feature_describe_redeemscript.py',
     'feature_getrpcinfo.py',
-    'feature_set_min_fee.py',
     'feature_uptime.py',
     'interface_http.py',
     'feature_safemode.py',
