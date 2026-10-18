@@ -14,11 +14,46 @@ concurrency:
 jobs:
   build-ubuntu-1604:
     runs-on: ubuntu-latest  
+    timeout-minutes: 60
+    env:
+      IMAGE: ubuntu.16.04-2
     steps:
       - uses: actions/checkout@v6
-      - name: build
+      - name: cache dir and key
         run: |
-          docker run -v /home/runner/work/yacoin/yacoin:/src -e BUILDVERSION=$GITHUB_RUN_NUMBER dev34253/yacoin-build:ubuntu.16.04-2
+          echo "REL_CACHE=$RUNNER_TEMP/yacoin-cache" >> "$GITHUB_ENV"
+          echo "CACHE_KEY=release-$IMAGE-v1-${{ hashFiles('depends/packages/*.mk', 'depends/patches/**', 'depends/Makefile', 'depends/funcs.mk', 'depends/hosts/*.mk', 'depends/builders/*.mk') }}" >> "$GITHUB_ENV"
+          if [ "$GITHUB_EVENT_NAME" = push ] && [ "$GITHUB_REF" = refs/heads/master ]; then
+            echo "CLEAN_BUILD=true" >> "$GITHUB_ENV"
+          else
+            echo "CLEAN_BUILD=false" >> "$GITHUB_ENV"
+          fi
+      - uses: actions/cache/restore@v5
+        if: env.CLEAN_BUILD != 'true'
+        with:
+          path: ${{ env.REL_CACHE }}
+          key: ${{ env.CACHE_KEY }}
+          restore-keys: |
+            release-${{ env.IMAGE }}-v1-
+      - name: build
+        # Below the job timeout. Pushes to master build from scratch (nothing
+        # restored); other runs reuse the cached depends packages.
+        timeout-minutes: 50
+        run: |
+          mkdir -p "$REL_CACHE"
+          docker run --rm --init --name release-build -v "$GITHUB_WORKSPACE":/src -v "$REL_CACHE":/cache \
+            -e BUILDVERSION=$GITHUB_RUN_NUMBER "dev34253/yacoin-build:$IMAGE"
+      - name: stop the container and make the cache readable for saving
+        if: always()
+        run: |
+          # A step timeout may kill docker run without stopping the container.
+          docker rm -f release-build 2>/dev/null || true
+          sudo chown -R "$(id -u):$(id -g)" "$REL_CACHE"
+      - uses: actions/cache/save@v5
+        if: success() && env.CLEAN_BUILD == 'true'
+        with:
+          path: ${{ env.REL_CACHE }}
+          key: ${{ env.CACHE_KEY }}
       - uses: actions/upload-artifact@v6
         with:
           name: yacoind-ubuntu-16.04
@@ -138,8 +173,27 @@ jobs:
           retention-days: 14
   build-ubuntu-1604-low-difficulty:
     runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      IMAGE: ubuntu.16.04-2
     steps:
       - uses: actions/checkout@v6
+      - name: cache dir and key
+        run: |
+          echo "REL_CACHE=$RUNNER_TEMP/yacoin-cache" >> "$GITHUB_ENV"
+          echo "CACHE_KEY=release-$IMAGE-v1-${{ hashFiles('depends/packages/*.mk', 'depends/patches/**', 'depends/Makefile', 'depends/funcs.mk', 'depends/hosts/*.mk', 'depends/builders/*.mk') }}" >> "$GITHUB_ENV"
+          if [ "$GITHUB_EVENT_NAME" = push ] && [ "$GITHUB_REF" = refs/heads/master ]; then
+            echo "CLEAN_BUILD=true" >> "$GITHUB_ENV"
+          else
+            echo "CLEAN_BUILD=false" >> "$GITHUB_ENV"
+          fi
+      - uses: actions/cache/restore@v5
+        if: env.CLEAN_BUILD != 'true'
+        with:
+          path: ${{ env.REL_CACHE }}
+          key: ${{ env.CACHE_KEY }}
+          restore-keys: |
+            release-${{ env.IMAGE }}-v1-
       - name: build
         # Build a low-difficulty yacoind using the depends system, mirroring
         # build-ubuntu-1604 (depends, glibc-back-compat, static-libstdc++) so
@@ -148,8 +202,21 @@ jobs:
         # so mainnet PoW limits are relaxed enough for miner end-to-end testing.
         # See doc/cross-compilation-with-depends-system.md for the source of
         # the depends + configure commands chained here.
+        # The depends packages come from the 16.04 release job's cache (same
+        # image, same packages; the entrypoint keeps them under
+        # /cache/ubuntu.16.04, without the -2 suffix). This job never saves a
+        # cache. Pushes to master restore nothing and build from scratch.
+        timeout-minutes: 50
         run: |
-          docker run -v /home/runner/work/yacoin/yacoin:/src -e BUILDVERSION=$GITHUB_RUN_NUMBER --entrypoint /bin/bash dev34253/yacoin-build:ubuntu.16.04-2 -c "cd /src/depends && make -j 4 HOST=x86_64-pc-linux-gnu && cd /src && ./autogen.sh && CONFIG_SITE=/src/depends/x86_64-pc-linux-gnu/share/config.site ./configure --enable-glibc-back-compat --enable-reduce-exports --enable-low-difficulty-for-development LDFLAGS=-static-libstdc++ --prefix=/ && make -j 4 && make install DESTDIR=/src/release-root"
+          mkdir -p "$REL_CACHE"
+          docker run --rm --init --name low-difficulty-build -v "$GITHUB_WORKSPACE":/src -v "$REL_CACHE":/cache \
+            -e BUILDVERSION=$GITHUB_RUN_NUMBER --entrypoint /bin/bash "dev34253/yacoin-build:$IMAGE" -c "cd /src/depends && make -j 4 HOST=x86_64-pc-linux-gnu BASE_CACHE=/cache/ubuntu.16.04/depends-built SOURCES_PATH=/cache/depends-sources && cd /src && ./autogen.sh && CONFIG_SITE=/src/depends/x86_64-pc-linux-gnu/share/config.site ./configure --enable-glibc-back-compat --enable-reduce-exports --enable-low-difficulty-for-development LDFLAGS=-static-libstdc++ --prefix=/ && make -j 4 && make install DESTDIR=/src/release-root"
+      - name: stop the container and make the cache readable for saving
+        if: always()
+        run: |
+          # A step timeout may kill docker run without stopping the container.
+          docker rm -f low-difficulty-build 2>/dev/null || true
+          sudo chown -R "$(id -u):$(id -g)" "$REL_CACHE"
       - uses: actions/upload-artifact@v6
         with:
           name: yacoind-low-difficulty-16.04
@@ -157,11 +224,46 @@ jobs:
           if-no-files-found: error
   build-ubuntu-1804:
     runs-on: ubuntu-latest  
+    timeout-minutes: 60
+    env:
+      IMAGE: ubuntu.18.04-2
     steps:
       - uses: actions/checkout@v6
-      - name: build
+      - name: cache dir and key
         run: |
-          docker run -v /home/runner/work/yacoin/yacoin:/src -e BUILDVERSION=$GITHUB_RUN_NUMBER dev34253/yacoin-build:ubuntu.18.04-2
+          echo "REL_CACHE=$RUNNER_TEMP/yacoin-cache" >> "$GITHUB_ENV"
+          echo "CACHE_KEY=release-$IMAGE-v1-${{ hashFiles('depends/packages/*.mk', 'depends/patches/**', 'depends/Makefile', 'depends/funcs.mk', 'depends/hosts/*.mk', 'depends/builders/*.mk') }}" >> "$GITHUB_ENV"
+          if [ "$GITHUB_EVENT_NAME" = push ] && [ "$GITHUB_REF" = refs/heads/master ]; then
+            echo "CLEAN_BUILD=true" >> "$GITHUB_ENV"
+          else
+            echo "CLEAN_BUILD=false" >> "$GITHUB_ENV"
+          fi
+      - uses: actions/cache/restore@v5
+        if: env.CLEAN_BUILD != 'true'
+        with:
+          path: ${{ env.REL_CACHE }}
+          key: ${{ env.CACHE_KEY }}
+          restore-keys: |
+            release-${{ env.IMAGE }}-v1-
+      - name: build
+        # Below the job timeout. Pushes to master build from scratch (nothing
+        # restored); other runs reuse the cached depends packages.
+        timeout-minutes: 50
+        run: |
+          mkdir -p "$REL_CACHE"
+          docker run --rm --init --name release-build -v "$GITHUB_WORKSPACE":/src -v "$REL_CACHE":/cache \
+            -e BUILDVERSION=$GITHUB_RUN_NUMBER "dev34253/yacoin-build:$IMAGE"
+      - name: stop the container and make the cache readable for saving
+        if: always()
+        run: |
+          # A step timeout may kill docker run without stopping the container.
+          docker rm -f release-build 2>/dev/null || true
+          sudo chown -R "$(id -u):$(id -g)" "$REL_CACHE"
+      - uses: actions/cache/save@v5
+        if: success() && env.CLEAN_BUILD == 'true'
+        with:
+          path: ${{ env.REL_CACHE }}
+          key: ${{ env.CACHE_KEY }}
       - uses: actions/upload-artifact@v6
         with:
           name: yacoind-ubuntu-18.04
@@ -179,11 +281,46 @@ jobs:
           if-no-files-found: error
   build-ubuntu-2004:
     runs-on: ubuntu-latest  
+    timeout-minutes: 60
+    env:
+      IMAGE: ubuntu.20.04-2
     steps:
       - uses: actions/checkout@v6
-      - name: build
+      - name: cache dir and key
         run: |
-          docker run -v /home/runner/work/yacoin/yacoin:/src -e BUILDVERSION=$GITHUB_RUN_NUMBER dev34253/yacoin-build:ubuntu.20.04-2
+          echo "REL_CACHE=$RUNNER_TEMP/yacoin-cache" >> "$GITHUB_ENV"
+          echo "CACHE_KEY=release-$IMAGE-v1-${{ hashFiles('depends/packages/*.mk', 'depends/patches/**', 'depends/Makefile', 'depends/funcs.mk', 'depends/hosts/*.mk', 'depends/builders/*.mk') }}" >> "$GITHUB_ENV"
+          if [ "$GITHUB_EVENT_NAME" = push ] && [ "$GITHUB_REF" = refs/heads/master ]; then
+            echo "CLEAN_BUILD=true" >> "$GITHUB_ENV"
+          else
+            echo "CLEAN_BUILD=false" >> "$GITHUB_ENV"
+          fi
+      - uses: actions/cache/restore@v5
+        if: env.CLEAN_BUILD != 'true'
+        with:
+          path: ${{ env.REL_CACHE }}
+          key: ${{ env.CACHE_KEY }}
+          restore-keys: |
+            release-${{ env.IMAGE }}-v1-
+      - name: build
+        # Below the job timeout. Pushes to master build from scratch (nothing
+        # restored); other runs reuse the cached depends packages.
+        timeout-minutes: 50
+        run: |
+          mkdir -p "$REL_CACHE"
+          docker run --rm --init --name release-build -v "$GITHUB_WORKSPACE":/src -v "$REL_CACHE":/cache \
+            -e BUILDVERSION=$GITHUB_RUN_NUMBER "dev34253/yacoin-build:$IMAGE"
+      - name: stop the container and make the cache readable for saving
+        if: always()
+        run: |
+          # A step timeout may kill docker run without stopping the container.
+          docker rm -f release-build 2>/dev/null || true
+          sudo chown -R "$(id -u):$(id -g)" "$REL_CACHE"
+      - uses: actions/cache/save@v5
+        if: success() && env.CLEAN_BUILD == 'true'
+        with:
+          path: ${{ env.REL_CACHE }}
+          key: ${{ env.CACHE_KEY }}
       - uses: actions/upload-artifact@v6
         with:
           name: yacoind-ubuntu-20.04
@@ -201,11 +338,46 @@ jobs:
           if-no-files-found: error
   build-ubuntu-2204:
     runs-on: ubuntu-latest  
+    timeout-minutes: 60
+    env:
+      IMAGE: ubuntu.22.04-2
     steps:
       - uses: actions/checkout@v6
-      - name: build
+      - name: cache dir and key
         run: |
-          docker run -v /home/runner/work/yacoin/yacoin:/src -e BUILDVERSION=$GITHUB_RUN_NUMBER dev34253/yacoin-build:ubuntu.22.04-2
+          echo "REL_CACHE=$RUNNER_TEMP/yacoin-cache" >> "$GITHUB_ENV"
+          echo "CACHE_KEY=release-$IMAGE-v1-${{ hashFiles('depends/packages/*.mk', 'depends/patches/**', 'depends/Makefile', 'depends/funcs.mk', 'depends/hosts/*.mk', 'depends/builders/*.mk') }}" >> "$GITHUB_ENV"
+          if [ "$GITHUB_EVENT_NAME" = push ] && [ "$GITHUB_REF" = refs/heads/master ]; then
+            echo "CLEAN_BUILD=true" >> "$GITHUB_ENV"
+          else
+            echo "CLEAN_BUILD=false" >> "$GITHUB_ENV"
+          fi
+      - uses: actions/cache/restore@v5
+        if: env.CLEAN_BUILD != 'true'
+        with:
+          path: ${{ env.REL_CACHE }}
+          key: ${{ env.CACHE_KEY }}
+          restore-keys: |
+            release-${{ env.IMAGE }}-v1-
+      - name: build
+        # Below the job timeout. Pushes to master build from scratch (nothing
+        # restored); other runs reuse the cached depends packages.
+        timeout-minutes: 50
+        run: |
+          mkdir -p "$REL_CACHE"
+          docker run --rm --init --name release-build -v "$GITHUB_WORKSPACE":/src -v "$REL_CACHE":/cache \
+            -e BUILDVERSION=$GITHUB_RUN_NUMBER "dev34253/yacoin-build:$IMAGE"
+      - name: stop the container and make the cache readable for saving
+        if: always()
+        run: |
+          # A step timeout may kill docker run without stopping the container.
+          docker rm -f release-build 2>/dev/null || true
+          sudo chown -R "$(id -u):$(id -g)" "$REL_CACHE"
+      - uses: actions/cache/save@v5
+        if: success() && env.CLEAN_BUILD == 'true'
+        with:
+          path: ${{ env.REL_CACHE }}
+          key: ${{ env.CACHE_KEY }}
       - uses: actions/upload-artifact@v6
         with:
           name: yacoind-ubuntu-22.04
