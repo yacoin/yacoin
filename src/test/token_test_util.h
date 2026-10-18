@@ -50,10 +50,22 @@ struct TokenGlobalsGuard {
 
     ~TokenGlobalsGuard()
     {
+        // The guard owns these; a test that replaced them must use ResetTokenDb
+        BOOST_CHECK_MESSAGE(ptokensdb == tokensDb.get() && ptokensCache == tokensCache.get(),
+                            "token globals were replaced behind TokenGlobalsGuard's back");
         ClearTokenGlobals();
         ptokensdb = prevTokensDb;
         ptokensCache = prevTokensCache;
         fTokenIndex = prevTokenIndex;
+    }
+
+    /** Replace the token database with an empty one; the guard keeps owning it */
+    void ResetTokenDb()
+    {
+        ptokensdb = nullptr;
+        tokensDb.reset();
+        tokensDb.reset(new CTokensDB(1 << 20, true, true));
+        ptokensdb = tokensDb.get();
     }
 
     TokenGlobalsGuard(const TokenGlobalsGuard&) = delete;
