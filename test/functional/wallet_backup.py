@@ -4,68 +4,86 @@
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
 """Test the wallet backup features.
 
-Test case is:
-4 nodes. 1 2 and 3 send transactions between each other,
-fourth node is a miner.
-1 2 3 each mine a block to start, then
-Miner creates 100 blocks so 1 2 3 each have 50 mature
-coins to spend.
-Then 5 iterations of 1/2/3 sending coins amongst
-themselves to get transactions in the wallets,
-and the miner mining one block.
+4 nodes. Nodes 0, 1 and 2 send coins to each other (a seeded random
+schedule), node 3 is the miner.
 
-Wallets are backed up using dumpwallet/backupwallet.
-Then 5 more iterations of transactions and mining a block.
+The clock starts a day in the past (mocktime, set before the nodes start, so
+the wallet keys are older than the first coins). Nodes 0-2 mine 2 blocks
+each and node 3 mines 10; node 3 pays 1 YAC to a fresh address of node 0;
+one round of sends. Then the clock jumps to now. So part of every wallet's
+funds is more than 2 hours older than the tip.
 
-Miner then generates 101 more blocks, so any
-transaction fees paid mature.
+Wallets are backed up with backupwallet and dumpwallet, then one more round
+of sends, and node 3 mines 10 more blocks.
 
-Sanity check:
-  Sum(1,2,3,4 balances) == 114*50
+Sanity check: the balances plus the immature balances of all 4 nodes equal
+the sum of all coinbase values minus the fees paid (YACoin burns fees).
 
-1/2/3 are shutdown, and their wallets erased.
-Then restore using wallet.dat backup. And
-confirm 1/2/3/4 balances are same as before.
+Restore 1: nodes 0-2 are stopped, their wallets erased, node 2 also loses its
+chain; the wallet.dat backups are copied back. All balances are as before.
 
-Shutdown again, restore using importwallet,
-and confirm again balances are correct.
+Restore 2: the same, but the wallets are restored with importwallet from the
+dumps. Known failure W-B2: importwallet rescans only the last 2 hours, so the
+old funds are missing. After a restart with -rescan all balances are as
+before.
+
+Also: backupwallet into a directory, onto a missing path, and onto the
+wallet file itself.
 """
 from decimal import Decimal
+import filecmp
 import os
-from random import randint
+import random
 import shutil
+import time
 
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import (
     assert_equal,
-    assert_approx,
     assert_raises_rpc_error,
     connect_nodes,
 )
+from test_framework.wallet_util import coinbase_value, wipe_chain
 
 
 class WalletBackupTest(BitcoinTestFramework):
     def set_test_params(self):
         self.num_nodes = 4
         self.setup_clean_chain = True
-        # nodes 1, 2,3 are spenders, let's give them a keypool=100
+        # nodes 0, 1 and 2 are the spenders; give them keypool=100
         self.extra_args = [["-keypool=100"], ["-keypool=100"], ["-keypool=100"], []]
 
     def skip_test_if_missing_module(self):
         self.skip_if_no_wallet()
 
     def setup_network(self):
-        self.setup_nodes()
+        self.add_nodes(self.num_nodes, self.extra_args)
+        # Start a day in the past, before the nodes create their keys, so the
+        # keys are older than the coins they receive, as in real use.
+        self.set_mocktime(int(time.time()) - 86400)
+        self.start_nodes()
+        self.import_deterministic_coinbase_privkeys()
         connect_nodes(self.nodes[0], 3)
         connect_nodes(self.nodes[1], 3)
         connect_nodes(self.nodes[2], 3)
         connect_nodes(self.nodes[2], 0)
         self.sync_all()
 
+    def mine(self, node_index, n):
+        self.mined[node_index] += self.nodes[node_index].generate(n)
+        self.sync_blocks()
+
+    def mature_coinbase_value(self, node_index):
+        node = self.nodes[3]
+        tip = node.getblockcount()
+        return sum(coinbase_value(node, h) for h in self.mined[node_index]
+                   if tip - node.getblock(h)['height'] + 1 >= 6)
+
     def one_send(self, from_node, to_address):
-        if (randint(1,2) == 1):
-            amount = Decimal(randint(1,10)) / Decimal(10)
-            self.nodes[from_node].sendtoaddress(to_address, amount)
+        if (self.rng.randint(1,2) == 1):
+            amount = Decimal(self.rng.randint(1,10)) / Decimal(10)
+            txid = self.nodes[from_node].sendtoaddress(to_address, amount)
+            self.sends.append((from_node, txid))
 
     def do_one_round(self):
         a0 = self.nodes[0].getnewaddress()
@@ -82,14 +100,13 @@ class WalletBackupTest(BitcoinTestFramework):
         # Have the miner (node3) mine a block.
         # Must sync mempools before mining.
         self.sync_mempools()
-        self.nodes[3].generate(1)
-        self.sync_blocks()
+        self.mine(3, 1)
 
     # As above, this mirrors the original bash test.
-    def start_three(self):
-        self.start_node(0)
-        self.start_node(1)
-        self.start_node(2)
+    def start_three(self, extra_args=None):
+        self.start_node(0, extra_args)
+        self.start_node(1, extra_args)
+        self.start_node(2, extra_args)
         connect_nodes(self.nodes[0], 3)
         connect_nodes(self.nodes[1], 3)
         connect_nodes(self.nodes[2], 3)
@@ -105,25 +122,36 @@ class WalletBackupTest(BitcoinTestFramework):
         os.remove(os.path.join(self.nodes[1].datadir, 'wallet.dat'))
         os.remove(os.path.join(self.nodes[2].datadir, 'wallet.dat'))
 
-    def run_test(self):
-        self.log.info("Generating initial blockchain")
-        self.nodes[0].generate(2)
-        self.sync_blocks()
-        self.nodes[1].generate(2)
-        self.sync_blocks()
-        self.nodes[2].generate(2)
-        self.sync_blocks()
-        self.nodes[3].generate(10)
-        self.sync_blocks()
+    def assert_balances(self, balances):
+        for node, balance in zip(self.nodes, balances):
+            assert_equal(node.getbalance(), balance)
 
-        assert_approx(self.nodes[0].getbalance(), 7.60514)
-        assert_approx(self.nodes[1].getbalance(), 7.60514)
-        assert_approx(self.nodes[2].getbalance(), 7.60514)
-        assert_approx(self.nodes[3].getbalance(), 19.01285)
+    def run_test(self):
+        self.rng = random.Random(1)
+        self.mined = [[], [], [], []]
+        self.sends = []
+
+        self.log.info("Generating initial blockchain (a day ago)")
+        self.mine(0, 2)
+        self.mine(1, 2)
+        self.mine(2, 2)
+        self.mine(3, 10)
+        for i in range(4):
+            assert_equal(self.nodes[i].getbalance(), self.mature_coinbase_value(i))
+
+        self.log.info("Old funds: node 3 pays 1 YAC to a fresh address of node 0")
+        addr_old = self.nodes[0].getnewaddress('old')
+        self.sends.append((3, self.nodes[3].sendtoaddress(addr_old, 1)))
+        self.sync_mempools()
+        self.mine(3, 1)
 
         self.log.info("Creating transactions")
         # Sending each other transactions.
         self.do_one_round()
+
+        self.log.info("Move the clock to now")
+        self.set_mocktime(int(time.time()))
+        self.mine(3, 1)
 
         self.log.info("Backing up")
 
@@ -138,13 +166,18 @@ class WalletBackupTest(BitcoinTestFramework):
         self.do_one_round()
 
         # Generate 10 more blocks
-        self.nodes[3].generate(10)
+        self.mine(3, 10)
         self.sync_all()
 
-        balance0 = self.nodes[0].getbalance()
-        balance1 = self.nodes[1].getbalance()
-        balance2 = self.nodes[2].getbalance()
-        balance3 = self.nodes[3].getbalance()
+        balances = [node.getbalance() for node in self.nodes]
+        assert_equal(self.nodes[0].getreceivedbyaddress(addr_old), 1)
+
+        self.log.info("Sanity check: balances = coinbases - fees")
+        total = sum(node.getbalance() + node.getwalletinfo()['immature_balance'] for node in self.nodes)
+        tip = self.nodes[3].getblockcount()
+        minted = sum(coinbase_value(self.nodes[3], self.nodes[3].getblockhash(h)) for h in range(1, tip + 1))
+        fees = sum(-self.nodes[sender].gettransaction(txid)['fee'] for sender, txid in self.sends)
+        assert_equal(total, minted - fees)
 
         ##
         # Test restoring spender wallets from backups
@@ -154,8 +187,7 @@ class WalletBackupTest(BitcoinTestFramework):
         self.erase_three()
 
         # Start node2 with no chain
-        shutil.rmtree(os.path.join(self.nodes[2].datadir, 'blocks'))
-        shutil.rmtree(os.path.join(self.nodes[2].datadir, 'chainstate'))
+        wipe_chain(self.nodes[2])
 
         # Restore wallets from backup
         shutil.copyfile(os.path.join(self.nodes[0].datadir, 'wallet.bak'), os.path.join(self.nodes[0].datadir, 'wallet.dat'))
@@ -166,19 +198,19 @@ class WalletBackupTest(BitcoinTestFramework):
         self.start_three()
         self.sync_blocks()
 
-        assert_equal(self.nodes[0].getbalance(), balance0)
-        assert_equal(self.nodes[1].getbalance(), balance1)
-        assert_equal(self.nodes[2].getbalance(), balance2)
+        self.assert_balances(balances)
 
         self.log.info("Restoring using dumped wallet")
         self.stop_three()
         self.erase_three()
 
         #start node2 with no chain
-        shutil.rmtree(os.path.join(self.nodes[2].datadir, 'blocks'))
-        shutil.rmtree(os.path.join(self.nodes[2].datadir, 'chainstate'))
+        wipe_chain(self.nodes[2])
 
         self.start_three()
+        # Let node 2 have the whole chain before it imports, so all three
+        # nodes import with the same chain.
+        self.sync_blocks()
 
         assert_equal(self.nodes[0].getbalance(), 0)
         assert_equal(self.nodes[1].getbalance(), 0)
@@ -190,9 +222,30 @@ class WalletBackupTest(BitcoinTestFramework):
 
         self.sync_blocks()
 
-        assert_equal(self.nodes[0].getbalance(), balance0)
-        assert_equal(self.nodes[1].getbalance(), balance1)
-        assert_equal(self.nodes[2].getbalance(), balance2)
+        def check_import_finds_old_funds():
+            assert_equal(self.nodes[0].getreceivedbyaddress(addr_old), 1)
+            self.assert_balances(balances)
+        # importwallet never applies the key birth times from the dump (its
+        # parser waits for '@' section headers; dumpwallet writes '#'), so it
+        # rescans only from the tip time minus 2 hours.
+        self.known_failure("W-B2 (FrgyyrOz)", check_import_finds_old_funds, expected="not(0.000000 == 1)")
+
+        self.log.info("Restart the restored nodes with -rescan")
+        self.stop_three()
+        self.start_three(['-rescan'])
+        self.sync_blocks()
+        assert_equal(self.nodes[0].getreceivedbyaddress(addr_old), 1)
+        self.assert_balances(balances)
+
+        self.log.info("Backup into a directory and onto a missing path")
+        backup_dir = os.path.join(self.nodes[0].datadir, 'backupdir')
+        os.mkdir(backup_dir)
+        self.nodes[0].backupwallet(backup_dir)
+        backup_file = os.path.join(self.nodes[0].datadir, 'plain.bak')
+        self.nodes[0].backupwallet(backup_file)
+        assert filecmp.cmp(os.path.join(backup_dir, 'wallet.dat'), backup_file, shallow=False)
+        assert_raises_rpc_error(-4, "Error: Wallet backup failed!", self.nodes[0].backupwallet,
+                                os.path.join(self.options.tmpdir, 'nonexistent', 'wallet.bak'))
 
         # Backup to source wallet file must fail
         sourcePaths = [
