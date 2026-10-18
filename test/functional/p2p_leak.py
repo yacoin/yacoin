@@ -51,9 +51,6 @@ class CLazyNode(P2PInterface):
     def on_feefilter(self, message): self.bad_message(message)
     def on_sendheaders(self, message): self.bad_message(message)
     def on_sendcmpct(self, message): self.bad_message(message)
-    def on_cmpctblock(self, message): self.bad_message(message)
-    def on_getblocktxn(self, message): self.bad_message(message)
-    def on_blocktxn(self, message): self.bad_message(message)
 
 # Node that never sends a version. We'll use this to send a bunch of messages
 # anyway, and eventually get disconnected.
