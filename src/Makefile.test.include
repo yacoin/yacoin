@@ -25,6 +25,7 @@ GENERATED_TEST_FILES = $(JSON_TEST_FILES:.json=.json.h) $(RAW_TEST_FILES:.raw=.r
 BITCOIN_TESTS =\
   test/arith_uint256_tests.cpp \
   test/scriptnum10.h \
+  test/addressindex_tests.cpp \
   test/addrman_tests.cpp \
   test/amount_tests.cpp \
   test/allocator_tests.cpp \
@@ -59,6 +60,7 @@ BITCOIN_TESTS =\
   test/prevector_tests.cpp \
   test/raii_event_tests.cpp \
   test/random_tests.cpp \
+  test/restart_tests.cpp \
   test/reverselock_tests.cpp \
   test/rpc_tests.cpp \
   test/sanity_tests.cpp \
@@ -78,6 +80,7 @@ BITCOIN_TESTS =\
   test/test_bitcoin_main.cpp \
   test/timedata_tests.cpp \
   test/token_cache_tests.cpp \
+  test/token_db_tests.cpp \
   test/token_test_util.h \
   test/token_tests.cpp \
   test/token_tx_tests.cpp \
@@ -94,6 +97,7 @@ BITCOIN_TESTS += \
   wallet/test/wallet_test_fixture.cpp \
   wallet/test/wallet_test_fixture.h \
   wallet/test/accounting_tests.cpp \
+  wallet/test/token_wallet_tests.cpp \
   wallet/test/wallet_tests.cpp \
   wallet/test/crypto_tests.cpp
 endif
