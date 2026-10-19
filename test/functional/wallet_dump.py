@@ -204,7 +204,7 @@ class WalletDumpTest(BitcoinTestFramework):
 
         # encrypt wallet, restart, unlock and dump
         node0.encryptwallet('test')
-        self.stop_node(0)
+        node0.wait_until_stopped()
         self.start_node(0)
 
         self.log.info("Dump and import need an unlocked wallet")

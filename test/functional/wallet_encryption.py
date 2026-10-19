@@ -63,7 +63,7 @@ class WalletEncryptionTest(BitcoinTestFramework):
 
         # Encrypt the wallet
         node.encryptwallet(passphrase)
-        self.stop_node(0)
+        node.wait_until_stopped()
         self.start_node(0)
         node = self.nodes[0]
 
